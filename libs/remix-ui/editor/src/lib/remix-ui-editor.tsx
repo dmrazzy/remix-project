@@ -9,12 +9,14 @@ import { solidityTokensProvider, solidityLanguageConfig } from './syntaxes/solid
 import { cairoTokensProvider, cairoLanguageConfig } from './syntaxes/cairo'
 import { zokratesTokensProvider, zokratesLanguageConfig } from './syntaxes/zokrates'
 import { moveTokenProvider, moveLanguageConfig } from './syntaxes/move'
+import { tomlLanguageConfig, tomlTokenProvider } from './syntaxes/toml'
 import { monacoTypes } from '@remix-ui/editor'
 import { loadTypes } from './web-types'
 import { retrieveNodesAtPosition } from './helpers/retrieveNodesAtPosition'
 import { RemixHoverProvider } from './providers/hoverProvider'
 import { RemixReferenceProvider } from './providers/referenceProvider'
 import { RemixCompletionProvider } from './providers/completionProvider'
+import { RemixSolidityDocumentationProvider } from './providers/documentationProvider'
 import { RemixHighLightProvider } from './providers/highlightProvider'
 import { RemixDefinitionProvider } from './providers/definitionProvider'
 import { RemixCodeActionProvider } from './providers/codeActionProvider'
@@ -22,6 +24,7 @@ import './remix-ui-editor.css'
 import { circomLanguageConfig, circomTokensProvider } from './syntaxes/circom'
 import { IPosition } from 'monaco-editor'
 import { RemixInLineCompletionProvider } from './providers/inlineCompletionProvider'
+import { providers } from 'ethers'
 const _paq = (window._paq = window._paq || [])
 
 enum MarkerSeverity {
@@ -147,10 +150,10 @@ export const EditorUI = (props: EditorUIProps) => {
   const intl = useIntl()
   const [, setCurrentBreakpoints] = useState({})
   const defaultEditorValue = `
-  \t\t\t\t\t\t\t ____    _____   __  __   ___  __  __   ___   ____    _____ 
+  \t\t\t\t\t\t\t ____    _____   __  __   ___  __  __   ___   ____    _____
   \t\t\t\t\t\t\t|  _ \\  | ____| |  \\/  | |_ _| \\ \\/ /  |_ _| |  _ \\  | ____|
-  \t\t\t\t\t\t\t| |_) | |  _|   | |\\/| |  | |   \\  /    | |  | | | | |  _|  
-  \t\t\t\t\t\t\t|  _ <  | |___  | |  | |  | |   /  \\    | |  | |_| | | |___ 
+  \t\t\t\t\t\t\t| |_) | |  _|   | |\\/| |  | |   \\  /    | |  | | | | |  _|
+  \t\t\t\t\t\t\t|  _ <  | |___  | |  | |  | |   /  \\    | |  | |_| | | |___
   \t\t\t\t\t\t\t|_| \\_\\ |_____| |_|  |_| |___| /_/\\_\\  |___| |____/  |_____|\n\n
   \t\t\t\t\t\t\t${intl.formatMessage({ id: 'editor.keyboardShortcuts' })}:\n
   \t\t\t\t\t\t\t\tCTRL + S: ${intl.formatMessage({ id: 'editor.keyboardShortcuts.text1' })}\n
@@ -173,6 +176,8 @@ export const EditorUI = (props: EditorUIProps) => {
   const currentFunction = useRef('')
   const currentFileRef = useRef('')
   const currentUrlRef = useRef('')
+  let currenFunctionNode = useRef('')
+
   // const currentDecorations = useRef({ sourceAnnotationsPerFile: {}, markerPerFile: {} }) // decorations that are currently in use by the editor
   // const registeredDecorations = useRef({}) // registered decorations
 
@@ -344,6 +349,8 @@ export const EditorUI = (props: EditorUIProps) => {
       monacoRef.current.editor.setModelLanguage(file.model, 'remix-move')
     } else if (file.language === 'circom') {
       monacoRef.current.editor.setModelLanguage(file.model, 'remix-circom')
+    } else if (file.language === 'toml') {
+      monacoRef.current.editor.setModelLanguage(file.model, 'remix-toml')
     }
   }, [props.currentFile])
 
@@ -710,18 +717,63 @@ export const EditorUI = (props: EditorUIProps) => {
     }
 
     let gptGenerateDocumentationAction
+    const extractNatspecComments = (codeString: string): string => {
+      const natspecCommentRegex = /\/\*\*[\s\S]*?\*\//g;
+      const comments = codeString.match(natspecCommentRegex);
+      return comments ? comments[0] : "";
+    }
+
     const executeGptGenerateDocumentationAction = {
       id: 'generateDocumentation',
       label: intl.formatMessage({ id: 'editor.generateDocumentation' }),
       contextMenuOrder: 0, // choose the order
       contextMenuGroupId: 'gtp', // create a new grouping
-      keybindings: [],
+      keybindings: [
+        // Keybinding for Ctrl + D
+        monacoRef.current.KeyMod.CtrlCmd | monacoRef.current.KeyCode.KeyD
+      ],
       run: async () => {
+        const unsupportedDocTags = ['@title'] // these tags are not supported by the current docstring parser
         const file = await props.plugin.call('fileManager', 'getCurrentFile')
         const content = await props.plugin.call('fileManager', 'readFile', file)
         const message = intl.formatMessage({ id: 'editor.generateDocumentationByAI' }, { content, currentFunction: currentFunction.current })
-        await props.plugin.call('openaigpt', 'message', message)
-        _paq.push(['trackEvent', 'ai', 'openai', 'generateDocumentation'])
+        const cm = await props.plugin.call('solcoder', 'code_explaining', message)
+
+        const natSpecCom = "\n" + extractNatspecComments(cm)
+        const cln = await props.plugin.call('codeParser', "getLineColumnOfNode", currenFunctionNode)
+        const range = new monacoRef.current.Range(cln.start.line, cln.start.column, cln.start.line, cln.start.column)
+
+        const lines = natSpecCom.split('\n')
+        const newNatSpecCom = []
+
+        for (let i = 0; i < lines.length; i++) {
+          let cont = false
+
+          for (let j = 0; j < unsupportedDocTags.length; j++) {
+            if (lines[i].includes(unsupportedDocTags[j])) {
+              cont = true
+              break
+            }
+          }
+          if (cont) {continue}
+
+          if (i <= 1) { newNatSpecCom.push(' '.repeat(cln.start.column) + lines[i].trimStart()) }
+          else { newNatSpecCom.push(' '.repeat(cln.start.column + 1) + lines[i].trimStart()) }
+        }
+
+        // TODO: activate the provider to let the user accept the documentation suggestion
+        // const provider = new RemixSolidityDocumentationProvider(natspecCom)
+        // monacoRef.current.languages.registerInlineCompletionsProvider('solidity', provider)
+
+        editor.executeEdits('clipboard', [
+          {
+            range: range,
+            text: newNatSpecCom.join('\n'),
+            forceMoveMarkers: true,
+          },
+        ]);
+
+        _paq.push(['trackEvent', 'ai', 'solcoder', 'generateDocumentation'])
       },
     }
 
@@ -731,13 +783,16 @@ export const EditorUI = (props: EditorUIProps) => {
       label: intl.formatMessage({ id: 'editor.explainFunction' }),
       contextMenuOrder: 1, // choose the order
       contextMenuGroupId: 'gtp', // create a new grouping
-      keybindings: [],
+      keybindings: [
+        // Keybinding for Ctrl + Shift + E
+        monacoRef.current.KeyMod.CtrlCmd | monacoRef.current.KeyMod.Shift | monacoRef.current.KeyCode.KeyE
+      ],
       run: async () => {
         const file = await props.plugin.call('fileManager', 'getCurrentFile')
         const content = await props.plugin.call('fileManager', 'readFile', file)
         const message = intl.formatMessage({ id: 'editor.explainFunctionByAI' }, { content, currentFunction: currentFunction.current })
-        await props.plugin.call('openaigpt', 'message', message)
-        _paq.push(['trackEvent', 'ai', 'openai', 'explainFunction'])
+        await props.plugin.call('solcoder', 'code_explaining', message, content)
+        _paq.push(['trackEvent', 'ai', 'solcoder', 'explainFunction'])
       },
     }
 
@@ -747,7 +802,10 @@ export const EditorUI = (props: EditorUIProps) => {
       label: intl.formatMessage({ id: 'editor.explainFunctionSol' }),
       contextMenuOrder: 1, // choose the order
       contextMenuGroupId: 'sol-gtp', // create a new grouping
-      keybindings: [],
+      keybindings: [
+        // Keybinding for Ctrl + E
+        monacoRef.current.KeyMod.CtrlCmd | monacoRef.current.KeyCode.KeyE
+      ],
       run: async () => {
         const file = await props.plugin.call('fileManager', 'getCurrentFile')
         const content = await props.plugin.call('fileManager', 'readFile', file)
@@ -833,6 +891,8 @@ export const EditorUI = (props: EditorUIProps) => {
       const functionImpl = nodesAtPosition.find((node) => node.kind === 'function')
       if (functionImpl) {
         currentFunction.current = functionImpl.name
+        currenFunctionNode = functionImpl
+
         executeGptGenerateDocumentationAction.label = intl.formatMessage({ id: 'editor.generateDocumentation2' }, { name: functionImpl.name })
         gptGenerateDocumentationAction = editor.addAction(executeGptGenerateDocumentationAction)
         executegptExplainFunctionAction.label = intl.formatMessage({ id: 'editor.explainFunction2' }, { name: functionImpl.name })
@@ -888,6 +948,7 @@ export const EditorUI = (props: EditorUIProps) => {
     monacoRef.current.languages.register({ id: 'remix-zokrates' })
     monacoRef.current.languages.register({ id: 'remix-move' })
     monacoRef.current.languages.register({ id: 'remix-circom' })
+    monacoRef.current.languages.register({ id: 'remix-toml' })
 
     // Allow JSON schema requests
     monacoRef.current.languages.json.jsonDefaults.setDiagnosticsOptions({ enableSchemaRequest: true })
@@ -907,6 +968,9 @@ export const EditorUI = (props: EditorUIProps) => {
 
     monacoRef.current.languages.setMonarchTokensProvider('remix-circom', circomTokensProvider as any)
     monacoRef.current.languages.setLanguageConfiguration('remix-circom', circomLanguageConfig(monacoRef.current) as any)
+
+    monacoRef.current.languages.setMonarchTokensProvider('remix-toml', tomlTokenProvider as any)
+    monacoRef.current.languages.setLanguageConfiguration('remix-toml', tomlLanguageConfig as any)
 
     monacoRef.current.languages.registerDefinitionProvider('remix-solidity', new RemixDefinitionProvider(props, monaco))
     monacoRef.current.languages.registerDocumentHighlightProvider('remix-solidity', new RemixHighLightProvider(props, monaco))
