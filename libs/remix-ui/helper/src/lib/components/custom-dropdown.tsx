@@ -217,3 +217,60 @@ export const ProxyDropdownMenu = React.forwardRef(
     )
   }
 )
+
+export const EnvironmentToggle = React.forwardRef(
+  (
+    {
+      children,
+      onClick,
+      className = '',
+      environmentUI
+    }: {
+      children: React.ReactNode
+      onClick: (e) => void
+      className: string
+      environmentUI: React.ReactNode
+    },
+    ref: Ref<HTMLButtonElement>
+  ) => (
+    <button
+      ref={ref}
+      onClick={(e) => {
+        e.preventDefault()
+        onClick(e)
+      }}
+      className={className.replace('dropdown-toggle', '')}
+    >
+      <div className="d-flex align-items-center">
+        <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm">{children}</div>
+        {environmentUI}
+      </div>
+    </button>
+  )
+)
+
+export const AddressToggle = React.forwardRef(
+  (
+    {
+      children,
+      onClick,
+      className = '',
+    }: {
+      children: React.ReactNode
+      onClick: (e) => void
+      className: string
+    },
+    ref: Ref<HTMLButtonElement>
+  ) => (
+    <button
+      ref={ref}
+      onClick={(e) => {
+        e.preventDefault()
+        onClick(e)
+      }}
+      className={className.replace('dropdown-toggle', '')}
+    >
+      {children}
+    </button>
+  )
+)

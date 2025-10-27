@@ -59,6 +59,8 @@ import { MainnetPrompt } from './components/mainnet'
 import { ScenarioPrompt } from './components/scenario'
 import { setIpfsCheckedState, setRemixDActivated } from './actions/payload'
 import { ChainCompatibleInfo, getCompatibleChain, getCompatibleChains, HardFork, isChainCompatible, isChainCompatibleWithAnyFork } from './actions/evmmap'
+import { Dropdown } from 'react-bootstrap'
+import { AddressToggle, CustomMenu, CustomToggle, EnvironmentToggle } from '@remix-ui/helper'
 
 export type CheckStatus = 'Passed' | 'Failed' | 'Not Found'
 
@@ -352,9 +354,84 @@ export function RunTabUI(props: RunTabProps) {
     )
   }
 
+  const environmentUI = (
+    <Dropdown onClick={(e) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }}>
+      <Dropdown.Toggle as={CustomToggle} className="btn btn-secondary w-100 d-inline-block pe-0" icon="fas fa-caret-down text-secondary ms-2" useDefaultIcon={false}>
+        <div style={{ flexGrow: 1, overflow: 'hidden', display:'flex', justifyContent:'left' }}>
+          <div className="text-truncate text-secondary">
+            {<span data-id="selectedVersion">Cancun</span>}
+          </div>
+        </div>
+      </Dropdown.Toggle>
+
+      <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden bg-light">
+      </Dropdown.Menu>
+    </Dropdown>
+  )
+
   return (
     <Fragment>
-      <div className="udapp_runTabView run-tab" id="runTabView" data-id="runTabView">
+      <div className='card ms-2 bg-light'>
+        <div className="d-flex align-items-center justify-content-between p-3">
+          <div className="d-flex align-items-center">
+            <h6 className="my-auto" style={{ color: 'white' }}>Environment</h6>
+          </div>
+          <div className="toggle-container">
+            <button className='btn btn-primary btn-sm small me-2' style={{ fontSize: '0.7rem' }}>
+              <i className='fas fa-code-branch'></i> Fork
+            </button>
+            <button className='btn btn-outline-danger btn-sm small' style={{ fontSize: '0.7rem' }}>
+              <i className='fas fa-redo'></i> Reset
+            </button>
+          </div>
+        </div>
+        <div className="d-flex p-3 pt-0">
+          <Dropdown className="w-100">
+            <Dropdown.Toggle as={EnvironmentToggle} className="btn-secondary w-100 d-inline-block border form-control" environmentUI={environmentUI}>
+              <div style={{ flexGrow: 1, overflow: 'hidden', display:'flex', justifyContent:'left' }}>
+                <div className="text-truncate text-secondary">
+                  {<span >Remix VM</span>}
+                </div>
+              </div>
+            </Dropdown.Toggle>
+
+            <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden bg-light">
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+        <div className="d-flex px-3">
+          <Dropdown className="w-100">
+            <Dropdown.Toggle as={AddressToggle} className="btn-secondary w-100 d-inline-block border form-control">
+              <div className="d-flex align-items-center">
+                <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
+                  <div className="d-flex align-items-center justify-content-between w-100">
+                    <div className='d-flex flex-column align-items-start'>
+                      <div className="text-truncate text-secondary">
+                        <span>Account 1</span><i className="fa-solid fa-pen small ms-1"></i>
+                      </div>
+                      <div style={{ color: 'var(--bs-tertiary-color)' }}>
+                        <span className="small">0x5B3...eddC4</span><i className="fa-solid fa-copy small ms-1"></i>
+                      </div>
+                    </div>
+                    <div><span>100 ETH</span></div>
+                  </div>
+                </div>
+              </div>
+            </Dropdown.Toggle>
+
+            <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden bg-light">
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+        <div className="mx-auto py-3" style={{ color: 'var(--bs-tertiary-color)' }}>
+          <span className="small me-1">Deployed Contracts</span><span className="small me-2 text-primary">2</span>
+          <span className="small me-1">Transactions recorded</span><span className="small text-primary">8</span>
+        </div>
+      </div>
+      {/* <div className="udapp_runTabView run-tab" id="runTabView" data-id="runTabView">
         <div className="list-group pb-4 list-group-flush">
           <SettingsUI
             addFile={addFile}
@@ -518,7 +595,7 @@ export function RunTabUI(props: RunTabProps) {
       </div>
       <ModalDialog id="udappNotify" {...focusModal} handleHide={handleHideModal} />
       <Toaster message={focusToaster} handleHide={handleToaster} />
-      <PublishToStorage id="udapp" api={plugin} resetStorage={resetStorage} storage={publishData.storage} contract={publishData.contract} />
+      <PublishToStorage id="udapp" api={plugin} resetStorage={resetStorage} storage={publishData.storage} contract={publishData.contract} /> */}
     </Fragment>
   )
 }
