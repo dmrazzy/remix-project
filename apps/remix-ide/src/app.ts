@@ -87,6 +87,7 @@ import { AIDappGenerator } from './app/plugins/ai-dapp-generator'
 import { IndexedDbCachePlugin } from './app/plugins/IndexedDbCache'
 import { NotificationCenterPlugin } from './app/plugins/notification-center'
 import { FeedbackPlugin } from './app/plugins/feedback'
+import { EnvironmentPlugin } from './app/udapp/udappEnv'
 
 import { TemplatesSelectionPlugin } from './app/plugins/templates-selection/templates-selection-plugin'
 
@@ -453,6 +454,8 @@ class AppComponent {
 
     const walletConnect = new WalletConnect()
 
+    const udappEnvPlugin = new EnvironmentPlugin()
+
     this.engine.register([
       permissionHandler,
       this.layout,
@@ -519,7 +522,8 @@ class AppComponent {
       amp,
       // vega,
       chartjs,
-      indexedDbCache
+      indexedDbCache,
+      udappEnvPlugin
     ])
 
     //---- fs plugin
@@ -841,6 +845,7 @@ class AppComponent {
     if (isElectron()){
       this.appManager.activatePlugin(['desktopHost'])
     }
+    this.appManager.activatePlugin(['udappEnv'])
   }
 }
 
