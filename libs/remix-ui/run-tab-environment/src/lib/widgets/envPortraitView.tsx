@@ -36,6 +36,13 @@ function EnvironmentPortraitView() {
     dispatch({ type: 'SET_SELECTED_ACCOUNT', payload: account.account })
   }
 
+  const handleKebabClick = (e: React.MouseEvent, account: Account) => {
+    e.preventDefault() // Prevent default behavior (page reload)
+    e.stopPropagation() // Prevent triggering account selection
+    // Add your kebab menu logic here
+    console.log('Kebab clicked for account:', account)
+  }
+
   const uniqueDropdownItems = useMemo(() => {
     const categoryMap = new Map<string, Provider>()
     const itemsWithoutCategory: Provider[] = []
@@ -78,6 +85,25 @@ function EnvironmentPortraitView() {
         .category-item-hover:hover {
           background-color: var(--custom-onsurface-layer-4) !important;
           border: 1px solid var(--bs-border-color) !important;
+        }
+        .account-balance-container {
+          position: relative;
+        }
+        .account-balance-text {
+          display: block;
+        }
+        .account-kebab-icon {
+          display: none;
+        }
+        .account-item-hover:hover .account-balance-text {
+          display: none;
+        }
+        .account-item-hover:hover .account-kebab-icon {
+          display: block;
+          padding-right: 0.5rem;
+        }
+        .account-kebab-icon:hover {
+          color: white !important;
         }
       `}</style>
       <div className='card ms-2 bg-light'>
@@ -154,7 +180,10 @@ function EnvironmentPortraitView() {
                           <span className="small">{shortenAddress(account?.account)}</span><i className="fa-solid fa-copy small ms-1"></i>
                         </div>
                       </div>
-                      <div style={{ color: 'var(--bs-tertiary-color)' }}>{`${account?.balance} ${account?.symbol}`}</div>
+                      <div className="account-balance-container" style={{ color: 'var(--bs-tertiary-color)' }}>
+                        <span className="account-balance-text">{`${account?.balance} ${account?.symbol}`}</span>
+                        <i className="account-kebab-icon fas fa-ellipsis-v" onClick={(e) => handleKebabClick(e, account)} style={{ cursor: 'pointer' }}></i>
+                      </div>
                     </Dropdown.Item>
                   )
                 })
