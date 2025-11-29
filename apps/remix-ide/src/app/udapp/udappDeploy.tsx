@@ -9,7 +9,7 @@ const profile = {
   name: 'udappDeploy',
   displayName: 'Udapp Deploy',
   description: 'Handles contract deployment UI and state',
-  methods: ['getUI', 'getSelectedContract', 'getDeployState'],
+  methods: ['getUI'],
   events: []
 }
 
@@ -29,17 +29,12 @@ export class DeployPlugin extends Plugin {
     this.getWidgetState = getter
   }
 
-  getSelectedContract () {
-    const state = this.getWidgetState?.()
-    return state?.contracts.selectedContract || null
-  }
-
-  getUI(engine: Engine, blockchain: Blockchain, compilersArtefacts: CompilerArtefacts, editor: any, fileManager: any) {
+  getUI(engine: Engine, blockchain: Blockchain, editor: any) {
     this.engine = engine
     this.blockchain = blockchain
-    this.compilersArtefacts = compilersArtefacts
+    // this.compilersArtefacts = compilersArtefacts
     this.editor = editor
-    this.fileManager = fileManager
+    // this.fileManager = fileManager
     return <DeployWidget plugin={this} />
   }
 }

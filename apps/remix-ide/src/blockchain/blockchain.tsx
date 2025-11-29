@@ -133,13 +133,13 @@ export class Blockchain extends Plugin {
       }
     })
 
-    this.on('environmentExplorer', 'providerPinned', (name, provider) => {
-      this.emit('shouldAddProvidertoUdapp', name, provider)
-      this.pinnedProviders.push(name)
-      this.call('config', 'setAppParameter', 'settings/pinned-providers', JSON.stringify(this.pinnedProviders))
-      trackMatomoEvent(this, { category: 'blockchain', action: 'providerPinned', name: name, isClick: false })
-      // this.emit('providersChanged')
-    })
+    // this.on('environmentExplorer', 'providerPinned', (name, provider) => {
+    //   this.emit('shouldAddProvidertoUdapp', name, provider)
+    //   this.pinnedProviders.push(name)
+    //   this.call('config', 'setAppParameter', 'settings/pinned-providers', JSON.stringify(this.pinnedProviders))
+    //   trackMatomoEvent(this, { category: 'blockchain', action: 'providerPinned', name: name, isClick: false })
+    //  // this.emit('providersChanged')
+    // })
     // used to pin and select newly created forked state provider
     this.on('udapp', 'forkStateProviderAdded', (providerName) => {
       const name = `vm-fs-${providerName}`
@@ -149,14 +149,14 @@ export class Blockchain extends Plugin {
       this.call('notification', 'toast', `New environment '${providerName}' created with forked state.`)
     })
 
-    this.on('environmentExplorer', 'providerUnpinned', (name, provider) => {
-      this.emit('shouldRemoveProviderFromUdapp', name, provider)
-      const index = this.pinnedProviders.indexOf(name)
-      this.pinnedProviders.splice(index, 1)
-      this.call('config', 'setAppParameter', 'settings/pinned-providers', JSON.stringify(this.pinnedProviders))
-      trackMatomoEvent(this, { category: 'blockchain', action: 'providerUnpinned', name: name, isClick: false })
-      // this.emit('providersChanged')
-    })
+    // this.on('environmentExplorer', 'providerUnpinned', (name, provider) => {
+    //   this.emit('shouldRemoveProviderFromUdapp', name, provider)
+    //   const index = this.pinnedProviders.indexOf(name)
+    //   this.pinnedProviders.splice(index, 1)
+    //   this.call('config', 'setAppParameter', 'settings/pinned-providers', JSON.stringify(this.pinnedProviders))
+    //   trackMatomoEvent(this, { category: 'blockchain', action: 'providerUnpinned', name: name, isClick: false })
+    //  // this.emit('providersChanged')
+    // })
 
     this.call('config', 'getAppParameter', 'settings/pinned-providers').then((providers) => {
       if (!providers) {

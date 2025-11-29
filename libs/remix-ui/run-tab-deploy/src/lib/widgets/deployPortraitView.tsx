@@ -1,17 +1,17 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import { FormattedMessage } from 'react-intl'
 import { Dropdown } from 'react-bootstrap'
 import { AddressToggle, CustomMenu, CustomToggle, extractNameFromKey } from '@remix-ui/helper'
 import { CopyToClipboard } from '@remix-ui/clipboard'
 import { DeployAppContext } from '../contexts'
-import { DeployWidgetState } from '../types'
 import { Provider } from '@remix-ui/run-tab-environment'
 
 function DeployPortraitView() {
-  const { plugin, widgetState, dispatch } = useContext(DeployAppContext)
+  const { plugin, widgetState } = useContext(DeployAppContext)
   const [isExpanded, setIsExpanded] = useState(true)
   const [defaultProvider, setDefaultProvider] = useState<string | null>(null)
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
+  const [selectedContractIndex, setSelectedContractIndex] = useState<number | null>(0)
 
   useEffect(() => {
     (async () => {
@@ -24,6 +24,10 @@ function DeployPortraitView() {
       setSelectedProvider(provider)
     })
   }, [])
+
+  const selectedContract = useMemo(() => {
+    return widgetState.contracts.contractList[selectedContractIndex] || null
+  }, [widgetState.contracts.contractList, selectedContractIndex])
 
   return (
     <>
@@ -57,20 +61,20 @@ function DeployPortraitView() {
                               <span>Contract</span>
                             </div>
                             <div style={{ color: 'var(--bs-tertiary-color)' }}>
-                              <span className="small">{extractNameFromKey(widgetState.contracts.selectedContract) || 'No contract selected'}</span>
+                              <span className="small">{extractNameFromKey(selectedContract?.filePath) || 'No contract selected'}</span>
                             </div>
                           </div>
-                          {widgetState.contracts.contractList.find((contract) => contract.filePath === widgetState.contracts.selectedContract)?.isCompiled && (
+                          {selectedContract?.isCompiled && (
                             <span className={`badge border p-2 text-success`} style={{ fontWeight: 'light', backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
                               <i className="fas fa-check"></i> Compiled
                             </span>
                           )}
-                          {widgetState.contracts.contractList.find((contract) => contract.filePath === widgetState.contracts.selectedContract)?.isCompiling && (
+                          {selectedContract?.isCompiling && (
                             <span className={`badge border p-2 text-info`} style={{ fontWeight: 'light', backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
                               <i className="fas fa-spinner fa-spin"></i> Compiling
                             </span>
                           )}
-                          {widgetState.contracts.contractList.find((contract) => contract.filePath === widgetState.contracts.selectedContract && !contract.isCompiled && !contract.isCompiling) && (
+                          {selectedContract && !selectedContract?.isCompiled && !selectedContract?.isCompiling && (
                             <span className={`badge border p-2 text-secondary`} style={{ fontWeight: 'light', backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
                               Not compiled
                             </span>
@@ -86,8 +90,8 @@ function DeployPortraitView() {
 
                 {widgetState.contracts.contractList.length > 0 && (
                   <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
-                    {widgetState.contracts.contractList.map((contract) => (
-                      <Dropdown.Item key={contract.filePath} className="d-flex align-items-center" onClick={() => dispatch({ type: 'SET_SELECTED_CONTRACT', payload: contract.filePath })}>
+                    {widgetState.contracts.contractList.map((contract, index) => (
+                      <Dropdown.Item key={contract.filePath} className="d-flex align-items-center" onClick={() => setSelectedContractIndex(index)}>
                         <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                           <div className="d-flex align-items-center justify-content-between w-100">
                             <div className='d-flex flex-column align-items-start'>

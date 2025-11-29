@@ -1,21 +1,22 @@
 import { Engine, Plugin } from "@remixproject/engine"
 import { Dispatch } from 'react'
-import { ContractData, FuncABI } from '@remix-project/core-plugin'
-import { CompilerAbstract } from '@remix-project/remix-solidity'
+import { CompilationResult, CompilationSourceCode } from '@remix-project/remix-solidity'
+import type { ContractData } from "@remix-project/core-plugin"
 
 type FilePath = string
 
 export interface DeployAppContextType {
-  plugin: Plugin & { engine: Engine, blockchain: any, compilersArtefacts: any, editor: any, fileManager: any }
+  plugin: Plugin & { engine: Engine, editor: any }
   widgetState: DeployWidgetState
   dispatch: Dispatch<Actions>
 }
 
 export interface DeployWidgetState {
   contracts: {
-    selectedContract: string,
     contractList: {
+      name: string,
       filePath: FilePath,
+      contractData: ContractData,
       isCompiled: boolean,
       isCompiling: boolean
     }[]
@@ -23,8 +24,9 @@ export interface DeployWidgetState {
 }
 
 export interface ActionPayloadTypes {
-  SET_SELECTED_CONTRACT: string
-  ADD_CONTRACT: FilePath
+  ADD_CONTRACT_FILE: FilePath,
+  UPDATE_COMPILED_CONTRACT: CompiledContractPayload,
+  REMOVE_CONTRACT_FILE: FilePath
 }
 
 export interface Action<T extends keyof ActionPayloadTypes> {
@@ -33,4 +35,24 @@ export interface Action<T extends keyof ActionPayloadTypes> {
 }
 
 export type Actions = {[A in keyof ActionPayloadTypes]: Action<A>}[keyof ActionPayloadTypes]
+
+export type CompilationRawResult = {
+  file: string,
+  source: CompilationSourceCode,
+  languageVersion: string,
+  data: CompilationResult,
+  input?: any
+}
+
+export type VisitedContract = {
+  name: string,
+  object: any,
+  file: string
+}
+
+export type CompiledContractPayload = {
+  name: string,
+  filePath: FilePath,
+  contractData: ContractData
+}
 
