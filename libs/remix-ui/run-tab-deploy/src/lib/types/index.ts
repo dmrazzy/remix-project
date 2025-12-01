@@ -13,18 +13,15 @@ export interface DeployAppContextType {
 
 export interface DeployWidgetState {
   contracts: {
-    contractList: {
-      name: string,
-      filePath: FilePath,
-      contractData: ContractData,
+    contractList: (CompiledContractPayload & {
       isCompiled: boolean,
       isCompiling: boolean
-    }[]
+    })[]
   }
 }
 
 export interface ActionPayloadTypes {
-  ADD_CONTRACT_FILE: FilePath,
+  ADD_CONTRACT_FILE: { name: string, filePath: FilePath },
   UPDATE_COMPILED_CONTRACT: CompiledContractPayload,
   REMOVE_CONTRACT_FILE: FilePath
 }
@@ -53,6 +50,7 @@ export type VisitedContract = {
 export type CompiledContractPayload = {
   name: string,
   filePath: FilePath,
-  contractData: ContractData
+  contractData: ContractData,
+  isUpgradeable: boolean
 }
 

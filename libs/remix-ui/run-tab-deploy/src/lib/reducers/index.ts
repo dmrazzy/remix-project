@@ -11,13 +11,14 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
 
   case 'ADD_CONTRACT_FILE': {
     const contract = {
-      name: '',
-      filePath: action.payload,
+      name: action.payload.name,
+      filePath: action.payload.filePath,
       contractData: null,
+      isUpgradeable: false,
       isCompiled: false,
       isCompiling: false
     }
-    const contractList = state.contracts.contractList.find((contract) => contract.filePath === action.payload) ? state.contracts.contractList : [...state.contracts.contractList, contract]
+    const contractList = state.contracts.contractList.find((contract) => contract.filePath === action.payload.filePath) ? state.contracts.contractList : [...state.contracts.contractList, contract]
 
     return {
       ...state,
@@ -33,6 +34,7 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
       name: action.payload.name,
       filePath: action.payload.filePath,
       contractData: action.payload.contractData,
+      isUpgradeable: action.payload.isUpgradeable,
       isCompiled: true,
       isCompiling: false
     }
@@ -41,6 +43,9 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
     if (existingContract) {
       // existingContract.name = action.payload.name
       existingContract.contractData = action.payload.contractData
+      existingContract.isUpgradeable = action.payload.isUpgradeable
+      existingContract.isCompiled = true
+      existingContract.isCompiling = false
     } else {
       state.contracts.contractList.push(contract)
     }

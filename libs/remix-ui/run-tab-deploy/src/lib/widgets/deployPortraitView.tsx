@@ -96,7 +96,7 @@ function DeployPortraitView() {
                           <div className="d-flex align-items-center justify-content-between w-100">
                             <div className='d-flex flex-column align-items-start'>
                               <div className="text-truncate text-white">
-                                <span>{extractNameFromKey(contract.filePath)}</span>
+                                <span>{contract.name}</span>
                               </div>
                               <div style={{ color: 'var(--bs-tertiary-color)' }}>
                                 <span className="small">{extractNameFromKey(contract.filePath)}</span>

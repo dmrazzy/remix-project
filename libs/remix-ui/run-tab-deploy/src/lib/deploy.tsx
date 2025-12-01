@@ -16,8 +16,22 @@ function DeployWidget({ plugin }: { plugin: Plugin & { engine: Engine, editor: a
   }, [plugin, widgetState])
 
   useEffect(() => {
-    plugin.on('fileManager', 'currentFileChanged', (filePath: string) => {
-      dispatch({ type: 'ADD_CONTRACT_FILE', payload: filePath })
+    plugin.on('fileManager', 'currentFileChanged', async (filePath: string) => {
+      console.log('filePath: ', filePath)
+      if (filePath && filePath.endsWith('.sol')) {
+        const contract: string = await plugin.call('fileManager', 'readFile', filePath)
+
+        if (contract) {
+          let contractName = null
+          const match = contract.match(/contract\s+([A-Za-z_][A-Za-z0-9_]*)/)
+          if (match) {
+            contractName = match[1]
+          }
+          if (contractName) {
+            dispatch({ type: 'ADD_CONTRACT_FILE', payload: { name: contractName, filePath } })
+          }
+        }
+      }
     })
     // plugin.blockchain.events.on('newTransaction', (tx, receipt) => {
     //   plugin.emit('newTransaction', tx, receipt)

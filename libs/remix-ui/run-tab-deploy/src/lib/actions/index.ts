@@ -14,17 +14,17 @@ export async function broadcastCompilationResult (compilerName: string, compileR
   // plugin.compilersArtefacts[languageVersion] = compiler
   // plugin.compilersArtefacts.__last = compiler
 
-  const contracts = getCompiledContracts(compiler).map((contract) => {
-    // return { name: languageVersion, alias: contract.name, file: contract.file, compiler, compilerName }
-  })
-  // if ((contracts.length > 0)) {
-  //   const contractsInCompiledFile = contracts.filter(obj => obj.file === file)
-  //   let currentContract
-  //   if (contractsInCompiledFile.length) currentContract = contractsInCompiledFile[0].alias
-  //   else currentContract = contracts[0].alias
-  //   dispatch(setCurrentContract(currentContract))
-  // }
-  // const isUpgradeable = await plugin.call('openzeppelin-proxy', 'isConcerned', data.sources && data.sources[file] ? data.sources[file].ast : {})
+  const contracts = getCompiledContracts(compiler)
+  if (contracts.length > 0) {
+    contracts.forEach(async (contract) => {
+      if (contract.contract.file !== source.target) {
+        dispatch({ type: 'UPDATE_COMPILED_CONTRACT', payload: { name: contract.name, filePath: file, contractData: contract, isUpgradeable: false } })
+      } else {
+        const isUpgradeable = await plugin.call('openzeppelin-proxy', 'isConcerned', data.sources && data.sources[file] ? data.sources[file].ast : {})
+        dispatch({ type: 'UPDATE_COMPILED_CONTRACT', payload: { name: contract.name, filePath: file, contractData: contract, isUpgradeable: isUpgradeable } })
+      }
+    })
+  }
 
   // if (isUpgradeable) {
   //   const options = await plugin.call('openzeppelin-proxy', 'getProxyOptions', data, file)
@@ -33,9 +33,6 @@ export async function broadcastCompilationResult (compilerName: string, compileR
   // } else {
   //   dispatch(addDeployOption({ [file]: {} }))
   // }
-  // dispatch(fetchContractListSuccess({ [file]: contracts }))
-  // dispatch(setCurrentFile(file))
-  // // TODO: set current contract
 }
 
 function getCompiledContracts (compiler: CompilerAbstract) {
@@ -44,7 +41,7 @@ function getCompiledContracts (compiler: CompilerAbstract) {
   compiler.visitContracts((contract: VisitedContract) => {
     const contractData = getContractData(contract.name, compiler)
 
-    if (contractData && contractData.bytecodeObject.length === 0) {
+    if (contractData && contractData.bytecodeObject.length !== 0) {
       contracts.push(contractData)
     }
   })
