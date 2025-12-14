@@ -1,3 +1,3 @@
 export { default as DeployWidget } from './lib/deploy'
-export type { DeployWidgetState, DeployAppContextType } from './lib/types'
+export type { DeployWidgetState, DeployAppContextType, Actions } from './lib/types'
 

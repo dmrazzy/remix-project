@@ -3,17 +3,29 @@ import { DeployAppContext } from './contexts'
 import { deployInitialState, deployReducer } from './reducers'
 import DeployPortraitView from './widgets/deployPortraitView'
 import { Plugin, Engine } from '@remixproject/engine'
-import { DeployWidgetState } from './types'
+import { Actions, DeployWidgetState } from './types'
 import { broadcastCompilationResult } from './actions'
 
-function DeployWidget({ plugin }: { plugin: Plugin & { engine: Engine, editor: any, setStateGetter?: (getter: () => DeployWidgetState) => void } }) {
+interface DeployWidgetProps {
+  plugin: Plugin & {
+    engine: Engine,
+    editor: any,
+    setStateGetter?: (getter: () => DeployWidgetState) => void,
+    setDispatchGetter?: (getter: () => React.Dispatch<Actions>) => void
+  }
+}
+
+function DeployWidget({ plugin }: DeployWidgetProps) {
   const [widgetState, dispatch] = useReducer(deployReducer, deployInitialState)
 
   useEffect(() => {
     if (plugin.setStateGetter) {
       plugin.setStateGetter(() => widgetState)
     }
-  }, [plugin, widgetState])
+    if (plugin.setDispatchGetter) {
+      plugin.setDispatchGetter(() => dispatch)
+    }
+  }, [plugin])
 
   useEffect(() => {
     plugin.on('fileManager', 'currentFileChanged', async (filePath: string) => {

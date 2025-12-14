@@ -3,14 +3,14 @@ import { Engine, Plugin } from '@remixproject/engine'
 import { DeployWidget } from '@remix-ui/run-tab-deploy'
 import type { Blockchain } from '../../blockchain/blockchain'
 import type { CompilerArtefacts } from '@remix-project/core-plugin'
-import { DeployWidgetState } from '@remix-ui/run-tab-deploy'
+import { DeployWidgetState, Actions } from '@remix-ui/run-tab-deploy'
 import BN from 'bn.js'
 
 const profile = {
   name: 'udappDeploy',
   displayName: 'Udapp Deploy',
   description: 'Handles contract deployment UI and state',
-  methods: ['getUI', 'getGasLimit', 'getValueUnit'],
+  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'setGasPriceStatus', 'setConfirmSettings', 'getMaxFee', 'getMaxPriorityFee', 'setMaxPriorityFee', 'setGasPrice', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings'],
   events: []
 }
 
@@ -21,13 +21,17 @@ export class DeployPlugin extends Plugin {
   editor: any
   fileManager: any
   private getWidgetState: (() => DeployWidgetState) | null = null
-
+  private getDispatch: (() => React.Dispatch<Actions>) | null = null
   constructor () {
     super(profile)
   }
 
   setStateGetter(getter: () => DeployWidgetState) {
     this.getWidgetState = getter
+  }
+
+  setDispatchGetter(getter: () => React.Dispatch<Actions>) {
+    this.getDispatch = getter
   }
 
   getGasLimit(): string {
@@ -42,6 +46,42 @@ export class DeployPlugin extends Plugin {
 
   getValueUnit(): 'wei' | 'gwei' | 'finney' | 'ether' {
     return this.getWidgetState()?.valueUnit
+  }
+
+  getMaxFee(): string {
+    return this.getWidgetState()?.maxFee
+  }
+
+  getMaxPriorityFee(): string {
+    return this.getWidgetState()?.maxPriorityFee
+  }
+
+  getBaseFeePerGas(): string {
+    return this.getWidgetState()?.baseFeePerGas
+  }
+
+  getGasPrice(): string {
+    return this.getWidgetState()?.gasPrice
+  }
+
+  getConfirmSettings(): boolean {
+    return this.getWidgetState()?.confirmSettings
+  }
+
+  setGasPriceStatus(status: boolean) {
+    this.getDispatch()({ type: 'SET_GAS_PRICE_STATUS', payload: status })
+  }
+
+  setConfirmSettings(confirmation: boolean) {
+    this.getDispatch()({ type: 'SET_CONFIRM_SETTINGS', payload: confirmation })
+  }
+
+  setMaxPriorityFee(fee: string) {
+    this.getDispatch()({ type: 'SET_MAX_PRIORITY_FEE', payload: fee })
+  }
+
+  setGasPrice(price: string) {
+    this.getDispatch()({ type: 'SET_GAS_PRICE', payload: price })
   }
 
   getUI(engine: Engine, blockchain: Blockchain, editor: any) {

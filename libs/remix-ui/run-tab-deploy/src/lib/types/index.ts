@@ -21,6 +21,12 @@ export interface DeployWidgetState {
   value: number
   valueUnit: 'wei' | 'gwei' | 'finney' | 'ether'
   gasLimit: number
+  gasPriceStatus: boolean
+  confirmSettings: boolean
+  maxFee: string
+  maxPriorityFee: string
+  baseFeePerGas: string
+  gasPrice: string
 }
 
 export interface ActionPayloadTypes {
@@ -30,7 +36,11 @@ export interface ActionPayloadTypes {
   SET_VALUE: number,
   SET_VALUE_UNIT: 'wei' | 'gwei' | 'finney' | 'ether',
   SET_GAS_LIMIT: number,
-  SET_COMPILING: FilePath
+  SET_COMPILING: FilePath,
+  SET_GAS_PRICE_STATUS: boolean,
+  SET_CONFIRM_SETTINGS: boolean,
+  SET_MAX_PRIORITY_FEE: string,
+  SET_GAS_PRICE: string
 }
 
 export interface Action<T extends keyof ActionPayloadTypes> {

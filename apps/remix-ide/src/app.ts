@@ -126,9 +126,9 @@ import Filepanel from './app/panels/file-panel'
 import Editor from './app/editor/editor'
 import Terminal from './app/panels/terminal'
 import TabProxy from './app/panels/tab-proxy.js'
-import { Plugin } from '@remixproject/engine'
 import BottomBarPanel from './app/components/bottom-bar-panel'
 import { TemplateExplorerModalPlugin } from './app/plugins/template-explorer-modal'
+import { TxRunner } from './app/plugins/txRunner'
 
 // Tracking now handled by this.track() method using MatomoManager
 
@@ -457,8 +457,10 @@ class AppComponent {
 
     const udappEnvPlugin = new EnvironmentPlugin()
     const udappDeployPlugin = new DeployPlugin()
+    const txRunner = new TxRunner()
 
     this.engine.register([
+      txRunner,
       permissionHandler,
       this.layout,
       this.notification,
@@ -671,6 +673,7 @@ class AppComponent {
     if (isElectron()) {
       await this.appManager.activatePlugin(['fs'])
     }
+    await this.appManager.activatePlugin(['txRunner'])
     await this.appManager.activatePlugin(['layout'])
     await this.appManager.activatePlugin(['notification'])
     await this.appManager.activatePlugin(['editor'])

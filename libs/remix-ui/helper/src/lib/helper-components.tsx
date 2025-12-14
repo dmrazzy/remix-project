@@ -1,5 +1,4 @@
 import { LayoutCompatibilityReport } from '@openzeppelin/upgrades-core/dist/storage/report'
-import React from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { CompileOptionsProps } from '../types/compilerTypes'
 import { CustomTooltip } from './components/custom-tooltip'
@@ -265,5 +264,14 @@ export const EtherscanConfigDescription = () => {
         </a> <FormattedMessage id="settings.etherscanAccessTokenText3" />
       </p>
     </>
+  )
+}
+
+export const gasEstimationPrompt = (msg: string) => {
+  return (
+    <div>
+      <FormattedMessage id="udapp.gasEstimationPromptText" /> <br />
+      {msg}
+    </div>
   )
 }

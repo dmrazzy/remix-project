@@ -6,7 +6,13 @@ export const deployInitialState: DeployWidgetState = {
   },
   value: 0,
   valueUnit: 'wei',
-  gasLimit: 0
+  gasLimit: 0,
+  gasPriceStatus: false,
+  confirmSettings: false,
+  maxFee: '',
+  maxPriorityFee: '.0001',
+  baseFeePerGas: '',
+  gasPrice: '',
 }
 
 export const deployReducer = (state = deployInitialState, action: Actions): DeployWidgetState => {
@@ -107,6 +113,34 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
         ...state.contracts,
         contractList
       }
+    }
+  }
+
+  case 'SET_GAS_PRICE_STATUS': {
+    return {
+      ...state,
+      gasPriceStatus: action.payload
+    }
+  }
+
+  case 'SET_CONFIRM_SETTINGS': {
+    return {
+      ...state,
+      confirmSettings: action.payload
+    }
+  }
+
+  case 'SET_MAX_PRIORITY_FEE': {
+    return {
+      ...state,
+      maxPriorityFee: action.payload
+    }
+  }
+
+  case 'SET_GAS_PRICE': {
+    return {
+      ...state,
+      gasPrice: action.payload
     }
   }
 

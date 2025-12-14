@@ -1,6 +1,6 @@
 'use strict'
 import { EventManager } from '../eventManager'
-import type { Transaction as InternalTransaction, TxResult } from './txRunner'
+import type { Transaction as InternalTransaction, TxResult } from '../index'
 import { BrowserProvider, getAddress, parseUnits } from 'ethers'
 import { normalizeHexAddress } from '../helpers/uiHelper'
 import { aaSupportedNetworks, aaLocalStorageKey, getPimlicoBundlerURL, aaDeterminiticProxyAddress } from '../helpers/aaConstants'
@@ -9,24 +9,24 @@ import "viem/window"
 import { custom, http, createWalletClient, createPublicClient, encodePacked, getContractAddress, toHex } from "viem"
 import * as chains from "viem/chains"
 import { entryPoint07Address } from "viem/account-abstraction"
+import { Registry } from '../registry'
 const { createSmartAccountClient } = require("permissionless")
 const { toSafeSmartAccount } = require("permissionless/accounts")
 const { createPimlicoClient } = require("permissionless/clients/pimlico")
+import { Plugin } from '@remixproject/engine'
+// @ts-ignore
+import { MainnetPrompt, gasEstimationPrompt } from '@remix-ui/helper'
 
 export class TxRunnerWeb3 {
   event
-  _api
-  getWeb3: () => BrowserProvider
-  currentblockGasLimit: () => number
+  _api: Plugin
 
-  constructor (api, getWeb3, currentblockGasLimit) {
+  constructor (wrapperAPI: Plugin) {
     this.event = new EventManager()
-    this.getWeb3 = getWeb3
-    this.currentblockGasLimit = currentblockGasLimit
-    this._api = api
+    this._api = wrapperAPI
   }
 
-  async _executeTx (tx, network, txFee, api, promptCb, callback) {
+  async _executeTx (tx, network, txFee) {
     if (network && network.lastBlock && network.lastBlock.baseFeePerGas) {
       // the sending stack (web3.js / metamask need to have the type defined)
       // this is to avoid the following issue: https://github.com/MetaMask/metamask-extension/issues/11824
@@ -48,187 +48,264 @@ export class TxRunnerWeb3 {
       }
     }
 
-    let currentDateTime = new Date();
-
-    const cb = (err, resp, isCreation: boolean, isUserOp, contractAddress) => {
-      if (err) {
-        return callback(err, resp)
-      }
-      this.event.trigger('transactionBroadcasted', [resp, isUserOp])
-      const listenOnResponse = () => {
-        // eslint-disable-next-line no-async-promise-executor
-        return new Promise(async (resolve, reject) => {
-          const receipt = await tryTillReceiptAvailable(resp, this.getWeb3())
-          const originTo = tx.to
-          tx = await tryTillTxAvailable(resp, this.getWeb3())
-          if (isCreation && !receipt.contractAddress) {
-            // if it is a isCreation, contractAddress should be defined.
-            // if it's not the case look for the event ContractCreated(uint256,address,uint256,bytes32) and extract the address
-            // topic id: 0xa1fb700aaee2ae4a2ff6f91ce7eba292f89c2f5488b8ec4c5c5c8150692595c3
-            if (receipt.logs && receipt.logs.length) {
-              receipt.logs.map((log) => {
-                if (log.topics[0] === '0xa1fb700aaee2ae4a2ff6f91ce7eba292f89c2f5488b8ec4c5c5c8150692595c3') {
-                  (receipt as any).contractAddress = getAddress(normalizeHexAddress(toHex(log.topics[2])))
-                }
-              })
-            }
-          }
-          currentDateTime = new Date();
-          if (isUserOp) {
-            tx.isUserOp = isUserOp
-            tx.originTo = originTo
-            if (contractAddress && !receipt.contractAddress) (receipt as any).contractAddress = contractAddress
-          }
-          resolve({
-            receipt,
-            tx,
-            transactionHash: receipt ? receipt['hash'] : null
-          })
-        })
-      }
-      listenOnResponse().then((txData: TxResult) => {
-        callback(null, txData)
-      }).catch((error) => { callback(error) })
-    }
-
     const isCreation = !tx.to
-    if (api.personalMode()) {
-      promptCb(
-        async (value) => {
-          try {
-            const res = await (await this.getWeb3().getSigner(tx.from || 0)).sendTransaction({ ...tx, value })
-            cb(null, res.hash, isCreation, false, null)
+    const isPersonalMode = await this._api.call('blockchain', 'getProvider') === 'web3' ? (Registry.getInstance().get('config').api).get('settings/personal-mode') : false
 
-          } catch (e) {
-            console.log(`Send transaction failed: ${e.message || e.error} . if you use an injected provider, please check it is properly unlocked. `)
-            // in case the receipt is available, we consider that only the execution failed but the transaction went through.
-            // So we don't consider this to be an error.
-            if (e.receipt) cb(null, e.receipt.hash, isCreation, false, null)
-            else cb(e, null, isCreation, false, null)
+    return new Promise(async (resolve, reject) => {
+      if (isPersonalMode) {
+        this._api.call('notification', 'prompt', {
+          id: 'passphrase-requested',
+          title: 'Passphrase requested',
+          message: 'Personal mode is enabled. Please provide passphrase of account',
+          defaultValue: '',
+          okLabel: 'OK',
+          okFn: async (value) => {
+            try {
+              const web3 = await this._api.call('blockchain', 'getWeb3')
+              const res = await (await web3.getSigner(tx.from || 0)).sendTransaction({ ...tx, value })
+              resolve(await this.broadcastTx(tx, res.hash, isCreation, false, null))
+
+            } catch (e) {
+              console.log(`Send transaction failed: ${e.message || e.error} . if you use an injected provider, please check it is properly unlocked. `)
+              // in case the receipt is available, we consider that only the execution failed but the transaction went through.
+              // So we don't consider this to be an error.
+              if (e.receipt) resolve(await this.broadcastTx(tx, e.receipt.hash, isCreation, false, null))
+              else reject(e)
+            }
+          },
+          cancelLabel: 'Cancel',
+          cancelFn: () => {
+            reject(new Error('Canceled by user.'))
           }
-        },
-        () => {
-          return callback('Canceled by user.')
+        })
+      } else {
+        try {
+          if (tx.fromSmartAccount) {
+            const { txHash, contractAddress } = await this.sendUserOp(tx, network.id)
+            resolve(await this.broadcastTx(tx, txHash, isCreation, true, contractAddress))
+          } else {
+            const web3 = await this._api.call('blockchain', 'getWeb3')
+            const res = await (await web3.getSigner(tx.from)).sendTransaction(tx)
+            resolve(await this.broadcastTx(tx, res.hash, isCreation, false, null))
+          }
+        } catch (e) {
+          if (!e.message) e.message = ''
+          if (e.error) {
+            e.message = e.message + ' ' + e.error
+          }
+          console.log(`Send transaction failed: ${e.message} . if you use an injected provider, please check it is properly unlocked. `)
+          // in case the receipt is available, we consider that only the execution failed but the transaction went through.
+          // So we don't consider this to be an error.
+          if (e.receipt) resolve(await this.broadcastTx(tx, e.receipt.hash, isCreation, false, null))
+          else reject(e)
         }
-      )
-    } else {
+      }
+    })
+
+  }
+
+  async broadcastTx (tx, resp, isCreation: boolean, isUserOp, contractAddress) {
+    this._api.emit('transactionBroadcasted', [resp, isUserOp])
+    // eslint-disable-next-line no-async-promise-executor
+    return new Promise(async (resolve, reject) => {
       try {
-        if (tx.fromSmartAccount) {
-          const { txHash, contractAddress } = await this.sendUserOp(tx, network.id)
-          cb(null, txHash, isCreation, true, contractAddress)
-        } else {
-          const res = await (await this.getWeb3().getSigner(tx.from)).sendTransaction(tx)
-          cb(null, res.hash, isCreation, false, null)
+        const receipt = await tryTillReceiptAvailable(resp, await this._api.call('blockchain', 'getWeb3'))
+        const originTo = tx.to
+        tx = await tryTillTxAvailable(resp, await this._api.call('blockchain', 'getWeb3'))
+        if (isCreation && !receipt.contractAddress) {
+          // if it is a isCreation, contractAddress should be defined.
+          // if it's not the case look for the event ContractCreated(uint256,address,uint256,bytes32) and extract the address
+          // topic id: 0xa1fb700aaee2ae4a2ff6f91ce7eba292f89c2f5488b8ec4c5c5c8150692595c3
+          if (receipt.logs && receipt.logs.length) {
+            receipt.logs.map((log) => {
+              if (log.topics[0] === '0xa1fb700aaee2ae4a2ff6f91ce7eba292f89c2f5488b8ec4c5c5c8150692595c3') {
+                (receipt as any).contractAddress = getAddress(normalizeHexAddress(toHex(log.topics[2])))
+              }
+            })
+          }
         }
-      } catch (e) {
-        if (!e.message) e.message = ''
-        if (e.error) {
-          e.message = e.message + ' ' + e.error
+        if (isUserOp) {
+          tx.isUserOp = isUserOp
+          tx.originTo = originTo
+          if (contractAddress && !receipt.contractAddress) (receipt as any).contractAddress = contractAddress
         }
-        console.log(`Send transaction failed: ${e.message} . if you use an injected provider, please check it is properly unlocked. `)
-        // in case the receipt is available, we consider that only the execution failed but the transaction went through.
-        // So we don't consider this to be an error.
-        if (e.receipt) cb(null, e.receipt.hash, isCreation, false, null)
-        else cb(e, null, isCreation, false, null)
+        resolve({
+          receipt,
+          tx,
+          transactionHash: receipt ? receipt['hash'] : null
+        })
+      } catch (error) {
+        reject(error)
       }
-    }
+    })
   }
 
-  execute (args: InternalTransaction, confirmationCb, gasEstimationForceSend, promptCb, callback) {
-    return this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp, confirmationCb, gasEstimationForceSend, promptCb, callback)
+  execute (args: InternalTransaction) {
+    return this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp)
   }
 
-  runInNode (from, fromSmartAccount, deployedBytecode, to, data, value, gasLimit, useCall, timestamp, confirmCb, gasEstimationForceSend, promptCb, callback) {
+  async runInNode (from, fromSmartAccount, deployedBytecode, to, data, value, gasLimit, useCall, timestamp) {
     const tx = { from: from, fromSmartAccount, deployedBytecode, to: to, data: data, value: value }
-    if (!from) return callback('the value of "from" is not defined. Please make sure an account is selected.')
+    if (!from) throw new Error('the value of "from" is not defined. Please make sure an account is selected.')
     if (useCall) {
-      if (this._api && this._api.isVM()) {
-        (this.getWeb3() as any).remix.registerCallId(timestamp)
+      const isVM = await this._api.call('blockchain', 'isVM')
+      const web3 = await this._api.call('blockchain', 'getWeb3')
+      if (isVM) {
+        web3.remix.registerCallId(timestamp)
       }
-      this.getWeb3().call(tx)
-        .then((result: any) => callback(null, {
-          result: result
-        }))
-        .catch(error => callback(error))
-      return
+      const result = await web3.call(tx)
+      return {
+        result: result
+      }
     }
-    this._api.detectNetwork((errNetWork, network) => {
-      if (errNetWork) {
-        console.log(errNetWork)
+    const network = await this._api.call('blockchain', 'detectNetwork')
+    const txCopy = { ...tx, type: undefined, maxFeePerGas: undefined, gasPrice: undefined }
+
+    if (network && network.lastBlock) {
+      if (network.lastBlock.baseFeePerGas) {
+        // the sending stack (web3.js / metamask need to have the type defined)
+        // this is to avoid the following issue: https://github.com/MetaMask/metamask-extension/issues/11824
+        txCopy.type = '0x2'
+        txCopy.maxFeePerGas = Math.ceil(Number((BigInt(network.lastBlock.baseFeePerGas) + BigInt(network.lastBlock.baseFeePerGas) / BigInt(3)).toString()))
+      } else {
+        txCopy.type = '0x1'
+        txCopy.gasPrice = undefined
+      }
+    }
+    const ethersProvider = await this._api.call('blockchain', 'getWeb3')
+    const config = Registry.getInstance().get('config').api
+    try {
+      const gasEstimationBigInt = await ethersProvider.estimateGas(txCopy)
+      // continueTxExecution()
+      const gasEstimation = Number(gasEstimationBigInt)
+      /*
+        * gasLimit is a value that can be set in the UI to hardcap value that can be put in a tx.
+        * e.g if the gasestimate
+        */
+      if (gasLimit !== '0x0' && gasEstimation > gasLimit) {
+        throw new Error(`estimated gas for this transaction (${gasEstimation}) is higher than gasLimit set in the configuration  (${gasLimit}). Please raise the gas limit.`)
+      }
+
+      if (gasLimit === '0x0') {
+        tx['gasLimit'] = gasEstimation
+      } else {
+        tx['gasLimit'] = gasLimit
+      }
+
+      if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
+        return this._executeTx(tx, network, null)
+      }
+
+      // confirmCb(network, tx, tx['gasLimit'], (txFee) => {
+      //   return this._executeTx(tx, network, txFee, this._api, promptCb, callback)
+      // }, (error) => {
+      //   callback(error)
+      // })
+      // }, callback)
+      if (network.name !== 'Main') {
+        return this._executeTx(tx, network, null)
+      }
+      await this.confirmTransaction(tx, network, gasEstimation)
+    } catch (err) {
+      if (err && err.error && err.error.indexOf('Invalid JSON RPC response') !== -1) {
+        // // @todo(#378) this should be removed when https://github.com/WalletConnect/walletconnect-monorepo/issues/334 is fixed
+        // Should log in terminal
+        // callback(new Error('Gas estimation failed because of an unknown internal error. This may indicated that the transaction will fail.'))
         return
       }
-      const txCopy = { ...tx, type: undefined, maxFeePerGas: undefined, gasPrice: undefined }
-      if (network && network.lastBlock) {
-        if (network.lastBlock.baseFeePerGas) {
-          // the sending stack (web3.js / metamask need to have the type defined)
-          // this is to avoid the following issue: https://github.com/MetaMask/metamask-extension/issues/11824
-          txCopy.type = '0x2'
-          txCopy.maxFeePerGas = Math.ceil(Number((BigInt(network.lastBlock.baseFeePerGas) + BigInt(network.lastBlock.baseFeePerGas) / BigInt(3)).toString()))
+      if (network.name === 'VM') {
+        const defaultGasLimit = 3000000
+        tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
+
+        if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
+          return this._executeTx(tx, network, null)
+        }
+        await this.confirmTransaction(tx, network, tx['gasLimit'])
+      } else {
+        if (tx.fromSmartAccount && tx.value === "0" &&
+              err && err.message && err.message.includes('missing revert data')
+        ) {
+          // Do not show dialog for 'missing revert data'
+          // tx fees can be managed by paymaster in case of smart account tx
+          // @todo If paymaster is used, check if balance/credits are available
+
+          const defaultGasLimit = 3000000
+          tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
+
+          if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
+            return this._executeTx(tx, network, null)
+          }
+
+          return await this.confirmTransaction(tx, network, tx['gasLimit'])
         } else {
-          txCopy.type = '0x1'
-          txCopy.gasPrice = undefined
+          let msg = ''
+          if (typeof err === 'string') {
+            msg = err
+          }
+          if (err && err.innerError) {
+            msg += '\n' + err.innerError
+          }
+          if (err && err.message) {
+            msg += '\n' + err.message
+          }
+          if (err && err.error) {
+            msg += '\n' + err.error
+          }
+
+          if (msg.includes('invalid opcode')) msg += '\nThe EVM version used by the selected environment is not compatible with the compiler EVM version.'
+
+          return this._api.call('notification', 'modal', {
+            id: 'gas-estimation-failed',
+            title: 'Gas estimation failed',
+            message: gasEstimationPrompt(msg),
+            okLabel: 'Send Transaction',
+            okFn: () => {
+              return this._executeTx(tx, network, null)
+            },
+            cancelLabel: 'Cancel Transaction',
+            cancelFn: () => {
+              throw new Error('Transaction canceled by user.')
+            }
+          })
         }
       }
-      const ethersProvider = this.getWeb3()
-      ethersProvider.estimateGas(txCopy)
-        .then(gasEstimationBigInt => {
-          gasEstimationForceSend(null, () => {
-            const gasEstimation = Number(gasEstimationBigInt)
-            /*
-            * gasLimit is a value that can be set in the UI to hardcap value that can be put in a tx.
-            * e.g if the gasestimate
-            */
-            if (gasLimit !== '0x0' && gasEstimation > gasLimit) {
-              return callback(`estimated gas for this transaction (${gasEstimation}) is higher than gasLimit set in the configuration  (${gasLimit}). Please raise the gas limit.`)
-            }
+    }
+  }
 
-            if (gasLimit === '0x0') {
-              tx['gasLimit'] = gasEstimation
-            } else {
-              tx['gasLimit'] = gasLimit
-            }
+  async confirmTransaction (tx, network, gasEstimation) {
+    const amount = await this._api.call('blockchain', 'fromWei', tx.value, true, 'ether')
+    const content = MainnetPrompt(this._api, tx, network, amount, gasEstimation)
 
-            if (this._api.config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
-              return this._executeTx(tx, network, null, this._api, promptCb, callback)
-            }
+    this._api.call('notification', 'modal', {
+      id: 'confirm-transaction',
+      title: 'Confirm transaction',
+      message: content,
+      okLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+      okFn: async () => {
+        // @ts-ignore
+        const confirmSettings = await this._api.call('udappDeploy', 'getConfirmSettings')
+        // @ts-ignore
+        const gasPriceStatus = await this._api.call('udappDeploy', 'getGasPriceStatus')
+        // @ts-ignore
+        const maxFee = await this._api.call('udappDeploy', 'getMaxFee')
+        // @ts-ignore
+        const maxPriorityFee = await this._api.call('udappDeploy', 'getMaxPriorityFee')
+        // @ts-ignore
+        const baseFeePerGas = await this._api.call('udappDeploy', 'getBaseFeePerGas')
+        // @ts-ignore
+        const gasPrice = await this._api.call('udappDeploy', 'getGasPrice')
 
-            confirmCb(network, tx, tx['gasLimit'], (txFee) => {
-              return this._executeTx(tx, network, txFee, this._api, promptCb, callback)
-            }, (error) => {
-              callback(error)
-            })
-          }, callback)
-        })
-        .catch(err => {
-          if (err && err.error && err.error.indexOf('Invalid JSON RPC response') !== -1) {
-            // // @todo(#378) this should be removed when https://github.com/WalletConnect/walletconnect-monorepo/issues/334 is fixed
-            callback(new Error('Gas estimation failed because of an unknown internal error. This may indicated that the transaction will fail.'))
-            return
-          }
-          if (tx.fromSmartAccount && tx.value === "0" &&
-            err && err.message && err.message.includes('missing revert data')
-          ) {
-            // Do not show dialog for 'missing revert data'
-            // tx fees can be managed by paymaster in case of smart account tx
-            // @todo If paymaster is used, check if balance/credits are available
-            err = null
-          }
-          err = network.name === 'VM' ? null : err // just send the tx if "VM"
-          gasEstimationForceSend(err, () => {
-            const defaultGasLimit = 3000000
-            tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
-
-            if (this._api.config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
-              return this._executeTx(tx, network, null, this._api, promptCb, callback)
-            }
-
-            confirmCb(network, tx, tx['gasLimit'], (txFee) => {
-              return this._executeTx(tx, network, txFee, this._api, promptCb, callback)
-            }, (error) => {
-              callback(error)
-            })
-          }, callback)
-        })
+        (Registry.getInstance().get('config').api).setUnpersistedProperty('doNotShowTransactionConfirmationAgain', confirmSettings)
+        if (!gasPriceStatus) {
+          throw new Error('Given transaction fee is not correct')
+        } else {
+          return this._executeTx(tx, network, { maxFee, maxPriorityFee, baseFeePerGas, gasPrice })
+        }
+      },
+      cancelFn: () => {
+        throw new Error('Transaction canceled by user.')
+      }
     })
   }
 
@@ -345,4 +422,3 @@ async function tryTillTxAvailable (txhash: string, provider: BrowserProvider) {
 }
 
 async function pause () { return new Promise((resolve, reject) => { setTimeout(resolve, 500) }) }
-
