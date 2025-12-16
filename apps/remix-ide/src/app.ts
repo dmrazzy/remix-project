@@ -128,7 +128,7 @@ import Terminal from './app/panels/terminal'
 import TabProxy from './app/panels/tab-proxy.js'
 import BottomBarPanel from './app/components/bottom-bar-panel'
 import { TemplateExplorerModalPlugin } from './app/plugins/template-explorer-modal'
-import { TxRunner } from './app/plugins/txRunner'
+import { TxRunnerPlugin } from './app/plugins/txRunnerPlugin'
 
 // Tracking now handled by this.track() method using MatomoManager
 
@@ -457,10 +457,10 @@ class AppComponent {
 
     const udappEnvPlugin = new EnvironmentPlugin()
     const udappDeployPlugin = new DeployPlugin()
-    const txRunner = new TxRunner()
+    const txRunnerPlugin = new TxRunnerPlugin()
 
     this.engine.register([
-      txRunner,
+      txRunnerPlugin,
       permissionHandler,
       this.layout,
       this.notification,

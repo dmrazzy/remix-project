@@ -10,7 +10,7 @@ const profile = {
   name: 'udappDeploy',
   displayName: 'Udapp Deploy',
   description: 'Handles contract deployment UI and state',
-  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'setGasPriceStatus', 'setConfirmSettings', 'getMaxFee', 'getMaxPriorityFee', 'setMaxPriorityFee', 'setGasPrice', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings'],
+  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'setGasPriceStatus', 'setConfirmSettings', 'getMaxFee', 'getMaxPriorityFee', 'setMaxPriorityFee', 'setGasPrice', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue'],
   events: []
 }
 
@@ -39,9 +39,7 @@ export class DeployPlugin extends Plugin {
   }
 
   async getValue(): Promise<number> {
-    const web3 = await this.call('blockchain', 'web3')
-
-    return web3.utils.toWei(this.getWidgetState()?.value, this.getWidgetState()?.valueUnit)
+    return await this.call('blockchain', 'toWei', this.getWidgetState()?.value?.toString(), this.getWidgetState()?.valueUnit)
   }
 
   getValueUnit(): 'wei' | 'gwei' | 'finney' | 'ether' {

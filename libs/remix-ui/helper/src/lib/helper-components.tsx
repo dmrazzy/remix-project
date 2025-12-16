@@ -4,6 +4,7 @@ import { FormattedMessage, useIntl } from 'react-intl'
 import { CompileOptionsProps } from '../types/compilerTypes'
 import { CustomTooltip } from './components/custom-tooltip'
 import { extractNameFromKey } from './remix-ui-helper'
+import type { OverSizeLimit } from '@remix-project/core-plugin'
 
 export const fileChangedToastMsg = (from: string, path: string) => (
   <div>
@@ -265,5 +266,42 @@ export const EtherscanConfigDescription = () => {
         </a> <FormattedMessage id="settings.etherscanAccessTokenText3" />
       </p>
     </>
+  )
+}
+
+export const isOverSizePrompt = (values: OverSizeLimit) => {
+  return (
+    <div>
+      {values.overSizeEip170 && (
+        <div>
+          <FormattedMessage
+            id="udapp.isOverSizePromptEip170"
+            values={{
+              br: <br />,
+              a: (
+                <a href="https://eips.ethereum.org/EIPS/eip-170" target="_blank" rel="noreferrer">
+                  eip-170
+                </a>
+              ),
+            }}
+          />
+        </div>
+      )}
+      {values.overSizeEip3860 && (
+        <div>
+          <FormattedMessage
+            id="udapp.isOverSizePromptEip3860"
+            values={{
+              br: <br />,
+              a: (
+                <a href="https://eips.ethereum.org/EIPS/eip-3860" target="_blank" rel="noreferrer">
+                  eip-3860
+                </a>
+              ),
+            }}
+          />
+        </div>
+      )}
+    </div>
   )
 }

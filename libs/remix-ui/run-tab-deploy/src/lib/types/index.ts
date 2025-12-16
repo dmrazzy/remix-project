@@ -86,3 +86,8 @@ export type DeployUdappNetwork = {
   }
 }
 
+export type OZDeployMode = {
+  deployWithProxy: boolean,
+  upgradeWithProxy: boolean
+}
+

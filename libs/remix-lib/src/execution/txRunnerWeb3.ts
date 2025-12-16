@@ -85,6 +85,7 @@ export class TxRunnerWeb3 {
         } else {
           const web3 = await this._api.call('blockchain', 'getWeb3')
           const res = await (await web3.getSigner(tx.from)).sendTransaction(tx)
+
           return this.broadcastTx(tx, res.hash, isCreation, false, null)
         }
       } catch (e) {

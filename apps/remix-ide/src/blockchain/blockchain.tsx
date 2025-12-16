@@ -24,7 +24,7 @@ const profile = {
   name: 'blockchain',
   displayName: 'Blockchain',
   description: 'Blockchain - Logic',
-  methods: ['dumpState', 'getCode', 'getTransactionReceipt', 'addProvider', 'removeProvider', 'getCurrentFork', 'isSmartAccount', 'getAccounts', 'web3VM', 'web3', 'sendRpc', 'getProvider', 'getCurrentProvider', 'getCurrentNetworkStatus', 'getCurrentNetworkCurrency', 'getAllProviders', 'getPinnedProviders', 'changeExecutionContext', 'getProviderObject', 'runTx', 'getBalanceInEther', 'getCurrentProvider', 'deployContractAndLibraries', 'runOrCallContractMethod', 'getStateDetails', 'resetAndInit', 'detectNetwork', 'isVM', 'getWeb3', 'fromWei'],
+  methods: ['dumpState', 'getCode', 'getTransactionReceipt', 'addProvider', 'removeProvider', 'getCurrentFork', 'isSmartAccount', 'getAccounts', 'web3VM', 'web3', 'sendRpc', 'getProvider', 'getCurrentProvider', 'getCurrentNetworkStatus', 'getCurrentNetworkCurrency', 'getAllProviders', 'getPinnedProviders', 'changeExecutionContext', 'getProviderObject', 'runTx', 'getBalanceInEther', 'getCurrentProvider', 'deployContractAndLibraries', 'runOrCallContractMethod', 'getStateDetails', 'resetAndInit', 'detectNetwork', 'isVM', 'getWeb3', 'fromWei', 'toWei', 'deployContractWithLibrary'],
   version: packageJson.version
 }
 
@@ -98,7 +98,6 @@ export class Blockchain extends Plugin {
     this.networkStatus = { network: { name: this.defaultPinnedProviders[0], id: ' - ' } }
     this.networkNativeCurrency = { name: "Ether", symbol: "ETH", decimals: 18 }
     this.pinnedProviders = []
-    this.setupEvents()
     this.setupProviders()
   }
 
@@ -149,6 +148,8 @@ export class Blockchain extends Plugin {
     //   trackMatomoEvent(this, { category: 'blockchain', action: 'providerUnpinned', name: name, isClick: false })
     //  // this.emit('providersChanged')
     // })
+
+    this.setupEvents()
 
     this.call('config', 'getAppParameter', 'settings/pinned-providers').then((providers) => {
       if (!providers) {
@@ -1009,60 +1010,56 @@ export class Blockchain extends Plugin {
   async runTransaction(args) {
     const gasLimit = await this.call('udappDeploy', 'getGasLimit')
     const queryValue = !args.useCall ? await this.call('udappDeploy', 'getValue') : 0
-    // eslint-disable-next-line no-async-promise-executor
-    return new Promise(async (resolve, reject) => {
-      let fromAddress
-      let fromSmartAccount
-      let authorizationList
-      try {
-        fromAddress = await this.getAccount(args)
-        fromSmartAccount = this.isSmartAccount(fromAddress)
-      } catch (e) {
-        reject(e)
-        return
-      }
-      const tx = {
-        to: args.to,
-        data: args.data.dataHex,
-        deployedBytecode: args.data.contractDeployedBytecode,
-        useCall: args.useCall,
-        from: fromAddress,
-        fromSmartAccount,
-        value: queryValue,
-        gasLimit: gasLimit,
-        timestamp: args.data.timestamp,
-        authorizationList: args.authorizationList
-      }
-      const payLoad = {
-        funAbi: args.data.funAbi,
-        funArgs: args.data.funArgs,
-        contractBytecode: args.data.contractBytecode,
-        contractName: args.data.contractName,
-        contractABI: args.data.contractABI,
-        linkReferences: args.data.linkReferences
-      }
+    let fromAddress
+    let fromSmartAccount
+    let authorizationList
+    try {
+      fromAddress = await this.getAccount(args)
+      fromSmartAccount = await this.isSmartAccount(fromAddress)
+    } catch (e) {
+      return new Promise((_, reject) => reject(e))
+    }
+    const tx = {
+      to: args.to,
+      data: args.data.dataHex,
+      deployedBytecode: args.data.contractDeployedBytecode,
+      useCall: args.useCall,
+      from: fromAddress,
+      fromSmartAccount,
+      value: queryValue,
+      gasLimit: gasLimit,
+      timestamp: args.data.timestamp,
+      authorizationList: args.authorizationList
+    }
+    const payLoad = {
+      funAbi: args.data.funAbi,
+      funArgs: args.data.funArgs,
+      contractBytecode: args.data.contractBytecode,
+      contractName: args.data.contractName,
+      contractABI: args.data.contractABI,
+      linkReferences: args.data.linkReferences
+    }
 
-      if (!tx.timestamp) tx.timestamp = Date.now()
-      const timestamp = tx.timestamp
-      this._triggerEvent('initiatingTransaction', [timestamp, tx, payLoad])
-      if (fromSmartAccount) trackMatomoEvent(this, { category: 'udapp', action: 'safeSmartAccount', name: 'txInitiatedFromSmartAccount', isClick: false })
-      try {
-        const result = await this.call('txRunner', 'rawRun', tx)
-        const isVM = this.executionContext.isVM()
-        if (isVM && tx.useCall) {
-          try {
-            result.transactionHash = await this.web3().remix.getHashFromTagBySimulator(timestamp)
-          } catch (e) {
-            console.log('unable to retrieve back the "call" hash', e)
-          }
+    if (!tx.timestamp) tx.timestamp = Date.now()
+    const timestamp = tx.timestamp
+    this._triggerEvent('initiatingTransaction', [timestamp, tx, payLoad])
+    if (fromSmartAccount) trackMatomoEvent(this, { category: 'udapp', action: 'safeSmartAccount', name: 'txInitiatedFromSmartAccount', isClick: false })
+    try {
+      const result = await this.call('txRunner', 'rawRun', tx)
+      const isVM = this.executionContext.isVM()
+      if (isVM && tx.useCall) {
+        try {
+          result.transactionHash = await this.web3().remix.getHashFromTagBySimulator(timestamp)
+        } catch (e) {
+          console.log('unable to retrieve back the "call" hash', e)
         }
-        const eventName = tx.useCall ? 'callExecuted' : 'transactionExecuted'
-
-        this._triggerEvent(eventName, [null, tx.from, tx.to, tx.data, tx.useCall, result, timestamp, payLoad])
-        return resolve({ result, tx })
-      } catch (err) {
-        return reject(err)
       }
-    })
+      const eventName = tx.useCall ? 'callExecuted' : 'transactionExecuted'
+
+      this._triggerEvent(eventName, [null, tx.from, tx.to, tx.data, tx.useCall, result, timestamp, payLoad])
+      return new Promise((resolve) => resolve({ result, tx }))
+    } catch (err) {
+      return new Promise((_, reject) => reject(err))
+    }
   }
 }

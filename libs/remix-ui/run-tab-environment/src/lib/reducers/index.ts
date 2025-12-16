@@ -2,8 +2,8 @@ import { Actions, WidgetState } from '../types'
 
 export const widgetInitialState: WidgetState = {
   providers: {
-    defaultProvider: 'vm-prague',
-    selectedProvider: 'vm-prague',
+    defaultProvider: 'vm-osaka',
+    selectedProvider: 'vm-osaka',
     providerList: [],
     isRequesting: false,
     isSuccessful: false,

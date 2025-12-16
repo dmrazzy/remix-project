@@ -7,6 +7,8 @@ import { DeployAppContext } from '../contexts'
 import { Provider } from '@remix-ui/run-tab-environment'
 import { useIntl } from 'react-intl'
 import * as remixLib from '@remix-project/remix-lib'
+import { deployContract } from '../actions'
+import { ToggleSwitch } from '@remix-ui/toggle'
 
 const txFormat = remixLib.execution.txFormat
 const txHelper = remixLib.execution.txHelper
@@ -19,6 +21,8 @@ function DeployPortraitView() {
   const [selectedContractIndex, setSelectedContractIndex] = useState<number | null>(0)
   const [expandedInputs, setExpandedInputs] = useState<Set<number>>(new Set())
   const [inputValues, setInputValues] = useState<{[key: number]: string}>({})
+  const [deployWithProxy, setDeployWithProxy] = useState<boolean>(false)
+  const [upgradeWithProxy, setUpgradeWithProxy] = useState<boolean>(false)
   const intl = useIntl()
 
   useEffect(() => {
@@ -90,6 +94,13 @@ function DeployPortraitView() {
       ...prev,
       [index]: value
     }))
+  }
+
+  const handleDeployClick = () => {
+    const args = getMultiValsString(Object.values(inputValues))
+
+    console.log('selectedContract: ', selectedContract)
+    deployContract(selectedContract?.contractData, args, { deployWithProxy, upgradeWithProxy }, plugin, intl, dispatch)
   }
 
   return (
@@ -215,6 +226,43 @@ function DeployPortraitView() {
                 )}
               </Dropdown>
             </div>
+            {/* Proxy Options */}
+            { selectedContract?.isUpgradeable && (
+              <>
+                <div className="d-flex align-items-center justify-content-between">
+                  <div className='d-flex align-items-center'>
+                    <span className="fw-light">Deploy with Proxy</span>
+                  </div>
+                  <div className="toggle-container">
+                    <div
+                      data-id={`deployWithProxyToggle`}
+                      aria-label={`Deploy with Proxy`}>
+                      <ToggleSwitch
+                        id={`deployWithProxyToggle`}
+                        isOn={deployWithProxy}
+                        onClick={() => setDeployWithProxy(!deployWithProxy)}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="d-flex align-items-center justify-content-between pb-2">
+                  <div className='d-flex align-items-center'>
+                    <span className="fw-light">Upgrade with Proxy</span>
+                  </div>
+                  <div className="toggle-container">
+                    <div
+                      data-id={`upgradeWithProxyToggle`}
+                      aria-label={`Upgrade with Proxy`}>
+                      <ToggleSwitch
+                        id={`upgradeWithProxyToggle`}
+                        isOn={upgradeWithProxy}
+                        onClick={() => setUpgradeWithProxy(!upgradeWithProxy)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Constructor Parameters */}
             {
@@ -390,6 +438,7 @@ function DeployPortraitView() {
               {/* Deploy Button */}
               <div>
                 <button
+                  onClick={handleDeployClick}
                   className="btn btn-primary w-100 py-2"
                   style={{ fontSize: '1rem', fontWeight: '500' }}
                 >
