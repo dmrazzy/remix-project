@@ -49,14 +49,14 @@ export async function addCustomInjectedProvider (providerDetails: ProviderDetail
   // name = `${name} through ${event.detail.info.name}`
   const parent = 'injected-' + event.detail.info.name
   await plugin.engine.register([new InjectedCustomProvider(event.detail.provider, name, displayName, networkId, urls, nativeCurrency, [], parent)])
-  await addProvider({ position, name, displayName: displayName + ' - ' + event.detail.info.name, providerConfig: { isInjected: true, isVM: false, isRpcForkedState: false, fork: '' } }, plugin, dispatch)
+  await addProvider({ position, name, displayName: displayName + ' - ' + event.detail.info.name, category: 'Browser Extension', providerConfig: { isInjected: true, isVM: false, isRpcForkedState: false, fork: '' } }, plugin, dispatch)
 }
 
 export async function registerInjectedProvider (event: ProviderDetailsEvent, plugin: Plugin & { engine: Engine }, dispatch: React.Dispatch<Actions>) {
   const name = 'injected-' + event.detail.info.name
   const displayName = 'Injected Provider - ' + event.detail.info.name
   await plugin.engine.register([new InjectedProviderDefault(event.detail.provider, name)])
-  await addProvider({ position: 0, name, displayName, providerConfig: { isInjected: true, isVM: false, isRpcForkedState: false, fork: '' } }, plugin, dispatch)
+  await addProvider({ position: 0, name, displayName, category: 'Browser Extension', providerConfig: { isInjected: true, isVM: false, isRpcForkedState: false, fork: '' } }, plugin, dispatch)
 
   if (event.detail.info.name === 'MetaMask') {
     await addCustomInjectedProvider({ position: 7, event, name: 'injected-metamask-optimism', displayName: 'L2 - Optimism', networkId: '0xa', urls: ['https://mainnet.optimism.io']}, plugin, dispatch)

@@ -105,6 +105,11 @@ export async function setExecutionContext (provider: Provider, plugin: Plugin, w
     }
     dispatch({ type: 'SET_CURRENT_PROVIDER', payload: provider.name })
     plugin.emit('providersChanged', provider)
+    if (provider.category === 'Browser Extension') {
+      await plugin.call('layout', 'maximiseSidePanel', 0.25)
+    } else {
+      await plugin.call('layout', 'resetSidePanel')
+    }
   }
 }
 

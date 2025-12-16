@@ -165,16 +165,16 @@ export class Layout extends Plugin {
     this.event.emit('minimizesidepanel')
   }
 
-  async maximiseSidePanel () {
+  async maximiseSidePanel (coeff?: number) {
     const current = await this.call('sidePanel', 'currentFocus')
     this.maximized[current] = true
-    this.event.emit('maximisesidepanel')
+    this.event.emit('maximisesidepanel', coeff)
   }
 
-  async maximiseRightSidePanel () {
+  async maximiseRightSidePanel (coeff?: number) {
     const current = await this.call('rightSidePanel', 'currentFocus')
     this.maximized[current] = true
-    this.event.emit('maximiseRightSidePanel')
+    this.event.emit('maximiseRightSidePanel', coeff)
   }
 
   async maximizeTerminal() {
