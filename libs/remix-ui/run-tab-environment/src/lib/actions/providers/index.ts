@@ -5,6 +5,8 @@ import { ProviderWrapper } from "./providerWrapper"
 import { InjectedCustomProvider } from "./injected-custom-provider"
 import { InjectedProviderDefault } from "./injected-provider-default"
 import { ForkedVMStateProvider } from "./vm-provider"
+// eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
+import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
 import * as packageJson from '../../../../../../../package.json'
 
 export async function addProvider (providerDetails: ProviderDetails, plugin: Plugin, dispatch: React.Dispatch<Actions>) {
@@ -94,7 +96,7 @@ export async function registerInjectedProvider (event: ProviderDetailsEvent, plu
 }
 
 // Forked VM States
-export async function addFVSProvider (stateFilePath: string, pos: number, plugin: Plugin & { engine: Engine, blockchain: Blockchain }, dispatch: React.Dispatch<Actions>) {
+export async function addFVSProvider (stateFilePath: string, pos: number, plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>) {
   let stateDetail = await plugin.call('fileManager', 'readFile', stateFilePath)
   stateDetail = JSON.parse(stateDetail)
   const providerName = 'vm-fs-' + stateDetail.stateName

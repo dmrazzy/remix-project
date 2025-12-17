@@ -7,23 +7,18 @@ const profile = {
   name: 'txRunner',
   displayName: 'TxRunner',
   description: 'Transaction deployments',
-  methods: ['resetInternalRunner', 'getPendingTransactions', 'rawRun'],
+  methods: ['resetInternalRunner', 'rawRun'],
   events: []
 }
 
 export class TxRunnerPlugin extends Plugin {
   event
-  pendingTxs
-  queueTxs
   opt = {}
   internalRunner
 
   constructor () {
     super(profile)
     this.event = new EventManager()
-
-    this.pendingTxs = {}
-    this.queueTxs = []
   }
 
   resetInternalRunner() {
@@ -34,12 +29,10 @@ export class TxRunnerPlugin extends Plugin {
     this.opt = runnerOptions
   }
 
-  getPendingTransactions() {
-    return this.pendingTxs
-  }
-
   async rawRun (args: Transaction) {
-    return await this.run(args, args.timestamp || Date.now())
+    const result = await this.run(args, args.timestamp || Date.now())
+
+    return result
   }
 
   async execute (args: Transaction) {
@@ -48,15 +41,18 @@ export class TxRunnerPlugin extends Plugin {
     if (args.deployedBytecode && args.deployedBytecode.slice(0, 2) !== '0x') {
       args.deployedBytecode = '0x' + args.deployedBytecode
     }
+
     return await this.internalRunner.execute(args)
   }
 
   async run (tx: Transaction, stamp) {
-    if (Object.keys(this.pendingTxs).length) {
-      return this.queueTxs.push({ tx, stamp })
-    }
-    this.pendingTxs[stamp] = tx
-    return await this.execute(tx)
+  //   if (Object.keys(this.pendingTxs).length) {
+  //     return this.queueTxs.push({ tx, stamp })
+  //   }
+  //   this.pendingTxs[stamp] = tx
+    const result = await this.execute(tx)
+
+    return result
     // delete this.pendingTxs[stamp]
     // if (this.queueTxs.length) {
     //   const next = this.queueTxs.pop()

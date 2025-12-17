@@ -75,63 +75,56 @@ export class ExecutionContext {
     return provider
   }
 
-  detectNetwork (callback) {
-    return new Promise((resolve, reject) => {
-      if (this.isVM()) {
-        callback && callback(null, { id: '-', name: 'VM' })
-        return resolve({ id: '-', name: 'VM' })
-      } else {
-        if (!provider) {
-          callback && callback('No provider set')
-          return reject('No provider set')
-        }
-        const cb = async (err, id) => {
-          let name = 'Custom'
-          let networkNativeCurrency = { name: "Ether", symbol: "ETH", decimals: 18 }
-          if (err) name = 'Unknown'
-          // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md
-          else if (id === 1) name = 'Main'
-          else if (id === 11155111) name = 'Sepolia'
-          else {
-            let networkDetails = localStorage.getItem('networkDetails')
-            if (!networkDetails) networkDetails = '{}'
-            networkDetails = JSON.parse(networkDetails)
-            if (networkDetails[id]) {
-              name = networkDetails[id].name
-              networkNativeCurrency = networkDetails[id].nativeCurrency
-            } else {
-              const response = await fetch('https://chainid.network/chains.json')
-              if (response.ok) {
-                const networks = await response.json()
-                const connectedNetwork = networks.find((n) => n.chainId === id)
-                if (connectedNetwork) {
-                  name = connectedNetwork.name
-                  networkNativeCurrency = connectedNetwork.nativeCurrency
-                  networkDetails[id] = { name, nativeCurrency:  networkNativeCurrency}
-                  localStorage.setItem('networkDetails', JSON.stringify(networkDetails))
-                }
-              }
+  async detectNetwork () {
+    if (this.isVM()) {
+      return { id: '-', name: 'VM' }
+    } else {
+      if (!provider) {
+        throw new Error('No provider set')
+      }
+      const network = await provider.getNetwork()
+      const id = parseInt(network.chainId)
+      let name = 'Custom'
+      let networkNativeCurrency = { name: "Ether", symbol: "ETH", decimals: 18 }
+      // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md
+      if (id === 1) name = 'Main'
+      else if (id === 11155111) name = 'Sepolia'
+      else {
+        let networkDetails = localStorage.getItem('networkDetails')
+        if (!networkDetails) networkDetails = '{}'
+        networkDetails = JSON.parse(networkDetails)
+        if (networkDetails[id]) {
+          name = networkDetails[id].name
+          networkNativeCurrency = networkDetails[id].nativeCurrency
+        } else {
+          const response = await fetch('https://chainid.network/chains.json')
+          if (response.ok) {
+            const networks = await response.json()
+            const connectedNetwork = networks.find((n) => n.chainId === id)
+            if (connectedNetwork) {
+              name = connectedNetwork.name
+              networkNativeCurrency = connectedNetwork.nativeCurrency
+              networkDetails[id] = { name, nativeCurrency:  networkNativeCurrency}
+              localStorage.setItem('networkDetails', JSON.stringify(networkDetails))
             }
           }
-        
-          if (id === 1) {
-            provider.getBlock(0).then((block) => {
-              if (block && block.hash !== this.mainNetGenesisHash) name = 'Custom'
-              callback && callback(err, { id, name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency })
-              return resolve({ id, name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency })
-            }).catch((error) => {
-              // Rabby wallet throws an error at this point. We are in that case unable to check the genesis hash.
-              callback && callback(err, { id, name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency })
-              return resolve({ id, name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency })
-            })
-          } else {
-            callback && callback(err, { id, name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency })
-            return resolve({ id, name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency })
-          }
         }
-        provider.getNetwork().then(async (network) => await cb(null, parseInt(network.chainId))).catch(err => cb(err))
       }
-    })
+        
+      if (id === 1) {
+        try {
+          const block = await provider.getBlock(0)
+
+          if (block && block.hash !== this.mainNetGenesisHash) name = 'Custom'
+          return { id: id.toString(), name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency }
+        } catch(error) {
+          // Rabby wallet throws an error at this point. We are in that case unable to check the genesis hash.
+          return { id: id.toString(), name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency }
+        }
+      } else {
+        return { id: id.toString(), name, lastBlock: this.lastBlock, currentFork: this.currentFork, networkNativeCurrency }
+      }
+    }
   }
 
   removeProvider (name) {

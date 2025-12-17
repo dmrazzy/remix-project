@@ -48,7 +48,6 @@ const profile = {
   methods: [
     'createVMAccount',
     'sendTransaction',
-    'getAccounts',
     'pendingTransactionsCount',
     'getSettings',
     'setEnvironmentMode',
@@ -194,10 +193,6 @@ export class RunTab extends ViewPlugin {
     return this.blockchain.sendTransaction(tx)
   }
 
-  getAccounts(cb) {
-    return this.blockchain.getAccounts(cb)
-  }
-
   getRunTabAPI(){
     return this.REACT_API;
   }
@@ -239,10 +234,6 @@ export class RunTab extends ViewPlugin {
     });
 
     return deployedContracts;
-  }
-
-  pendingTransactionsCount() {
-    return this.blockchain.pendingTransactionsCount()
   }
 
   setDispatch(dispatch: (state: any) => void) {

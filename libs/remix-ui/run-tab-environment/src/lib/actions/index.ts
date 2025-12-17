@@ -8,8 +8,10 @@ import { addFVSProvider } from "./providers"
 import React from "react"
 import { aaLocalStorageKey } from "@remix-project/remix-lib"
 export * from "./providers"
+// eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
+import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
 
-export async function resetVmState (plugin: Plugin, widgetState: WidgetState, intl: IntlShape) {
+export async function resetVmState (plugin: EnvironmentPlugin, widgetState: WidgetState, intl: IntlShape) {
   const context = widgetState.providers.selectedProvider
   const contextExists = await plugin.call('fileManager', 'exists', `.states/${context}/state.json`)
 
@@ -38,7 +40,7 @@ export async function resetVmState (plugin: Plugin, widgetState: WidgetState, in
   } else plugin.call('notification', 'toast', `State not available to reset, as no transactions have been made for selected environment & selected workspace.`)
 }
 
-export async function forkState (widgetState: WidgetState, plugin: Plugin & { engine: Engine, blockchain: Blockchain }, dispatch: React.Dispatch<Actions>, intl: IntlShape) {
+export async function forkState (widgetState: WidgetState, plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>, intl: IntlShape) {
   const provider = widgetState.providers.providerList.find(provider => provider.name === widgetState.providers.selectedProvider)
   if (!provider) {
     plugin.call('notification', 'toast', `Provider not found.`)
@@ -94,7 +96,7 @@ export async function forkState (widgetState: WidgetState, plugin: Plugin & { en
   })
 }
 
-export async function setExecutionContext (provider: Provider, plugin: Plugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
+export async function setExecutionContext (provider: Provider, plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
   if (provider.name !== widgetState.providers.selectedProvider) {
     if (provider.name === 'walletconnect') {
       await setWalletConnectExecutionContext(plugin, { context: provider.name, fork: provider.config.fork })
@@ -136,7 +138,7 @@ function cleanupWalletConnectEvents (plugin: Plugin) {
   plugin.off('walletconnect', 'connectionSuccessful')
 }
 
-export async function getAccountsList (plugin: Plugin & { blockchain: Blockchain }, dispatch: React.Dispatch<Actions>, widgetState: WidgetState) {
+export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>, widgetState: WidgetState) {
   let accounts = await plugin.call('blockchain', 'getAccounts')
   const provider = await plugin.call('blockchain', 'getProvider')
   let safeAddresses = []

@@ -14,7 +14,7 @@ import { etherScanLink, getBlockScoutUrl } from './helper'
 import { logBuilder, cancelUpgradeMsg, cancelProxyMsg, addressToString } from '@remix-ui/helper'
 import { Provider } from '@remix-ui/environment-explorer'
 
-const { txFormat, txExecution, typeConversion, txListener: Txlistener, TxRunnerWeb3, txHelper } = execution
+const { txFormat, txExecution, typeConversion, txListener: Txlistener, txHelper } = execution
 const { txResultHelper } = helpers
 const { resultToRemixTx } = txResultHelper
 import * as packageJson from '../../../../package.json'
@@ -199,40 +199,39 @@ export class Blockchain extends Plugin {
       this._triggerEvent('networkStatus', [this.networkStatus])
     }, 30000)
 
-    this.on('txRunner','transactionBroadcasted', (txhash, isUserOp) => {
+    this.on('txRunner','transactionBroadcasted', async (txhash, isUserOp) => {
       if (isUserOp) trackMatomoEvent(this, { category: 'udapp', action: 'safeSmartAccount', name: 'txBroadcastedFromSmartAccount', isClick: false })
       // logTransaction(txhash, 'gui')
-      this.executionContext.detectNetwork(async (error, network) => {
-        if (error || !network) return
-        if (network.name === 'VM') return
-        const viewEtherScanLink = etherScanLink(network.name, txhash)
-        const viewBlockScoutLink = await getBlockScoutUrl(network.id, txhash)
-        if (viewEtherScanLink) {
-          this.call(
-            'terminal',
-            'logHtml',
-            <span className="flex flex-row">
-              <a href={etherScanLink(network.name, txhash)} className="me-3" target="_blank">
+      const network = await this.executionContext.detectNetwork()
+      if (!network) return
+      if (network.name === 'VM') return
+      const viewEtherScanLink = etherScanLink(network.name, txhash)
+      const viewBlockScoutLink = await getBlockScoutUrl(network.id as any, txhash)
+      if (viewEtherScanLink) {
+        this.call(
+          'terminal',
+          'logHtml',
+          <span className="flex flex-row">
+            <a href={etherScanLink(network.name, txhash)} className="me-3" target="_blank">
                   view on Etherscan
-              </a>
-              {' '}
-              {viewBlockScoutLink && <a href={viewBlockScoutLink} target="_blank">
+            </a>
+            {' '}
+            {viewBlockScoutLink && <a href={viewBlockScoutLink} target="_blank">
                   view on Blockscout
-              </a>}
-            </span>
-          )
-        } else {
-          this.call(
-            'terminal',
-            'logHtml',
-            <span className="flex flex-row">
-              {viewBlockScoutLink && <a href={viewBlockScoutLink} target="_blank">
+            </a>}
+          </span>
+        )
+      } else {
+        this.call(
+          'terminal',
+          'logHtml',
+          <span className="flex flex-row">
+            {viewBlockScoutLink && <a href={viewBlockScoutLink} target="_blank">
                   view on Blockscout
-              </a>}
-            </span>
-          )
-        }
-      })
+            </a>}
+          </span>
+        )
+      }
     })
   }
 
@@ -265,16 +264,13 @@ export class Blockchain extends Plugin {
 
   /** Return the list of accounts */
   // note: the dual promise/callback is kept for now as it was before
-  getAccounts(cb) {
+  getAccounts() {
     return new Promise((resolve, reject) => {
       this.getCurrentProvider().getAccounts((error, accounts) => {
-        if (cb) {
-          return cb(error, accounts)
-        }
         if (error) {
           reject(error)
         }
-        resolve(accounts)
+        return resolve(accounts)
       })
     })
   }
@@ -323,6 +319,7 @@ export class Blockchain extends Plugin {
 
   async deployContractAndLibraries(selectedContract, args, contractMetadata, compilerContracts) {
     const constructor = selectedContract.getConstructorInterface()
+
     try {
       const data = await txFormat.buildData(
         selectedContract.name,
@@ -632,7 +629,7 @@ export class Blockchain extends Plugin {
   }
 
   async detectNetwork() {
-    return this.executionContext.detectNetwork()
+    return await this.executionContext.detectNetwork()
   }
 
   isVM() {
@@ -842,10 +839,6 @@ export class Blockchain extends Plugin {
     return this.getCurrentProvider().getBalanceInEther(address)
   }
 
-  async pendingTransactionsCount() {
-    return Object.keys(await this.call('txRunner', 'getPendingTransactions')).length
-  }
-
   async getCode(address) {
     return await this.web3().getCode(address)
   }
@@ -982,34 +975,31 @@ export class Blockchain extends Plugin {
   }
 
   async getAccount(args) {
-    return new Promise((resolve, reject) => {
-      if (args.from) {
-        return resolve(args.from)
-      }
-      this.call('udappEnv', 'getSelectedAccount').then((address) => {
-        if (!address)
-          return reject(
-            '"from" is not defined. Please make sure an account is selected. If you are using a public node, it is likely that no account will be provided. In that case, add the public node to your injected provider (type Metamask) and use injected provider in Remix.'
-          )
-        return resolve(address)
-      }).catch(() => {
-        this.getAccounts(function (err, accounts) {
-          if (err) return reject(err)
-          const address = accounts[0]
+    if (args.from) {
+      return new Promise((resolve) => resolve(args.from))
+    }
+    try {
+      const address = await this.call('udappEnv', 'getSelectedAccount')
 
-          if (!address) return reject('No accounts available')
-          if (this.executionContext.isVM() && !this.providers.vm.RemixSimulatorProvider.Accounts.accounts[address]) {
-            return reject('Invalid account selected')
-          }
-          return resolve(address)
-        })
-      })
-    })
+      if (!address) throw new Error('"from" is not defined. Please make sure an account is selected. If you are using a public node, it is likely that no account will be provided. In that case, add the public node to your injected provider (type Metamask) and use injected provider in Remix.')
+      return address
+    } catch (error) {
+      const accounts = await this.getAccounts()
+      const address = accounts[0]
+
+      if (!address) throw new Error('No accounts available')
+      // @ts-ignore
+      if (this.executionContext.isVM() && !this.providers.vm.RemixSimulatorProvider.Accounts.accounts[address]) {
+        throw new Error('Invalid account selected')
+      }
+      return address
+    }
   }
 
   async runTransaction(args) {
     const gasLimit = await this.call('udappDeploy', 'getGasLimit')
-    const queryValue = !args.useCall ? await this.call('udappDeploy', 'getValue') : 0
+    const value = await this.call('udappDeploy', 'getValue')
+    const queryValue = !args.useCall ? value : 0
     let fromAddress
     let fromSmartAccount
     let authorizationList

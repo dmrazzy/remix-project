@@ -5,12 +5,13 @@ import type { Blockchain } from '../../blockchain/blockchain'
 import type { CompilerArtefacts } from '@remix-project/core-plugin'
 import { DeployWidgetState, Actions, GasEstimationPrompt, MainnetPrompt, DeployUdappTx, DeployUdappNetwork } from '@remix-ui/run-tab-deploy'
 import BN from 'bn.js'
+import { parseUnits } from 'ethers'
 
 const profile = {
   name: 'udappDeploy',
   displayName: 'Udapp Deploy',
   description: 'Handles contract deployment UI and state',
-  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'setGasPriceStatus', 'setConfirmSettings', 'getMaxFee', 'getMaxPriorityFee', 'setMaxPriorityFee', 'setGasPrice', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue'],
+  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'setGasPriceStatus', 'setConfirmSettings', 'getMaxFee', 'getMaxPriorityFee', 'setMaxPriorityFee', 'setGasPrice', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue', 'getGasEstimationPrompt', 'getMainnetPrompt', 'getGasPriceStatus'],
   events: []
 }
 
@@ -38,8 +39,8 @@ export class DeployPlugin extends Plugin {
     return '0x' + new BN( this.getWidgetState()?.gasLimit, 10).toString(16)
   }
 
-  async getValue(): Promise<number> {
-    return await this.call('blockchain', 'toWei', this.getWidgetState()?.value?.toString(), this.getWidgetState()?.valueUnit)
+  getValue(): string {
+    return (parseUnits(this.getWidgetState()?.value.toString() || '0', this.getValueUnit() || 'gwei')).toString()
   }
 
   getValueUnit(): 'wei' | 'gwei' | 'finney' | 'ether' {
@@ -72,6 +73,10 @@ export class DeployPlugin extends Plugin {
 
   getMainnetPrompt(tx: DeployUdappTx, network: DeployUdappNetwork, amount: string, gasEstimation: string): React.ReactElement {
     return <MainnetPrompt udappDeploy={this} tx={tx} network={network} amount={amount} gasEstimation={gasEstimation} />
+  }
+
+  getGasPriceStatus(): boolean {
+    return this.getWidgetState()?.gasPriceStatus
   }
 
   setGasPriceStatus(status: boolean) {

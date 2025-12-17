@@ -1,12 +1,10 @@
 import React, { useEffect, useReducer, useState } from 'react'
-import { IntlProvider } from 'react-intl'
 import isElectron from 'is-electron'
 import { EnvAppContext } from './contexts'
 import { widgetInitialState, widgetReducer } from './reducers'
 import EnvironmentPortraitView from './widgets/envPortraitView'
 import { addFVSProvider, addProvider, getAccountsList, registerInjectedProvider } from './actions'
-import { Blockchain, ProviderDetailsEvent } from './types'
-import { Engine, Plugin } from '@remixproject/engine'
+import { ProviderDetailsEvent } from './types'
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
 

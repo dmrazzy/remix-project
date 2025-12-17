@@ -99,7 +99,6 @@ function DeployPortraitView() {
   const handleDeployClick = () => {
     const args = getMultiValsString(Object.values(inputValues))
 
-    console.log('selectedContract: ', selectedContract)
     deployContract(selectedContract?.contractData, args, { deployWithProxy, upgradeWithProxy }, plugin, intl, dispatch)
   }
 

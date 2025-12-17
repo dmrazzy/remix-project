@@ -138,8 +138,10 @@ export class TxRunnerWeb3 {
     })
   }
 
-  execute (args: InternalTransaction) {
-    return this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp)
+  async execute (args: InternalTransaction) {
+    const result = await this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp)
+
+    return result
   }
 
   async runInNode (from, fromSmartAccount, deployedBytecode, to, data, value, gasLimit, useCall, timestamp) {
@@ -152,11 +154,12 @@ export class TxRunnerWeb3 {
         web3.remix.registerCallId(timestamp)
       }
       const result = await web3.call(tx)
+
       return {
         result: result
       }
     }
-    const network = await this._api.call('blockchain', 'detectNetwork')
+    const network = await this._api.call('network', 'detectNetwork')
     const txCopy = { ...tx, type: undefined, maxFeePerGas: undefined, gasPrice: undefined }
 
     if (network && network.lastBlock) {
@@ -172,6 +175,7 @@ export class TxRunnerWeb3 {
     }
     const ethersProvider = await this._api.call('blockchain', 'getWeb3')
     const config = Registry.getInstance().get('config').api
+
     try {
       const gasEstimationBigInt = await ethersProvider.estimateGas(txCopy)
       // continueTxExecution()

@@ -185,11 +185,8 @@ export const createInstance = async (selectedContract: ContractData, args, deplo
   }
 
   // trackMatomoEvent(plugin, { category: 'udapp', action: 'DeployContractTo', name: plugin.REACT_API.networkName, isClick: true })
-
   if (!contractMetadata || (contractMetadata && contractMetadata.autoDeployLib)) {
-    const contract = await plugin.call('blockchain', 'deployContractAndLibraries', selectedContract, args, contractMetadata, compilerContracts)
-
-    console.log('contract: ', contract)
+    await plugin.call('blockchain', 'deployContractAndLibraries', selectedContract, args, contractMetadata, compilerContracts)
     return
   }
   if (Object.keys(selectedContract.bytecodeLinkReferences).length) {

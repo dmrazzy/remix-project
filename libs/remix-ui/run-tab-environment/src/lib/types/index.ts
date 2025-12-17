@@ -1,9 +1,11 @@
-import { Engine, Plugin } from "@remixproject/engine"
+import { Plugin } from "@remixproject/engine"
 import { Dispatch } from 'react'
 import { EventEmitter } from "events"
+// eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
+import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
 
 export interface EnvironmentAppContext {
-  plugin: Plugin & { engine: Engine, blockchain: Blockchain }
+  plugin: EnvironmentPlugin
   widgetState: WidgetState
   dispatch: Dispatch<Actions>
 }
@@ -11,7 +13,7 @@ export interface EnvironmentAppContext {
 export interface IEnvWidgetContext {
   widgetState: WidgetState
   dispatch: Dispatch<Actions>,
-  plugin: Plugin
+  plugin: EnvironmentPlugin
 }
 
 export interface WidgetState {
