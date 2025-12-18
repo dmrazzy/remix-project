@@ -5,7 +5,7 @@ import { CompilerAbstract } from "@remix-project/remix-solidity"
 import type { ContractData } from "@remix-project/core-plugin"
 import { execution } from '@remix-project/remix-lib'
 import { IntlShape } from "react-intl"
-import { isOverSizePrompt } from "@remix-ui/helper"
+import { deployWithProxyMsg, isOverSizePrompt } from "@remix-ui/helper"
 
 export async function broadcastCompilationResult (compilerName: string, compileRawResult: CompilationRawResult, plugin: Plugin, dispatch: React.Dispatch<Actions>) {
   const { file, source, languageVersion, data, input } = compileRawResult
@@ -104,26 +104,17 @@ export function deployContract(selectedContract: ContractData, args: string, dep
     // if (selectedContract.name !== currentContract && selectedContract.name === 'ERC1967Proxy') selectedContract.name = currentContract
 
     if (isProxyDeployment) {
-    //     props.modal(
-    //       'Deploy Implementation & Proxy (ERC1967)',
-    //       deployWithProxyMsg(),
-    //       intl.formatMessage({ id: 'udapp.proceed' }),
-    //       () => {
-    //         props.createInstance(
-    //           loadedContractData,
-    //           props.gasEstimationPrompt,
-    //           props.passphrasePrompt,
-    //           props.publishToStorage,
-    //           props.mainnetPrompt,
-    //           isOverSizePrompt,
-    //           args,
-    //           deployMode,
-    //           isVerifyChecked
-    //         )
-    //       },
-    //       intl.formatMessage({ id: 'udapp.cancel' }),
-    //       () => {}
-    //     )
+      plugin.call('notification', 'modal', {
+        id: 'confirmProxyDeployment',
+        title: 'Deploy Implementation & Proxy (ERC1967)',
+        message: deployWithProxyMsg(),
+        okLabel: intl.formatMessage({ id: 'udapp.proceed' }),
+        okFn: () => {
+          createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
+        },
+        cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
+        cancelFn: () => {}
+      })
     } else if (isContractUpgrade) {
     //     props.modal(
     //       'Deploy Implementation & Update Proxy',

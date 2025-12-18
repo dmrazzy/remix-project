@@ -134,7 +134,7 @@ export function RunTabUI(props: RunTabProps) {
   //   const fetchDetails = await plugin.call('solidity', 'getCompilerQueryParameters')
   //   const compilerState = await plugin.call('solidity', 'getCompilerState')
 
-    // if no contract file is open, don't do anything
+  // if no contract file is open, don't do anything
   //   if (compilerState.target !== null) {
   //     const targetChainId = runTab.chainId
   //     const ideDefault = fetchDetails && fetchDetails.evmVersion !== null ? fetchDetails.evmVersion : 'osaka'

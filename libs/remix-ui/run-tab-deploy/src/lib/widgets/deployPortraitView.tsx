@@ -15,6 +15,7 @@ const txHelper = remixLib.execution.txHelper
 
 function DeployPortraitView() {
   const { plugin, widgetState, dispatch } = useContext(DeployAppContext)
+  // TODO: Move all state to reducer
   const [isExpanded, setIsExpanded] = useState(true)
   const [defaultProvider, setDefaultProvider] = useState<string | null>(null)
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
