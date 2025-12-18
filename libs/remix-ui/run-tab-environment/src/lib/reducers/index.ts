@@ -17,6 +17,15 @@ export const widgetInitialState: WidgetState = {
     isSuccessful: false,
     error: null
   },
+  fork: {
+    isVisible: {
+      forkUI: false,
+      resetUI: false
+    },
+    isRequesting: false,
+    isSuccessful: false,
+    error: null
+  },
   network: {
     chainId: '',
     name: ''
@@ -151,6 +160,94 @@ export const widgetReducer = (state = widgetInitialState, action: Actions): Widg
       accounts: {
         ...state.accounts,
         selectedAccount: action.payload
+      }
+    }
+  }
+
+  case 'SHOW_FORK_UI': {
+    return {
+      ...state,
+      fork: {
+        ...state.fork,
+        isVisible: {
+          ...state.fork.isVisible,
+          forkUI: true
+        }
+      }
+    }
+  }
+
+  case 'HIDE_FORK_UI': {
+    return {
+      ...state,
+      fork: {
+        ...state.fork,
+        isVisible: {
+          ...state.fork.isVisible,
+          forkUI: false
+        }
+      }
+    }
+  }
+
+  case 'SHOW_RESET_UI': {
+    return {
+      ...state,
+      fork: {
+        ...state.fork,
+        isVisible: {
+          ...state.fork.isVisible,
+          resetUI: true
+        }
+      }
+    }
+  }
+
+  case 'HIDE_RESET_UI': {
+    return {
+      ...state,
+      fork: {
+        ...state.fork,
+        isVisible: {
+          ...state.fork.isVisible,
+          resetUI: false
+        }
+      }
+    }
+  }
+
+  case 'REQUEST_FORK': {
+    return {
+      ...state,
+      fork: {
+        ...state.fork,
+        isRequesting: true,
+        isSuccessful: false,
+        error: null
+      }
+    }
+  }
+
+  case 'COMPLETED_FORK': {
+    return {
+      ...state,
+      fork: {
+        ...state.fork,
+        isRequesting: false,
+        isSuccessful: true,
+        error: null
+      }
+    }
+  }
+
+  case 'ERROR_FORK': {
+    return {
+      ...state,
+      fork: {
+        ...state.fork,
+        isRequesting: false,
+        isSuccessful: false,
+        error: action.payload
       }
     }
   }

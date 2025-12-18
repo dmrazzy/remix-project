@@ -1,6 +1,6 @@
 import { Plugin } from '@remixproject/engine'
 import { AppModal, AlertModal, ModalTypes } from '@remix-ui/app'
-import type { Blockchain } from '../../types'
+import type { Blockchain } from 'apps/remix-ide/src/blockchain/blockchain' // eslint-disable-line
 import { JsonRpcProvider } from 'ethers'
 
 export type JsonDataRequest = {

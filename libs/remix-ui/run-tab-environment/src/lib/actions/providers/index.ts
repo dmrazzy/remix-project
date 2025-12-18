@@ -1,5 +1,5 @@
 import { Engine, Plugin } from "@remixproject/engine"
-import { Actions, Blockchain, ProviderDetails, ProviderDetailsEvent } from "../../types"
+import { Actions, ProviderDetails, ProviderDetailsEvent } from "../../types"
 import { PROVIDER_DESCRIPTIONS, PROVIDER_LOGOS } from "../../constants"
 import { ProviderWrapper } from "./providerWrapper"
 import { InjectedCustomProvider } from "./injected-custom-provider"
@@ -118,5 +118,5 @@ export async function addFVSProvider (stateFilePath: string, pos: number, plugin
   const isRpcForkedState = !!stateDetail.nodeUrl
 
   plugin.engine.register(fvsProvider)
-  await addProvider({ position: pos, name: providerName, displayName: stateDetail.stateName, providerConfig: { nodeUrl: stateDetail.nodeUrl, baseBlockNumber: stateDetail.baseBlockNumber, isInjected: false, isVM: true, isRpcForkedState, isVMStateForked: true, statePath: `.states/forked_states/${stateDetail.stateName}.json`, fork: stateDetail.forkName } }, plugin, dispatch)
+  await addProvider({ position: pos, name: providerName, displayName: stateDetail.stateName, category: 'Forked State', providerConfig: { nodeUrl: stateDetail.nodeUrl, baseBlockNumber: stateDetail.baseBlockNumber, isInjected: false, isVM: true, isRpcForkedState, isVMStateForked: true, statePath: `.states/forked_states/${stateDetail.stateName}.json`, fork: stateDetail.forkName } }, plugin, dispatch)
 }
