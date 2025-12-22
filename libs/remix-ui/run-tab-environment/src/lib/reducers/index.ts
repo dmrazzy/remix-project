@@ -29,7 +29,8 @@ export const widgetInitialState: WidgetState = {
   network: {
     chainId: '',
     name: ''
-  }
+  },
+  matchPassphrase: null
 }
 
 export const widgetReducer = (state = widgetInitialState, action: Actions): WidgetState => {
@@ -249,6 +250,13 @@ export const widgetReducer = (state = widgetInitialState, action: Actions): Widg
         isSuccessful: false,
         error: action.payload
       }
+    }
+  }
+
+  case 'SET_MATCH_PASSPHRASE': {
+    return {
+      ...state,
+      matchPassphrase: action.payload
     }
   }
 

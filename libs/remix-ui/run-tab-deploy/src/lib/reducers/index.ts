@@ -12,7 +12,7 @@ export const deployInitialState: DeployWidgetState = {
   maxFee: '',
   maxPriorityFee: '.0001',
   baseFeePerGas: '',
-  gasPrice: '',
+  gasPrice: ''
 }
 
 export const deployReducer = (state = deployInitialState, action: Actions): DeployWidgetState => {

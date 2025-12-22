@@ -24,7 +24,7 @@ const profile = {
   name: 'blockchain',
   displayName: 'Blockchain',
   description: 'Blockchain - Logic',
-  methods: ['dumpState', 'getCode', 'getTransactionReceipt', 'addProvider', 'removeProvider', 'getCurrentFork', 'isSmartAccount', 'getAccounts', 'web3VM', 'web3', 'sendRpc', 'getProvider', 'getCurrentProvider', 'getCurrentNetworkStatus', 'getCurrentNetworkCurrency', 'getAllProviders', 'getPinnedProviders', 'changeExecutionContext', 'getProviderObject', 'runTx', 'getBalanceInEther', 'getCurrentProvider', 'deployContractAndLibraries', 'runOrCallContractMethod', 'getStateDetails', 'resetAndInit', 'detectNetwork', 'isVM', 'getWeb3', 'fromWei', 'toWei', 'deployContractWithLibrary'],
+  methods: ['dumpState', 'getCode', 'getTransactionReceipt', 'addProvider', 'removeProvider', 'getCurrentFork', 'isSmartAccount', 'getAccounts', 'web3VM', 'web3', 'sendRpc', 'getProvider', 'getCurrentProvider', 'getCurrentNetworkStatus', 'getCurrentNetworkCurrency', 'getAllProviders', 'getPinnedProviders', 'changeExecutionContext', 'getProviderObject', 'runTx', 'getBalanceInEther', 'getCurrentProvider', 'deployContractAndLibraries', 'runOrCallContractMethod', 'getStateDetails', 'resetAndInit', 'detectNetwork', 'isVM', 'getWeb3', 'fromWei', 'toWei', 'deployContractWithLibrary', 'newAccount'],
   version: packageJson.version
 }
 
@@ -830,8 +830,36 @@ export class Blockchain extends Plugin {
     return (this.providers.vm as VMProvider).createVMAccount(newAccount)
   }
 
-  newAccount(_password, passwordPromptCb, cb) {
-    return this.getCurrentProvider().newAccount(passwordPromptCb, cb)
+  async newAccount() {
+    const passphrasePrompt = await this.call('udappEnv', 'getPassphrasePrompt')
+
+    return new Promise((resolve, reject) => {
+      this.getCurrentProvider().newAccount((cb) => {
+        this.call('notification', 'modal', {
+          id: 'newAccount',
+          title: 'Enter Passphrase',
+          message: passphrasePrompt,
+          okLabel: 'OK',
+          cancelLabel: 'Cancel',
+          okFn: async () => {
+            const passphrase = await this.call('udappEnv', 'getPassphrase')
+
+            if (!passphrase) {
+              return reject('Passphrase does not match')
+            }
+            cb(passphrase)
+          },
+          cancelFn: () => {
+            reject('Canceled by user')
+          }
+        })
+      }, (error, address) => {
+        if (error) {
+          return reject(error)
+        }
+        return resolve(address)
+      })
+    })
   }
 
   /** Get the balance of an address, and convert wei to ether */

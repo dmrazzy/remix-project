@@ -44,7 +44,8 @@ export interface WidgetState {
   network: {
     chainId: string,
     name: string
-  }
+  },
+  matchPassphrase: string
 }
 
 export interface ActionPayloadTypes {
@@ -64,7 +65,8 @@ export interface ActionPayloadTypes {
   HIDE_RESET_UI: undefined,
   REQUEST_FORK: undefined,
   COMPLETED_FORK: undefined,
-  ERROR_FORK: string
+  ERROR_FORK: string,
+  SET_MATCH_PASSPHRASE: string
 }
 export interface Action<T extends keyof ActionPayloadTypes> {
   type: T

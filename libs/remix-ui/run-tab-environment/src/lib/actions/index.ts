@@ -1,6 +1,5 @@
 import { Engine, Plugin } from "@remixproject/engine"
 import { Actions, Provider, WidgetState } from "../types"
-import DeleteVmStatePrompt from "../components/deleteVMStatePrompt"
 import { trackMatomoEvent } from "@remix-api"
 import { IntlShape } from "react-intl"
 import { addFVSProvider } from "./providers"
@@ -144,20 +143,20 @@ export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: Reac
       defaultAccounts.push({
         alias: `Account ${index}`,
         account: account,
-        balance: balance,
+        balance: parseFloat(balance).toFixed(4),
         symbol: plugin.blockchain['networkNativeCurrency'].symbol
       })
     else
       defaultAccounts.push({
         alias: `Account ${index}`,
         account: account,
-        balance: balance,
+        balance: parseFloat(balance).toFixed(4),
         symbol: plugin.blockchain['networkNativeCurrency'].symbol
       })
     if (safeAddresses.length && safeAddresses.includes(account)) smartAccounts.push({
       alias: `Account ${index}`,
       account: account,
-      balance: balance
+      balance: parseFloat(balance).toFixed(4)
     })
     index++
   }
@@ -182,5 +181,16 @@ function loadSmartAccounts (widgetState: WidgetState) {
     const objToStore = {}
     objToStore[chainId] = {}
     localStorage.setItem(aaLocalStorageKey, JSON.stringify(objToStore))
+  }
+}
+
+export async function createNewAccount (plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
+  try {
+    const address = await plugin.call('blockchain', 'newAccount')
+
+    plugin.call('notification', 'toast', `account ${address} created`)
+    await getAccountsList(plugin, dispatch, widgetState)
+  } catch (error) {
+    return plugin.call('notification', 'toast', 'Cannot create an account: ' + error)
   }
 }

@@ -66,7 +66,7 @@ export function ResetUI() {
               flex: 1
             }}
           >
-            {widgetState.fork.isRequesting ? <Spinner animation="border" size="sm" /> : intl.formatMessage({ id: 'udapp.reset' })}
+            {widgetState.fork.isRequesting ? <Spinner animation="border" size="sm" /> : intl.formatMessage({ id: 'udapp.yesReset' })}
           </button>
         </div>
       </div>

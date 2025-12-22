@@ -30,3 +30,33 @@
   .account-kebab-icon:hover {
     color: white !important;
   }
+  .selected-account-balance-container {
+    position: relative;
+  }
+  .selected-account-balance-text {
+    display: block;
+  }
+  .selected-account-kebab-icon {
+    display: none;
+  }
+  .selected-account-hover:hover .selected-account-balance-text,
+  .selected-account-hover.dropdown-open .selected-account-balance-text,
+  .selected-account-balance-container.kebab-menu-open .selected-account-balance-text {
+    display: none;
+  }
+  .selected-account-hover:hover .selected-account-kebab-icon,
+  .selected-account-hover.dropdown-open .selected-account-kebab-icon,
+  .selected-account-balance-container.kebab-menu-open .selected-account-kebab-icon {
+    display: block;
+    padding-right: 0.5rem;
+  }
+  .selected-account-kebab-icon:hover {
+    color: white !important;
+  }
+  .account-balance-container.kebab-menu-open .account-balance-text {
+    display: none;
+  }
+  .account-balance-container.kebab-menu-open .account-kebab-icon {
+    display: block;
+    padding-right: 0.5rem;
+  }

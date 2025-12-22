@@ -37,7 +37,7 @@ export function EnvCategoryUI () {
         </div>
       </Dropdown.Toggle>
 
-      <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
+      <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-3)', zIndex: 1000 }}>
         {subCategories.map((provider) => {
           return (
             <Dropdown.Item key={provider.name} onClick={() => handleCategorySelection(provider)} className="category-item-hover">

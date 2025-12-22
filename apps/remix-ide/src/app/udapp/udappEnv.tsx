@@ -1,14 +1,14 @@
 import React from 'react'
 import { Engine, Plugin } from '@remixproject/engine'
-import { EnvironmentWidget } from '@remix-ui/run-tab-environment'
+import { Actions, EnvironmentWidget } from '@remix-ui/run-tab-environment'
 import type { Blockchain } from '../../blockchain/blockchain'
-import { WidgetState, Account } from '@remix-ui/run-tab-environment'
+import { WidgetState, Account, PassphraseCreationPrompt } from '@remix-ui/run-tab-environment'
 
 const profile = {
   name: 'udappEnv',
   displayName: 'Udapp Environment',
   description: 'Maintains the schema for deployment and execution environment',
-  methods: ['getUI', 'getSelectedAccount', 'isSmartAccount', 'getDefaultProvider'],
+  methods: ['getUI', 'getSelectedAccount', 'isSmartAccount', 'getDefaultProvider', 'getPassphrasePrompt'],
   events: []
 }
 
@@ -16,6 +16,7 @@ export class EnvironmentPlugin extends Plugin {
   engine: Engine
   blockchain: Blockchain
   private getWidgetState: (() => WidgetState) | null = null
+  private getDispatch: (() => React.Dispatch<Actions>) | null = null
 
   constructor () {
     super(profile)
@@ -23,6 +24,10 @@ export class EnvironmentPlugin extends Plugin {
 
   setStateGetter(getter: () => WidgetState) {
     this.getWidgetState = getter
+  }
+
+  setDispatchGetter(getter: () => React.Dispatch<Actions>) {
+    this.getDispatch = getter
   }
 
   getSelectedAccount () {
@@ -49,5 +54,13 @@ export class EnvironmentPlugin extends Plugin {
     this.engine = engine
     this.blockchain = blockchain
     return <EnvironmentWidget plugin={this} />
+  }
+
+  getPassphrasePrompt(): React.ReactElement {
+    return <PassphraseCreationPrompt udappEnv={this} />
+  }
+
+  setMatchPassphrase(matchPassphrase: string) {
+    this.getDispatch()({ type: 'SET_MATCH_PASSPHRASE', payload: matchPassphrase })
   }
 }

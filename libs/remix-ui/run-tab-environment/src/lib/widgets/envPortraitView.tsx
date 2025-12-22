@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useRef } from 'react'
 import { AddressToggle, CustomMenu, EnvironmentToggle, shortenAddress } from "@remix-ui/helper"
 import { Dropdown } from "react-bootstrap"
 import { useIntl } from 'react-intl'
@@ -6,11 +6,12 @@ import { EnvAppContext } from '../contexts'
 import { useContext } from "react"
 import { TrackingContext } from '@remix-ide/tracking'
 import { MatomoEvent, UdappEvent } from '@remix-api'
-import { setExecutionContext } from '../actions'
+import { createNewAccount, setExecutionContext } from '../actions'
 import { EnvCategoryUI } from '../components/envCategoryUI'
 import { Provider, Account } from '../types'
 import { ForkUI } from '../components/forkUI'
 import { ResetUI } from '../components/resetUI'
+import { AccountKebabMenu } from '../components/accountKebabMenu'
 import '../css/index.css'
 
 function EnvironmentPortraitView() {
@@ -20,6 +21,9 @@ function EnvironmentPortraitView() {
     baseTrackEvent?.<T>(event)
   }
   const intl = useIntl()
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false)
+  const [openKebabMenuId, setOpenKebabMenuId] = useState<string | null>(null)
+  const kebabIconRefs = useRef<{[key: string]: HTMLElement}>({})
 
   const handleResetClick = () => {
     trackMatomoEvent({ category: 'udapp', action: 'deleteState', name: 'deleteState clicked', isClick: true })
@@ -39,11 +43,35 @@ function EnvironmentPortraitView() {
     dispatch({ type: 'SET_SELECTED_ACCOUNT', payload: account.account })
   }
 
-  const handleKebabClick = (e: React.MouseEvent, account: Account) => {
-    e.preventDefault() // Prevent default behavior (page reload)
-    e.stopPropagation() // Prevent triggering account selection
-    // Add your kebab menu logic here
-    console.log('Kebab clicked for account:', account)
+  const handleKebabClick = (e: React.MouseEvent, accountId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setOpenKebabMenuId(prev => prev === accountId ? null : accountId)
+  }
+
+  const handleNewAccount = () => {
+    createNewAccount(plugin, widgetState, dispatch)
+    setOpenKebabMenuId(null)
+  }
+
+  const handleCreateSmartAccount = (account: Account) => {
+    console.log('Create smart account for:', account)
+    setOpenKebabMenuId(null)
+  }
+
+  const handleAuthorizeDelegation = (account: Account) => {
+    console.log('Authorize delegation for:', account)
+    setOpenKebabMenuId(null)
+  }
+
+  const handleSignUsingAccount = (account: Account) => {
+    console.log('Sign using account:', account)
+    setOpenKebabMenuId(null)
+  }
+
+  const handleDeleteAccount = (account: Account) => {
+    console.log('Delete account:', account)
+    setOpenKebabMenuId(null)
   }
 
   const uniqueDropdownItems = useMemo(() => {
@@ -111,7 +139,7 @@ function EnvironmentPortraitView() {
                 </div>
               </Dropdown.Toggle>
 
-              <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
+              <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', zIndex: 1 }}>
                 {
                   uniqueDropdownItems.map((provider, index) => {
                     return (
@@ -125,8 +153,8 @@ function EnvironmentPortraitView() {
           </div>)}
         {!widgetState.fork.isVisible.resetUI && (
           <div className="d-flex px-3">
-            <Dropdown className="w-100">
-              <Dropdown.Toggle as={AddressToggle} className="w-100 d-inline-block border form-control" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
+            <Dropdown className="w-100" onToggle={(isOpen) => setIsAccountDropdownOpen(isOpen)}>
+              <Dropdown.Toggle as={AddressToggle} className={`w-100 d-inline-block border form-control selected-account-hover ${isAccountDropdownOpen ? 'dropdown-open' : ''}`} style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
                 <div className="d-flex align-items-center">
                   <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                     <div className="d-flex align-items-center justify-content-between w-100">
@@ -138,30 +166,75 @@ function EnvironmentPortraitView() {
                           <span className="small">{shortenAddress(selectedAccount?.account)}</span><i className="fa-solid fa-copy small ms-1"></i>
                         </div>
                       </div>
-                      <div style={{ color: 'var(--bs-tertiary-color)' }}><span>{`${selectedAccount?.balance} ${selectedAccount?.symbol}`}</span></div>
+                      <div className={`selected-account-balance-container ${openKebabMenuId === 'selected' ? 'kebab-menu-open' : ''}`} style={{ color: 'var(--bs-tertiary-color)' }}>
+                        <span className="selected-account-balance-text">{`${selectedAccount?.balance} ${selectedAccount?.symbol}`}</span>
+                        <i
+                          ref={(el) => {
+                            if (el && selectedAccount) kebabIconRefs.current['selected'] = el
+                          }}
+                          className="selected-account-kebab-icon fas fa-ellipsis-v"
+                          onClick={(e) => handleKebabClick(e, 'selected')}
+                          style={{ cursor: 'pointer' }}
+                        ></i>
+                      </div>
                     </div>
                   </div>
                 </div>
               </Dropdown.Toggle>
 
+              <AccountKebabMenu
+                show={openKebabMenuId === 'selected'}
+                target={kebabIconRefs.current['selected']}
+                onHide={() => setOpenKebabMenuId(null)}
+                account={selectedAccount}
+                menuIndex="selected"
+                onNewAccount={handleNewAccount}
+                onCreateSmartAccount={handleCreateSmartAccount}
+                onAuthorizeDelegation={handleAuthorizeDelegation}
+                onSignUsingAccount={handleSignUsingAccount}
+                onDeleteAccount={handleDeleteAccount}
+              />
+
               <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
                 {
                   widgetState.accounts.defaultAccounts.map((account, index) => {
+                    const accountId = `account-${index}`
                     return (
-                      <Dropdown.Item key={index} className="d-flex align-items-center justify-content-between p-1 m-1 account-item-hover" onClick={() => handleAccountSelection(account)} style={{ cursor: 'pointer' }}>
-                        <div className='d-flex flex-column align-items-start'>
-                          <div className="text-truncate text-dark">
-                            <span>{account?.alias}</span>
+                      <div key={index}>
+                        <Dropdown.Item className="d-flex align-items-center justify-content-between p-1 m-1 account-item-hover" onClick={() => handleAccountSelection(account)} style={{ cursor: 'pointer' }}>
+                          <div className='d-flex flex-column align-items-start'>
+                            <div className="text-truncate text-dark">
+                              <span>{account?.alias}</span>
+                            </div>
+                            <div style={{ color: 'var(--bs-tertiary-color)' }}>
+                              <span className="small">{shortenAddress(account?.account)}</span><i className="fa-solid fa-copy small ms-1"></i>
+                            </div>
                           </div>
-                          <div style={{ color: 'var(--bs-tertiary-color)' }}>
-                            <span className="small">{shortenAddress(account?.account)}</span><i className="fa-solid fa-copy small ms-1"></i>
+                          <div className={`account-balance-container ${openKebabMenuId === accountId ? 'kebab-menu-open' : ''}`} style={{ color: 'var(--bs-tertiary-color)' }}>
+                            <span className="account-balance-text">{`${account?.balance} ${account?.symbol}`}</span>
+                            <i
+                              ref={(el) => {
+                                if (el) kebabIconRefs.current[accountId] = el
+                              }}
+                              className="account-kebab-icon fas fa-ellipsis-v"
+                              onClick={(e) => handleKebabClick(e, accountId)}
+                              style={{ cursor: 'pointer' }}
+                            ></i>
                           </div>
-                        </div>
-                        <div className="account-balance-container" style={{ color: 'var(--bs-tertiary-color)' }}>
-                          <span className="account-balance-text">{`${account?.balance} ${account?.symbol}`}</span>
-                          <i className="account-kebab-icon fas fa-ellipsis-v" onClick={(e) => handleKebabClick(e, account)} style={{ cursor: 'pointer' }}></i>
-                        </div>
-                      </Dropdown.Item>
+                        </Dropdown.Item>
+                        <AccountKebabMenu
+                          show={openKebabMenuId === accountId}
+                          target={kebabIconRefs.current[accountId]}
+                          onHide={() => setOpenKebabMenuId(null)}
+                          account={account}
+                          menuIndex={index}
+                          onNewAccount={handleNewAccount}
+                          onCreateSmartAccount={handleCreateSmartAccount}
+                          onAuthorizeDelegation={handleAuthorizeDelegation}
+                          onSignUsingAccount={handleSignUsingAccount}
+                          onDeleteAccount={handleDeleteAccount}
+                        />
+                      </div>
                     )
                   })
                 }
