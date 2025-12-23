@@ -17,7 +17,8 @@ type EndpointUrls = {
     sso: string;
     billing: string;
     credits: string;
-    audio;
+    audio: string;
+    storage: string;
 };
 
 const defaultUrls: EndpointUrls = {
@@ -40,6 +41,7 @@ const defaultUrls: EndpointUrls = {
   billing: 'https://auth.api.remix.live:8443//billing',
   credits: 'https://auth.api.remix.live:8443/credits',
   audio: 'https://audio.api.remix.live',
+  storage: 'https://auth.api.remix.live:8443/storage',
 };
 
 const endpointPathMap: Record<keyof EndpointUrls, string> = {
@@ -62,6 +64,7 @@ const endpointPathMap: Record<keyof EndpointUrls, string> = {
   billing: 'billing',
   credits: 'credits',
   audio: 'audio',
+  storage: 'storage',
 };
 
 const prefix = process.env.NX_ENDPOINTS_URL;
@@ -98,6 +101,9 @@ const localhostUrls: EndpointUrls = {
   billing: 'http://localhost:3002/billing',
   credits: 'http://localhost:3002/credits',
   audio: 'http://localhost:3004/audio',
+  
+  // STORAGE service (port 3002 - same as billing)
+  storage: 'http://localhost:3002/storage',
 };
 
 const resolvedUrls: EndpointUrls = prefix

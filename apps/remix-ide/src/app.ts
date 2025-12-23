@@ -51,6 +51,7 @@ import { TransactionSimulator } from './app/plugins/transaction-simulator'
 import { CodeFormat } from './app/plugins/code-format'
 import { CompilationDetailsPlugin } from './app/plugins/compile-details'
 import { AuthPlugin } from './app/plugins/auth-plugin'
+import { S3StoragePlugin } from './app/plugins/storage/s3-storage-plugin'
 import { RemixGuidePlugin } from './app/plugins/remixGuide'
 import { TemplatesPlugin } from './app/plugins/remix-templates'
 import { fsPlugin } from './app/plugins/electron/fsPlugin'
@@ -165,6 +166,7 @@ class AppComponent {
   templateExplorerModal: TemplateExplorerModalPlugin
   settings: SettingsTab
   authPlugin: AuthPlugin
+  s3StoragePlugin: S3StoragePlugin
   params: any
   desktopClientMode: boolean
 
@@ -578,6 +580,7 @@ class AppComponent {
     )
 
     this.authPlugin = new AuthPlugin()
+    this.s3StoragePlugin = new S3StoragePlugin()
 
     this.engine.register([
       compileTab,
@@ -591,7 +594,8 @@ class AppComponent {
       deployLibraries,
       openZeppelinProxy,
       run.recorder,
-      this.authPlugin
+      this.authPlugin,
+      this.s3StoragePlugin
     ])
     this.engine.register([templateExplorerModal, this.topBar])
 
@@ -660,6 +664,7 @@ class AppComponent {
     ])
 
     await this.appManager.activatePlugin(['auth'])
+    await this.appManager.activatePlugin(['s3Storage'])
     await this.appManager.activatePlugin(['settings'])
 
     await this.appManager.activatePlugin(['walkthrough', 'storage', 'search', 'compileAndRun', 'recorder', 'dgitApi', 'dgit'])

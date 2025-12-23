@@ -118,3 +118,93 @@ export interface RefreshTokenResponse {
   access_token: string
   refresh_token?: string
 }
+
+// ==================== Storage ====================
+
+/**
+ * Storage health check response
+ */
+export interface StorageHealthResponse {
+  ok: boolean
+  provider: string
+  message?: string
+}
+
+/**
+ * Storage configuration (limits and allowed types)
+ */
+export interface StorageConfig {
+  maxFileSize: number
+  maxTotalStorage: number
+  allowedMimeTypes: string[]
+  allowedExtensions: string[]
+}
+
+/**
+ * Request for presigned upload URL
+ */
+export interface PresignUploadRequest {
+  filename: string
+  folder?: string
+  contentType: string
+  fileSize?: number
+}
+
+/**
+ * Response with presigned upload URL
+ */
+export interface PresignUploadResponse {
+  url: string
+  headers: Record<string, string>
+  expiresAt: string
+  key: string
+}
+
+/**
+ * Request for presigned download URL
+ */
+export interface PresignDownloadRequest {
+  filename: string
+  folder?: string
+}
+
+/**
+ * Response with presigned download URL
+ */
+export interface PresignDownloadResponse {
+  url: string
+  expiresAt: string
+}
+
+/**
+ * File metadata stored in the system
+ */
+export interface StorageFile {
+  filename: string
+  folder: string
+  key: string
+  contentType: string
+  size: number
+  uploadedAt: string
+  lastModified: string
+  etag?: string
+}
+
+/**
+ * List of user's files
+ */
+export interface StorageFilesResponse {
+  files: StorageFile[]
+  totalSize: number
+  totalCount: number
+  nextCursor?: string
+}
+
+/**
+ * File list request options
+ */
+export interface StorageListOptions {
+  folder?: string
+  limit?: number
+  cursor?: string
+}
