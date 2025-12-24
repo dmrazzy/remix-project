@@ -81,11 +81,58 @@ export class S3StoragePlugin extends Plugin {
         this.config = null
       }
     })
+    
+    // EXPERIMENT: Listen for file saves and upload to S3
+    this.on('fileManager', 'fileSaved', async (path: string) => {
+      await this.handleFileSaved(path)
+    })
+  }
+  
+  /**
+   * Handle file saved event - upload to S3 as experiment
+   */
+  private async handleFileSaved(path: string): Promise<void> {
+    try {
+      // Check if user is authenticated
+      const user = await this.call('auth', 'getUser')
+      if (!user) {
+        console.log('[S3StoragePlugin] User not authenticated, skipping S3 upload')
+        return
+      }
+      
+      // Only sync .sol files for now as experiment
+      if (!path.endsWith('.sol')) {
+        console.log('[S3StoragePlugin] Skipping non-Solidity file:', path)
+        return
+      }
+      
+      // Get file content from fileManager
+      const content = await this.call('fileManager', 'readFile', path)
+      if (!content) {
+        console.log('[S3StoragePlugin] No content for file:', path)
+        return
+      }
+      
+      console.log(`[S3StoragePlugin] 🚀 Uploading to S3: ${path}`)
+      
+      // Upload to S3
+      const key = await this.upload(path.replace(/^\//, ''), content)
+      
+      console.log(`[S3StoragePlugin] ✅ Uploaded to S3: ${key}`)
+      
+      // Show notification to user
+      await this.call('notification', 'toast', `☁️ Synced to cloud: ${path}`)
+      
+    } catch (error) {
+      console.error('[S3StoragePlugin] Failed to upload on save:', error)
+      // Don't show error to user for now - this is experimental
+    }
   }
   
   onDeactivation(): void {
     console.log('[S3StoragePlugin] Deactivated')
     this.off('auth', 'authStateChanged')
+    this.off('fileManager', 'fileSaved')
   }
   
   /**
