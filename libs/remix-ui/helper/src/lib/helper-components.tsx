@@ -305,3 +305,12 @@ export const isOverSizePrompt = (values: OverSizeLimit) => {
     </div>
   )
 }
+
+export const SmartAccountPromptTitle = ({ title }: { title: string }) => {
+  return (
+    <div className="d-flex align-items-center">
+      <span className="badge bg-success me-2">Alpha</span>
+      <span>{title}</span>
+    </div>
+  )
+}

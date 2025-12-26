@@ -1,13 +1,19 @@
-import { Engine, Plugin } from "@remixproject/engine"
-import { Actions, Provider, WidgetState } from "../types"
+import React from "react"
+import { Plugin } from "@remixproject/engine"
+import { Actions, Provider, SmartAccount, WidgetState } from "../types"
 import { trackMatomoEvent } from "@remix-api"
 import { IntlShape } from "react-intl"
 import { addFVSProvider } from "./providers"
-import React from "react"
-import { aaLocalStorageKey } from "@remix-project/remix-lib"
+import { aaLocalStorageKey, aaSupportedNetworks, getPimlicoBundlerURL, toAddress } from "@remix-project/remix-lib"
+import * as chains from "viem/chains"
+import { custom, createWalletClient, createPublicClient, http } from "viem"
 export * from "./providers"
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
+import { entryPoint07Address } from "viem/account-abstraction"
+const { createSmartAccountClient } = require("permissionless") /* eslint-disable-line  @typescript-eslint/no-var-requires */
+const { toSafeSmartAccount } = require("permissionless/accounts") /* eslint-disable-line  @typescript-eslint/no-var-requires */
+const { createPimlicoClient } = require("permissionless/clients/pimlico") /* eslint-disable-line  @typescript-eslint/no-var-requires */
 
 export async function resetVmState (plugin: EnvironmentPlugin, widgetState: WidgetState) {
   const context = widgetState.providers.selectedProvider
@@ -126,9 +132,25 @@ export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: Reac
   let safeAddresses = []
 
   if (provider && provider.startsWith('injected') && accounts?.length) {
-    await loadSmartAccounts(widgetState)
-    if (widgetState.accounts.smartAccounts) {
-      safeAddresses = Object.keys(widgetState.accounts.smartAccounts)
+    const smartAccountsStr = localStorage.getItem(aaLocalStorageKey)
+    let smartAccounts = {}
+
+    if (smartAccountsStr) {
+      const smartAccountsObj = JSON.parse(smartAccountsStr)
+
+      if (smartAccountsObj[widgetState.network.chainId]) {
+        smartAccounts = smartAccountsObj[widgetState.network.chainId]
+      } else {
+        smartAccountsObj[widgetState.network.chainId] = {}
+        localStorage.setItem(aaLocalStorageKey, JSON.stringify(smartAccountsObj))
+      }
+    } else {
+      const objToStore = {}
+      objToStore[widgetState.network.chainId] = {}
+      localStorage.setItem(aaLocalStorageKey, JSON.stringify(objToStore))
+    }
+    if (Object.keys(smartAccounts).length) {
+      safeAddresses = Object.keys(smartAccounts)
       accounts.push(...safeAddresses)
     }
   }
@@ -165,25 +187,6 @@ export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: Reac
   dispatch({ type: 'SET_SMART_ACCOUNTS', payload: smartAccounts })
 }
 
-function loadSmartAccounts (widgetState: WidgetState) {
-  const { chainId } = widgetState.network
-  const smartAccountsStr = localStorage.getItem(aaLocalStorageKey)
-
-  if (smartAccountsStr) {
-    const smartAccountsObj = JSON.parse(smartAccountsStr)
-    if (smartAccountsObj[chainId]) {
-      widgetState.accounts.smartAccounts = smartAccountsObj[chainId]
-    } else {
-      smartAccountsObj[chainId] = {}
-      localStorage.setItem(aaLocalStorageKey, JSON.stringify(smartAccountsObj))
-    }
-  } else {
-    const objToStore = {}
-    objToStore[chainId] = {}
-    localStorage.setItem(aaLocalStorageKey, JSON.stringify(objToStore))
-  }
-}
-
 export async function createNewAccount (plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
   try {
     const address = await plugin.call('blockchain', 'newAccount')
@@ -192,5 +195,111 @@ export async function createNewAccount (plugin: EnvironmentPlugin, widgetState: 
     await getAccountsList(plugin, dispatch, widgetState)
   } catch (error) {
     return plugin.call('notification', 'toast', 'Cannot create an account: ' + error)
+  }
+}
+
+export async function createSmartAccount (plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
+  plugin.call('notification', 'toast', `Preparing tx to sign...`)
+  const chainId = widgetState.network.chainId
+  console.log('chainId: ', chainId)
+  const chain = chains[aaSupportedNetworks[chainId].name]
+  const PUBLIC_NODE_URL = aaSupportedNetworks[chainId].publicNodeUrl
+  const BUNDLER_URL = getPimlicoBundlerURL(chainId)
+  const safeAddresses: string[] = widgetState.accounts.smartAccounts.map(account => account.account)
+  let salt
+
+  // @ts-ignore
+  const [account] = await window.ethereum!.request({ method: 'eth_requestAccounts' })
+
+  const walletClient = createWalletClient({
+    account,
+    chain,
+    transport: custom(window.ethereum!),
+  })
+
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(PUBLIC_NODE_URL) // choose any provider here
+  })
+
+  const safeAddressesLength = safeAddresses.length
+  if (safeAddressesLength) {
+    const lastSafeAddress: string = safeAddresses[safeAddressesLength - 1]
+    const lastSmartAccount = widgetState.accounts.smartAccounts.find(account => account.account === lastSafeAddress)
+    salt = lastSmartAccount.salt + 1
+  } else salt = 0
+
+  try {
+    const safeAccount = await toSafeSmartAccount({
+      client: publicClient,
+      entryPoint: {
+        address: entryPoint07Address,
+        version: "0.7",
+      },
+      owners: [walletClient],
+      saltNonce: salt,
+      version: "1.4.1"
+    })
+
+    const paymasterClient = createPimlicoClient({
+      transport: http(BUNDLER_URL),
+      entryPoint: {
+        address: entryPoint07Address,
+        version: "0.7",
+      },
+    })
+
+    const saClient = createSmartAccountClient({
+      account: safeAccount,
+      chain,
+      paymaster: paymasterClient,
+      bundlerTransport: http(BUNDLER_URL),
+      userOperation: {
+        estimateFeesPerGas: async () => (await paymasterClient.getUserOperationGasPrice()).fast,
+      }
+    })
+
+    // Make a dummy tx to force smart account deployment
+    const useropHash = await saClient.sendUserOperation({
+      calls: [{
+        to: toAddress,
+        value: 0
+      }]
+    })
+    plugin.call('notification', 'toast', `Waiting for tx confirmation, can take 5-10 seconds...`)
+    await saClient.waitForUserOperationReceipt({ hash: useropHash })
+
+    console.log('safeAccount: ', safeAccount)
+
+    // To verify creation, check if there is a contract code at this address
+    const safeAddress = safeAccount.address
+    const sAccount: SmartAccount = {
+      alias: `Smart Account ${safeAddressesLength + 1}`,
+      account : safeAccount.address,
+      balance: '0',
+      salt,
+      ownerEOA: account,
+      timestamp: Date.now()
+    }
+    const smartAccounts = [...widgetState.accounts.smartAccounts, sAccount]
+    // Save smart accounts in local storage
+    const smartAccountsStr = localStorage.getItem(aaLocalStorageKey)
+    if (!smartAccountsStr) {
+      const objToStore = {}
+      objToStore[chainId] = smartAccounts
+      localStorage.setItem(aaLocalStorageKey, JSON.stringify(objToStore))
+    } else {
+      const smartAccountsObj = JSON.parse(smartAccountsStr)
+      smartAccountsObj[chainId] = smartAccounts
+      localStorage.setItem(aaLocalStorageKey, JSON.stringify(smartAccountsObj))
+    }
+    await getAccountsList(plugin, dispatch, widgetState)
+    await trackMatomoEvent(plugin, { category: 'udapp', action: 'safeSmartAccount', name: `createdSuccessfullyForChainID:${chainId}`, isClick: false })
+    return plugin.call('notification', 'toast', `Safe account ${safeAccount.address} created for owner ${account}`)
+  } catch (error) {
+    await trackMatomoEvent(plugin, { category: 'udapp', action: 'safeSmartAccount', name: `creationFailedWithError:${error.message}`, isClick: false })
+    console.error('Failed to create safe smart account: ', error)
+    if (error.message.includes('User rejected the request')) return plugin.call('notification', 'toast', `User rejected the request to create safe smart account !!!`)
+    else return plugin.call('notification', 'toast', `Failed to create safe smart account !!!`)
   }
 }

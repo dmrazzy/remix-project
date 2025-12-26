@@ -50,6 +50,12 @@ export class EnvironmentPlugin extends Plugin {
     return state?.providers?.defaultProvider
   }
 
+  getSelectedProvider () {
+    const state = this.getWidgetState?.()
+
+    return state?.providers?.selectedProvider
+  }
+
   getUI(engine: Engine, blockchain: Blockchain) {
     this.engine = engine
     this.blockchain = blockchain

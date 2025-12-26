@@ -27,7 +27,7 @@ export interface WidgetState {
   accounts: {
     selectedAccount: string,
     defaultAccounts: Account[],
-    smartAccounts: Account[],
+    smartAccounts: SmartAccount[],
     isRequesting: boolean,
     isSuccessful: boolean,
     error: string
@@ -57,7 +57,7 @@ export interface ActionPayloadTypes {
   LOADING_ALL_ACCOUNTS: undefined,
   COMPLETED_LOADING_ALL_ACCOUNTS: undefined,
   SET_ACCOUNTS: Account[],
-  SET_SMART_ACCOUNTS: Account[],
+  SET_SMART_ACCOUNTS: SmartAccount[],
   SET_SELECTED_ACCOUNT: string,
   SHOW_FORK_UI: undefined,
   HIDE_FORK_UI: undefined,
@@ -167,5 +167,15 @@ export type Account = {
   alias: string,
   account: string,
   balance: string,
+  symbol?: string
+}
+
+export type SmartAccount = {
+  alias: string,
+  account: string,
+  balance: string,
+  salt: number
+  ownerEOA: string
+  timestamp: number
   symbol?: string
 }

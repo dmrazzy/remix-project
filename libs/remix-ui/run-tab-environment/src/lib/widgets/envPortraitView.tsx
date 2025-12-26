@@ -1,18 +1,19 @@
 import React, { useMemo, useState, useRef } from 'react'
-import { AddressToggle, CustomMenu, EnvironmentToggle, shortenAddress } from "@remix-ui/helper"
+import { AddressToggle, CustomMenu, EnvironmentToggle, shortenAddress, SmartAccountPromptTitle } from "@remix-ui/helper"
 import { Dropdown } from "react-bootstrap"
 import { useIntl } from 'react-intl'
 import { EnvAppContext } from '../contexts'
 import { useContext } from "react"
 import { TrackingContext } from '@remix-ide/tracking'
 import { MatomoEvent, UdappEvent } from '@remix-api'
-import { createNewAccount, setExecutionContext } from '../actions'
+import { createNewAccount, createSmartAccount, setExecutionContext } from '../actions'
 import { EnvCategoryUI } from '../components/envCategoryUI'
 import { Provider, Account } from '../types'
 import { ForkUI } from '../components/forkUI'
 import { ResetUI } from '../components/resetUI'
 import { AccountKebabMenu } from '../components/accountKebabMenu'
 import '../css/index.css'
+import { SmartAccountPrompt } from '../components/smartAccountPrompt'
 
 function EnvironmentPortraitView() {
   const { plugin, widgetState, dispatch } = useContext(EnvAppContext)
@@ -55,7 +56,17 @@ function EnvironmentPortraitView() {
   }
 
   const handleCreateSmartAccount = (account: Account) => {
-    console.log('Create smart account for:', account)
+    plugin.call('notification', 'modal', {
+      id: 'createSmartAccount',
+      title: <SmartAccountPromptTitle title={intl.formatMessage({ id: 'udapp.createSmartAccount' })} />,
+      message: <SmartAccountPrompt plugin={plugin} />,
+      okLabel: intl.formatMessage({ id: 'udapp.continue' }),
+      cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
+      okFn: () => {
+        trackMatomoEvent({ category: 'udapp', action: 'safeSmartAccount', name: 'createClicked', isClick: true })
+        createSmartAccount(plugin, widgetState, dispatch)
+      }
+    })
     setOpenKebabMenuId(null)
   }
 
