@@ -120,12 +120,30 @@ export class S3StorageProvider implements IStorageProvider {
     
     // 2. Upload directly to S3
     console.log(`[S3StorageProvider] Uploading to S3: ${key}`)
+    console.log(`[S3StorageProvider] Presigned URL:`, url)
+    console.log(`[S3StorageProvider] Headers from server:`, headers)
+    
+    // Build the request headers - only include Content-Type, let S3 handle the rest via query params
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': mimeType
+    }
+    
+    // Add any headers from the presigned response (but filter out problematic ones)
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        // Skip headers that might cause CORS issues
+        const lowerKey = key.toLowerCase()
+        if (!['host', 'content-length'].includes(lowerKey)) {
+          requestHeaders[key] = value
+        }
+      }
+    }
+    
+    console.log(`[S3StorageProvider] Final request headers:`, requestHeaders)
+    
     const uploadResponse = await fetch(url, {
       method: 'PUT',
-      headers: {
-        ...headers,
-        'Content-Type': mimeType
-      },
+      headers: requestHeaders,
       body
     })
     
