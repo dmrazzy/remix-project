@@ -34,8 +34,18 @@ import {
   RemixConfig, 
   RemoteWorkspaceConfig 
 } from './workspace-id'
+import JSZip from 'jszip'
 
 const REMIX_CONFIG_FILE = 'remix.config.json'
+
+// Folders/patterns to exclude from workspace backup
+const EXCLUDED_PATTERNS = [
+  '.deps',           // npm dependencies cached by Remix
+  'artifacts',       // compiled contract artifacts
+  '.git',            // git folder
+  'node_modules',    // node modules (shouldn't exist but just in case)
+  '.cache',          // cache folders
+]
 
 const profile = {
   name: 's3Storage',
@@ -53,7 +63,9 @@ const profile = {
     'isHealthy',
     'getProviderName',
     'getWorkspaceRemoteId',
-    'ensureWorkspaceRemoteId'
+    'ensureWorkspaceRemoteId',
+    'backupWorkspace',
+    'restoreWorkspace'
   ],
   events: [
     'fileUploaded',
@@ -62,7 +74,9 @@ const profile = {
     'uploadProgress',
     'downloadProgress',
     'error',
-    'configLoaded'
+    'configLoaded',
+    'backupCompleted',
+    'restoreCompleted'
   ]
 }
 
@@ -528,6 +542,263 @@ export class S3StoragePlugin extends Plugin {
       this.emitError('getMetadata', fullPath, error as Error)
       return null
     }
+  }
+  
+  // ==================== Workspace Backup & Restore ====================
+  
+  /**
+   * Check if a path should be excluded from backup
+   */
+  private shouldExclude(path: string): boolean {
+    const normalizedPath = path.replace(/^\//, '').toLowerCase()
+    
+    for (const pattern of EXCLUDED_PATTERNS) {
+      if (normalizedPath.startsWith(pattern.toLowerCase()) || 
+          normalizedPath.includes('/' + pattern.toLowerCase())) {
+        return true
+      }
+    }
+    
+    return false
+  }
+  
+  /**
+   * Recursively collect all files in the workspace
+   */
+  private async collectWorkspaceFiles(
+    basePath: string = ''
+  ): Promise<Array<{ path: string; content: string }>> {
+    const files: Array<{ path: string; content: string }> = []
+    
+    try {
+      const entries = await this.call('fileManager', 'readdir', basePath || '/')
+      
+      for (const [entryPath, info] of Object.entries(entries)) {
+        // Skip excluded patterns
+        if (this.shouldExclude(entryPath)) {
+          console.log(`[S3StoragePlugin] Skipping excluded path: ${entryPath}`)
+          continue
+        }
+        
+        const entryInfo = info as { isDirectory: boolean }
+        
+        if (entryInfo.isDirectory) {
+          // Recursively collect files from subdirectory
+          const subFiles = await this.collectWorkspaceFiles(entryPath)
+          files.push(...subFiles)
+        } else {
+          // Read file content
+          try {
+            const content = await this.call('fileManager', 'readFile', entryPath)
+            files.push({ path: entryPath, content })
+          } catch (err) {
+            console.warn(`[S3StoragePlugin] Could not read file: ${entryPath}`, err)
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[S3StoragePlugin] Error reading directory: ${basePath}`, err)
+    }
+    
+    return files
+  }
+  
+  /**
+   * Backup the entire workspace to S3 as a compressed zip
+   * 
+   * @returns The S3 key of the uploaded backup
+   * 
+   * @example
+   * const backupKey = await s3Storage.backupWorkspace()
+   * console.log('Backup saved to:', backupKey)
+   */
+  async backupWorkspace(): Promise<string> {
+    const provider = this.ensureProvider()
+    
+    // Check if user is authenticated
+    const user = await this.call('auth', 'getUser')
+    if (!user) {
+      throw new Error('You must be logged in to backup your workspace')
+    }
+    
+    // Get or create workspace remote ID
+    const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
+    
+    console.log(`[S3StoragePlugin] 📦 Starting workspace backup for: ${workspaceRemoteId}`)
+    
+    // Collect all files
+    const files = await this.collectWorkspaceFiles()
+    
+    console.log(`[S3StoragePlugin] Found ${files.length} files to backup`)
+    
+    if (files.length === 0) {
+      throw new Error('No files found in workspace to backup')
+    }
+    
+    // Create zip file
+    const zip = new JSZip()
+    
+    // Add metadata
+    const metadata = {
+      workspaceRemoteId,
+      createdAt: new Date().toISOString(),
+      fileCount: files.length,
+      version: '1.0'
+    }
+    zip.file('_backup_metadata.json', JSON.stringify(metadata, null, 2))
+    
+    // Add all files to zip
+    for (const file of files) {
+      // Remove leading slash for zip paths
+      const zipPath = file.path.replace(/^\//, '')
+      zip.file(zipPath, file.content)
+    }
+    
+    // Generate compressed blob
+    console.log('[S3StoragePlugin] Compressing workspace...')
+    const blob = await zip.generateAsync({ 
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    })
+    
+    console.log(`[S3StoragePlugin] Compressed size: ${(blob.size / 1024).toFixed(2)} KB`)
+    
+    // Convert blob to Uint8Array for upload
+    const arrayBuffer = await blob.arrayBuffer()
+    const content = new Uint8Array(arrayBuffer)
+    
+    // Upload to S3
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const backupFilename = `backup-${timestamp}.zip`
+    const backupPath = `${workspaceRemoteId}/backups/${backupFilename}`
+    
+    console.log(`[S3StoragePlugin] 🚀 Uploading backup: ${backupPath}`)
+    
+    const key = await this.upload(backupFilename, content, { 
+      folder: `${workspaceRemoteId}/backups`,
+      contentType: 'application/zip'
+    })
+    
+    console.log(`[S3StoragePlugin] ✅ Backup complete: ${key}`)
+    
+    this.emit('backupCompleted', { 
+      key, 
+      fileCount: files.length, 
+      size: blob.size,
+      workspaceRemoteId 
+    })
+    
+    await this.call('notification', 'toast', `☁️ Workspace backed up (${files.length} files, ${(blob.size / 1024).toFixed(1)} KB)`)
+    
+    return key
+  }
+  
+  /**
+   * Restore workspace from a backup zip
+   * 
+   * @param backupKey - The S3 key of the backup to restore (optional, uses latest if not provided)
+   * 
+   * @example
+   * await s3Storage.restoreWorkspace()  // Restores latest backup
+   * await s3Storage.restoreWorkspace('backups/backup-2025-12-26.zip')
+   */
+  async restoreWorkspace(backupKey?: string): Promise<void> {
+    const provider = this.ensureProvider()
+    
+    // Check if user is authenticated
+    const user = await this.call('auth', 'getUser')
+    if (!user) {
+      throw new Error('You must be logged in to restore your workspace')
+    }
+    
+    const workspaceRemoteId = await this.getWorkspaceRemoteId()
+    if (!workspaceRemoteId) {
+      throw new Error('No workspace remote ID found. This workspace has no cloud backups.')
+    }
+    
+    // Variables to track the backup path
+    let backupFolder: string
+    let backupFilename: string
+    
+    // If no backup key provided, list backups and get the latest
+    if (!backupKey) {
+      const backups = await this.list({ folder: `${workspaceRemoteId}/backups` })
+      if (!backups.files || backups.files.length === 0) {
+        throw new Error('No backups found for this workspace')
+      }
+      
+      // Sort by date (newest first) and get the latest
+      const sortedBackups = backups.files.sort((a, b) => 
+        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      )
+      
+      // Use folder and filename from the API response, not the key
+      const latestBackup = sortedBackups[0]
+      backupFolder = latestBackup.folder
+      backupFilename = latestBackup.filename
+    } else {
+      // Parse the provided backup key into folder and filename
+      const lastSlashIndex = backupKey.lastIndexOf('/')
+      if (lastSlashIndex === -1) {
+        backupFolder = `${workspaceRemoteId}/backups`
+        backupFilename = backupKey
+      } else {
+        backupFolder = backupKey.substring(0, lastSlashIndex)
+        backupFilename = backupKey.substring(lastSlashIndex + 1)
+      }
+    }
+    
+    console.log(`[S3StoragePlugin] 📥 Downloading backup: ${backupFolder}/${backupFilename}`)
+    
+    // Download the backup using folder and filename
+    const content = await this.downloadBinary(backupFilename, backupFolder)
+    
+    console.log(`[S3StoragePlugin] Downloaded ${(content.length / 1024).toFixed(2)} KB`)
+    
+    // Unzip
+    const zip = await JSZip.loadAsync(content)
+    
+    // Read metadata
+    const metadataFile = zip.file('_backup_metadata.json')
+    if (metadataFile) {
+      const metadataStr = await metadataFile.async('string')
+      const metadata = JSON.parse(metadataStr)
+      console.log('[S3StoragePlugin] Backup metadata:', metadata)
+    }
+    
+    // Extract and write files
+    let restoredCount = 0
+    const filePromises: Promise<void>[] = []
+    
+    zip.forEach((relativePath, zipEntry) => {
+      // Skip metadata and directories
+      if (relativePath === '_backup_metadata.json' || zipEntry.dir) {
+        return
+      }
+      
+      filePromises.push((async () => {
+        try {
+          const content = await zipEntry.async('string')
+          await this.call('fileManager', 'writeFile', relativePath, content)
+          restoredCount++
+        } catch (err) {
+          console.warn(`[S3StoragePlugin] Failed to restore file: ${relativePath}`, err)
+        }
+      })())
+    })
+    
+    await Promise.all(filePromises)
+    
+    console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files`)
+    
+    this.emit('restoreCompleted', { 
+      backupPath: `${backupFolder}/${backupFilename}`, 
+      fileCount: restoredCount,
+      workspaceRemoteId 
+    })
+    
+    await this.call('notification', 'toast', `☁️ Workspace restored (${restoredCount} files)`)
   }
   
   /**

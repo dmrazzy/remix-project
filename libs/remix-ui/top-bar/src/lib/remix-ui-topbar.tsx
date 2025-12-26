@@ -6,6 +6,7 @@ import { Button, Dropdown } from 'react-bootstrap'
 import { CustomToggle, CustomTopbarMenu } from 'libs/remix-ui/helper/src/lib/components/custom-dropdown'
 import { WorkspaceMetadata } from 'libs/remix-ui/workspace/src/lib/types'
 import { AppContext, platformContext } from 'libs/remix-ui/app/src/lib/remix-app/context/context'
+import { useAuth } from 'libs/remix-ui/app/src/lib/remix-app/context/auth-context'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { TopbarContext } from '../context/topbarContext'
 import { WorkspacesDropdown } from '../components/WorkspaceDropdown'
@@ -56,6 +57,9 @@ export function RemixUiTopbar() {
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enableLogin, setEnableLogin] = useState<boolean>(false);
+
+  // Auth state for cloud backup/restore
+  const { isAuthenticated } = useAuth()
 
   // Use the clone repository modal hook
   const { showCloneModal } = useCloneRepositoryModal({
@@ -325,6 +329,50 @@ export function RemixUiTopbar() {
       console.error(e)
     }
   }
+
+  const cloudBackup = async () => {
+    try {
+      await plugin.call('s3Storage', 'backupWorkspace')
+    } catch (e) {
+      console.error('Cloud backup failed:', e)
+      global.modal(
+        'Cloud Backup Failed',
+        e.message || 'Failed to backup workspace to cloud',
+        intl.formatMessage({ id: 'filePanel.ok' }),
+        () => { },
+        ''
+      )
+    }
+  }
+
+  const cloudRestore = async () => {
+    try {
+      // Confirm before restoring
+      global.modal(
+        'Restore from Cloud',
+        'This will restore files from the latest cloud backup. Existing files with the same name will be overwritten. Continue?',
+        intl.formatMessage({ id: 'filePanel.ok' }),
+        async () => {
+          try {
+            await plugin.call('s3Storage', 'restoreWorkspace')
+          } catch (e) {
+            console.error('Cloud restore failed:', e)
+            global.modal(
+              'Cloud Restore Failed',
+              e.message || 'Failed to restore workspace from cloud',
+              intl.formatMessage({ id: 'filePanel.ok' }),
+              () => { },
+              ''
+            )
+          }
+        },
+        intl.formatMessage({ id: 'filePanel.cancel' })
+      )
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const onFinishDeleteAllWorkspaces = async () => {
     try {
       await deleteAllWorkspacesAction()
@@ -568,6 +616,9 @@ export function RemixUiTopbar() {
             setMenuItems={setMenuItems}
             connectToLocalhost={() => switchWorkspace(LOCALHOST)}
             openTemplateExplorer={openTemplateExplorer}
+            cloudBackup={cloudBackup}
+            cloudRestore={cloudRestore}
+            isLoggedIn={isAuthenticated}
           />
           <div className="d-flex ms-4 gap-2 align-items-center" >
             <CustomTooltip placement="bottom-start" tooltipText={`Toggle Left Side Panel`}>
