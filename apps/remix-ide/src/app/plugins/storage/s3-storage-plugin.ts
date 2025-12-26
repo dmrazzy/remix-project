@@ -28,6 +28,14 @@ import {
   joinPath
 } from './types'
 import { S3StorageProvider } from './s3-provider'
+import { 
+  generateWorkspaceId, 
+  isValidWorkspaceId, 
+  RemixConfig, 
+  RemoteWorkspaceConfig 
+} from './workspace-id'
+
+const REMIX_CONFIG_FILE = 'remix.config.json'
 
 const profile = {
   name: 's3Storage',
@@ -43,7 +51,9 @@ const profile = {
     'getMetadata',
     'getConfig',
     'isHealthy',
-    'getProviderName'
+    'getProviderName',
+    'getWorkspaceRemoteId',
+    'ensureWorkspaceRemoteId'
   ],
   events: [
     'fileUploaded',
@@ -106,6 +116,13 @@ export class S3StoragePlugin extends Plugin {
         return
       }
       
+      // Get or create workspace remote ID
+      const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
+      if (!workspaceRemoteId) {
+        console.log('[S3StoragePlugin] Could not get workspace remote ID, skipping upload')
+        return
+      }
+      
       // Get file content from fileManager
       const content = await this.call('fileManager', 'readFile', path)
       if (!content) {
@@ -113,10 +130,13 @@ export class S3StoragePlugin extends Plugin {
         return
       }
       
-      console.log(`[S3StoragePlugin] 🚀 Uploading to S3: ${path}`)
+      // Build the remote path: workspaceRemoteId/path
+      const remotePath = joinPath(workspaceRemoteId, path.replace(/^\//, ''))
+      
+      console.log(`[S3StoragePlugin] 🚀 Uploading to S3: ${remotePath}`)
       
       // Upload to S3
-      const key = await this.upload(path.replace(/^\//, ''), content)
+      const key = await this.upload(path.replace(/^\//, ''), content, { folder: workspaceRemoteId })
       
       console.log(`[S3StoragePlugin] ✅ Uploaded to S3: ${key}`)
       
@@ -127,6 +147,81 @@ export class S3StoragePlugin extends Plugin {
       console.error('[S3StoragePlugin] Failed to upload on save:', error)
       // Don't show error to user for now - this is experimental
     }
+  }
+  
+  // ==================== Workspace Remote ID Management ====================
+  
+  /**
+   * Get the current remix.config.json content
+   */
+  private async getRemixConfig(): Promise<RemixConfig | null> {
+    try {
+      const exists = await this.call('fileManager', 'exists', REMIX_CONFIG_FILE)
+      if (!exists) {
+        return null
+      }
+      
+      const content = await this.call('fileManager', 'readFile', REMIX_CONFIG_FILE)
+      return JSON.parse(content)
+    } catch (error) {
+      console.error('[S3StoragePlugin] Failed to read remix.config.json:', error)
+      return null
+    }
+  }
+  
+  /**
+   * Save remix.config.json
+   */
+  private async saveRemixConfig(config: RemixConfig): Promise<void> {
+    await this.call('fileManager', 'writeFile', REMIX_CONFIG_FILE, JSON.stringify(config, null, 2))
+  }
+  
+  /**
+   * Get the workspace remote ID from remix.config.json
+   * Returns null if not configured
+   */
+  async getWorkspaceRemoteId(): Promise<string | null> {
+    const config = await this.getRemixConfig()
+    return config?.['remote-workspace']?.remoteId || null
+  }
+  
+  /**
+   * Ensure the workspace has a remote ID, creating one if needed
+   * @returns The workspace remote ID
+   */
+  async ensureWorkspaceRemoteId(): Promise<string> {
+    // Check if we already have a remote ID
+    let config = await this.getRemixConfig()
+    
+    if (config?.['remote-workspace']?.remoteId) {
+      const existingId = config['remote-workspace'].remoteId
+      // Accept any existing ID (don't validate format - user might have set their own)
+      if (existingId && typeof existingId === 'string' && existingId.trim().length > 0) {
+        console.log('[S3StoragePlugin] Using existing workspace remote ID:', existingId)
+        return existingId
+      }
+    }
+    
+    // Generate a new remote ID
+    const newRemoteId = generateWorkspaceId()
+    console.log('[S3StoragePlugin] Generated new workspace remote ID:', newRemoteId)
+    
+    // Create or update config
+    if (!config) {
+      config = {}
+    }
+    
+    config['remote-workspace'] = {
+      remoteId: newRemoteId,
+      createdAt: new Date().toISOString()
+    }
+    
+    // Save the config
+    await this.saveRemixConfig(config)
+    
+    await this.call('notification', 'toast', `🔗 Workspace linked to cloud: ${newRemoteId}`)
+    
+    return newRemoteId
   }
   
   onDeactivation(): void {
