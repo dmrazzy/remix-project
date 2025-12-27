@@ -23,6 +23,7 @@ export interface CloudWorkspacesState {
   workspaces: WorkspaceSummary[]
   selectedWorkspace: string | null
   backups: StorageFile[]
+  autosave: StorageFile | null
   loading: boolean
   error: string | null
   isAuthenticated: boolean
@@ -34,6 +35,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     workspaces: [],
     selectedWorkspace: null,
     backups: [],
+    autosave: null,
     loading: false,
     error: null,
     isAuthenticated: false
@@ -55,6 +57,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       } else {
         this.state.workspaces = []
         this.state.backups = []
+        this.state.autosave = null
         this.state.selectedWorkspace = null
         this.renderComponent()
       }
@@ -140,9 +143,19 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.renderComponent()
 
     try {
-      const result = await this.call('s3Storage', 'list', { folder: `${workspaceId}/backups` })
-      this.state.backups = result.files || []
-      this.emit('backupsLoaded', { workspaceId, backups: this.state.backups })
+      // Load both backups and autosave in parallel
+      const [backupsResult, autosaveResult] = await Promise.all([
+        this.call('s3Storage', 'list', { folder: `${workspaceId}/backups` }),
+        this.call('s3Storage', 'list', { folder: `${workspaceId}/autosave` })
+      ])
+      
+      this.state.backups = backupsResult.files || []
+      
+      // Autosave folder should only have one file
+      const autosaveFiles = autosaveResult.files || []
+      this.state.autosave = autosaveFiles.length > 0 ? autosaveFiles[0] : null
+      
+      this.emit('backupsLoaded', { workspaceId, backups: this.state.backups, autosave: this.state.autosave })
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Failed to load backups:', e)
       this.state.error = e.message || 'Failed to load backups'
@@ -201,6 +214,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         workspaces={state.workspaces}
         selectedWorkspace={state.selectedWorkspace}
         backups={state.backups}
+        autosave={state.autosave}
         loading={state.loading}
         error={state.error}
         isAuthenticated={state.isAuthenticated}
