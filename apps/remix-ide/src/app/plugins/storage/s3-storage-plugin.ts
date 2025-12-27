@@ -15,7 +15,8 @@ import {
   StorageConfig,
   StorageFile,
   StorageFilesResponse,
-  StorageListOptions
+  StorageListOptions,
+  StorageApiService
 } from '@remix-api'
 import { endpointUrls } from '@remix-endpoints-helper'
 
@@ -57,6 +58,7 @@ const profile = {
     'downloadBinary',
     'delete',
     'list',
+    'listWorkspaces',
     'exists',
     'getMetadata',
     'getConfig',
@@ -83,6 +85,7 @@ const profile = {
 export class S3StoragePlugin extends Plugin {
   private provider: IStorageProvider | null = null
   private apiClient: ApiClient | null = null
+  private storageApi: StorageApiService | null = null
   private config: StorageConfig | null = null
   
   constructor() {
@@ -250,6 +253,9 @@ export class S3StoragePlugin extends Plugin {
   private async initializeProvider(): Promise<void> {
     // Create API client for storage endpoint
     this.apiClient = new ApiClient(endpointUrls.storage)
+    
+    // Create storage API service
+    this.storageApi = new StorageApiService(this.apiClient)
     
     // Set up token refresh callback via auth plugin
     this.apiClient.setTokenRefreshCallback(async () => {
@@ -502,6 +508,43 @@ export class S3StoragePlugin extends Plugin {
       return await provider.list(options)
     } catch (error) {
       this.emitError('list', options?.folder || '', error as Error)
+      throw error
+    }
+  }
+  
+  /**
+   * List all remote workspaces for the current user with backup info
+   * 
+   * @returns List of workspaces with their backup counts and last backup dates
+   * 
+   * @example
+   * const result = await s3Storage.listWorkspaces()
+   * // { workspaces: [{ id: 'sage-lotus-uq4m', backupCount: 3, lastBackup: '2025-12-26...', totalSize: 26652 }] }
+   */
+  async listWorkspaces(): Promise<{ workspaces: { id: string; backupCount: number; lastBackup: string | null; totalSize: number }[] }> {
+    this.ensureProvider()
+    
+    // Ensure storageApi is initialized
+    if (!this.storageApi) {
+      throw new Error('Storage API not initialized. Please log in first.')
+    }
+    
+    // Check if user is authenticated
+    const user = await this.call('auth', 'getUser')
+    if (!user) {
+      throw new Error('You must be logged in to list workspaces')
+    }
+    
+    try {
+      const response = await this.storageApi.getWorkspaces()
+      
+      if (!response.ok || !response.data) {
+        throw new Error(response.error || 'Failed to list workspaces')
+      }
+      
+      return response.data
+    } catch (error) {
+      this.emitError('listWorkspaces', '', error as Error)
       throw error
     }
   }

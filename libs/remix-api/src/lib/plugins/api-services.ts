@@ -27,7 +27,8 @@ import {
   PresignDownloadResponse,
   StorageFile,
   StorageFilesResponse,
-  StorageListOptions
+  StorageListOptions,
+  WorkspacesResponse
 } from './api-types'
 
 /**
@@ -226,5 +227,12 @@ export class StorageApiService {
    */
   async deleteFile(filename: string): Promise<ApiResponse<GenericSuccessResponse>> {
     return this.apiClient.delete<GenericSuccessResponse>(`/files/${encodeURIComponent(filename)}`)
+  }
+
+  /**
+   * Get list of user's remote workspaces with backup info
+   */
+  async getWorkspaces(): Promise<ApiResponse<WorkspacesResponse>> {
+    return this.apiClient.get<WorkspacesResponse>('/workspaces')
   }
 }

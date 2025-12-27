@@ -208,3 +208,20 @@ export interface StorageListOptions {
   limit?: number
   cursor?: string
 }
+
+/**
+ * Summary of a remote workspace
+ */
+export interface WorkspaceSummary {
+  id: string
+  backupCount: number
+  lastBackup: string | null
+  totalSize: number
+}
+
+/**
+ * List of user's remote workspaces
+ */
+export interface WorkspacesResponse {
+  workspaces: WorkspaceSummary[]
+}
