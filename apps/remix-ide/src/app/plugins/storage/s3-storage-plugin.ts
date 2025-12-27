@@ -65,9 +65,13 @@ const profile = {
     'isHealthy',
     'getProviderName',
     'getWorkspaceRemoteId',
+    'setWorkspaceRemoteId',
     'ensureWorkspaceRemoteId',
     'backupWorkspace',
     'restoreWorkspace',
+    'saveToCloud',
+    'getLastSaveTime',
+    'getLastBackupTime',
     'isAutosaveEnabled',
     'setAutosaveEnabled',
     'startAutosave',
@@ -82,6 +86,7 @@ const profile = {
     'error',
     'configLoaded',
     'backupCompleted',
+    'saveCompleted',
     'restoreCompleted'
   ]
 }
@@ -223,6 +228,10 @@ export class S3StoragePlugin extends Plugin {
         `${workspaceRemoteId}/autosave`
       )
       
+      // Update last save time
+      await this.updateLastSaveTime()
+      this.emit('saveCompleted', { workspaceRemoteId })
+      
       console.log(`[S3StoragePlugin] ✅ Autosave completed: ${backupKey}`)
       
     } catch (error) {
@@ -349,6 +358,98 @@ export class S3StoragePlugin extends Plugin {
     await this.call('notification', 'toast', `🔗 Workspace linked to cloud: ${newRemoteId}`)
     
     return newRemoteId
+  }
+
+  /**
+   * Set a custom remote ID for the workspace
+   * @param workspaceName - The local workspace name (not used if we're in the active workspace)
+   * @param remoteId - The new remote ID to set
+   */
+  async setWorkspaceRemoteId(workspaceName: string, remoteId: string): Promise<void> {
+    if (!remoteId || typeof remoteId !== 'string' || !remoteId.trim()) {
+      throw new Error('Invalid remote ID')
+    }
+    
+    const sanitizedId = remoteId.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-')
+    
+    let config = await this.getRemixConfig()
+    if (!config) {
+      config = {}
+    }
+    
+    const existingConfig = config['remote-workspace'] as RemoteWorkspaceConfig | undefined
+    config['remote-workspace'] = {
+      ...existingConfig,
+      remoteId: sanitizedId,
+      createdAt: existingConfig?.createdAt || new Date().toISOString()
+    }
+    
+    await this.saveRemixConfig(config)
+    console.log('[S3StoragePlugin] Updated workspace remote ID to:', sanitizedId)
+  }
+
+  /**
+   * Get the last save time for the current workspace
+   */
+  async getLastSaveTime(workspaceName?: string): Promise<string | null> {
+    const config = await this.getRemixConfig()
+    return config?.['remote-workspace']?.lastSaveAt || null
+  }
+
+  /**
+   * Get the last backup time for the current workspace
+   */
+  async getLastBackupTime(workspaceName?: string): Promise<string | null> {
+    const config = await this.getRemixConfig()
+    return config?.['remote-workspace']?.lastBackupAt || null
+  }
+
+  /**
+   * Update the last save time in config
+   */
+  private async updateLastSaveTime(): Promise<void> {
+    let config = await this.getRemixConfig()
+    if (!config || !config['remote-workspace']) return
+    
+    config['remote-workspace'].lastSaveAt = new Date().toISOString()
+    await this.saveRemixConfig(config)
+  }
+
+  /**
+   * Update the last backup time in config
+   */
+  private async updateLastBackupTime(): Promise<void> {
+    let config = await this.getRemixConfig()
+    if (!config || !config['remote-workspace']) return
+    
+    config['remote-workspace'].lastBackupAt = new Date().toISOString()
+    await this.saveRemixConfig(config)
+  }
+
+  /**
+   * Save the current workspace to cloud (immediate save to autosave slot)
+   * This is a manual trigger for the autosave functionality
+   */
+  async saveToCloud(): Promise<void> {
+    console.log('[S3StoragePlugin] Manual save to cloud triggered')
+    
+    const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
+    if (!workspaceRemoteId) {
+      throw new Error('No workspace remote ID configured')
+    }
+
+    await this.call('notification', 'toast', '☁️ Saving to cloud...')
+    
+    // Use the same createBackup logic but save to autosave slot
+    // createBackup(filename, folder) - filename first, then folder
+    const folder = `${workspaceRemoteId}/autosave`
+    const filename = 'autosave-backup.zip'
+    
+    await this.createBackup(filename, folder)
+    await this.updateLastSaveTime()
+    
+    this.emit('saveCompleted', { workspaceRemoteId })
+    await this.call('notification', 'toast', '✅ Saved to cloud')
   }
   
   onDeactivation(): void {
@@ -834,6 +935,9 @@ export class S3StoragePlugin extends Plugin {
     })
     
     console.log(`[S3StoragePlugin] ✅ Backup complete: ${key}`)
+    
+    // Update the last backup time in config
+    await this.updateLastBackupTime()
     
     this.emit('backupCompleted', { 
       key, 

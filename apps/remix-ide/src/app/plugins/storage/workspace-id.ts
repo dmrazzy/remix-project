@@ -87,6 +87,10 @@ export interface RemoteWorkspaceConfig {
   createdAt: string
   /** Last sync timestamp */
   lastSyncAt?: string
+  /** Last save to cloud timestamp */
+  lastSaveAt?: string
+  /** Last backup timestamp */
+  lastBackupAt?: string
 }
 
 /**

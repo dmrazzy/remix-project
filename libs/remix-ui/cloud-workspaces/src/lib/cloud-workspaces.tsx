@@ -1,7 +1,7 @@
 import React from 'react'
 import { FormattedMessage } from 'react-intl'
 import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
-import { RemoteWorkspacesList } from './components'
+import { RemoteWorkspacesList, CurrentWorkspaceSection } from './components'
 
 export interface CloudWorkspacesProps {
   plugin: any
@@ -51,6 +51,12 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
 
   return (
     <div className="cloud-workspaces-container h-100 d-flex flex-column" style={{ fontSize: '0.85rem' }}>
+      {/* Current Workspace Section */}
+      <CurrentWorkspaceSection 
+        plugin={plugin} 
+        isAuthenticated={isAuthenticated} 
+      />
+
       {/* Remote Workspaces Section */}
       <RemoteWorkspacesList
         workspaces={workspaces}
@@ -64,9 +70,6 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
         onDeleteBackup={onDeleteBackup}
         onRefresh={onRefresh}
       />
-
-      {/* Current Workspace Section - placeholder for future */}
-      {/* <CurrentWorkspaceSection plugin={plugin} /> */}
     </div>
   )
 }
