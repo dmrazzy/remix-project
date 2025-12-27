@@ -31,6 +31,7 @@ import { createFileManagementTools } from './handlers/FileManagementHandler';
 import { createDeploymentTools } from './handlers/DeploymentHandler';
 import { createDebuggingTools } from './handlers/DebuggingHandler';
 import { createCodeAnalysisTools } from './handlers/CodeAnalysisHandler';
+import { createChartJsTools } from './handlers/ChartJsHandler';
 import { createTutorialsTools } from './handlers/TutorialsHandler';
 import { createAmpTools } from './handlers/AmpHandler';
 import { createMathUtilsTools } from './handlers/MathUtilsHandler';
@@ -364,7 +365,7 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
         console.log(`[RemixMCPServer] Input validation PASSED for tool '${call.name}'`);
       }
 
-      const timeout = this._config.toolTimeout || 60000;
+      const timeout = this._config.toolTimeout || 60000 * 10 // 10 minutes;;
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Tool execution timeout')), timeout);
       });
@@ -807,6 +808,10 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
       // Register Foundry and Hardhat tools
       const foundryHardhatTools = createFoundryHardhatTools();
       this._tools.registerBatch(foundryHardhatTools);
+
+      // Register Chartjs tool
+      const chartJsTools = createChartJsTools();
+      this._tools.registerBatch(chartJsTools);
 
       const totalTools = this._tools.list().length;
 

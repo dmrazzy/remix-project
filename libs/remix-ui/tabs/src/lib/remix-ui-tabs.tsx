@@ -43,17 +43,20 @@ interface ITabsState {
   selectedIndex: number
   fileDecorations: fileDecoration[]
   currentExt: string
+  name: string
 }
 interface ITabsAction {
   type: string
   payload: any
   ext?: string
+  name?: string
 }
 
 const initialTabsState: ITabsState = {
   selectedIndex: -1,
   fileDecorations: [],
-  currentExt: ''
+  currentExt: '',
+  name: ''
 }
 
 const tabsReducer = (state: ITabsState, action: ITabsAction) => {
@@ -62,7 +65,8 @@ const tabsReducer = (state: ITabsState, action: ITabsAction) => {
     return {
       ...state,
       currentExt: action.ext,
-      selectedIndex: action.payload
+      selectedIndex: action.payload,
+      name: action.name
     }
   case 'SET_FILE_DECORATIONS':
     return {
@@ -92,6 +96,8 @@ export const TabsUI = (props: TabsUIProps) => {
   const settledSeqRef = useRef<number>(0)
 
   const [compileState, setCompileState] = useState<'idle' | 'compiling' | 'compiled'>('idle')
+
+  const isVegaVisualization = tabsState.name && tabsState.name.indexOf('amp/vega-specs/') !== -1 && tabsState.currentExt === 'json'
 
   useEffect(() => {
     if (props.tabs[tabsState.selectedIndex] && props.tabs[tabsState.selectedIndex].show) {
@@ -183,7 +189,7 @@ export const TabsUI = (props: TabsUIProps) => {
     currentIndexRef.current = index
     const ext = getExt(name)
     props.plugin.emit('extChanged', ext)
-    dispatch({ type: 'SELECT_INDEX', payload: index, ext: getExt(name) })
+    dispatch({ type: 'SELECT_INDEX', payload: index, ext: getExt(name), name })
   }
 
   const setFileDecorations = (fileStates: fileDecoration[]) => {
@@ -467,8 +473,12 @@ export const TabsUI = (props: TabsUIProps) => {
           // Perform the Amp query
           props.plugin.call('notification', 'toast', 'Performing the query...')
           const data = await props.plugin.call('amp', 'performAmpQuery', content, baseUrl, authToken)
+          const result = {
+            query: content,
+            data
+          }
           const resultPath = `./amp/results/query-${Date.now()}.json`
-          await props.plugin.call('fileManager', 'writeFile', resultPath, JSON.stringify(data, null, '\t'))
+          await props.plugin.call('fileManager', 'writeFile', resultPath, JSON.stringify(result, null, '\t'))
           props.plugin.call('notification', 'toast',`Query done. Result has been added to ${resultPath}`)
           setCompileState('compiled')
         } catch (e) {
@@ -477,6 +487,15 @@ export const TabsUI = (props: TabsUIProps) => {
           setCompileState('idle')
         }
         return
+      }
+
+      if (isVegaVisualization) {
+        try {
+          const file = await props.plugin.call('fileManager', 'getCurrentFile')
+          await props.plugin.call('vega', 'generateVisualization', file)
+        } catch (e) {
+          props.plugin.call('terminal', 'log', { type: 'error', value: e.message })
+        }
       }
 
       const compilerName = {
@@ -552,9 +571,12 @@ export const TabsUI = (props: TabsUIProps) => {
   const onNotify = (text: string, duration?: number) => {
     props.plugin.call('notification', 'toast', text, duration)
   }
+
   let mainLabel = ''
   if (tabsState.currentExt === 'sql') {
     mainLabel = 'Run SQL'
+  } else if (isVegaVisualization) {
+    mainLabel = 'Generate Visualization'
   } else {
     mainLabel = (tabsState.currentExt === 'js' || tabsState.currentExt === 'ts')
       ? (compileState === 'compiling' ? "Run script" :
@@ -604,6 +626,10 @@ export const TabsUI = (props: TabsUIProps) => {
     )
   }
 
+  let btnDisabled = compileState === 'compiling' || !PlayExtList.includes(tabsState.currentExt)
+  if (isVegaVisualization) {
+    btnDisabled = false
+  }
   return (
     <div
       className={`remix-ui-tabs justify-content-between  border-0 header nav-tabs ${
@@ -643,7 +669,7 @@ export const TabsUI = (props: TabsUIProps) => {
                     whiteSpace: "nowrap",
                     borderRadius: "4px 0 0 4px"
                   }}
-                  disabled={!(PlayExtList.includes(tabsState.currentExt)) || compileState === 'compiling'}
+                  disabled={btnDisabled}
                   onClick={handleCompileClick}
                 >
                   <i className={

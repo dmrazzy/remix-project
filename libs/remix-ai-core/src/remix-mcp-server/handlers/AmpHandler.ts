@@ -4,7 +4,6 @@
  *
  * Provides functionality to query data using the Amp hosted server
  */
-
 import { IMCPToolResult } from '../../types/mcp';
 import { BaseToolHandler } from '../registry/RemixToolRegistry';
 import {
@@ -227,7 +226,7 @@ export class AmpDatasetListHandler extends BaseToolHandler {
   };
 
   getPermissions(): string[] {
-    return ['amp:dataset:manifest'];
+    return ['amp:dataset:list'];
   }
 
   validate(args: AmpDatasetManifestArgs): boolean | string {

@@ -99,7 +99,10 @@ let requiredModules = [
   'auth',
   'transactionSimulator',
   'amp',
-  's3Storage'
+  's3Storage',
+  'resolutionIndex',
+  'vega',
+  'chartjs'
 ]
 
 // dependentModules shouldn't be manually activated (e.g hardhat is activated by remixd)
@@ -166,7 +169,10 @@ export function isNative(name) {
     'LearnEth',
     'noir-compiler',
     'remixaiassistant',
-    'templateexplorermodal'
+    'templateexplorermodal',
+    'amp',
+    'vega',
+    'chartjs'
   ]
   return nativePlugins.includes(name) || requiredModules.includes(name) || isInjectedProvider(name) || isVM(name) || isScriptRunner(name)
 }
