@@ -174,7 +174,76 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     try {
       // Construct the relative path (without users/X prefix)
       const backupPath = `${backupFolder}/${backupFilename}`
-      await this.call('s3Storage', 'restoreWorkspace', backupPath)
+      
+      // Extract the remote workspace ID from the backup path (first segment)
+      const backupRemoteId = backupFolder.split('/')[0]
+      
+      // Check if current workspace has the same remote ID
+      const currentRemoteId = await this.call('s3Storage', 'getWorkspaceRemoteId')
+      const canRestoreToCurrent = currentRemoteId && currentRemoteId === backupRemoteId
+      
+      if (canRestoreToCurrent) {
+        // Show modal with both options: restore to current or new workspace
+        const restoreModal = {
+          id: 'restoreBackupModal',
+          title: 'Restore Backup',
+          message: 'How would you like to restore this backup?',
+          modalType: 'modal',
+          okLabel: 'Restore to Current Workspace',
+          cancelLabel: 'Create New Workspace',
+          okFn: async () => {
+            try {
+              await this.call('s3Storage', 'restoreWorkspace', backupPath)
+            } catch (e) {
+              console.error('[CloudWorkspacesPlugin] Restore to current failed:', e)
+              await this.call('notification', 'alert', {
+                id: 'restoreError',
+                title: 'Restore Failed',
+                message: e.message || 'Failed to restore backup'
+              })
+            }
+          },
+          cancelFn: async () => {
+            try {
+              await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath)
+            } catch (e) {
+              console.error('[CloudWorkspacesPlugin] Restore to new workspace failed:', e)
+              await this.call('notification', 'alert', {
+                id: 'restoreError',
+                title: 'Restore Failed',
+                message: e.message || 'Failed to restore backup to new workspace'
+              })
+            }
+          },
+          hideFn: () => null
+        }
+        await this.call('notification', 'modal', restoreModal)
+      } else {
+        // Only option is to restore to a new workspace - show confirmation
+        const confirmModal = {
+          id: 'restoreToNewWorkspaceModal',
+          title: 'Restore to New Workspace',
+          message: 'This will create a new workspace and restore the backup to it. Continue?',
+          modalType: 'modal',
+          okLabel: 'Yes, Create New Workspace',
+          cancelLabel: 'Cancel',
+          okFn: async () => {
+            try {
+              await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath)
+            } catch (e) {
+              console.error('[CloudWorkspacesPlugin] Restore to new workspace failed:', e)
+              await this.call('notification', 'alert', {
+                id: 'restoreError',
+                title: 'Restore Failed',
+                message: e.message || 'Failed to restore backup to new workspace'
+              })
+            }
+          },
+          cancelFn: () => null,
+          hideFn: () => null
+        }
+        await this.call('notification', 'modal', confirmModal)
+      }
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Restore failed:', e)
       throw e

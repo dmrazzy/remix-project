@@ -69,6 +69,7 @@ const profile = {
     'ensureWorkspaceRemoteId',
     'backupWorkspace',
     'restoreWorkspace',
+    'restoreBackupToNewWorkspace',
     'saveToCloud',
     'getLastSaveTime',
     'getLastBackupTime',
@@ -1056,6 +1057,104 @@ export class S3StoragePlugin extends Plugin {
     })
     
     await this.call('notification', 'toast', `☁️ Workspace restored (${restoredCount} files)`)
+  }
+
+  /**
+   * Restore a backup to a NEW workspace
+   * Creates a new workspace and restores the backup content to it
+   * @param backupPath - Full path like "workspace-id/backups/backup-123.zip" or "workspace-id/autosave/autosave-backup.zip"
+   */
+  async restoreBackupToNewWorkspace(backupPath: string): Promise<void> {
+    const provider = this.ensureProvider()
+    
+    // Check if user is authenticated
+    const user = await this.call('auth', 'getUser')
+    if (!user) {
+      throw new Error('You must be logged in to restore a backup')
+    }
+    
+    // Parse the backup path into folder and filename
+    const lastSlashIndex = backupPath.lastIndexOf('/')
+    if (lastSlashIndex === -1) {
+      throw new Error('Invalid backup path format')
+    }
+    
+    const backupFolder = backupPath.substring(0, lastSlashIndex)
+    const backupFilename = backupPath.substring(lastSlashIndex + 1)
+    
+    // Extract the remote workspace ID from the path (first segment)
+    const remoteWorkspaceId = backupPath.split('/')[0]
+    
+    console.log(`[S3StoragePlugin] 📥 Downloading backup for new workspace: ${backupPath}`)
+    
+    // Download the backup using folder and filename
+    const content = await this.downloadBinary(backupFilename, backupFolder)
+    
+    console.log(`[S3StoragePlugin] Downloaded ${(content.length / 1024).toFixed(2)} KB`)
+    
+    // Unzip to get metadata for workspace name
+    const zip = await JSZip.loadAsync(content)
+    
+    // Read metadata to get original workspace name
+    let originalWorkspaceName = 'restored-workspace'
+    const metadataFile = zip.file('_backup_metadata.json')
+    if (metadataFile) {
+      try {
+        const metadataStr = await metadataFile.async('string')
+        const metadata = JSON.parse(metadataStr)
+        if (metadata.workspaceName) {
+          originalWorkspaceName = metadata.workspaceName
+        }
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not parse backup metadata:', e)
+      }
+    }
+    
+    // Generate a unique name for the new workspace
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const newWorkspaceName = `${originalWorkspaceName}-restored-${timestamp}`
+    
+    // Create the new workspace (blank template, no need for git)
+    await this.call('filePanel', 'createWorkspace', newWorkspaceName, 'blank')
+    
+    console.log(`[S3StoragePlugin] Created new workspace: ${newWorkspaceName}`)
+    
+    // Extract and write files to the new workspace
+    let restoredCount = 0
+    const filePromises: Promise<void>[] = []
+    
+    zip.forEach((relativePath, zipEntry) => {
+      // Skip metadata and directories
+      if (relativePath === '_backup_metadata.json' || zipEntry.dir) {
+        return
+      }
+      
+      filePromises.push((async () => {
+        try {
+          const content = await zipEntry.async('string')
+          await this.call('fileManager', 'writeFile', relativePath, content)
+          restoredCount++
+        } catch (err) {
+          console.warn(`[S3StoragePlugin] Failed to restore file: ${relativePath}`, err)
+        }
+      })())
+    })
+    
+    await Promise.all(filePromises)
+    
+    // Link the new workspace to the same remote ID so future saves sync
+    await this.setWorkspaceRemoteId(newWorkspaceName, remoteWorkspaceId)
+    
+    console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName}`)
+    
+    this.emit('restoreCompleted', { 
+      backupPath, 
+      fileCount: restoredCount,
+      workspaceRemoteId: remoteWorkspaceId,
+      newWorkspaceName 
+    })
+    
+    await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files)`)
   }
   
   /**

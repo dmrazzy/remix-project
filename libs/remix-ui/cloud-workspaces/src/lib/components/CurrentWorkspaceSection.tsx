@@ -124,17 +124,36 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
   const handleRestoreAutosave = async () => {
     if (!status.remoteId) return
     
-    setStatus(prev => ({ ...prev, isRestoring: true }))
-    setError(null)
-    try {
-      const autosavePath = `${status.remoteId}/autosave/autosave-backup.zip`
-      await plugin.call('s3Storage', 'restoreWorkspace', autosavePath)
-      await loadStatus()
-    } catch (e) {
-      setError(e.message || 'Restore failed')
-    } finally {
-      setStatus(prev => ({ ...prev, isRestoring: false }))
+    // Show confirmation modal before restoring
+    const autosavePath = `${status.remoteId}/autosave/autosave-backup.zip`
+    
+    const restoreModal = {
+      id: 'restoreAutosaveModal',
+      title: intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosave', defaultMessage: 'Restore Autosave' }),
+      message: intl.formatMessage({ 
+        id: 'cloudWorkspaces.restoreAutosaveConfirm', 
+        defaultMessage: 'This will restore the last autosave to your current workspace. Existing files with the same name will be overwritten. Continue?' 
+      }),
+      modalType: 'modal',
+      okLabel: intl.formatMessage({ id: 'cloudWorkspaces.restore', defaultMessage: 'Restore' }),
+      cancelLabel: intl.formatMessage({ id: 'cloudWorkspaces.cancel', defaultMessage: 'Cancel' }),
+      okFn: async () => {
+        setStatus(prev => ({ ...prev, isRestoring: true }))
+        setError(null)
+        try {
+          await plugin.call('s3Storage', 'restoreWorkspace', autosavePath)
+          await loadStatus()
+        } catch (e) {
+          setError(e.message || 'Restore failed')
+        } finally {
+          setStatus(prev => ({ ...prev, isRestoring: false }))
+        }
+      },
+      cancelFn: () => null,
+      hideFn: () => null
     }
+    
+    await plugin.call('notification', 'modal', restoreModal)
   }
 
   const handleStartEditName = () => {

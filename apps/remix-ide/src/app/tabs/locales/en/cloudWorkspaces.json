@@ -18,6 +18,7 @@
   "cloudWorkspaces.autosave": "Autosave",
   "cloudWorkspaces.latestAutosave": "Latest autosave",
   "cloudWorkspaces.restoreAutosave": "Restore",
+  "cloudWorkspaces.restoreAutosaveConfirm": "This will restore the last autosave to your current workspace. Existing files with the same name will be overwritten. Continue?",
   "cloudWorkspaces.manualBackups": "Manual Backups",
   "cloudWorkspaces.notLinked": "Not linked",
   "cloudWorkspaces.editCloudName": "Edit cloud name",
@@ -32,7 +33,12 @@
   "cloudWorkspaces.saveToCloudTip": "Save current state to cloud",
   "cloudWorkspaces.createBackup": "Backup",
   "cloudWorkspaces.createBackupTip": "Create a timestamped backup",
-  "cloudWorkspaces.restoreAutosave": "Restore",
   "cloudWorkspaces.restoreAutosaveTip": "Restore from last cloud save",
-  "cloudWorkspaces.autosaveOn": "Autosave enabled"
+  "cloudWorkspaces.autosaveOn": "Autosave enabled",
+  "cloudWorkspaces.restoreBackup": "Restore Backup",
+  "cloudWorkspaces.restoreBackupChoose": "How would you like to restore this backup?",
+  "cloudWorkspaces.restoreToCurrent": "Restore to Current Workspace",
+  "cloudWorkspaces.restoreToNew": "Create New Workspace",
+  "cloudWorkspaces.restoreToNewConfirm": "This will create a new workspace and restore the backup to it. Continue?",
+  "cloudWorkspaces.yesCreateNew": "Yes, Create New Workspace"
 }
