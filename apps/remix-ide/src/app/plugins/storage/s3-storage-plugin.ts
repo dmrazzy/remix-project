@@ -67,7 +67,11 @@ const profile = {
     'getWorkspaceRemoteId',
     'ensureWorkspaceRemoteId',
     'backupWorkspace',
-    'restoreWorkspace'
+    'restoreWorkspace',
+    'isAutosaveEnabled',
+    'setAutosaveEnabled',
+    'startAutosave',
+    'stopAutosave'
   ],
   events: [
     'fileUploaded',
@@ -103,67 +107,173 @@ export class S3StoragePlugin extends Plugin {
       if (state.isAuthenticated) {
         await this.initializeProvider()
         await this.loadConfig()
+        // Start autosave if enabled
+        await this.startAutosaveIfEnabled()
       } else {
         // Clear config on logout
         this.config = null
+        this.stopAutosave()
       }
     })
     
-    // EXPERIMENT: Listen for file saves and upload to S3
-    this.on('fileManager', 'fileSaved', async (path: string) => {
-      await this.handleFileSaved(path)
-    })
+    // Start autosave on activation if user is already logged in and setting is enabled
+    await this.startAutosaveIfEnabled()
+  }
+  
+  // ==================== Autosave Functionality ====================
+  
+  private autosaveIntervalId: ReturnType<typeof setInterval> | null = null
+  private static readonly AUTOSAVE_BACKUP_NAME = 'autosave-backup.zip'
+  private static readonly DEFAULT_AUTOSAVE_INTERVAL = 1 * 60 * 1000 // 5 minutes
+  
+  /**
+   * Check if autosave is enabled in settings
+   */
+  async isAutosaveEnabled(): Promise<boolean> {
+    try {
+      const enabled = await this.call('settings', 'get', 'settings/cloud-storage/autosave')
+      return enabled === true
+    } catch {
+      return false
+    }
   }
   
   /**
-   * Handle file saved event - upload to S3 as experiment
+   * Set autosave enabled/disabled
    */
-  private async handleFileSaved(path: string): Promise<void> {
+  async setAutosaveEnabled(enabled: boolean): Promise<void> {
+    await this.call('settings', 'set', 'settings/cloud-storage/autosave', enabled)
+    if (enabled) {
+      await this.startAutosave()
+    } else {
+      this.stopAutosave()
+    }
+  }
+  
+  /**
+   * Start autosave if enabled and user is authenticated
+   */
+  private async startAutosaveIfEnabled(): Promise<void> {
     try {
-      // Check if user is authenticated
-      const user = await this.call('auth', 'getUser')
-      if (!user) {
-        console.log('[S3StoragePlugin] User not authenticated, skipping S3 upload')
+      const isAuth = await this.call('auth', 'isAuthenticated')
+      if (!isAuth) {
         return
       }
       
-      // Only sync .sol files for now as experiment
-      if (!path.endsWith('.sol')) {
-        console.log('[S3StoragePlugin] Skipping non-Solidity file:', path)
+      const enabled = await this.isAutosaveEnabled()
+      if (enabled) {
+        await this.startAutosave()
+      }
+    } catch (e) {
+      console.error('[S3StoragePlugin] Failed to check autosave settings:', e)
+    }
+  }
+  
+  /**
+   * Start the autosave interval
+   */
+  async startAutosave(): Promise<void> {
+    // Stop any existing interval
+    this.stopAutosave()
+    
+    console.log('[S3StoragePlugin] 🔄 Starting autosave (every 5 minutes)')
+    
+    // Run immediately, then on interval
+    await this.runAutosave()
+    
+    this.autosaveIntervalId = setInterval(async () => {
+      await this.runAutosave()
+    }, S3StoragePlugin.DEFAULT_AUTOSAVE_INTERVAL)
+  }
+  
+  /**
+   * Stop the autosave interval
+   */
+  stopAutosave(): void {
+    if (this.autosaveIntervalId) {
+      clearInterval(this.autosaveIntervalId)
+      this.autosaveIntervalId = null
+      console.log('[S3StoragePlugin] ⏹️ Autosave stopped')
+    }
+  }
+  
+  /**
+   * Run a single autosave backup
+   */
+  private async runAutosave(): Promise<void> {
+    try {
+      // Check if user is still authenticated
+      const isAuth = await this.call('auth', 'isAuthenticated')
+      if (!isAuth) {
+        this.stopAutosave()
         return
       }
       
-      // Get or create workspace remote ID
-      const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
+      const workspaceRemoteId = await this.getWorkspaceRemoteId()
       if (!workspaceRemoteId) {
-        console.log('[S3StoragePlugin] Could not get workspace remote ID, skipping upload')
+        console.log('[S3StoragePlugin] No workspace remote ID, skipping autosave')
         return
       }
       
-      // Get file content from fileManager
-      const content = await this.call('fileManager', 'readFile', path)
-      if (!content) {
-        console.log('[S3StoragePlugin] No content for file:', path)
-        return
-      }
+      console.log('[S3StoragePlugin] 💾 Running autosave backup...')
       
-      // Build the remote path: workspaceRemoteId/path
-      const remotePath = joinPath(workspaceRemoteId, path.replace(/^\//, ''))
+      // Create backup with fixed name (overwrites previous autosave)
+      const backupKey = await this.createBackup(
+        S3StoragePlugin.AUTOSAVE_BACKUP_NAME,
+        `${workspaceRemoteId}/autosave`
+      )
       
-      console.log(`[S3StoragePlugin] 🚀 Uploading to S3: ${remotePath}`)
-      
-      // Upload to S3
-      const key = await this.upload(path.replace(/^\//, ''), content, { folder: workspaceRemoteId })
-      
-      console.log(`[S3StoragePlugin] ✅ Uploaded to S3: ${key}`)
-      
-      // Show notification to user
-      await this.call('notification', 'toast', `☁️ Synced to cloud: ${path}`)
+      console.log(`[S3StoragePlugin] ✅ Autosave completed: ${backupKey}`)
       
     } catch (error) {
-      console.error('[S3StoragePlugin] Failed to upload on save:', error)
-      // Don't show error to user for now - this is experimental
+      console.error('[S3StoragePlugin] Autosave failed:', error)
+      // Don't show error to user - autosave is background task
     }
+  }
+  
+  /**
+   * Create a backup with a specific filename
+   * This is a helper used by both backupWorkspace and autosave
+   */
+  private async createBackup(filename: string, folder: string): Promise<string> {
+    const provider = this.ensureProvider()
+    
+    // Get all files in workspace (excluding .deps, artifacts, etc.)
+    const files = await this.collectWorkspaceFiles()
+    
+    // Create zip with compression
+    const zip = new JSZip()
+    
+    // Add metadata
+    const metadata = {
+      createdAt: new Date().toISOString(),
+      fileCount: files.length,
+      workspaceRemoteId: await this.getWorkspaceRemoteId(),
+      isAutosave: folder.includes('autosave')
+    }
+    
+    // Add all files to zip
+    for (const file of files) {
+      // Remove leading slash for zip path
+      const zipPath = file.path.replace(/^\//, '')
+      zip.file(zipPath, file.content)
+    }
+    
+    // Add metadata file
+    zip.file('_backup_metadata.json', JSON.stringify(metadata, null, 2))
+    
+    // Generate compressed zip
+    const zipContent = await zip.generateAsync({
+      type: 'uint8array',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    })
+    
+    // Upload to S3
+    const fullPath = joinPath(folder, filename)
+    const key = await provider.upload(fullPath, zipContent, 'application/zip')
+    
+    return key
   }
   
   // ==================== Workspace Remote ID Management ====================
@@ -244,7 +354,7 @@ export class S3StoragePlugin extends Plugin {
   onDeactivation(): void {
     console.log('[S3StoragePlugin] Deactivated')
     this.off('auth', 'authStateChanged')
-    this.off('fileManager', 'fileSaved')
+    this.stopAutosave()
   }
   
   /**

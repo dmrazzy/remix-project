@@ -118,6 +118,7 @@ export interface SettingsState {
   'account-manager': ConfigState,
   'ollama-config': ConfigState,
   'ollama-endpoint': ConfigState,
+  'cloud-storage/autosave': ConfigState,
   toaster: ConfigState
 }
 export interface SettingsActionPayloadTypes {
