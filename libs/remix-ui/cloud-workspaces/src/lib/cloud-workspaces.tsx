@@ -2,6 +2,7 @@ import React from 'react'
 import { FormattedMessage } from 'react-intl'
 import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
 import { RemoteWorkspacesList, CurrentWorkspaceSection } from './components'
+import { LoginButton } from '@remix-ui/login'
 
 export interface CloudWorkspacesProps {
   plugin: any
@@ -32,6 +33,7 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
   onDeleteBackup,
   onRefresh
 }) => {
+
   if (!isAuthenticated) {
     return (
       <div className="p-3 text-center">
@@ -39,12 +41,11 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
         <p className="text-muted">
           <FormattedMessage id="cloudWorkspaces.loginRequired" defaultMessage="Please log in to view your cloud workspaces" />
         </p>
-        <button
-          className="btn btn-primary"
-          onClick={() => plugin.call('menuicons', 'select', 'settings')}
-        >
-          <FormattedMessage id="cloudWorkspaces.login" defaultMessage="Log In" />
-        </button>
+        <LoginButton
+          plugin={plugin}
+          variant="compact"
+          showCredits={true}
+        />
       </div>
     )
   }
