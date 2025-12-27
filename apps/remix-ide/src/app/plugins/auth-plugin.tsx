@@ -7,7 +7,7 @@ const profile = {
   name: 'auth',
   displayName: 'Authentication',
   description: 'Handles SSO authentication and credits',
-  methods: ['login', 'logout', 'getUser', 'getToken', 'getCredits', 'refreshCredits', 'linkAccount', 'getLinkedAccounts', 'unlinkAccount', 'getApiClient', 'getSSOApi', 'getCreditsApi'],
+  methods: ['login', 'logout', 'getUser', 'getToken', 'getCredits', 'refreshCredits', 'linkAccount', 'getLinkedAccounts', 'unlinkAccount', 'getApiClient', 'getSSOApi', 'getCreditsApi', 'isAuthenticated'],
   events: ['authStateChanged', 'creditsUpdated', 'accountLinked']
 }
 
@@ -487,20 +487,48 @@ export class AuthPlugin extends Plugin {
 
     // Check if user is already logged in
     const token = localStorage.getItem('remix_access_token')
+    const refreshToken = localStorage.getItem('remix_refresh_token')
+    
     if (token) {
       const userStr = localStorage.getItem('remix_user')
       if (userStr) {
         try {
           const user = JSON.parse(userStr)
-          this.emit('authStateChanged', {
-            isAuthenticated: true,
-            user,
-            token
-          })
-          // Auto-refresh credits
-          this.refreshCredits().catch(console.error)
-          // Schedule proactive refresh if possible
-          this.scheduleRefresh(token)
+          
+          // If we have a refresh token, proactively refresh on page load
+          // to ensure we have a fresh access token
+          if (refreshToken) {
+            this.refreshAccessToken()
+              .then((newToken) => {
+                this.emit('authStateChanged', {
+                  isAuthenticated: true,
+                  user,
+                  token: newToken || token
+                })
+                // Auto-refresh credits
+                this.refreshCredits().catch(console.error)
+              })
+              .catch(() => {
+                // Refresh failed, but still try to use existing token
+                this.emit('authStateChanged', {
+                  isAuthenticated: true,
+                  user,
+                  token
+                })
+                this.refreshCredits().catch(console.error)
+                this.scheduleRefresh(token)
+              })
+          } else {
+            this.emit('authStateChanged', {
+              isAuthenticated: true,
+              user,
+              token
+            })
+            // Auto-refresh credits
+            this.refreshCredits().catch(console.error)
+            // Schedule proactive refresh if possible
+            this.scheduleRefresh(token)
+          }
         } catch (e) {
           console.error('[AuthPlugin] Failed to restore user session:', e)
         }
