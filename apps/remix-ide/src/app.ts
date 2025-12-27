@@ -2,6 +2,7 @@
 import { RunTab, makeUdapp } from './app/udapp'
 import { RemixEngine } from './remixEngine'
 import { RemixAppManager } from './remixAppManager'
+import { ResolutionIndexPlugin } from '@remix-project/core-plugin'
 import { LocaleModule } from './app/tabs/locale-module'
 import { NetworkModule } from './app/tabs/network-module'
 import { Web3ProviderModule } from './app/tabs/web3-provider'
@@ -29,7 +30,7 @@ import { ContractFlattener } from './app/plugins/contractFlattener'
 
 import { WalkthroughService } from './walkthroughService'
 
-import { OffsetToLineColumnConverter, CompilerMetadata, CompilerArtefacts, FetchAndCompile, CompilerImports, GistHandler, AmpPlugin } from '@remix-project/core-plugin'
+import { OffsetToLineColumnConverter, CompilerMetadata, CompilerArtefacts, FetchAndCompile, CompilerImports, GistHandler, AmpPlugin, ChartJsPlugin } from '@remix-project/core-plugin'
 
 import { Registry } from '@remix-project/remix-lib'
 import { ConfigPlugin } from './app/plugins/config'
@@ -344,11 +345,19 @@ class AppComponent {
 
     // ----------------- import content service ------------------------
     const contentImport = new CompilerImports()
+    // ----------------- resolution index service ----------------------
+    const resolutionIndex = new ResolutionIndexPlugin()
 
     const blockchain = new Blockchain(Registry.getInstance().get('config').api)
 
     // ----------------- amp (thegraph) ------------------------
     const amp = new AmpPlugin()
+
+    // ----------------- vega (generate visualization) ------------------------
+    // const vega = new VegaPlugin()
+
+    // ----------------- chart (generate visualization) ------------------------
+    const chartjs = new ChartJsPlugin()
 
     // ----------------- compilation metadata generation service ---------
     const compilerMetadataGenerator = new CompilerMetadata()
@@ -431,6 +440,7 @@ class AppComponent {
       configPlugin,
       blockchain,
       contentImport,
+      resolutionIndex,
       this.themeModule,
       this.localeModule,
       editor,
@@ -482,7 +492,9 @@ class AppComponent {
       remixAI,
       remixAiAssistant,
       walletConnect,
-      amp
+      amp,
+      // vega,
+      chartjs
     ])
 
     //---- fs plugin
@@ -769,7 +781,7 @@ class AppComponent {
     })
 
     // activate solidity plugin
-    this.appManager.activatePlugin(['solidity', 'udapp', 'deploy-libraries', 'link-libraries', 'openzeppelin-proxy', 'scriptRunnerBridge'])
+    this.appManager.activatePlugin(['solidity', 'udapp', 'deploy-libraries', 'link-libraries', 'openzeppelin-proxy', 'scriptRunnerBridge', 'resolutionIndex'])
 
     if (isElectron()){
       this.appManager.activatePlugin(['desktopHost'])
