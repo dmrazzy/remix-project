@@ -114,19 +114,26 @@ export class AuthPlugin extends Plugin {
 
   /**
    * Handle successful authentication result
+   * Works the same for all providers (OAuth, SIWE, etc.)
    */
   private handleAuthSuccess(
     user: AuthUser, 
     accessToken: string, 
     refreshToken?: string
   ): void {
+    console.log('[AuthPlugin] handleAuthSuccess called')
+    console.log('[AuthPlugin] Has refresh token:', !!refreshToken)
+    
     // Store tokens
     tokenStorage.setTokens(accessToken, refreshToken)
     tokenStorage.setUser(user)
 
-    // Schedule proactive refresh
+    // Schedule proactive refresh (works the same for all auth methods)
     if (refreshToken) {
+      console.log('[AuthPlugin] Scheduling token refresh')
       this.refreshScheduler.schedule(accessToken)
+    } else {
+      console.warn('[AuthPlugin] No refresh token - token will expire without refresh')
     }
 
     // Emit auth state
@@ -146,6 +153,11 @@ export class AuthPlugin extends Plugin {
 
       if (provider === 'siwe') {
         const result = await performSIWELogin(endpointUrls.sso)
+        console.log('[AuthPlugin] SIWE login result:', {
+          hasUser: !!result.user,
+          hasAccessToken: !!result.accessToken,
+          hasRefreshToken: !!result.refreshToken
+        })
         this.handleAuthSuccess(result.user, result.accessToken, result.refreshToken)
       } else {
         const result = await performPopupLogin({

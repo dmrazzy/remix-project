@@ -138,7 +138,15 @@ export async function verifySIWESignature(
 
   const result = await response.json()
   console.log('[SIWE] Verification successful!')
-  return result
+  console.log('[SIWE] Response has refresh_token:', !!result.refresh_token)
+  console.log('[SIWE] Response has refreshToken:', !!result.refreshToken)
+  
+  // Normalize the refresh token field (backend might use either format)
+  return {
+    token: result.token,
+    refresh_token: result.refresh_token || result.refreshToken,
+    user: result.user
+  }
 }
 
 /**
