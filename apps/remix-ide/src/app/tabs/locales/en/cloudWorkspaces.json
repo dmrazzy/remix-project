@@ -40,5 +40,9 @@
   "cloudWorkspaces.restoreToCurrent": "Restore to Current Workspace",
   "cloudWorkspaces.restoreToNew": "Create New Workspace",
   "cloudWorkspaces.restoreToNewConfirm": "This will create a new workspace and restore the backup to it. Continue?",
-  "cloudWorkspaces.yesCreateNew": "Yes, Create New Workspace"
+  "cloudWorkspaces.yesCreateNew": "Yes, Create New Workspace",
+  "cloudWorkspaces.linkedToAnotherUser": "This workspace is linked to another user's cloud storage.",
+  "cloudWorkspaces.linkToAccount": "Link to My Account",
+  "cloudWorkspaces.linkToAccountConfirm": "This will create a new cloud link for this workspace under your account. The existing cloud link will remain with the original owner. Continue?",
+  "cloudWorkspaces.linkToAccountFirst": "Link to your account first"
 }

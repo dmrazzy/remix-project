@@ -37,9 +37,10 @@ export interface IStorageProvider {
    * @param path - Full path including folder (e.g., 'contracts/MyContract.sol')
    * @param content - File content as string or Uint8Array
    * @param contentType - MIME type of the file
+   * @param metadata - Optional metadata to store with the file
    * @returns The storage key/path of the uploaded file
    */
-  upload(path: string, content: string | Uint8Array, contentType: string): Promise<string>
+  upload(path: string, content: string | Uint8Array, contentType: string, metadata?: Record<string, string>): Promise<string>
   
   /**
    * Download a file from storage

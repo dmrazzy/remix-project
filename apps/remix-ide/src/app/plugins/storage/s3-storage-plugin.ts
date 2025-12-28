@@ -67,6 +67,9 @@ const profile = {
     'getWorkspaceRemoteId',
     'setWorkspaceRemoteId',
     'ensureWorkspaceRemoteId',
+    'checkWorkspaceOwnership',
+    'getWorkspaceOwnership',
+    'linkWorkspaceToCurrentUser',
     'backupWorkspace',
     'restoreWorkspace',
     'restoreBackupToNewWorkspace',
@@ -221,11 +224,21 @@ export class S3StoragePlugin extends Plugin {
         return
       }
       
+      // Get workspace name for filename
+      let workspaceName = 'workspace'
+      try {
+        const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
+        workspaceName = currentWorkspace?.name || 'workspace'
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not get workspace name:', e)
+      }
+      
       console.log('[S3StoragePlugin] 💾 Running autosave backup...')
       
-      // Create backup with fixed name (overwrites previous autosave)
+      // Create backup with workspace name in filename (overwrites previous autosave)
+      const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
       const backupKey = await this.createBackup(
-        S3StoragePlugin.AUTOSAVE_BACKUP_NAME,
+        `${sanitizedName}-autosave.zip`,
         `${workspaceRemoteId}/autosave`
       )
       
@@ -248,17 +261,29 @@ export class S3StoragePlugin extends Plugin {
   private async createBackup(filename: string, folder: string): Promise<string> {
     const provider = this.ensureProvider()
     
+    // Get current workspace name for metadata
+    let workspaceName = 'unknown'
+    try {
+      const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
+      workspaceName = currentWorkspace?.name || 'unknown'
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get workspace name:', e)
+    }
+    
     // Get all files in workspace (excluding .deps, artifacts, etc.)
     const files = await this.collectWorkspaceFiles()
     
     // Create zip with compression
     const zip = new JSZip()
     
-    // Add metadata
-    const metadata = {
+    const workspaceRemoteId = await this.getWorkspaceRemoteId()
+    
+    // Add metadata inside the zip (for when zip is downloaded/inspected)
+    const zipMetadata = {
       createdAt: new Date().toISOString(),
       fileCount: files.length,
-      workspaceRemoteId: await this.getWorkspaceRemoteId(),
+      workspaceRemoteId,
+      workspaceName,
       isAutosave: folder.includes('autosave')
     }
     
@@ -269,8 +294,8 @@ export class S3StoragePlugin extends Plugin {
       zip.file(zipPath, file.content)
     }
     
-    // Add metadata file
-    zip.file('_backup_metadata.json', JSON.stringify(metadata, null, 2))
+    // Add metadata file inside zip
+    zip.file('_backup_metadata.json', JSON.stringify(zipMetadata, null, 2))
     
     // Generate compressed zip
     const zipContent = await zip.generateAsync({
@@ -279,7 +304,7 @@ export class S3StoragePlugin extends Plugin {
       compressionOptions: { level: 6 }
     })
     
-    // Upload to S3
+    // Upload to S3 - filename already includes workspace name
     const fullPath = joinPath(folder, filename)
     const key = await provider.upload(fullPath, zipContent, 'application/zip')
     
@@ -343,6 +368,15 @@ export class S3StoragePlugin extends Plugin {
     const newRemoteId = generateWorkspaceId()
     console.log('[S3StoragePlugin] Generated new workspace remote ID:', newRemoteId)
     
+    // Get current user ID to associate with this workspace
+    let userId: string | undefined
+    try {
+      const user = await this.call('auth', 'getUser')
+      userId = user?.sub
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get user ID:', e)
+    }
+    
     // Create or update config
     if (!config) {
       config = {}
@@ -350,6 +384,7 @@ export class S3StoragePlugin extends Plugin {
     
     config['remote-workspace'] = {
       remoteId: newRemoteId,
+      userId,
       createdAt: new Date().toISOString()
     }
     
@@ -373,6 +408,15 @@ export class S3StoragePlugin extends Plugin {
     
     const sanitizedId = remoteId.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-')
     
+    // Get current user ID
+    let userId: string | undefined
+    try {
+      const user = await this.call('auth', 'getUser')
+      userId = user?.sub
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get user ID:', e)
+    }
+    
     let config = await this.getRemixConfig()
     if (!config) {
       config = {}
@@ -382,11 +426,100 @@ export class S3StoragePlugin extends Plugin {
     config['remote-workspace'] = {
       ...existingConfig,
       remoteId: sanitizedId,
+      userId,
       createdAt: existingConfig?.createdAt || new Date().toISOString()
     }
     
     await this.saveRemixConfig(config)
     console.log('[S3StoragePlugin] Updated workspace remote ID to:', sanitizedId)
+  }
+
+  /**
+   * Check if the current user owns the workspace cloud link
+   * @returns Object with ownership status and details
+   */
+  async checkWorkspaceOwnership(): Promise<{ isOwner: boolean; hasRemoteId: boolean; userId?: string }> {
+    const config = await this.getRemixConfig()
+    const remoteConfig = config?.['remote-workspace']
+    
+    if (!remoteConfig?.remoteId) {
+      return { isOwner: true, hasRemoteId: false } // No remote ID = user can link it
+    }
+    
+    // If no userId stored (legacy), consider it owned by current user
+    if (!remoteConfig.userId) {
+      return { isOwner: true, hasRemoteId: true }
+    }
+    
+    // Check if current user matches
+    try {
+      const user = await this.call('auth', 'getUser')
+      const currentUserId = user?.sub
+      
+      if (!currentUserId) {
+        // Not logged in - can't determine ownership
+        return { isOwner: false, hasRemoteId: true, userId: remoteConfig.userId }
+      }
+      
+      const isOwner = currentUserId === remoteConfig.userId
+      return { isOwner, hasRemoteId: true, userId: remoteConfig.userId }
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not check ownership:', e)
+      return { isOwner: false, hasRemoteId: true, userId: remoteConfig.userId }
+    }
+  }
+
+  /**
+   * Get workspace ownership details for UI display
+   */
+  async getWorkspaceOwnership(): Promise<{ 
+    remoteId: string | null
+    ownedByCurrentUser: boolean
+    linkedToAnotherUser: boolean
+    canSave: boolean
+  }> {
+    const ownership = await this.checkWorkspaceOwnership()
+    
+    return {
+      remoteId: ownership.hasRemoteId ? (await this.getWorkspaceRemoteId()) : null,
+      ownedByCurrentUser: ownership.isOwner && ownership.hasRemoteId,
+      linkedToAnotherUser: !ownership.isOwner && ownership.hasRemoteId,
+      canSave: ownership.isOwner // Can only save if owner or not linked
+    }
+  }
+
+  /**
+   * Link (or re-link) the workspace to the current user's cloud
+   * Creates a new remote ID and associates it with the current user
+   */
+  async linkWorkspaceToCurrentUser(): Promise<string> {
+    // Get current user
+    const user = await this.call('auth', 'getUser')
+    if (!user?.sub) {
+      throw new Error('You must be logged in to link a workspace')
+    }
+    
+    // Generate a new remote ID
+    const newRemoteId = generateWorkspaceId()
+    console.log('[S3StoragePlugin] Linking workspace to current user with new ID:', newRemoteId)
+    
+    let config = await this.getRemixConfig()
+    if (!config) {
+      config = {}
+    }
+    
+    // Create fresh config for this user (don't carry over old timestamps)
+    config['remote-workspace'] = {
+      remoteId: newRemoteId,
+      userId: user.sub,
+      createdAt: new Date().toISOString()
+    }
+    
+    await this.saveRemixConfig(config)
+    
+    await this.call('notification', 'toast', `🔗 Workspace linked to your cloud: ${newRemoteId}`)
+    
+    return newRemoteId
   }
 
   /**
@@ -434,17 +567,32 @@ export class S3StoragePlugin extends Plugin {
   async saveToCloud(): Promise<void> {
     console.log('[S3StoragePlugin] Manual save to cloud triggered')
     
+    // Check ownership first
+    const ownership = await this.checkWorkspaceOwnership()
+    if (!ownership.isOwner && ownership.hasRemoteId) {
+      throw new Error("This workspace is linked to another user's cloud storage. Use 'Link to my account' to create your own cloud link.")
+    }
+    
     const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
     if (!workspaceRemoteId) {
       throw new Error('No workspace remote ID configured')
+    }
+    
+    // Get workspace name for filename
+    let workspaceName = 'workspace'
+    try {
+      const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
+      workspaceName = currentWorkspace?.name || 'workspace'
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get workspace name:', e)
     }
 
     await this.call('notification', 'toast', '☁️ Saving to cloud...')
     
     // Use the same createBackup logic but save to autosave slot
-    // createBackup(filename, folder) - filename first, then folder
     const folder = `${workspaceRemoteId}/autosave`
-    const filename = 'autosave-backup.zip'
+    const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
+    const filename = `${sanitizedName}-autosave.zip`
     
     await this.createBackup(filename, folder)
     await this.updateLastSaveTime()
@@ -876,8 +1024,23 @@ export class S3StoragePlugin extends Plugin {
       throw new Error('You must be logged in to backup your workspace')
     }
     
+    // Check ownership first
+    const ownership = await this.checkWorkspaceOwnership()
+    if (!ownership.isOwner && ownership.hasRemoteId) {
+      throw new Error("This workspace is linked to another user's cloud storage. Use 'Link to my account' to create your own cloud link.")
+    }
+    
     // Get or create workspace remote ID
     const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
+    
+    // Get workspace name for filename
+    let workspaceName = 'workspace'
+    try {
+      const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
+      workspaceName = currentWorkspace?.name || 'workspace'
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get workspace name:', e)
+    }
     
     console.log(`[S3StoragePlugin] 📦 Starting workspace backup for: ${workspaceRemoteId}`)
     
@@ -923,9 +1086,10 @@ export class S3StoragePlugin extends Plugin {
     const arrayBuffer = await blob.arrayBuffer()
     const content = new Uint8Array(arrayBuffer)
     
-    // Upload to S3
+    // Upload to S3 with workspace name in filename
+    const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const backupFilename = `backup-${timestamp}.zip`
+    const backupFilename = `${sanitizedName}-${timestamp}.zip`
     const backupPath = `${workspaceRemoteId}/backups/${backupFilename}`
     
     console.log(`[S3StoragePlugin] 🚀 Uploading backup: ${backupPath}`)

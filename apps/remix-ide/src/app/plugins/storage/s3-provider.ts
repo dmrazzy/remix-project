@@ -82,7 +82,7 @@ export class S3StorageProvider implements IStorageProvider {
     }
   }
   
-  async upload(path: string, content: string | Uint8Array, contentType?: string): Promise<string> {
+  async upload(path: string, content: string | Uint8Array, contentType?: string, metadata?: Record<string, string>): Promise<string> {
     await this.ensureToken()
     
     const { folder, filename } = parsePath(path)
@@ -109,7 +109,8 @@ export class S3StorageProvider implements IStorageProvider {
       filename,
       folder: folder || undefined,
       contentType: mimeType,
-      fileSize: size
+      fileSize: size,
+      metadata
     })
     
     if (!presignResponse.ok || !presignResponse.data) {

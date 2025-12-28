@@ -148,6 +148,8 @@ export interface PresignUploadRequest {
   folder?: string
   contentType: string
   fileSize?: number
+  /** Optional metadata to store with the file (e.g., workspaceName, userId) */
+  metadata?: Record<string, string>
 }
 
 /**
@@ -188,6 +190,8 @@ export interface StorageFile {
   uploadedAt: string
   lastModified: string
   etag?: string
+  /** S3 object metadata (workspaceName, userId, etc.) */
+  metadata?: Record<string, string>
 }
 
 /**
@@ -217,6 +221,10 @@ export interface WorkspaceSummary {
   backupCount: number
   lastBackup: string | null
   totalSize: number
+  /** Original workspace name from the most recent backup metadata */
+  workspaceName?: string
+  /** User ID who owns this remote workspace */
+  userId?: string
 }
 
 /**

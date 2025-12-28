@@ -83,6 +83,8 @@ export function isValidWorkspaceId(id: string): boolean {
 export interface RemoteWorkspaceConfig {
   /** Unique identifier for remote sync (e.g., "fluffy-ocean-x7k2") */
   remoteId: string
+  /** User ID who linked this workspace (from auth plugin user.sub) */
+  userId?: string
   /** When the remote ID was created */
   createdAt: string
   /** Last sync timestamp */

@@ -16,6 +16,10 @@ interface WorkspaceCloudStatus {
   isSaving: boolean
   isBackingUp: boolean
   isRestoring: boolean
+  isLinking: boolean
+  ownedByCurrentUser: boolean
+  linkedToAnotherUser: boolean
+  canSave: boolean
 }
 
 export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = ({
@@ -31,7 +35,11 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     autosaveEnabled: false,
     isSaving: false,
     isBackingUp: false,
-    isRestoring: false
+    isRestoring: false,
+    isLinking: false,
+    ownedByCurrentUser: true,
+    linkedToAnotherUser: false,
+    canSave: true
   })
   const [isEditingName, setIsEditingName] = useState(false)
   const [editedName, setEditedName] = useState('')
@@ -78,6 +86,9 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
       const lastSaved = await plugin.call('s3Storage', 'getLastSaveTime', currentWorkspace.name)
       const lastBackup = await plugin.call('s3Storage', 'getLastBackupTime', currentWorkspace.name)
       const autosaveEnabled = await plugin.call('s3Storage', 'isAutosaveEnabled')
+      
+      // Get ownership info
+      const ownership = await plugin.call('s3Storage', 'getWorkspaceOwnership')
 
       setStatus({
         workspaceName: currentWorkspace.name,
@@ -87,7 +98,11 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         autosaveEnabled,
         isSaving: false,
         isBackingUp: false,
-        isRestoring: false
+        isRestoring: false,
+        isLinking: false,
+        ownedByCurrentUser: ownership.ownedByCurrentUser,
+        linkedToAnotherUser: ownership.linkedToAnotherUser,
+        canSave: ownership.canSave
       })
       setEditedName(remoteId || '')
     } catch (e) {
@@ -154,6 +169,37 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     }
     
     await plugin.call('notification', 'modal', restoreModal)
+  }
+
+  const handleLinkToCurrentUser = async () => {
+    // Show confirmation modal before re-linking
+    const linkModal = {
+      id: 'linkToCurrentUserModal',
+      title: intl.formatMessage({ id: 'cloudWorkspaces.linkToAccount', defaultMessage: 'Link to My Account' }),
+      message: intl.formatMessage({ 
+        id: 'cloudWorkspaces.linkToAccountConfirm', 
+        defaultMessage: 'This will create a new cloud link for this workspace under your account. The existing cloud link will remain with the original owner. Continue?' 
+      }),
+      modalType: 'modal',
+      okLabel: intl.formatMessage({ id: 'cloudWorkspaces.linkToAccount', defaultMessage: 'Link to My Account' }),
+      cancelLabel: intl.formatMessage({ id: 'cloudWorkspaces.cancel', defaultMessage: 'Cancel' }),
+      okFn: async () => {
+        setStatus(prev => ({ ...prev, isLinking: true }))
+        setError(null)
+        try {
+          await plugin.call('s3Storage', 'linkWorkspaceToCurrentUser')
+          await loadStatus()
+        } catch (e) {
+          setError(e.message || 'Link failed')
+        } finally {
+          setStatus(prev => ({ ...prev, isLinking: false }))
+        }
+      },
+      cancelFn: () => null,
+      hideFn: () => null
+    }
+    
+    await plugin.call('notification', 'modal', linkModal)
   }
 
   const handleStartEditName = () => {
@@ -290,7 +336,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         </div>
 
         {/* Status indicators */}
-        {status.remoteId && (
+        {status.remoteId && status.ownedByCurrentUser && (
           <div className="d-flex flex-wrap gap-2 mb-2" style={{ fontSize: '0.7rem' }}>
             <span className="text-muted">
               <i className="fas fa-cloud-upload-alt me-1"></i>
@@ -300,6 +346,28 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
               <i className="fas fa-archive me-1"></i>
               <FormattedMessage id="cloudWorkspaces.lastBackup" defaultMessage="Backup" />: {formatRelativeTime(status.lastBackup)}
             </span>
+          </div>
+        )}
+
+        {/* Warning: Workspace linked to another user */}
+        {status.linkedToAnotherUser && (
+          <div className="alert alert-warning py-1 px-2 mb-2 small">
+            <i className="fas fa-exclamation-triangle me-1"></i>
+            <FormattedMessage 
+              id="cloudWorkspaces.linkedToAnotherUser" 
+              defaultMessage="This workspace is linked to another user's cloud storage." 
+            />
+            <button
+              className="btn btn-sm btn-link p-0 ms-1"
+              onClick={handleLinkToCurrentUser}
+              disabled={status.isLinking}
+              style={{ fontSize: '0.75rem' }}
+            >
+              {status.isLinking ? (
+                <i className="fas fa-spinner fa-spin me-1"></i>
+              ) : null}
+              <FormattedMessage id="cloudWorkspaces.linkToAccount" defaultMessage="Link to My Account" />
+            </button>
           </div>
         )}
 
@@ -315,12 +383,16 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         <div className="d-flex gap-1">
           <CustomTooltip
             placement="top"
-            tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.saveToCloudTip', defaultMessage: 'Save current state to cloud' })}
+            tooltipText={
+              status.linkedToAnotherUser 
+                ? intl.formatMessage({ id: 'cloudWorkspaces.linkToAccountFirst', defaultMessage: 'Link to your account first' })
+                : intl.formatMessage({ id: 'cloudWorkspaces.saveToCloudTip', defaultMessage: 'Save current state to cloud' })
+            }
           >
             <button
               className="btn btn-sm btn-outline-primary flex-grow-1"
               onClick={handleSaveToCloud}
-              disabled={status.isSaving || status.isBackingUp || status.isRestoring}
+              disabled={status.isSaving || status.isBackingUp || status.isRestoring || !status.canSave}
               style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
             >
               {status.isSaving ? (
@@ -334,12 +406,16 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
           
           <CustomTooltip
             placement="top"
-            tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.createBackupTip', defaultMessage: 'Create a timestamped backup' })}
+            tooltipText={
+              status.linkedToAnotherUser 
+                ? intl.formatMessage({ id: 'cloudWorkspaces.linkToAccountFirst', defaultMessage: 'Link to your account first' })
+                : intl.formatMessage({ id: 'cloudWorkspaces.createBackupTip', defaultMessage: 'Create a timestamped backup' })
+            }
           >
             <button
               className="btn btn-sm btn-outline-secondary flex-grow-1"
               onClick={handleCreateBackup}
-              disabled={status.isSaving || status.isBackingUp || status.isRestoring}
+              disabled={status.isSaving || status.isBackingUp || status.isRestoring || !status.canSave}
               style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
             >
               {status.isBackingUp ? (
@@ -351,8 +427,8 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
             </button>
           </CustomTooltip>
           
-          {/* Restore button - only show if there's a saved state */}
-          {status.lastSaved && (
+          {/* Restore button - only show if there's a saved state and user owns workspace */}
+          {status.lastSaved && status.ownedByCurrentUser && (
             <CustomTooltip
               placement="top"
               tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosaveTip', defaultMessage: 'Restore from last cloud save' })}
