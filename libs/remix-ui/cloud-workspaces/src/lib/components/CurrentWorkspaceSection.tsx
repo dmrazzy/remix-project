@@ -54,6 +54,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
   useEffect(() => {
     // Listen for workspace changes
     const handleWorkspaceChange = () => {
+      console.log('Workspace change detected, reloading status')
       if (isAuthenticated) {
         loadStatus()
       }

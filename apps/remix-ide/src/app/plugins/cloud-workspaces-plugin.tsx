@@ -8,8 +8,8 @@ import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/ap
 const profile = {
   name: 'cloudWorkspaces',
   displayName: 'Cloud Workspaces',
-  methods: ['getWorkspaces', 'getBackups', 'refresh'],
-  events: ['workspacesLoaded', 'backupsLoaded'],
+  methods: ['getWorkspaces', 'getBackups', 'refresh', 'updateStatus'],
+  events: ['workspacesLoaded', 'backupsLoaded', 'statusChanged'],
   icon: 'assets/img/cloud.svg',
   description: 'View and manage your cloud workspaces and backups',
   kind: 'storage',
@@ -17,6 +17,15 @@ const profile = {
   documentation: '',
   version: packageJson.version,
   maintainedBy: 'Remix'
+}
+
+// Badge status types for the sidebar icon
+export type CloudStatusKey = 'none' | 'login' | 'link' | 'syncing' | 'synced' | 'autosave' | 'error'
+
+interface CloudStatus {
+  key: CloudStatusKey | number
+  title: string
+  type: 'warning' | 'success' | 'info' | 'error' | ''
 }
 
 export interface CloudWorkspacesState {
@@ -27,6 +36,7 @@ export interface CloudWorkspacesState {
   loading: boolean
   error: string | null
   isAuthenticated: boolean
+  currentStatus: CloudStatus
 }
 
 export class CloudWorkspacesPlugin extends ViewPlugin {
@@ -38,19 +48,110 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     autosave: null,
     loading: false,
     error: null,
-    isAuthenticated: false
+    isAuthenticated: false,
+    currentStatus: { key: 'none', title: '', type: '' }
   }
 
   constructor() {
     super(profile)
   }
 
+  // ==================== Status Badge Management ====================
+
+  /**
+   * Update the sidebar badge status based on current state
+   */
+  async updateStatus(): Promise<void> {
+    console.log('[CloudWorkspaces] updateStatus called')
+    const status = await this.computeCurrentStatus()
+    console.log('[CloudWorkspaces] Computed status:', status)
+    
+    if (status.key !== this.state.currentStatus.key) {
+      console.log('[CloudWorkspaces] Status changed from', this.state.currentStatus.key, 'to', status.key)
+      this.state.currentStatus = status
+      console.log('[CloudWorkspaces] Emitting statusChanged:', status)
+      this.emit('statusChanged', status)
+    } else {
+      console.log('[CloudWorkspaces] Status unchanged:', status.key)
+    }
+  }
+
+  private async computeCurrentStatus(): Promise<CloudStatus> {
+    console.log('[CloudWorkspaces] computeCurrentStatus - isAuthenticated:', this.state.isAuthenticated)
+    
+    // Check if user is logged in
+    if (!this.state.isAuthenticated) {
+      console.log('[CloudWorkspaces] Not authenticated, returning login status')
+      return { 
+        key: 'login', 
+        title: 'Login to sync workspaces to cloud', 
+        type: 'warning' 
+      }
+    }
+
+    // Check if there's a current workspace
+    try {
+      const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
+      console.log('[CloudWorkspaces] Current workspace:', currentWorkspace)
+      if (!currentWorkspace || !currentWorkspace.name) {
+        console.log('[CloudWorkspaces] No workspace open')
+        return { key: 'none', title: '', type: '' }
+      }
+
+      // Check if workspace is linked to cloud
+      const ownership = await this.call('s3Storage', 'getWorkspaceOwnership')
+      console.log('[CloudWorkspaces] Ownership:', ownership)
+      
+      if (!ownership.hasRemoteId) {
+        return { 
+          key: 'link', 
+          title: 'Link workspace to cloud for backup', 
+          type: 'info' 
+        }
+      }
+
+      // Check if workspace is owned by another user
+      if (!ownership.ownedByCurrentUser) {
+        return { 
+          key: 'error', 
+          title: 'Workspace linked to another account', 
+          type: 'error' 
+        }
+      }
+
+      // Check if autosave is enabled and running
+      const autosaveEnabled = await this.call('s3Storage', 'isAutosaveEnabled')
+      if (autosaveEnabled) {
+        return { 
+          key: 'autosave', 
+          title: 'Autosave enabled - syncing to cloud', 
+          type: 'success' 
+        }
+      }
+
+      // Workspace is linked but autosave is off
+      return { 
+        key: 'synced', 
+        title: 'Workspace linked to cloud', 
+        type: 'success' 
+      }
+    } catch (e) {
+      console.warn('[CloudWorkspacesPlugin] Could not compute status:', e)
+      return { key: 'none', title: '', type: '' }
+    }
+  }
+
+  // ==================== Lifecycle ====================
+
   async onActivation(): Promise<void> {
+    console.log('[CloudWorkspaces] Plugin activated')
+    
     // Check auth status and load workspaces
     await this.checkAuthAndLoad()
     
     // Listen for auth state changes
     this.on('auth', 'authStateChanged', async (state: { isAuthenticated: boolean }) => {
+      console.log('[CloudWorkspaces] authStateChanged:', state.isAuthenticated)
       this.state.isAuthenticated = state.isAuthenticated
       if (state.isAuthenticated) {
         await this.loadWorkspaces()
@@ -61,17 +162,38 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         this.state.selectedWorkspace = null
         this.renderComponent()
       }
+      await this.updateStatus()
+    })
+    
+    // Listen for workspace changes
+    this.on('filePanel', 'setWorkspace', async () => {
+      console.log('[CloudWorkspaces] setWorkspace event received')
+      await this.updateStatus()
     })
     
     // Listen for backup events from s3Storage
     this.on('s3Storage', 'backupCompleted', async () => {
+      console.log('[CloudWorkspaces] backupCompleted event received')
       await this.refresh()
+      await this.updateStatus()
     })
+    
+    // Listen for autosave setting changes
+    this.on('s3Storage', 'autosaveChanged', async () => {
+      console.log('[CloudWorkspaces] autosaveChanged event received')
+      await this.updateStatus()
+    })
+    
+    // Initial status update
+    console.log('[CloudWorkspaces] Calling initial updateStatus')
+    await this.updateStatus()
   }
 
   async onDeactivation(): Promise<void> {
     this.off('auth', 'authStateChanged')
+    this.off('filePanel', 'setWorkspace')
     this.off('s3Storage', 'backupCompleted')
+    this.off('s3Storage', 'autosaveChanged')
   }
 
   private async checkAuthAndLoad(): Promise<void> {

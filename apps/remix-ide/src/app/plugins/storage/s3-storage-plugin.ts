@@ -91,7 +91,8 @@ const profile = {
     'configLoaded',
     'backupCompleted',
     'saveCompleted',
-    'restoreCompleted'
+    'restoreCompleted',
+    'autosaveChanged'
   ]
 }
 
@@ -157,6 +158,7 @@ export class S3StoragePlugin extends Plugin {
     } else {
       this.stopAutosave()
     }
+    this.emit('autosaveChanged', { enabled })
   }
   
   /**
