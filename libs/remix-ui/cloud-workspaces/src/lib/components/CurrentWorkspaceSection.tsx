@@ -1,139 +1,44 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { CustomTooltip } from '@remix-ui/helper'
+import { useCloudWorkspaces } from '../context'
 
 export interface CurrentWorkspaceSectionProps {
   plugin: any
-  isAuthenticated: boolean
 }
 
-interface WorkspaceCloudStatus {
-  workspaceName: string
-  remoteId: string | null
-  lastSaved: string | null
-  lastBackup: string | null
-  autosaveEnabled: boolean
-  isSaving: boolean
-  isBackingUp: boolean
-  isRestoring: boolean
-  isLinking: boolean
-  ownedByCurrentUser: boolean
-  linkedToAnotherUser: boolean
-  canSave: boolean
-}
-
-export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = ({
-  plugin,
-  isAuthenticated
-}) => {
+export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = ({ plugin }) => {
   const intl = useIntl()
-  const [status, setStatus] = useState<WorkspaceCloudStatus>({
-    workspaceName: '',
-    remoteId: null,
-    lastSaved: null,
-    lastBackup: null,
-    autosaveEnabled: false,
-    isSaving: false,
-    isBackingUp: false,
-    isRestoring: false,
-    isLinking: false,
-    ownedByCurrentUser: true,
-    linkedToAnotherUser: false,
-    canSave: true
-  })
+  const { 
+    isAuthenticated, 
+    error,
+    currentWorkspaceStatus: status,
+    saveToCloud,
+    createBackup,
+    restoreAutosave,
+    linkToCurrentUser,
+    setWorkspaceRemoteId
+  } = useCloudWorkspaces()
+  
   const [isEditingName, setIsEditingName] = useState(false)
   const [editedName, setEditedName] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadStatus()
-    }
-  }, [isAuthenticated])
-
-  useEffect(() => {
-    // Listen for workspace changes
-    const handleWorkspaceChange = () => {
-      console.log('Workspace change detected, reloading status')
-      if (isAuthenticated) {
-        loadStatus()
-      }
-    }
-
-    plugin.on('filePanel', 'workspaceCreated', handleWorkspaceChange)
-    plugin.on('filePanel', 'workspaceRenamed', handleWorkspaceChange)
-    plugin.on('filePanel', 'setWorkspace', handleWorkspaceChange)
-    plugin.on('s3Storage', 'backupCompleted', handleWorkspaceChange)
-    plugin.on('s3Storage', 'saveCompleted', handleWorkspaceChange)
-
-    return () => {
-      plugin.off('filePanel', 'workspaceCreated')
-      plugin.off('filePanel', 'workspaceRenamed')
-      plugin.off('filePanel', 'setWorkspace')
-      plugin.off('s3Storage', 'backupCompleted')
-      plugin.off('s3Storage', 'saveCompleted')
-    }
-  }, [plugin, isAuthenticated])
-
-  const loadStatus = async () => {
-    try {
-      const currentWorkspace = await plugin.call('filePanel', 'getCurrentWorkspace')
-      if (!currentWorkspace || !currentWorkspace.name) {
-        setStatus(prev => ({ ...prev, workspaceName: '', remoteId: null }))
-        return
-      }
-
-      const remoteId = await plugin.call('s3Storage', 'getWorkspaceRemoteId', currentWorkspace.name)
-      const lastSaved = await plugin.call('s3Storage', 'getLastSaveTime', currentWorkspace.name)
-      const lastBackup = await plugin.call('s3Storage', 'getLastBackupTime', currentWorkspace.name)
-      const autosaveEnabled = await plugin.call('s3Storage', 'isAutosaveEnabled')
-      
-      // Get ownership info
-      const ownership = await plugin.call('s3Storage', 'getWorkspaceOwnership')
-
-      setStatus({
-        workspaceName: currentWorkspace.name,
-        remoteId,
-        lastSaved,
-        lastBackup,
-        autosaveEnabled,
-        isSaving: false,
-        isBackingUp: false,
-        isRestoring: false,
-        isLinking: false,
-        ownedByCurrentUser: ownership.ownedByCurrentUser,
-        linkedToAnotherUser: ownership.linkedToAnotherUser,
-        canSave: ownership.canSave
-      })
-      setEditedName(remoteId || '')
-    } catch (e) {
-      console.error('Failed to load workspace status:', e)
-    }
-  }
+  const [localError, setLocalError] = useState<string | null>(null)
 
   const handleSaveToCloud = async () => {
-    setStatus(prev => ({ ...prev, isSaving: true }))
-    setError(null)
+    setLocalError(null)
     try {
-      await plugin.call('s3Storage', 'saveToCloud')
-      await loadStatus()
+      await saveToCloud()
     } catch (e) {
-      setError(e.message || 'Save failed')
-    } finally {
-      setStatus(prev => ({ ...prev, isSaving: false }))
+      setLocalError(e.message || 'Save failed')
     }
   }
 
   const handleCreateBackup = async () => {
-    setStatus(prev => ({ ...prev, isBackingUp: true }))
-    setError(null)
+    setLocalError(null)
     try {
-      await plugin.call('s3Storage', 'backupWorkspace')
-      await loadStatus()
+      await createBackup()
     } catch (e) {
-      setError(e.message || 'Backup failed')
-    } finally {
-      setStatus(prev => ({ ...prev, isBackingUp: false }))
+      setLocalError(e.message || 'Backup failed')
     }
   }
 
@@ -141,8 +46,6 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     if (!status.remoteId) return
     
     // Show confirmation modal before restoring
-    const autosavePath = `${status.remoteId}/autosave/autosave-backup.zip`
-    
     const restoreModal = {
       id: 'restoreAutosaveModal',
       title: intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosave', defaultMessage: 'Restore Autosave' }),
@@ -154,15 +57,11 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
       okLabel: intl.formatMessage({ id: 'cloudWorkspaces.restore', defaultMessage: 'Restore' }),
       cancelLabel: intl.formatMessage({ id: 'cloudWorkspaces.cancel', defaultMessage: 'Cancel' }),
       okFn: async () => {
-        setStatus(prev => ({ ...prev, isRestoring: true }))
-        setError(null)
+        setLocalError(null)
         try {
-          await plugin.call('s3Storage', 'restoreWorkspace', autosavePath)
-          await loadStatus()
+          await restoreAutosave()
         } catch (e) {
-          setError(e.message || 'Restore failed')
-        } finally {
-          setStatus(prev => ({ ...prev, isRestoring: false }))
+          setLocalError(e.message || 'Restore failed')
         }
       },
       cancelFn: () => null,
@@ -185,15 +84,11 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
       okLabel: intl.formatMessage({ id: 'cloudWorkspaces.linkToAccount', defaultMessage: 'Link to My Account' }),
       cancelLabel: intl.formatMessage({ id: 'cloudWorkspaces.cancel', defaultMessage: 'Cancel' }),
       okFn: async () => {
-        setStatus(prev => ({ ...prev, isLinking: true }))
-        setError(null)
+        setLocalError(null)
         try {
-          await plugin.call('s3Storage', 'linkWorkspaceToCurrentUser')
-          await loadStatus()
+          await linkToCurrentUser()
         } catch (e) {
-          setError(e.message || 'Link failed')
-        } finally {
-          setStatus(prev => ({ ...prev, isLinking: false }))
+          setLocalError(e.message || 'Link failed')
         }
       },
       cancelFn: () => null,
@@ -216,13 +111,12 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
   const handleSaveName = async () => {
     if (!editedName.trim()) return
     
-    setError(null)
+    setLocalError(null)
     try {
-      await plugin.call('s3Storage', 'setWorkspaceRemoteId', status.workspaceName, editedName.trim())
+      await setWorkspaceRemoteId(status.workspaceName, editedName.trim())
       setIsEditingName(false)
-      await loadStatus()
     } catch (e) {
-      setError(e.message || 'Failed to rename')
+      setLocalError(e.message || 'Failed to rename')
     }
   }
 
@@ -243,6 +137,9 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   }
+
+  // Display error from context or local error
+  const displayError = localError || error
 
   if (!isAuthenticated) {
     return null
@@ -373,10 +270,10 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         )}
 
         {/* Error display */}
-        {error && (
+        {displayError && (
           <div className="alert alert-danger py-1 px-2 mb-2 small">
             <i className="fas fa-exclamation-triangle me-1"></i>
-            {error}
+            {displayError}
           </div>
         )}
 

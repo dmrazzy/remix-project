@@ -599,6 +599,7 @@ export class S3StoragePlugin extends Plugin {
     await this.createBackup(filename, folder)
     await this.updateLastSaveTime()
     
+    console.log('[S3Storage] Emitting saveCompleted event', { workspaceRemoteId })
     this.emit('saveCompleted', { workspaceRemoteId })
     await this.call('notification', 'toast', '✅ Saved to cloud')
   }

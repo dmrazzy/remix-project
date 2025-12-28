@@ -8,7 +8,17 @@ import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/ap
 const profile = {
   name: 'cloudWorkspaces',
   displayName: 'Cloud Workspaces',
-  methods: ['getWorkspaces', 'getBackups', 'refresh', 'updateStatus'],
+  methods: [
+    'getWorkspaces', 
+    'getBackups', 
+    'refresh', 
+    'updateStatus',
+    'saveToCloud',
+    'createBackup',
+    'restoreAutosave',
+    'linkToCurrentUser',
+    'updateWorkspaceRemoteId'
+  ],
   events: ['workspacesLoaded', 'backupsLoaded', 'statusChanged'],
   icon: 'assets/img/cloud.svg',
   description: 'View and manage your cloud workspaces and backups',
@@ -28,6 +38,37 @@ interface CloudStatus {
   type: 'warning' | 'success' | 'info' | 'error' | ''
 }
 
+// Current workspace cloud status - tracks sync state of the active workspace
+export interface CurrentWorkspaceCloudStatus {
+  workspaceName: string
+  remoteId: string | null
+  lastSaved: string | null
+  lastBackup: string | null
+  autosaveEnabled: boolean
+  isSaving: boolean
+  isBackingUp: boolean
+  isRestoring: boolean
+  isLinking: boolean
+  ownedByCurrentUser: boolean
+  linkedToAnotherUser: boolean
+  canSave: boolean
+}
+
+const defaultWorkspaceStatus: CurrentWorkspaceCloudStatus = {
+  workspaceName: '',
+  remoteId: null,
+  lastSaved: null,
+  lastBackup: null,
+  autosaveEnabled: false,
+  isSaving: false,
+  isBackingUp: false,
+  isRestoring: false,
+  isLinking: false,
+  ownedByCurrentUser: true,
+  linkedToAnotherUser: false,
+  canSave: true
+}
+
 export interface CloudWorkspacesState {
   workspaces: WorkspaceSummary[]
   selectedWorkspace: string | null
@@ -37,6 +78,7 @@ export interface CloudWorkspacesState {
   error: string | null
   isAuthenticated: boolean
   currentStatus: CloudStatus
+  currentWorkspaceStatus: CurrentWorkspaceCloudStatus
 }
 
 export class CloudWorkspacesPlugin extends ViewPlugin {
@@ -49,7 +91,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     loading: false,
     error: null,
     isAuthenticated: false,
-    currentStatus: { key: 'none', title: '', type: '' }
+    currentStatus: { key: 'none', title: '', type: '' },
+    currentWorkspaceStatus: { ...defaultWorkspaceStatus }
   }
 
   constructor() {
@@ -61,8 +104,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   /**
    * Update the sidebar badge status based on current state
    */
-  async updateStatus(): Promise<void> {
-    console.log('[CloudWorkspaces] updateStatus called')
+  async updateStatus(): Promise<void> {    
     const status = await this.computeCurrentStatus()
     console.log('[CloudWorkspaces] Computed status:', status)
     
@@ -79,6 +121,28 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   private async computeCurrentStatus(): Promise<CloudStatus> {
     console.log('[CloudWorkspaces] computeCurrentStatus - isAuthenticated:', this.state.isAuthenticated)
     
+    // Check if any remote activity is in progress
+    const status = this.state.currentWorkspaceStatus
+    if (status.isSaving || status.isBackingUp || status.isRestoring || status.isLinking) {
+      const activity = status.isSaving ? 'Saving' : 
+                       status.isBackingUp ? 'Backing up' : 
+                       status.isRestoring ? 'Restoring' : 'Linking'
+      return { 
+        key: 'syncing', 
+        title: `${activity} to cloud...`, 
+        type: 'info' 
+      }
+    }
+
+    // Check if there's an error
+    if (this.state.error) {
+      return { 
+        key: 'error', 
+        title: this.state.error, 
+        type: 'error' 
+      }
+    }
+
     // Check if user is logged in
     if (!this.state.isAuthenticated) {
       console.log('[CloudWorkspaces] Not authenticated, returning login status')
@@ -102,7 +166,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       const ownership = await this.call('s3Storage', 'getWorkspaceOwnership')
       console.log('[CloudWorkspaces] Ownership:', ownership)
       
-      if (!ownership.hasRemoteId) {
+      if (!ownership.remoteId) {
         return { 
           key: 'link', 
           title: 'Link workspace to cloud for backup', 
@@ -160,14 +224,17 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         this.state.backups = []
         this.state.autosave = null
         this.state.selectedWorkspace = null
+        this.state.currentWorkspaceStatus = { ...defaultWorkspaceStatus }
         this.renderComponent()
       }
+      await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
     
     // Listen for workspace changes
     this.on('filePanel', 'setWorkspace', async () => {
       console.log('[CloudWorkspaces] setWorkspace event received')
+      await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
     
@@ -175,17 +242,28 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.on('s3Storage', 'backupCompleted', async () => {
       console.log('[CloudWorkspaces] backupCompleted event received')
       await this.refresh()
+      await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
+    })
+    
+    // Listen for save events from s3Storage
+    this.on('s3Storage', 'saveCompleted', async (data) => {
+      console.log('[CloudWorkspaces] saveCompleted event received!', data)
+     
+      await this.updateStatus()
+       await this.loadCurrentWorkspaceStatus()
     })
     
     // Listen for autosave setting changes
     this.on('s3Storage', 'autosaveChanged', async () => {
       console.log('[CloudWorkspaces] autosaveChanged event received')
+      await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
     
     // Initial status update
     console.log('[CloudWorkspaces] Calling initial updateStatus')
+    await this.loadCurrentWorkspaceStatus()
     await this.updateStatus()
   }
 
@@ -193,6 +271,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.off('auth', 'authStateChanged')
     this.off('filePanel', 'setWorkspace')
     this.off('s3Storage', 'backupCompleted')
+    this.off('s3Storage', 'saveCompleted')
     this.off('s3Storage', 'autosaveChanged')
   }
 
@@ -212,9 +291,167 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     }
   }
 
+  // ==================== Current Workspace Status ====================
+
   /**
-   * Get list of user's remote workspaces
+   * Load the current workspace's cloud status
    */
+  private async loadCurrentWorkspaceStatus(): Promise<void> {
+    console.log('[CloudWorkspaces] loadCurrentWorkspaceStatus called')
+    
+    if (!this.state.isAuthenticated) {
+      this.state.currentWorkspaceStatus = { ...defaultWorkspaceStatus }
+      this.renderComponent()
+      return
+    }
+
+    try {
+      const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
+      if (!currentWorkspace || !currentWorkspace.name) {
+        this.state.currentWorkspaceStatus = { ...defaultWorkspaceStatus }
+        this.renderComponent()
+        return
+      }
+
+      const remoteId = await this.call('s3Storage', 'getWorkspaceRemoteId', currentWorkspace.name)
+      const lastSaved = await this.call('s3Storage', 'getLastSaveTime', currentWorkspace.name)
+      const lastBackup = await this.call('s3Storage', 'getLastBackupTime', currentWorkspace.name)
+      const autosaveEnabled = await this.call('s3Storage', 'isAutosaveEnabled')
+      const ownership = await this.call('s3Storage', 'getWorkspaceOwnership')
+      
+      console.log('[CloudWorkspaces] Ownership result:', ownership)
+
+      this.state.currentWorkspaceStatus = {
+        workspaceName: currentWorkspace.name,
+        remoteId,
+        lastSaved,
+        lastBackup,
+        autosaveEnabled,
+        ownedByCurrentUser: ownership.ownedByCurrentUser,
+        linkedToAnotherUser: ownership.linkedToAnotherUser,
+        canSave: ownership.canSave,
+        // Reset all action flags when loading fresh status
+        isSaving: false,
+        isBackingUp: false,
+        isRestoring: false,
+        isLinking: false
+      }
+      
+      console.log('[CloudWorkspaces] Current workspace status loaded:', this.state.currentWorkspaceStatus)
+      console.log('[CloudWorkspaces] canSave:', this.state.currentWorkspaceStatus.canSave)
+      this.renderComponent()
+    } catch (e) {
+      console.error('[CloudWorkspacesPlugin] Failed to load workspace status:', e)
+    }
+  }
+
+  // ==================== Current Workspace Actions ====================
+
+  /**
+   * Save current workspace to cloud
+   */
+  async saveToCloud(): Promise<void> {
+    this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isSaving: true }
+    this.state.error = null
+    this.renderComponent()
+    await this.updateStatus()
+    
+    try {
+      await this.call('s3Storage', 'saveToCloud')
+      await this.loadCurrentWorkspaceStatus()
+    } catch (e) {
+      this.state.error = e.message || 'Save failed'
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isSaving: false }
+      this.renderComponent()
+      await this.updateStatus()
+      throw e
+    }
+  }
+
+  /**
+   * Create a backup of current workspace
+   */
+  async createBackup(): Promise<void> {
+    this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isBackingUp: true }
+    this.state.error = null
+    this.renderComponent()
+    await this.updateStatus()
+    
+    try {
+      await this.call('s3Storage', 'backupWorkspace')
+      await this.loadCurrentWorkspaceStatus()
+    } catch (e) {
+      this.state.error = e.message || 'Backup failed'
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isBackingUp: false }
+      this.renderComponent()
+      await this.updateStatus()
+      throw e
+    }
+  }
+
+  /**
+   * Restore from autosave
+   */
+  async restoreAutosave(): Promise<void> {
+    const remoteId = this.state.currentWorkspaceStatus.remoteId
+    if (!remoteId) return
+    
+    this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isRestoring: true }
+    this.state.error = null
+    this.renderComponent()
+    await this.updateStatus()
+    
+    try {
+      const autosavePath = `${remoteId}/autosave/autosave-backup.zip`
+      await this.call('s3Storage', 'restoreWorkspace', autosavePath)
+      await this.loadCurrentWorkspaceStatus()
+    } catch (e) {
+      this.state.error = e.message || 'Restore failed'
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isRestoring: false }
+      this.renderComponent()
+      await this.updateStatus()
+      throw e
+    }
+  }
+
+  /**
+   * Link workspace to current user
+   */
+  async linkToCurrentUser(): Promise<void> {
+    this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isLinking: true }
+    this.state.error = null
+    this.renderComponent()
+    await this.updateStatus()
+    
+    try {
+      await this.call('s3Storage', 'linkWorkspaceToCurrentUser')
+      await this.loadCurrentWorkspaceStatus()
+    } catch (e) {
+      this.state.error = e.message || 'Link failed'
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isLinking: false }
+      this.renderComponent()
+      await this.updateStatus()
+      throw e
+    }
+  }
+
+  /**
+   * Update workspace remote ID (rename in cloud)
+   */
+  async updateWorkspaceRemoteId(workspaceName: string, remoteId: string): Promise<void> {
+    this.state.error = null
+    
+    try {
+      await this.call('s3Storage', 'setWorkspaceRemoteId', workspaceName, remoteId)
+      await this.loadCurrentWorkspaceStatus()
+    } catch (e) {
+      this.state.error = e.message || 'Failed to rename'
+      this.renderComponent()
+      throw e
+    }
+  }
+
+  // ==================== Public API ====================
   async getWorkspaces(): Promise<WorkspaceSummary[]> {
     return this.state.workspaces
   }
@@ -409,10 +646,16 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         loading={state.loading}
         error={state.error}
         isAuthenticated={state.isAuthenticated}
+        currentWorkspaceStatus={state.currentWorkspaceStatus}
         onSelectWorkspace={(id) => this.selectWorkspace(id)}
         onRestoreBackup={(folder, filename) => this.restoreBackup(folder, filename)}
         onDeleteBackup={(folder, filename) => this.deleteBackup(folder, filename)}
         onRefresh={() => this.refresh()}
+        onSaveToCloud={() => this.saveToCloud()}
+        onCreateBackup={() => this.createBackup()}
+        onRestoreAutosave={() => this.restoreAutosave()}
+        onLinkToCurrentUser={() => this.linkToCurrentUser()}
+        onUpdateRemoteId={(workspaceName, remoteId) => this.updateWorkspaceRemoteId(workspaceName, remoteId)}
       />
     )
   }

@@ -72,6 +72,7 @@ const Icon = ({ iconRecord, verticalIconPlugin, contextMenuAction, theme }: Icon
 
   useEffect(() => {
     verticalIconPlugin.on(name, 'statusChanged', (iconStatus: IconStatus) => {
+      console.log(`[VerticalIconsPanel] Received statusChanged for ${name}:`, iconStatus)
       iconStatus.pluginName = name
       const action: IconBadgeReducerAction = {
         type: name,
