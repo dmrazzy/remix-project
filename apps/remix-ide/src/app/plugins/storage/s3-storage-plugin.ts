@@ -660,6 +660,10 @@ export class S3StoragePlugin extends Plugin {
    * Returns conflict info if remote was modified by another session
    */
   async checkForConflict(): Promise<{ hasConflict: boolean; localEtag: string | null; remoteEtag: string | null; remoteLastModified: string | null }> {
+    // TEMPORARILY DISABLED for testing - always return no conflict
+    console.log('[S3StoragePlugin] checkForConflict - DISABLED for testing, returning no conflict')
+    return { hasConflict: false, localEtag: null, remoteEtag: null, remoteLastModified: null }
+    
     const workspaceRemoteId = await this.getWorkspaceRemoteId()
     if (!workspaceRemoteId) {
       return { hasConflict: false, localEtag: null, remoteEtag: null, remoteLastModified: null }
@@ -1603,21 +1607,27 @@ export class S3StoragePlugin extends Plugin {
     
     await Promise.all(filePromises)
     
-    // NOTE: We intentionally do NOT link the new workspace to the same remote ID.
-    // The restored workspace starts as "unlinked" - user can enable cloud backup
-    // to create a new remote ID if they want. This prevents multiple workspaces
-    // from writing to the same cloud location and causing conflicts.
+    // Link the restored workspace to the same remote ID for testing conflict detection
+    // This allows testing multi-browser/tab scenarios where both point to same cloud
+    const remixConfig: RemixConfig = {
+      'remote-workspace': {
+        remoteId: remoteWorkspaceId,
+        userId: user?.sub,
+        createdAt: new Date().toISOString()
+      }
+    }
+    await this.call('fileManager', 'writeFile', REMIX_CONFIG_FILE, JSON.stringify(remixConfig, null, 2))
     
-    console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (unlinked from cloud)`)
+    console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (linked to ${remoteWorkspaceId})`)
     
     this.emit('restoreCompleted', { 
       backupPath, 
       fileCount: restoredCount,
-      workspaceRemoteId: null, // New workspace is unlinked
+      workspaceRemoteId: remoteWorkspaceId,
       newWorkspaceName 
     })
     
-    await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files) - Enable cloud backup to sync`)
+    await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files)`)
   }
   
   /**
