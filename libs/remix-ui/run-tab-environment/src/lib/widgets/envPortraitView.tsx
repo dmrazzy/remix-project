@@ -6,7 +6,7 @@ import { EnvAppContext } from '../contexts'
 import { useContext } from "react"
 import { TrackingContext } from '@remix-ide/tracking'
 import { MatomoEvent, UdappEvent } from '@remix-api'
-import { createNewAccount, createSmartAccount, setExecutionContext, authorizeDelegation, signMessageWithAddress } from '../actions'
+import { createNewAccount, createSmartAccount, setExecutionContext, authorizeDelegation, signMessageWithAddress, deleteAccountAction, updateAccountAlias } from '../actions'
 import { EnvCategoryUI } from '../components/envCategoryUI'
 import { Provider, Account } from '../types'
 import { ForkUI } from '../components/forkUI'
@@ -16,6 +16,7 @@ import '../css/index.css'
 import { SmartAccountPrompt } from '../components/smartAccountPrompt'
 import { DelegationAuthorizationPrompt } from '../components/delegationAuthorizationPrompt'
 import { SignMessagePrompt, SignedMessagePrompt } from '../components/signMessagePrompt'
+import { CopyToClipboard } from '@remix-ui/clipboard'
 
 function EnvironmentPortraitView() {
   const { plugin, widgetState, dispatch } = useContext(EnvAppContext)
@@ -26,9 +27,12 @@ function EnvironmentPortraitView() {
   const intl = useIntl()
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false)
   const [openKebabMenuId, setOpenKebabMenuId] = useState<string | null>(null)
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
+  const [editingAlias, setEditingAlias] = useState<string>('')
   const kebabIconRefs = useRef<{[key: string]: HTMLElement}>({})
   const delegationAuthorizationAddressRef = useRef<string>('')
   const messageRef = useRef<string>('')
+  const editingInputRef = useRef<HTMLInputElement>(null)
 
   const handleResetClick = () => {
     trackMatomoEvent({ category: 'udapp', action: 'deleteState', name: 'deleteState clicked', isClick: true })
@@ -168,8 +172,47 @@ function EnvironmentPortraitView() {
   }
 
   const handleDeleteAccount = (account: Account) => {
-    console.log('Delete account:', account)
+    plugin.call('notification', 'modal', {
+      id: 'deleteAccount',
+      title: 'Delete Account',
+      message: `Are you sure you want to delete account ${account.alias} (${account.account})? This will hide it from the list but won't affect the actual blockchain account.`,
+      okLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      okFn: async () => {
+        await deleteAccountAction(account.account, plugin, widgetState, dispatch)
+      }
+    })
     setOpenKebabMenuId(null)
+  }
+
+  const handleStartEditAlias = (accountId: string, currentAlias: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingAccountId(accountId)
+    setEditingAlias(currentAlias)
+    // Auto-select text after state update
+    setTimeout(() => {
+      if (editingInputRef.current) {
+        editingInputRef.current.select()
+      }
+    }, 0)
+  }
+
+  const handleSaveAlias = async (accountAddress: string) => {
+    if (editingAlias.trim()) {
+      await updateAccountAlias(accountAddress, editingAlias.trim(), plugin, widgetState, dispatch)
+    }
+    setEditingAccountId(null)
+    setEditingAlias('')
+  }
+
+  const handleAliasKeyDown = (e: React.KeyboardEvent, accountAddress: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSaveAlias(accountAddress)
+    } else if (e.key === 'Escape') {
+      setEditingAccountId(null)
+      setEditingAlias('')
+    }
   }
 
   const uniqueDropdownItems = useMemo(() => {
@@ -257,11 +300,35 @@ function EnvironmentPortraitView() {
                   <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                     <div className="d-flex align-items-center justify-content-between w-100">
                       <div className='d-flex flex-column align-items-start'>
-                        <div className="text-truncate text-dark">
-                          <span>{selectedAccount?.alias}</span><i className="fa-solid fa-pen small ms-1"></i>
+                        <div className="text-truncate text-dark d-flex align-items-center">
+                          {editingAccountId === 'selected' ? (
+                            <input
+                              ref={editingInputRef}
+                              type="text"
+                              className="form-control form-control-sm"
+                              style={{ width: '150px' }}
+                              value={editingAlias}
+                              onChange={(e) => setEditingAlias(e.target.value)}
+                              onKeyDown={(e) => handleAliasKeyDown(e, selectedAccount?.account)}
+                              onBlur={() => handleSaveAlias(selectedAccount?.account)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <>
+                              <span>{selectedAccount?.alias}</span>
+                              <i
+                                className="fa-solid fa-pen small ms-1"
+                                style={{ cursor: 'pointer' }}
+                                onClick={(e) => handleStartEditAlias('selected', selectedAccount?.alias, e)}
+                              ></i>
+                            </>
+                          )}
                         </div>
-                        <div style={{ color: 'var(--bs-tertiary-color)' }}>
-                          <span className="small">{shortenAddress(selectedAccount?.account)}</span><i className="fa-solid fa-copy small ms-1"></i>
+                        <div style={{ color: 'var(--bs-tertiary-color)', position: 'relative' }}>
+                          <span className="small">{shortenAddress(selectedAccount?.account)}</span>
+                          <CopyToClipboard tip="Copy address" icon="fa-copy" direction="top" getContent={() => selectedAccount?.account}>
+                            <i className="fa-solid fa-copy small ms-1" style={{ cursor: 'pointer' }}></i>
+                          </CopyToClipboard>
                         </div>
                       </div>
                       <div className={`selected-account-balance-container ${openKebabMenuId === 'selected' ? 'kebab-menu-open' : ''}`} style={{ color: 'var(--bs-tertiary-color)' }}>
@@ -304,8 +371,11 @@ function EnvironmentPortraitView() {
                             <div className="text-truncate text-dark">
                               <span>{account?.alias}</span>
                             </div>
-                            <div style={{ color: 'var(--bs-tertiary-color)' }}>
-                              <span className="small">{shortenAddress(account?.account)}</span><i className="fa-solid fa-copy small ms-1"></i>
+                            <div style={{ color: 'var(--bs-tertiary-color)', position: 'relative' }}>
+                              <span className="small">{shortenAddress(account?.account)}</span>
+                              <CopyToClipboard tip="Copy address" icon="fa-copy" direction="top" getContent={() => account?.account}>
+                                <i className="fa-solid fa-copy small ms-1" style={{ cursor: 'pointer' }}></i>
+                              </CopyToClipboard>
                             </div>
                           </div>
                           <div className={`account-balance-container ${openKebabMenuId === accountId ? 'kebab-menu-open' : ''}`} style={{ color: 'var(--bs-tertiary-color)' }}>

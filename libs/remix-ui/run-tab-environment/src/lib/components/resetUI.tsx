@@ -11,7 +11,7 @@ export function ResetUI() {
   const handleSubmit = async () => {
     dispatch({ type: 'REQUEST_FORK', payload: undefined })
     try {
-      await resetVmState(plugin, widgetState)
+      await resetVmState(plugin, widgetState, dispatch)
       dispatch({ type: 'HIDE_RESET_UI', payload: undefined })
     } catch (error) {
       plugin.call('notification', 'toast', `Error resetting state: ${error.message}`)

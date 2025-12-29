@@ -9,6 +9,7 @@ import * as chains from "viem/chains"
 import { custom, createWalletClient, createPublicClient, http } from "viem"
 import { BrowserProvider, BaseWallet, SigningKey, isAddress } from "ethers"
 import { toChecksumAddress, bytesToHex, isZeroAddress } from '@ethereumjs/util'
+import { isAccountDeleted, getAccountAlias, deleteAccount as deleteAccountFromStorage, setAccountAlias, clearAccountPreferences } from '../utils/accountStorage'
 export * from "./providers"
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
@@ -17,7 +18,7 @@ const { createSmartAccountClient } = require("permissionless") /* eslint-disable
 const { toSafeSmartAccount } = require("permissionless/accounts") /* eslint-disable-line  @typescript-eslint/no-var-requires */
 const { createPimlicoClient } = require("permissionless/clients/pimlico") /* eslint-disable-line  @typescript-eslint/no-var-requires */
 
-export async function resetVmState (plugin: EnvironmentPlugin, widgetState: WidgetState) {
+export async function resetVmState (plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
   const context = widgetState.providers.selectedProvider
   const contextExists = await plugin.call('fileManager', 'exists', `.states/${context}/state.json`)
 
@@ -36,6 +37,10 @@ export async function resetVmState (plugin: EnvironmentPlugin, widgetState: Widg
   // If there are pinned contracts, delete pinned contracts folder
   const isPinnedContracts = await plugin.call('fileManager', 'exists', `.deploys/pinned-contracts/${context}`)
   if (isPinnedContracts) await plugin.call('fileManager', 'remove', `.deploys/pinned-contracts/${context}`)
+  // Clear account preferences (aliases and deleted accounts)
+  clearAccountPreferences()
+  // Refresh account list to show default names and all accounts
+  await getAccountsList(plugin, dispatch, widgetState)
   plugin.call('notification', 'toast', `VM state reset successfully.`)
   trackMatomoEvent(plugin, { category: 'udapp', action: 'deleteState', name: 'VM state reset', isClick: false })
 }
@@ -158,27 +163,34 @@ export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: Reac
   }
   if (!accounts) accounts = []
 
+  // Filter out deleted accounts
+  accounts = accounts.filter(account => !isAccountDeleted(account))
+
   const defaultAccounts = []
   const smartAccounts = []
   let index = 1
   for (const account of accounts) {
     const balance = await plugin.blockchain.getBalanceInEther(account)
+    // Get custom alias or use default
+    const customAlias = getAccountAlias(account)
+    const alias = customAlias || `Account ${index}`
+
     if (provider.startsWith('injected') && plugin.blockchain && plugin.blockchain['networkNativeCurrency'] && plugin.blockchain['networkNativeCurrency'].symbol)
       defaultAccounts.push({
-        alias: `Account ${index}`,
+        alias: alias,
         account: account,
         balance: parseFloat(balance).toFixed(4),
         symbol: plugin.blockchain['networkNativeCurrency'].symbol
       })
     else
       defaultAccounts.push({
-        alias: `Account ${index}`,
+        alias: alias,
         account: account,
         balance: parseFloat(balance).toFixed(4),
         symbol: plugin.blockchain['networkNativeCurrency'].symbol
       })
     if (safeAddresses.length && safeAddresses.includes(account)) smartAccounts.push({
-      alias: `Account ${index}`,
+      alias: alias,
       account: account,
       balance: parseFloat(balance).toFixed(4)
     })
@@ -397,4 +409,45 @@ export async function signMessageWithAddress (
     plugin.call('notification', 'toast', errorMsg)
     throw err
   }
+}
+
+export async function deleteAccountAction (
+  accountAddress: string,
+  plugin: EnvironmentPlugin,
+  widgetState: WidgetState,
+  dispatch: React.Dispatch<Actions>
+) {
+  // If this is the selected account, switch to the first available account
+  if (widgetState.accounts.selectedAccount === accountAddress) {
+    const remainingAccounts = widgetState.accounts.defaultAccounts.filter(
+      acc => acc.account !== accountAddress
+    )
+    if (remainingAccounts.length > 0) {
+      dispatch({ type: 'SET_SELECTED_ACCOUNT', payload: remainingAccounts[0].account })
+    }
+  }
+
+  // Mark account as deleted in localStorage
+  deleteAccountFromStorage(accountAddress)
+
+  // Refresh accounts list
+  await getAccountsList(plugin, dispatch, widgetState)
+
+  plugin.call('notification', 'toast', `Account ${accountAddress} deleted`)
+}
+
+export async function updateAccountAlias (
+  accountAddress: string,
+  newAlias: string,
+  plugin: EnvironmentPlugin,
+  widgetState: WidgetState,
+  dispatch: React.Dispatch<Actions>
+) {
+  // Save alias to localStorage
+  setAccountAlias(accountAddress, newAlias)
+
+  // Refresh accounts list to show updated alias
+  await getAccountsList(plugin, dispatch, widgetState)
+
+  plugin.call('notification', 'toast', `Account alias updated to "${newAlias}"`)
 }
