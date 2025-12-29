@@ -773,6 +773,16 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     }
   }
 
+  async downloadBackup(backupFolder: string, backupFilename: string): Promise<void> {
+    try {
+      await this.call('s3Storage', 'downloadToComputer', backupFilename, backupFolder)
+    } catch (e) {
+      console.error('[CloudWorkspacesPlugin] Download failed:', e)
+      await this.call('notification', 'toast', `❌ Download failed: ${e.message}`)
+      throw e
+    }
+  }
+
   setDispatch(dispatch: React.Dispatch<any>): void {
     this.dispatch = dispatch
     this.renderComponent()
@@ -802,6 +812,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         onCollapseWorkspace={(id) => this.collapseWorkspace(id)}
         onRestoreBackup={(folder, filename) => this.restoreBackup(folder, filename)}
         onDeleteBackup={(folder, filename) => this.deleteBackup(folder, filename)}
+        onDownloadBackup={(folder, filename) => this.downloadBackup(folder, filename)}
         onRefresh={() => this.refresh()}
         onSaveToCloud={() => this.saveToCloud()}
         onCreateBackup={() => this.createBackup()}

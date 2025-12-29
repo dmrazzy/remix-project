@@ -35,7 +35,8 @@ const parseBackupFilename = (filename: string): { workspaceName: string; isAutos
 export const BackupItem: React.FC<BackupItemProps> = ({
   backup,
   onRestore,
-  onDelete
+  onDelete,
+  onDownload
 }) => {
   const intl = useIntl()
   const { workspaceName } = parseBackupFilename(backup.filename)
@@ -59,6 +60,21 @@ export const BackupItem: React.FC<BackupItemProps> = ({
       </CustomTooltip>
       <CustomTooltip
         placement="top"
+        tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.downloadToComputerTip', defaultMessage: 'Download to your computer' })}
+      >
+        <button
+          className="btn btn-sm p-0 ms-1 text-primary"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDownload(backup.folder, backup.filename)
+          }}
+          style={{ border: 'none', background: 'none' }}
+        >
+          <i className="fas fa-file-download" style={{ fontSize: '0.8rem' }}></i>
+        </button>
+      </CustomTooltip>
+      <CustomTooltip
+        placement="top"
         tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreBackupTip', defaultMessage: 'Restore this backup to your workspace' })}
       >
         <button
@@ -69,7 +85,7 @@ export const BackupItem: React.FC<BackupItemProps> = ({
           }}
           style={{ border: 'none', background: 'none' }}
         >
-          <i className="fas fa-download" style={{ fontSize: '0.8rem' }}></i>
+          <i className="fas fa-upload" style={{ fontSize: '0.8rem' }}></i>
         </button>
       </CustomTooltip>
       <CustomTooltip

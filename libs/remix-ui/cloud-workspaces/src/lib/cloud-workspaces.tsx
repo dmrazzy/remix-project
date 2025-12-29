@@ -20,6 +20,7 @@ export interface CloudWorkspacesProps {
   onCollapseWorkspace: (workspaceId: string) => void
   onRestoreBackup: (folder: string, filename: string) => void
   onDeleteBackup: (folder: string, filename: string) => void
+  onDownloadBackup: (folder: string, filename: string) => void
   onRefresh: () => void
   onSaveToCloud: () => Promise<void>
   onCreateBackup: () => Promise<void>
@@ -44,6 +45,7 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
   onCollapseWorkspace,
   onRestoreBackup,
   onDeleteBackup,
+  onDownloadBackup,
   onRefresh,
   onSaveToCloud,
   onCreateBackup,
@@ -103,6 +105,7 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
           onCollapseWorkspace={onCollapseWorkspace}
           onRestoreBackup={onRestoreBackup}
           onDeleteBackup={onDeleteBackup}
+          onDownloadBackup={onDownloadBackup}
           onRefresh={onRefresh}
         />
       </div>

@@ -25,7 +25,8 @@ const parseAutosaveFilename = (filename: string): string | null => {
 
 export const AutosaveItem: React.FC<AutosaveItemProps> = ({
   autosave,
-  onRestore
+  onRestore,
+  onDownload
 }) => {
   const intl = useIntl()
   const workspaceName = parseAutosaveFilename(autosave.filename)
@@ -51,6 +52,21 @@ export const AutosaveItem: React.FC<AutosaveItemProps> = ({
       </CustomTooltip>
       <CustomTooltip
         placement="top"
+        tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.downloadToComputerTip', defaultMessage: 'Download to your computer' })}
+      >
+        <button
+          className="btn btn-sm p-0 ms-1 text-primary"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDownload(autosave.folder, autosave.filename)
+          }}
+          style={{ border: 'none', background: 'none' }}
+        >
+          <i className="fas fa-file-download" style={{ fontSize: '0.8rem' }}></i>
+        </button>
+      </CustomTooltip>
+      <CustomTooltip
+        placement="top"
         tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosaveTip', defaultMessage: 'Restore from this autosave' })}
       >
         <button
@@ -61,7 +77,7 @@ export const AutosaveItem: React.FC<AutosaveItemProps> = ({
           }}
           style={{ border: 'none', background: 'none' }}
         >
-          <i className="fas fa-download" style={{ fontSize: '0.8rem' }}></i>
+          <i className="fas fa-upload" style={{ fontSize: '0.8rem' }}></i>
         </button>
       </CustomTooltip>
     </div>

@@ -31,7 +31,8 @@ export const WorkspaceItem: React.FC<WorkspaceItemProps> = ({
   loading,
   onToggleExpand,
   onRestore,
-  onDelete
+  onDelete,
+  onDownload
 }) => {
   const { primary, secondary } = getWorkspaceDisplayName(workspace)
   
@@ -91,14 +92,15 @@ export const WorkspaceItem: React.FC<WorkspaceItemProps> = ({
           ) : (
             <>
               {autosave && (
-                <AutosaveItem autosave={autosave} onRestore={onRestore} />
+                <AutosaveItem autosave={autosave} onRestore={onRestore} onDownload={onDownload} />
               )}
               {backups.map((backup, index) => (
                 <BackupItem 
                   key={backup.key || index}
                   backup={backup} 
                   onRestore={onRestore} 
-                  onDelete={onDelete} 
+                  onDelete={onDelete}
+                  onDownload={onDownload}
                 />
               ))}
             </>

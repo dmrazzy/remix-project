@@ -17,6 +17,7 @@ export interface RemoteWorkspacesListProps {
   onCollapseWorkspace: (workspaceId: string) => void
   onRestoreBackup: (folder: string, filename: string) => void
   onDeleteBackup: (folder: string, filename: string) => void
+  onDownloadBackup: (folder: string, filename: string) => void
   onRefresh: () => void
 }
 
@@ -31,6 +32,7 @@ export const RemoteWorkspacesList: React.FC<RemoteWorkspacesListProps> = ({
   onCollapseWorkspace,
   onRestoreBackup,
   onDeleteBackup,
+  onDownloadBackup,
   onRefresh
 }) => {
   const intl = useIntl()
@@ -72,6 +74,14 @@ export const RemoteWorkspacesList: React.FC<RemoteWorkspacesListProps> = ({
         console.error('Delete failed:', e)
       }
       setConfirmDelete(null)
+    }
+  }
+
+  const handleDownload = async (folder: string, filename: string) => {
+    try {
+      await onDownloadBackup(folder, filename)
+    } catch (e) {
+      console.error('Download failed:', e)
     }
   }
 
@@ -141,6 +151,7 @@ export const RemoteWorkspacesList: React.FC<RemoteWorkspacesListProps> = ({
                   onToggleExpand={toggleWorkspaceExpand}
                   onRestore={handleRestore}
                   onDelete={handleDeleteConfirm}
+                  onDownload={handleDownload}
                 />
               )
             })}

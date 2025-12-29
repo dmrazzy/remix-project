@@ -27,11 +27,13 @@ export interface BackupItemProps {
   backup: StorageFile
   onRestore: (folder: string, filename: string) => void
   onDelete: (folder: string, filename: string) => void
+  onDownload: (folder: string, filename: string) => void
 }
 
 export interface AutosaveItemProps {
   autosave: StorageFile
   onRestore: (folder: string, filename: string) => void
+  onDownload: (folder: string, filename: string) => void
 }
 
 export interface WorkspaceItemProps {
@@ -44,6 +46,7 @@ export interface WorkspaceItemProps {
   onToggleExpand: (workspaceId: string) => void
   onRestore: (folder: string, filename: string) => void
   onDelete: (folder: string, filename: string) => void
+  onDownload: (folder: string, filename: string) => void
 }
 
 export interface DeleteConfirmModalProps {

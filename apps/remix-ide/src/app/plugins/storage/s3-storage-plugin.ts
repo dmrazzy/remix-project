@@ -56,6 +56,7 @@ const profile = {
     'upload',
     'download',
     'downloadBinary',
+    'downloadToComputer',
     'delete',
     'list',
     'listWorkspaces',
@@ -814,6 +815,39 @@ export class S3StoragePlugin extends Plugin {
       return content
     } catch (error) {
       this.emitError('downloadBinary', fullPath, error as Error)
+      throw error
+    }
+  }
+
+  /**
+   * Download a file from cloud storage to user's computer
+   * Triggers browser download
+   * 
+   * @param filename - Name of the file
+   * @param folder - Folder path
+   */
+  async downloadToComputer(filename: string, folder: string): Promise<void> {
+    try {
+      console.log(`[S3StoragePlugin] Downloading to computer: ${folder}/${filename}`)
+      
+      const content = await this.downloadBinary(filename, folder)
+      
+      // Create blob and trigger download
+      const blob = new Blob([content], { type: 'application/zip' })
+      const url = URL.createObjectURL(blob)
+      
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      
+      URL.revokeObjectURL(url)
+      
+      await this.call('notification', 'toast', `📥 Downloaded ${filename}`)
+    } catch (error) {
+      console.error('[S3StoragePlugin] Download to computer failed:', error)
       throw error
     }
   }
