@@ -6,7 +6,7 @@ import { EnvAppContext } from '../contexts'
 import { useContext } from "react"
 import { TrackingContext } from '@remix-ide/tracking'
 import { MatomoEvent, UdappEvent } from '@remix-api'
-import { createNewAccount, createSmartAccount, setExecutionContext } from '../actions'
+import { createNewAccount, createSmartAccount, setExecutionContext, authorizeDelegation, signMessageWithAddress } from '../actions'
 import { EnvCategoryUI } from '../components/envCategoryUI'
 import { Provider, Account } from '../types'
 import { ForkUI } from '../components/forkUI'
@@ -14,6 +14,8 @@ import { ResetUI } from '../components/resetUI'
 import { AccountKebabMenu } from '../components/accountKebabMenu'
 import '../css/index.css'
 import { SmartAccountPrompt } from '../components/smartAccountPrompt'
+import { DelegationAuthorizationPrompt } from '../components/delegationAuthorizationPrompt'
+import { SignMessagePrompt, SignedMessagePrompt } from '../components/signMessagePrompt'
 
 function EnvironmentPortraitView() {
   const { plugin, widgetState, dispatch } = useContext(EnvAppContext)
@@ -25,6 +27,8 @@ function EnvironmentPortraitView() {
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false)
   const [openKebabMenuId, setOpenKebabMenuId] = useState<string | null>(null)
   const kebabIconRefs = useRef<{[key: string]: HTMLElement}>({})
+  const delegationAuthorizationAddressRef = useRef<string>('')
+  const messageRef = useRef<string>('')
 
   const handleResetClick = () => {
     trackMatomoEvent({ category: 'udapp', action: 'deleteState', name: 'deleteState clicked', isClick: true })
@@ -71,12 +75,95 @@ function EnvironmentPortraitView() {
   }
 
   const handleAuthorizeDelegation = (account: Account) => {
-    console.log('Authorize delegation for:', account)
+    plugin.call('notification', 'modal', {
+      id: 'createDelegationAuthorization',
+      title: intl.formatMessage({ id: 'udapp.createDelegationTitle' }),
+      message: (
+        <DelegationAuthorizationPrompt
+          onAddressChange={(address) => {
+            delegationAuthorizationAddressRef.current = address
+          }}
+        />
+      ),
+      okLabel: intl.formatMessage({ id: 'udapp.authorize' }),
+      cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
+      okFn: async () => {
+        try {
+          await authorizeDelegation(delegationAuthorizationAddressRef.current, plugin, widgetState)
+          trackMatomoEvent({ category: 'udapp', action: 'contractDelegation', name: 'create', isClick: false })
+        } catch (e) {
+          plugin.call('terminal', 'log', { type: 'error', value: e.message })
+        }
+      }
+    })
     setOpenKebabMenuId(null)
   }
 
   const handleSignUsingAccount = (account: Account) => {
-    console.log('Sign using account:', account)
+    trackMatomoEvent({ category: 'udapp', action: 'signUsingAccount', name: `selectExEnv: ${widgetState.providers.selectedProvider}`, isClick: false })
+
+    if (!widgetState.accounts.defaultAccounts || widgetState.accounts.defaultAccounts.length === 0) {
+      plugin.call('notification', 'toast', intl.formatMessage({ id: 'udapp.tooltipText1' }))
+      setOpenKebabMenuId(null)
+      return
+    }
+
+    const showSignMessageModal = (passphrase?: string) => {
+      plugin.call('notification', 'modal', {
+        id: 'signMessage',
+        title: intl.formatMessage({ id: 'udapp.signAMessage' }),
+        message: (
+          <SignMessagePrompt
+            plugin={plugin}
+            onMessageChange={(message) => {
+              messageRef.current = message
+            }}
+            defaultMessage={messageRef.current}
+          />
+        ),
+        okLabel: intl.formatMessage({ id: 'udapp.sign' }),
+        cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
+        okFn: async () => {
+          try {
+            const result = await signMessageWithAddress(
+              plugin,
+              account.account,
+              messageRef.current,
+              passphrase
+            )
+            plugin.call('notification', 'modal', {
+              id: 'signedMessage',
+              title: 'Signed Message',
+              message: <SignedMessagePrompt msgHash={result.msgHash} signedData={result.signedData} />,
+              okLabel: 'OK',
+              cancelLabel: null,
+              okFn: () => {},
+              hideFn: () => {}
+            })
+          } catch (e) {
+            console.error(e)
+          }
+        }
+      })
+    }
+
+    if (widgetState.providers.selectedProvider === 'web3') {
+      // For web3 provider, we need to get passphrase first
+      plugin.call('notification', 'modal', {
+        id: 'enterPassphrase',
+        title: intl.formatMessage({ id: 'udapp.modalTitle1' }),
+        message: intl.formatMessage({ id: 'udapp.modalMessage1' }),
+        okLabel: intl.formatMessage({ id: 'udapp.ok' }),
+        cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
+        okFn: async () => {
+          const passphrase = await plugin.call('udappEnv', 'getPassphrase')
+          showSignMessageModal(passphrase)
+        }
+      })
+    } else {
+      showSignMessageModal()
+    }
+
     setOpenKebabMenuId(null)
   }
 
