@@ -1,11 +1,19 @@
 import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
 
+// Per-workspace backup data structure
+export interface WorkspaceBackupData {
+  backups: StorageFile[]
+  autosave: StorageFile | null
+  loading: boolean
+  error: string | null
+  loaded: boolean
+}
+
 export interface CloudWorkspacesProps {
   plugin: any
   workspaces: WorkspaceSummary[]
   selectedWorkspace: string | null
-  backups: StorageFile[]
-  autosave: StorageFile | null
+  workspaceBackups: Record<string, WorkspaceBackupData>
   loading: boolean
   error: string | null
   isAuthenticated: boolean

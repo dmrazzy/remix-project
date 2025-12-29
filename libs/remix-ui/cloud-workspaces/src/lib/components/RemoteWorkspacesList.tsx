@@ -4,15 +4,17 @@ import { CustomTooltip } from '@remix-ui/helper'
 import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
 import { WorkspaceItem } from './WorkspaceItem'
 import { DeleteConfirmModal } from './DeleteConfirmModal'
+import { WorkspaceBackupData } from '../types'
 
 export interface RemoteWorkspacesListProps {
   workspaces: WorkspaceSummary[]
   selectedWorkspace: string | null
-  backups: StorageFile[]
-  autosave: StorageFile | null
+  workspaceBackups: Record<string, WorkspaceBackupData>
+  expandedWorkspaces: Set<string>
   loading: boolean
   error: string | null
   onSelectWorkspace: (workspaceId: string) => void
+  onCollapseWorkspace: (workspaceId: string) => void
   onRestoreBackup: (folder: string, filename: string) => void
   onDeleteBackup: (folder: string, filename: string) => void
   onRefresh: () => void
@@ -21,28 +23,29 @@ export interface RemoteWorkspacesListProps {
 export const RemoteWorkspacesList: React.FC<RemoteWorkspacesListProps> = ({
   workspaces,
   selectedWorkspace,
-  backups,
-  autosave,
+  workspaceBackups,
+  expandedWorkspaces,
   loading,
   error,
   onSelectWorkspace,
+  onCollapseWorkspace,
   onRestoreBackup,
   onDeleteBackup,
   onRefresh
 }) => {
   const intl = useIntl()
-  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState<{ folder: string; filename: string } | null>(null)
 
   const toggleWorkspaceExpand = (workspaceId: string) => {
-    const newExpanded = new Set(expandedWorkspaces)
-    if (newExpanded.has(workspaceId)) {
-      newExpanded.delete(workspaceId)
+    const isCurrentlyExpanded = expandedWorkspaces.has(workspaceId)
+    
+    if (isCurrentlyExpanded) {
+      // Collapsing
+      onCollapseWorkspace(workspaceId)
     } else {
-      newExpanded.add(workspaceId)
+      // Expanding - this will add to expanded set and load backups
       onSelectWorkspace(workspaceId)
     }
-    setExpandedWorkspaces(newExpanded)
   }
 
   const handleRestore = async (folder: string, filename: string) => {
@@ -124,20 +127,23 @@ export const RemoteWorkspacesList: React.FC<RemoteWorkspacesListProps> = ({
           </div>
         ) : (
           <div className="list-group list-group-flush">
-            {workspaces.map((workspace) => (
-              <WorkspaceItem
-                key={workspace.id}
-                workspace={workspace}
-                isExpanded={expandedWorkspaces.has(workspace.id)}
-                isSelected={selectedWorkspace === workspace.id}
-                backups={selectedWorkspace === workspace.id ? backups : []}
-                autosave={selectedWorkspace === workspace.id ? autosave : null}
-                loading={loading && selectedWorkspace === workspace.id}
-                onToggleExpand={toggleWorkspaceExpand}
-                onRestore={handleRestore}
-                onDelete={handleDeleteConfirm}
-              />
-            ))}
+            {workspaces.map((workspace) => {
+              const backupData = workspaceBackups[workspace.id]
+              return (
+                <WorkspaceItem
+                  key={workspace.id}
+                  workspace={workspace}
+                  isExpanded={expandedWorkspaces.has(workspace.id)}
+                  isSelected={selectedWorkspace === workspace.id}
+                  backups={backupData?.backups || []}
+                  autosave={backupData?.autosave || null}
+                  loading={backupData?.loading || false}
+                  onToggleExpand={toggleWorkspaceExpand}
+                  onRestore={handleRestore}
+                  onDelete={handleDeleteConfirm}
+                />
+              )
+            })}
           </div>
         )}
       </div>

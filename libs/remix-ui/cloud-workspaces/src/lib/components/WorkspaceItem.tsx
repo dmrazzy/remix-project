@@ -35,16 +35,17 @@ export const WorkspaceItem: React.FC<WorkspaceItemProps> = ({
 }) => {
   const { primary, secondary } = getWorkspaceDisplayName(workspace)
   
-  // Content is only visible when both expanded AND selected
-  const isContentVisible = isExpanded && isSelected
+  // Show content when expanded - selection is used for loading backups data
+  // but shouldn't block visibility (avoids needing to click twice)
+  const isContentVisible = isExpanded
   
   return (
     <div className="workspace-item">
       {/* Workspace Header */}
       <div
-        className="d-flex align-items-center px-2 py-1 border-bottom cursor-pointer"
+        className="d-flex align-items-center px-2 py-1 border-bottom"
         onClick={() => onToggleExpand(workspace.id)}
-        style={{ minHeight: '32px' }}
+        style={{ minHeight: '32px', cursor: 'pointer' }}
       >
         <i 
           className={`fas fa-chevron-${isContentVisible ? 'down' : 'right'} me-1`} 

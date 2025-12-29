@@ -69,11 +69,22 @@ const defaultWorkspaceStatus: CurrentWorkspaceCloudStatus = {
   canSave: true
 }
 
+// Per-workspace backup data structure
+export interface WorkspaceBackupData {
+  backups: StorageFile[]
+  autosave: StorageFile | null
+  loading: boolean
+  error: string | null
+  loaded: boolean
+}
+
 export interface CloudWorkspacesState {
   workspaces: WorkspaceSummary[]
   selectedWorkspace: string | null
-  backups: StorageFile[]
-  autosave: StorageFile | null
+  // Map of workspaceId -> backup data (cached per workspace)
+  workspaceBackups: Record<string, WorkspaceBackupData>
+  // Set of currently expanded workspace IDs
+  expandedWorkspaces: Set<string>
   loading: boolean
   error: string | null
   isAuthenticated: boolean
@@ -86,8 +97,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   private state: CloudWorkspacesState = {
     workspaces: [],
     selectedWorkspace: null,
-    backups: [],
-    autosave: null,
+    workspaceBackups: {},
+    expandedWorkspaces: new Set(),
     loading: false,
     error: null,
     isAuthenticated: false,
@@ -221,8 +232,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         await this.loadWorkspaces()
       } else {
         this.state.workspaces = []
-        this.state.backups = []
-        this.state.autosave = null
+        this.state.workspaceBackups = {}
         this.state.selectedWorkspace = null
         this.state.currentWorkspaceStatus = { ...defaultWorkspaceStatus }
         this.renderComponent()
@@ -518,20 +528,36 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
    * Get backups for a specific workspace
    */
   async getBackups(workspaceId: string): Promise<StorageFile[]> {
-    if (this.state.selectedWorkspace === workspaceId) {
-      return this.state.backups
+    const backupData = this.state.workspaceBackups[workspaceId]
+    if (backupData?.loaded) {
+      return backupData.backups
     }
     await this.loadBackups(workspaceId)
-    return this.state.backups
+    return this.state.workspaceBackups[workspaceId]?.backups || []
   }
 
   /**
-   * Refresh the workspace list
+   * Refresh the workspace list - reloads only currently expanded workspaces
    */
   async refresh(): Promise<void> {
+    // Get list of currently expanded workspaces (only reload those)
+    const expandedIds = Array.from(this.state.expandedWorkspaces)
+    
+    // Mark expanded workspaces as needing reload
+    for (const workspaceId of expandedIds) {
+      if (this.state.workspaceBackups[workspaceId]) {
+        this.state.workspaceBackups[workspaceId] = {
+          ...this.state.workspaceBackups[workspaceId],
+          loaded: false
+        }
+      }
+    }
+    
     await this.loadWorkspaces()
-    if (this.state.selectedWorkspace) {
-      await this.loadBackups(this.state.selectedWorkspace)
+    
+    // Reload backups for currently expanded workspaces only (fire and forget, parallel)
+    for (const workspaceId of expandedIds) {
+      this.loadBackups(workspaceId)
     }
   }
 
@@ -554,9 +580,30 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   }
 
   private async loadBackups(workspaceId: string): Promise<void> {
-    this.state.selectedWorkspace = workspaceId
-    this.state.loading = true
-    this.state.error = null
+    // Initialize workspace backup data if not exists
+    if (!this.state.workspaceBackups[workspaceId]) {
+      this.state.workspaceBackups[workspaceId] = {
+        backups: [],
+        autosave: null,
+        loading: false,
+        error: null,
+        loaded: false
+      }
+    }
+    
+    const workspaceData = this.state.workspaceBackups[workspaceId]
+    
+    // Skip if already loading
+    if (workspaceData.loading) {
+      return
+    }
+    
+    // Set loading state for this specific workspace
+    this.state.workspaceBackups[workspaceId] = {
+      ...workspaceData,
+      loading: true,
+      error: null
+    }
     this.renderComponent()
 
     try {
@@ -566,25 +613,48 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         this.call('s3Storage', 'list', { folder: `${workspaceId}/autosave` })
       ])
       
-      this.state.backups = backupsResult.files || []
-      
-      // Autosave folder should only have one file
+      const backups = backupsResult.files || []
       const autosaveFiles = autosaveResult.files || []
-      this.state.autosave = autosaveFiles.length > 0 ? autosaveFiles[0] : null
+      const autosave = autosaveFiles.length > 0 ? autosaveFiles[0] : null
       
-      this.emit('backupsLoaded', { workspaceId, backups: this.state.backups, autosave: this.state.autosave })
+      // Update this workspace's backup data
+      this.state.workspaceBackups[workspaceId] = {
+        backups,
+        autosave,
+        loading: false,
+        error: null,
+        loaded: true
+      }
+      
+      this.emit('backupsLoaded', { workspaceId, backups, autosave })
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Failed to load backups:', e)
-      this.state.error = e.message || 'Failed to load backups'
+      this.state.workspaceBackups[workspaceId] = {
+        ...this.state.workspaceBackups[workspaceId],
+        loading: false,
+        error: e.message || 'Failed to load backups',
+        loaded: false
+      }
     } finally {
-      this.state.loading = false
       this.renderComponent()
     }
   }
 
   // Action handlers - will be called from UI
   async selectWorkspace(workspaceId: string): Promise<void> {
-    await this.loadBackups(workspaceId)
+    this.state.selectedWorkspace = workspaceId
+    // Track as expanded
+    this.state.expandedWorkspaces.add(workspaceId)
+    // Fire and forget - don't await so UI can be responsive
+    this.loadBackups(workspaceId)
+  }
+
+  /**
+   * Collapse a workspace (remove from expanded set)
+   */
+  collapseWorkspace(workspaceId: string): void {
+    this.state.expandedWorkspaces.delete(workspaceId)
+    this.renderComponent()
   }
 
   async restoreBackup(backupFolder: string, backupFilename: string): Promise<void> {
@@ -669,10 +739,19 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
 
   async deleteBackup(backupFolder: string, backupFilename: string): Promise<void> {
     try {
+      // Extract workspace ID from the backup folder path (first segment)
+      const workspaceId = backupFolder.split('/')[0]
+      
       await this.call('s3Storage', 'delete', backupFilename, backupFolder)
-      // Refresh the backup list
-      if (this.state.selectedWorkspace) {
-        await this.loadBackups(this.state.selectedWorkspace)
+      
+      // Invalidate cache and reload backups for this workspace
+      if (workspaceId && this.state.workspaceBackups[workspaceId]) {
+        // Mark as not loaded to force reload
+        this.state.workspaceBackups[workspaceId] = {
+          ...this.state.workspaceBackups[workspaceId],
+          loaded: false
+        }
+        await this.loadBackups(workspaceId)
       }
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Delete failed:', e)
@@ -699,13 +778,14 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         plugin={this}
         workspaces={state.workspaces}
         selectedWorkspace={state.selectedWorkspace}
-        backups={state.backups}
-        autosave={state.autosave}
+        workspaceBackups={state.workspaceBackups}
+        expandedWorkspaces={state.expandedWorkspaces}
         loading={state.loading}
         error={state.error}
         isAuthenticated={state.isAuthenticated}
         currentWorkspaceStatus={state.currentWorkspaceStatus}
         onSelectWorkspace={(id) => this.selectWorkspace(id)}
+        onCollapseWorkspace={(id) => this.collapseWorkspace(id)}
         onRestoreBackup={(folder, filename) => this.restoreBackup(folder, filename)}
         onDeleteBackup={(folder, filename) => this.deleteBackup(folder, filename)}
         onRefresh={() => this.refresh()}
@@ -720,6 +800,6 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   }
 
   renderComponent(): void {
-    this.dispatch({ ...this.state })
+    this.dispatch({ ...this.state, expandedWorkspaces: new Set(this.state.expandedWorkspaces) })
   }
 }

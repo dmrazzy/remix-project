@@ -4,18 +4,20 @@ import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/ap
 import { RemoteWorkspacesList, CurrentWorkspaceSection } from './components'
 import { LoginButton } from '@remix-ui/login'
 import { CloudWorkspacesProvider, CurrentWorkspaceCloudStatus, CloudWorkspacesContextValue } from './context'
+import { WorkspaceBackupData } from './types'
 
 export interface CloudWorkspacesProps {
   plugin: any
   workspaces: WorkspaceSummary[]
   selectedWorkspace: string | null
-  backups: StorageFile[]
-  autosave: StorageFile | null
+  workspaceBackups: Record<string, WorkspaceBackupData>
+  expandedWorkspaces: Set<string>
   loading: boolean
   error: string | null
   isAuthenticated: boolean
   currentWorkspaceStatus: CurrentWorkspaceCloudStatus
   onSelectWorkspace: (workspaceId: string) => void
+  onCollapseWorkspace: (workspaceId: string) => void
   onRestoreBackup: (folder: string, filename: string) => void
   onDeleteBackup: (folder: string, filename: string) => void
   onRefresh: () => void
@@ -31,13 +33,14 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
   plugin,
   workspaces,
   selectedWorkspace,
-  backups,
-  autosave,
+  workspaceBackups,
+  expandedWorkspaces,
   loading,
   error,
   isAuthenticated,
   currentWorkspaceStatus,
   onSelectWorkspace,
+  onCollapseWorkspace,
   onRestoreBackup,
   onDeleteBackup,
   onRefresh,
@@ -89,11 +92,12 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
         <RemoteWorkspacesList
           workspaces={workspaces}
           selectedWorkspace={selectedWorkspace}
-          backups={backups}
-          autosave={autosave}
+          workspaceBackups={workspaceBackups}
+          expandedWorkspaces={expandedWorkspaces}
           loading={loading}
           error={error}
           onSelectWorkspace={onSelectWorkspace}
+          onCollapseWorkspace={onCollapseWorkspace}
           onRestoreBackup={onRestoreBackup}
           onDeleteBackup={onDeleteBackup}
           onRefresh={onRefresh}
