@@ -249,9 +249,18 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     // Listen for save events from s3Storage
     this.on('s3Storage', 'saveCompleted', async (data) => {
       console.log('[CloudWorkspaces] saveCompleted event received!', data)
-     
+      // Reset the saving flag that was set by autosaveStarted
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isSaving: false }
+      await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
-       await this.loadCurrentWorkspaceStatus()
+    })
+    
+    // Listen for autosave starting (syncing indicator)
+    this.on('s3Storage', 'autosaveStarted', async () => {
+      console.log('[CloudWorkspaces] autosaveStarted event received')
+      // Temporarily set syncing state for the badge
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isSaving: true }
+      await this.updateStatus()
     })
     
     // Listen for autosave setting changes
@@ -359,6 +368,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     try {
       await this.call('s3Storage', 'saveToCloud')
       await this.loadCurrentWorkspaceStatus()
+      await this.updateStatus()
     } catch (e) {
       this.state.error = e.message || 'Save failed'
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isSaving: false }
@@ -380,6 +390,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     try {
       await this.call('s3Storage', 'backupWorkspace')
       await this.loadCurrentWorkspaceStatus()
+      await this.updateStatus()
     } catch (e) {
       this.state.error = e.message || 'Backup failed'
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isBackingUp: false }
@@ -394,7 +405,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
    */
   async restoreAutosave(): Promise<void> {
     const remoteId = this.state.currentWorkspaceStatus.remoteId
-    if (!remoteId) return
+    const workspaceName = this.state.currentWorkspaceStatus.workspaceName
+    if (!remoteId || !workspaceName) return
     
     this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isRestoring: true }
     this.state.error = null
@@ -402,9 +414,12 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     await this.updateStatus()
     
     try {
-      const autosavePath = `${remoteId}/autosave/autosave-backup.zip`
+      // Build the autosave filename using the same sanitization as saveToCloud
+      const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
+      const autosavePath = `${remoteId}/autosave/${sanitizedName}-autosave.zip`
       await this.call('s3Storage', 'restoreWorkspace', autosavePath)
       await this.loadCurrentWorkspaceStatus()
+      await this.updateStatus()
     } catch (e) {
       this.state.error = e.message || 'Restore failed'
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isRestoring: false }
@@ -426,6 +441,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     try {
       await this.call('s3Storage', 'linkWorkspaceToCurrentUser')
       await this.loadCurrentWorkspaceStatus()
+      await this.updateStatus()
     } catch (e) {
       this.state.error = e.message || 'Link failed'
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isLinking: false }

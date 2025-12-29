@@ -236,6 +236,7 @@ export class S3StoragePlugin extends Plugin {
       }
       
       console.log('[S3StoragePlugin] 💾 Running autosave backup...')
+      this.emit('autosaveStarted', { workspaceRemoteId })
       
       // Create backup with workspace name in filename (overwrites previous autosave)
       const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
