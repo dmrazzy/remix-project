@@ -75,7 +75,7 @@ export function RemixUiTopbar() {
 
   useEffect(() => {
     const checkLoginEnabled = () => {
-      const enabled = localStorage.getItem('enableLogin') === 'true';
+      const enabled = true/// localStorage.getItem('enableLogin') === 'true';
       setEnableLogin(enabled);
     };
     checkLoginEnabled();

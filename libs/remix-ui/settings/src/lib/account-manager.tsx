@@ -192,7 +192,7 @@ export const AccountManager: React.FC<AccountManagerProps> = ({ plugin }) => {
   useEffect(() => {
     // Check enableLogin flag
     const checkLoginEnabled = () => {
-      const enabled = localStorage.getItem('enableLogin') === 'true';
+      const enabled = true // localStorage.getItem('enableLogin') === 'true';
       setEnableLogin(enabled);
     };
     checkLoginEnabled();
