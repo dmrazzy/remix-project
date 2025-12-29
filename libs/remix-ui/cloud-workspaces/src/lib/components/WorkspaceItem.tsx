@@ -73,9 +73,11 @@ export const WorkspaceItem: React.FC<WorkspaceItemProps> = ({
             </span>
           )}
         </div>
+        {/* Backup count badge - hidden for now
         <small className="text-muted ms-1" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
           {workspace.backupCount}
         </small>
+        */}
       </div>
 
       {/* Backups List (when expanded and selected) */}
