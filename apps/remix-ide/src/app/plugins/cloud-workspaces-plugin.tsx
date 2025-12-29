@@ -261,6 +261,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       console.log('[CloudWorkspaces] saveCompleted event received!', data)
       // Reset the saving flag that was set by autosaveStarted
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isSaving: false }
+      await this.refresh()
       await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
