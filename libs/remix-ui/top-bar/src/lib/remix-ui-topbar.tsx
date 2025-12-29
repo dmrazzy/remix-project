@@ -84,14 +84,7 @@ export function RemixUiTopbar() {
     return () => window.removeEventListener('storage', checkLoginEnabled);
   }, []);
 
-  const handleLoginSuccess = (user: GitHubUser, token: string) => {
-    setUser(user);
-    setError(null);
-  };
 
-  const handleLoginError = (error: string) => {
-    setError(error);
-  };
 
   async function openTemplateExplorer(): Promise<void> {
     await global.plugin.call('templateexplorermodal', 'updateTemplateExplorerInFileMode', false)
@@ -101,10 +94,6 @@ export function RemixUiTopbar() {
     })
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('github_token');
-    setUser(null);
-  };
 
   const toggleDropdown = (isOpen: boolean) => {
     setShowDropdown(isOpen)
@@ -330,48 +319,7 @@ export function RemixUiTopbar() {
     }
   }
 
-  const cloudBackup = async () => {
-    try {
-      await plugin.call('s3Storage', 'backupWorkspace')
-    } catch (e) {
-      console.error('Cloud backup failed:', e)
-      global.modal(
-        'Cloud Backup Failed',
-        e.message || 'Failed to backup workspace to cloud',
-        intl.formatMessage({ id: 'filePanel.ok' }),
-        () => { },
-        ''
-      )
-    }
-  }
 
-  const cloudRestore = async () => {
-    try {
-      // Confirm before restoring
-      global.modal(
-        'Restore from Cloud',
-        'This will restore files from the latest cloud backup. Existing files with the same name will be overwritten. Continue?',
-        intl.formatMessage({ id: 'filePanel.ok' }),
-        async () => {
-          try {
-            await plugin.call('s3Storage', 'restoreWorkspace')
-          } catch (e) {
-            console.error('Cloud restore failed:', e)
-            global.modal(
-              'Cloud Restore Failed',
-              e.message || 'Failed to restore workspace from cloud',
-              intl.formatMessage({ id: 'filePanel.ok' }),
-              () => { },
-              ''
-            )
-          }
-        },
-        intl.formatMessage({ id: 'filePanel.cancel' })
-      )
-    } catch (e) {
-      console.error(e)
-    }
-  }
 
   const onFinishDeleteAllWorkspaces = async () => {
     try {
@@ -616,9 +564,6 @@ export function RemixUiTopbar() {
             setMenuItems={setMenuItems}
             connectToLocalhost={() => switchWorkspace(LOCALHOST)}
             openTemplateExplorer={openTemplateExplorer}
-            cloudBackup={cloudBackup}
-            cloudRestore={cloudRestore}
-            isLoggedIn={isAuthenticated}
           />
           <div className="d-flex ms-4 gap-2 align-items-center" >
             <CustomTooltip placement="bottom-start" tooltipText={`Toggle Left Side Panel`}>

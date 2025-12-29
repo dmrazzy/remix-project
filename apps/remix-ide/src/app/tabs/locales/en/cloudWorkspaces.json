@@ -20,7 +20,7 @@
   "cloudWorkspaces.restoreAutosave": "Restore",
   "cloudWorkspaces.restoreAutosaveConfirm": "This will restore the last autosave to your current workspace. Existing files with the same name will be overwritten. Continue?",
   "cloudWorkspaces.manualBackups": "Manual Backups",
-  "cloudWorkspaces.notLinked": "Not linked",
+  "cloudWorkspaces.notLinked": "Not Enabled",
   "cloudWorkspaces.editCloudName": "Edit cloud name",
   "cloudWorkspaces.lastSaved": "Saved",
   "cloudWorkspaces.lastBackup": "Backup",

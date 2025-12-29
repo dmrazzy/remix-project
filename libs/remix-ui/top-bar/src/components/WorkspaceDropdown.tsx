@@ -55,9 +55,6 @@ interface WorkspacesDropdownProps {
   setMenuItems: (menuItems: MenuItem[]) => void
   connectToLocalhost: () => void
   openTemplateExplorer: () => void
-  cloudBackup: () => void
-  cloudRestore: () => void
-  isLoggedIn: boolean
 }
 
 function useClickOutside(refs: React.RefObject<HTMLElement>[], handler: () => void) {
@@ -81,7 +78,7 @@ const ITEM_LABELS = [
   "Fifth item",
 ]
 
-export const WorkspacesDropdown: React.FC<WorkspacesDropdownProps> = ({ menuItems, NO_WORKSPACE, switchWorkspace, CustomToggle, createWorkspace, downloadCurrentWorkspace, restoreBackup, deleteAllWorkspaces, setCurrentMenuItemName, setMenuItems, renameCurrentWorkspace, deleteCurrentWorkspace, downloadWorkspaces, connectToLocalhost, openTemplateExplorer, cloudBackup, cloudRestore, isLoggedIn }) => {
+export const WorkspacesDropdown: React.FC<WorkspacesDropdownProps> = ({ menuItems, NO_WORKSPACE, switchWorkspace, CustomToggle, createWorkspace, downloadCurrentWorkspace, restoreBackup, deleteAllWorkspaces, setCurrentMenuItemName, setMenuItems, renameCurrentWorkspace, deleteCurrentWorkspace, downloadWorkspaces, connectToLocalhost, openTemplateExplorer }) => {
   const [showMain, setShowMain] = useState(false)
   const [openSub, setOpenSub] = useState<number | null>(null)
   const global = useContext(TopbarContext)
@@ -456,42 +453,7 @@ export const WorkspacesDropdown: React.FC<WorkspacesDropdownProps> = ({ menuItem
                 Restore
             </span>
           </Dropdown.Item>
-          <Dropdown.Divider />
-          <Dropdown.Item 
-            onClick={() => {
-              if (isLoggedIn) {
-                cloudBackup()
-                setShowMain(false)
-                setOpenSub(null)
-              }
-            }}
-            disabled={!isLoggedIn}
-            title={!isLoggedIn ? 'Login required for cloud backup' : ''}
-          >
-            <span className="pl-2">
-              <i className="fas fa-cloud-arrow-up me-2"></i>
-                Cloud Backup
-                {!isLoggedIn && <small className="text-muted ms-1">(login required)</small>}
-            </span>
-          </Dropdown.Item>
-          <Dropdown.Item 
-            onClick={() => {
-              if (isLoggedIn) {
-                cloudRestore()
-                setShowMain(false)
-                setOpenSub(null)
-              }
-            }}
-            disabled={!isLoggedIn}
-            title={!isLoggedIn ? 'Login required for cloud restore' : ''}
-          >
-            <span className="pl-2">
-              <i className="fas fa-cloud-arrow-down me-2"></i>
-                Cloud Restore
-                {!isLoggedIn && <small className="text-muted ms-1">(login required)</small>}
-            </span>
-          </Dropdown.Item>
-          <Dropdown.Divider />
+          <Dropdown.Divider />          
           <Dropdown.Item onClick={() => {
             connectToLocalhost()
             setShowMain(false)

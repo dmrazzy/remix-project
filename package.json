@@ -28,8 +28,8 @@
   "scripts": {
     "nx": "nx",
     "start": "nx start",
-    "serve": "nx serve remix-ide --configuration=development",
-    "serve:hot": "nx serve remix-ide --configuration=hot",
+    "serve": "node --max-old-space-size=8192 ./node_modules/.bin/nx serve remix-ide --configuration=development",
+    "serve:hot": "node --max-old-space-size=8192 ./node_modules/.bin/nx serve remix-ide --configuration=hot",
     "serve:endpoints": "NX_ENDPOINTS_URL=\"http://localhost\" yarn serve",
     "serve:ngrok": "NX_ENDPOINTS_URL=\"https://api-remix-dev.ngrok.dev\" yarn serve",
     "serve:plugin": "nx serve ${npm_config_plugin} --configuration=development",

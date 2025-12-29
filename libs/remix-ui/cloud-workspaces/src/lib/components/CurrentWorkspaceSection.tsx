@@ -17,6 +17,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     createBackup,
     restoreAutosave,
     linkToCurrentUser,
+    enableCloud,
     setWorkspaceRemoteId
   } = useCloudWorkspaces()
   
@@ -96,6 +97,15 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     }
     
     await plugin.call('notification', 'modal', linkModal)
+  }
+
+  const handleEnableCloud = async () => {
+    setLocalError(null)
+    try {
+      await enableCloud()
+    } catch (e) {
+      setLocalError(e.message || 'Failed to enable cloud')
+    }
   }
 
   const handleStartEditName = () => {
@@ -277,8 +287,34 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
           </div>
         )}
 
-        {/* Action buttons */}
-        <div className="d-flex gap-1">
+        {/* Enable Cloud CTA - show when workspace not linked */}
+        {!status.remoteId && !status.linkedToAnotherUser && (
+          <div className="text-center py-2">
+            <p className="text-muted small mb-2">
+              <FormattedMessage 
+                id="cloudWorkspaces.enableCloudDesc" 
+                defaultMessage="Back up this workspace to the cloud" 
+              />
+            </p>
+            <button
+              className="btn btn-primary w-100"
+              onClick={handleEnableCloud}
+              disabled={status.isLinking || status.isSaving}
+              style={{ fontSize: '0.85rem' }}
+            >
+              {(status.isLinking || status.isSaving) ? (
+                <i className="fas fa-spinner fa-spin me-1"></i>
+              ) : (
+                <i className="fas fa-cloud me-1"></i>
+              )}
+              <FormattedMessage id="cloudWorkspaces.enableCloud" defaultMessage="Enable Cloud Backup" />
+            </button>
+          </div>
+        )}
+
+        {/* Action buttons - only show when linked */}
+        {status.remoteId && status.ownedByCurrentUser && (
+          <div className="d-flex gap-1">
           <CustomTooltip
             placement="top"
             tooltipText={
@@ -326,7 +362,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
           </CustomTooltip>
           
           {/* Restore button - only show if there's a saved state and user owns workspace */}
-          {status.lastSaved && status.ownedByCurrentUser && (
+          {status.lastSaved && (
             <CustomTooltip
               placement="top"
               tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosaveTip', defaultMessage: 'Restore from last cloud save' })}
@@ -347,9 +383,10 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
             </CustomTooltip>
           )}
         </div>
+        )}
 
         {/* Autosave indicator */}
-        {status.autosaveEnabled && (
+        {status.remoteId && status.autosaveEnabled && (
           <div className="mt-1 text-center" style={{ fontSize: '0.65rem' }}>
             <span className="text-success">
               <i className="fas fa-check-circle me-1"></i>

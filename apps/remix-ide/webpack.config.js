@@ -241,7 +241,16 @@ module.exports = composePlugins(withNx(), withReact(), (config) => {
     config.optimization.minimize = true
 
   config.watchOptions = {
-    ignored: /node_modules/
+    ignored: /node_modules/,
+    aggregateTimeout: 300,
+    poll: false
+  }
+
+  // Reduce memory usage in development by using cheaper source maps
+  if (config.mode === 'development') {
+    config.devtool = 'eval-cheap-module-source-map'
+    // Disable caching if memory is an issue (trade-off: slower rebuilds)
+    // config.cache = false
   }
 
   return config;

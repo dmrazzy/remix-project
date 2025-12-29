@@ -35,8 +35,8 @@ function Badge({ badgeStatus }: BadgeProps) {
     case 'login':
       classes += ' fas fa-sign-in-alt text-' + type + ' ' + 'remixui_statusCheck'
       break
-    case 'link':
-      classes += ' fas fa-link text-' + type + ' ' + 'remixui_statusCheck'
+    case 'cloud-off':
+      classes += ' fas fa-cloud text-' + type + ' ' + 'remixui_statusCheck'
       break
     case 'synced':
       classes += ' fas fa-cloud text-' + type + ' ' + 'remixui_statusCheck'

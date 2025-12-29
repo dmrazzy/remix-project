@@ -30,7 +30,7 @@ const profile = {
 }
 
 // Badge status types for the sidebar icon
-export type CloudStatusKey = 'none' | 'login' | 'link' | 'syncing' | 'synced' | 'autosave' | 'error'
+export type CloudStatusKey = 'none' | 'login' | 'cloud-off' | 'syncing' | 'synced' | 'autosave' | 'error'
 
 interface CloudStatus {
   key: CloudStatusKey | number
@@ -168,8 +168,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       
       if (!ownership.remoteId) {
         return { 
-          key: 'link', 
-          title: 'Link workspace to cloud for backup', 
+          key: 'cloud-off', 
+          title: 'Enable cloud backup for this workspace', 
           type: 'info' 
         }
       }
@@ -452,6 +452,48 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   }
 
   /**
+   * Enable cloud for workspace - one click action that:
+   * 1. Links workspace to user's cloud
+   * 2. Runs first save
+   * 3. Enables autosave
+   */
+  async enableCloud(): Promise<void> {
+    this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isLinking: true }
+    this.state.error = null
+    this.renderComponent()
+    await this.updateStatus()
+    
+    try {
+      // Step 1: Link workspace to cloud
+      await this.call('s3Storage', 'linkWorkspaceToCurrentUser')
+      
+      // Step 2: Run first save
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isLinking: false, isSaving: true }
+      this.renderComponent()
+      await this.updateStatus()
+      await this.call('s3Storage', 'saveToCloud')
+      
+      // Step 3: Enable autosave
+      await this.call('s3Storage', 'setAutosaveEnabled', true)
+      
+      await this.loadCurrentWorkspaceStatus()
+      await this.updateStatus()
+      
+      await this.call('notification', 'toast', '☁️ Cloud backup enabled!')
+    } catch (e) {
+      this.state.error = e.message || 'Failed to enable cloud'
+      this.state.currentWorkspaceStatus = { 
+        ...this.state.currentWorkspaceStatus, 
+        isLinking: false, 
+        isSaving: false 
+      }
+      this.renderComponent()
+      await this.updateStatus()
+      throw e
+    }
+  }
+
+  /**
    * Update workspace remote ID (rename in cloud)
    */
   async updateWorkspaceRemoteId(workspaceName: string, remoteId: string): Promise<void> {
@@ -671,6 +713,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         onCreateBackup={() => this.createBackup()}
         onRestoreAutosave={() => this.restoreAutosave()}
         onLinkToCurrentUser={() => this.linkToCurrentUser()}
+        onEnableCloud={() => this.enableCloud()}
         onUpdateRemoteId={(workspaceName, remoteId) => this.updateWorkspaceRemoteId(workspaceName, remoteId)}
       />
     )
