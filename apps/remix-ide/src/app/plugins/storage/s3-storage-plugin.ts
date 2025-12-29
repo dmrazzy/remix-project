@@ -833,7 +833,7 @@ export class S3StoragePlugin extends Plugin {
       const content = await this.downloadBinary(filename, folder)
       
       // Create blob and trigger download
-      const blob = new Blob([content], { type: 'application/zip' })
+      const blob = new Blob([content.buffer as ArrayBuffer], { type: 'application/zip' })
       const url = URL.createObjectURL(blob)
       
       const a = document.createElement('a')
@@ -1232,8 +1232,8 @@ export class S3StoragePlugin extends Plugin {
     const filePromises: Promise<void>[] = []
     
     zip.forEach((relativePath, zipEntry) => {
-      // Skip metadata and directories
-      if (relativePath === '_backup_metadata.json' || zipEntry.dir) {
+      // Skip metadata, directories, and remix.config.json (preserve local cloud settings)
+      if (relativePath === '_backup_metadata.json' || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
         return
       }
       
@@ -1326,8 +1326,8 @@ export class S3StoragePlugin extends Plugin {
     const filePromises: Promise<void>[] = []
     
     zip.forEach((relativePath, zipEntry) => {
-      // Skip metadata and directories
-      if (relativePath === '_backup_metadata.json' || zipEntry.dir) {
+      // Skip metadata, directories, and remix.config.json (to avoid inheriting remoteId)
+      if (relativePath === '_backup_metadata.json' || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
         return
       }
       
@@ -1344,19 +1344,21 @@ export class S3StoragePlugin extends Plugin {
     
     await Promise.all(filePromises)
     
-    // Link the new workspace to the same remote ID so future saves sync
-    await this.setWorkspaceRemoteId(newWorkspaceName, remoteWorkspaceId)
+    // NOTE: We intentionally do NOT link the new workspace to the same remote ID.
+    // The restored workspace starts as "unlinked" - user can enable cloud backup
+    // to create a new remote ID if they want. This prevents multiple workspaces
+    // from writing to the same cloud location and causing conflicts.
     
-    console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName}`)
+    console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (unlinked from cloud)`)
     
     this.emit('restoreCompleted', { 
       backupPath, 
       fileCount: restoredCount,
-      workspaceRemoteId: remoteWorkspaceId,
+      workspaceRemoteId: null, // New workspace is unlinked
       newWorkspaceName 
     })
     
-    await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files)`)
+    await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files) - Enable cloud backup to sync`)
   }
   
   /**
