@@ -504,6 +504,20 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   }
 
   /**
+   * Toggle autosave on/off
+   * This syncs with the settings plugin via s3Storage
+   */
+  async toggleAutosave(enabled: boolean): Promise<void> {
+    try {
+      await this.call('s3Storage', 'setAutosaveEnabled', enabled)
+      // The autosaveChanged event will trigger loadCurrentWorkspaceStatus
+    } catch (e) {
+      this.state.error = e.message || 'Failed to toggle autosave'
+      this.renderComponent()
+    }
+  }
+
+  /**
    * Update workspace remote ID (rename in cloud)
    */
   async updateWorkspaceRemoteId(workspaceName: string, remoteId: string): Promise<void> {
@@ -794,6 +808,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         onRestoreAutosave={() => this.restoreAutosave()}
         onLinkToCurrentUser={() => this.linkToCurrentUser()}
         onEnableCloud={() => this.enableCloud()}
+        onToggleAutosave={(enabled) => this.toggleAutosave(enabled)}
         onUpdateRemoteId={(workspaceName, remoteId) => this.updateWorkspaceRemoteId(workspaceName, remoteId)}
       />
     )

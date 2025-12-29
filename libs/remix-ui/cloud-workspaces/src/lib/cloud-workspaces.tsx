@@ -26,6 +26,7 @@ export interface CloudWorkspacesProps {
   onRestoreAutosave: () => Promise<void>
   onLinkToCurrentUser: () => Promise<void>
   onEnableCloud: () => Promise<void>
+  onToggleAutosave: (enabled: boolean) => Promise<void>
   onUpdateRemoteId: (workspaceName: string, remoteId: string) => Promise<void>
 }
 
@@ -49,6 +50,7 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
   onRestoreAutosave,
   onLinkToCurrentUser,
   onEnableCloud,
+  onToggleAutosave,
   onUpdateRemoteId
 }) => {
   // Create context value from props
@@ -62,6 +64,7 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
     restoreAutosave: onRestoreAutosave,
     linkToCurrentUser: onLinkToCurrentUser,
     enableCloud: onEnableCloud,
+    toggleAutosave: onToggleAutosave,
     setWorkspaceRemoteId: onUpdateRemoteId,
     refresh: async () => { onRefresh() }
   }

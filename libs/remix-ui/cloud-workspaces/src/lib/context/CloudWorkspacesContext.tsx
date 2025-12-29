@@ -37,6 +37,7 @@ export interface CloudWorkspacesContextActions {
   restoreAutosave: () => Promise<void>
   linkToCurrentUser: () => Promise<void>
   enableCloud: () => Promise<void>
+  toggleAutosave: (enabled: boolean) => Promise<void>
   setWorkspaceRemoteId: (workspaceName: string, remoteId: string) => Promise<void>
   refresh: () => Promise<void>
 }
@@ -68,6 +69,7 @@ const defaultContext: CloudWorkspacesContextValue = {
   restoreAutosave: async () => {},
   linkToCurrentUser: async () => {},
   enableCloud: async () => {},
+  toggleAutosave: async () => {},
   setWorkspaceRemoteId: async () => {},
   refresh: async () => {}
 }

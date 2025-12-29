@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { CustomTooltip } from '@remix-ui/helper'
+import { ToggleSwitch } from '@remix-ui/toggle'
 import { useCloudWorkspaces } from '../context'
 
 export interface CurrentWorkspaceSectionProps {
@@ -18,12 +19,22 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     restoreAutosave,
     linkToCurrentUser,
     enableCloud,
+    toggleAutosave,
     setWorkspaceRemoteId
   } = useCloudWorkspaces()
   
   const [isEditingName, setIsEditingName] = useState(false)
   const [editedName, setEditedName] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
+  const [, setTick] = useState(0) // Force re-render for time updates
+
+  // Update relative times every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(t => t + 1)
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleSaveToCloud = async () => {
     setLocalError(null)
@@ -324,7 +335,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
             }
           >
             <button
-              className="btn btn-sm btn-outline-primary flex-grow-1"
+              className="btn btn-sm btn-primary flex-grow-1"
               onClick={handleSaveToCloud}
               disabled={status.isSaving || status.isBackingUp || status.isRestoring || !status.canSave}
               style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
@@ -347,7 +358,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
             }
           >
             <button
-              className="btn btn-sm btn-outline-secondary flex-grow-1"
+              className="btn btn-sm btn-secondary flex-grow-1"
               onClick={handleCreateBackup}
               disabled={status.isSaving || status.isBackingUp || status.isRestoring || !status.canSave}
               style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
@@ -368,7 +379,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
               tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosaveTip', defaultMessage: 'Restore from last cloud save' })}
             >
               <button
-                className="btn btn-sm btn-outline-success flex-grow-1"
+                className="btn btn-sm btn-success flex-grow-1"
                 onClick={handleRestoreAutosave}
                 disabled={status.isSaving || status.isBackingUp || status.isRestoring}
                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
@@ -385,13 +396,24 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         </div>
         )}
 
-        {/* Autosave indicator */}
-        {status.remoteId && status.autosaveEnabled && (
-          <div className="mt-1 text-center" style={{ fontSize: '0.65rem' }}>
-            <span className="text-success">
-              <i className="fas fa-check-circle me-1"></i>
-              <FormattedMessage id="cloudWorkspaces.autosaveOn" defaultMessage="Autosave enabled" />
+        {/* Autosave toggle - only show when linked */}
+        {status.remoteId && status.ownedByCurrentUser && (
+          <div className="mt-2 d-flex align-items-center justify-content-between px-1">
+            <span 
+              className="small text-muted mb-0 d-flex align-items-center"
+              style={{ fontSize: '0.75rem' }}
+            >
+              <i className={`fas ${status.autosaveEnabled ? 'fa-cloud-upload-alt text-success' : 'fa-cloud text-muted'} me-1`}></i>
+              <FormattedMessage id="cloudWorkspaces.autosave" defaultMessage="Autosave" />
             </span>
+            <ToggleSwitch
+              id="cloud-autosave-toggle"
+              isOn={status.autosaveEnabled}
+              onClick={() => toggleAutosave(!status.autosaveEnabled)}
+              onstyle="text-success"
+              offstyle="text-secondary"
+              size="md"
+            />
           </div>
         )}
       </div>
