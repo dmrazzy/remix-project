@@ -43,6 +43,16 @@ export interface IStorageProvider {
   upload(path: string, content: string | Uint8Array, contentType: string, metadata?: Record<string, string>): Promise<string>
   
   /**
+   * Upload a file and return both key and ETag for conflict detection
+   * @param path - Full path including folder
+   * @param content - File content
+   * @param contentType - MIME type
+   * @param metadata - Optional metadata
+   * @returns Object with key and etag
+   */
+  uploadWithEtag?(path: string, content: string | Uint8Array, contentType: string, metadata?: Record<string, string>): Promise<{ key: string; etag: string | null }>
+  
+  /**
    * Download a file from storage
    * @param path - Full path including folder
    * @returns File content as string

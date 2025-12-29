@@ -39,6 +39,15 @@ import JSZip from 'jszip'
 
 const REMIX_CONFIG_FILE = 'remix.config.json'
 
+/**
+ * Normalize an ETag by stripping surrounding quotes.
+ * S3 returns ETags with quotes like "abc123" - this removes them for consistent comparison.
+ */
+function normalizeEtag(etag: string | null | undefined): string | null {
+  if (!etag) return null
+  return etag.replace(/^"|"$/g, '')
+}
+
 // Folders/patterns to exclude from workspace backup
 const EXCLUDED_PATTERNS = [
   '.deps',           // npm dependencies cached by Remix
@@ -75,6 +84,9 @@ const profile = {
     'restoreWorkspace',
     'restoreBackupToNewWorkspace',
     'saveToCloud',
+    'forceSaveToCloud',
+    'saveToCloudWithConflictCheck',
+    'checkForConflict',
     'getLastSaveTime',
     'getLastBackupTime',
     'isAutosaveEnabled',
@@ -93,7 +105,9 @@ const profile = {
     'backupCompleted',
     'saveCompleted',
     'restoreCompleted',
-    'autosaveChanged'
+    'autosaveChanged',
+    'conflictDetected',
+    'autosaveStarted'
   ]
 }
 
@@ -190,9 +204,8 @@ export class S3StoragePlugin extends Plugin {
     
     console.log('[S3StoragePlugin] 🔄 Starting autosave (every 5 minutes)')
     
-    // Run immediately, then on interval
-    await this.runAutosave()
-    
+    // Don't run immediately - wait for the first interval
+    // This avoids triggering conflict detection right when user enables autosave
     this.autosaveIntervalId = setInterval(async () => {
       await this.runAutosave()
     }, S3StoragePlugin.DEFAULT_AUTOSAVE_INTERVAL)
@@ -227,6 +240,17 @@ export class S3StoragePlugin extends Plugin {
         return
       }
       
+      // Check for conflicts before autosave
+      const conflictInfo = await this.checkForConflict()
+      if (conflictInfo.hasConflict) {
+        console.warn('[S3StoragePlugin] ⚠️ Conflict detected during autosave, skipping this cycle')
+        this.emit('conflictDetected', {
+          ...conflictInfo,
+          source: 'autosave'
+        })
+        return
+      }
+      
       // Get workspace name for filename
       let workspaceName = 'workspace'
       try {
@@ -241,14 +265,17 @@ export class S3StoragePlugin extends Plugin {
       
       // Create backup with workspace name in filename (overwrites previous autosave)
       const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
-      const backupKey = await this.createBackup(
+      const { key: backupKey, etag } = await this.createBackup(
         `${sanitizedName}-autosave.zip`,
         `${workspaceRemoteId}/autosave`
       )
       
-      // Update last save time
+      // Update last save time and etag for conflict detection
       await this.updateLastSaveTime()
-      this.emit('saveCompleted', { workspaceRemoteId })
+      if (etag) {
+        await this.updateLastKnownEtag(etag)
+      }
+      this.emit('saveCompleted', { workspaceRemoteId, etag })
       
       console.log(`[S3StoragePlugin] ✅ Autosave completed: ${backupKey}`)
       
@@ -262,7 +289,7 @@ export class S3StoragePlugin extends Plugin {
    * Create a backup with a specific filename
    * This is a helper used by both backupWorkspace and autosave
    */
-  private async createBackup(filename: string, folder: string): Promise<string> {
+  private async createBackup(filename: string, folder: string): Promise<{ key: string; etag: string | null }> {
     const provider = this.ensureProvider()
     
     // Get current workspace name for metadata
@@ -308,11 +335,36 @@ export class S3StoragePlugin extends Plugin {
       compressionOptions: { level: 6 }
     })
     
-    // Upload to S3 - filename already includes workspace name
+    // Upload to S3 with etag tracking for conflict detection
     const fullPath = joinPath(folder, filename)
-    const key = await provider.upload(fullPath, zipContent, 'application/zip')
     
-    return key
+    // Upload the file
+    let key: string
+    let etag: string | null = null
+    
+    // Try uploadWithEtag first (gets etag from S3 response header if CORS allows)
+    if (provider.uploadWithEtag) {
+      const result = await provider.uploadWithEtag(fullPath, zipContent, 'application/zip')
+      key = result.key
+      etag = result.etag
+    } else {
+      key = await provider.upload(fullPath, zipContent, 'application/zip')
+    }
+    
+    // If etag is null (CORS doesn't expose it), fetch it via list API
+    if (!etag) {
+      console.log('[S3StoragePlugin] ETag not in response, fetching via list API...')
+      try {
+        const listResult = await this.list({ folder })
+        const uploadedFile = listResult.files.find(f => f.filename === filename)
+        etag = normalizeEtag(uploadedFile?.etag)
+        console.log('[S3StoragePlugin] Fetched ETag from list:', etag)
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not fetch ETag from list:', e)
+      }
+    }
+    
+    return { key, etag }
   }
   
   // ==================== Workspace Remote ID Management ====================
@@ -565,8 +617,139 @@ export class S3StoragePlugin extends Plugin {
   }
 
   /**
+   * Update the last known etag after a successful save
+   */
+  private async updateLastKnownEtag(etag: string): Promise<void> {
+    let config = await this.getRemixConfig()
+    if (!config || !config['remote-workspace']) return
+    
+    config['remote-workspace'].lastKnownEtag = etag
+    await this.saveRemixConfig(config)
+  }
+
+  /**
+   * Get the last known etag from config
+   */
+  private async getLastKnownEtag(): Promise<string | null> {
+    const config = await this.getRemixConfig()
+    return config?.['remote-workspace']?.lastKnownEtag || null
+  }
+
+  /**
+   * Get the current remote etag for the autosave file
+   * Returns null if file doesn't exist
+   */
+  private async getRemoteAutosaveEtag(workspaceRemoteId: string, workspaceName: string): Promise<string | null> {
+    try {
+      const folder = `${workspaceRemoteId}/autosave`
+      const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
+      const filename = `${sanitizedName}-autosave.zip`
+      
+      const result = await this.list({ folder })
+      const autosaveFile = result.files.find(f => f.filename === filename)
+      
+      return autosaveFile?.etag || null
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get remote autosave etag:', e)
+      return null
+    }
+  }
+
+  /**
+   * Check if there's a conflict with the remote version
+   * Returns conflict info if remote was modified by another session
+   */
+  async checkForConflict(): Promise<{ hasConflict: boolean; localEtag: string | null; remoteEtag: string | null; remoteLastModified: string | null }> {
+    const workspaceRemoteId = await this.getWorkspaceRemoteId()
+    if (!workspaceRemoteId) {
+      return { hasConflict: false, localEtag: null, remoteEtag: null, remoteLastModified: null }
+    }
+
+    let workspaceName = 'workspace'
+    try {
+      const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
+      workspaceName = currentWorkspace?.name || 'workspace'
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get workspace name:', e)
+    }
+
+    const localEtag = await this.getLastKnownEtag()
+    
+    // Get remote file info
+    const folder = `${workspaceRemoteId}/autosave`
+    const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
+    const filename = `${sanitizedName}-autosave.zip`
+    
+    let remoteEtag: string | null = null
+    let remoteLastModified: string | null = null
+    
+    try {
+      const result = await this.list({ folder })
+      const autosaveFile = result.files.find(f => f.filename === filename)
+      remoteEtag = normalizeEtag(autosaveFile?.etag)
+      remoteLastModified = autosaveFile?.lastModified || null
+      console.log('[S3StoragePlugin] checkForConflict - Remote file found:', { 
+        filename, 
+        remoteEtag, 
+        remoteLastModified,
+        allFiles: result.files.map(f => ({ filename: f.filename, etag: f.etag }))
+      })
+    } catch (e) {
+      // File doesn't exist - no conflict
+      console.log('[S3StoragePlugin] checkForConflict - No remote file, no conflict')
+      return { hasConflict: false, localEtag, remoteEtag: null, remoteLastModified: null }
+    }
+
+    console.log('[S3StoragePlugin] checkForConflict - Comparing:', { localEtag, remoteEtag })
+
+    // No local etag means this is first save from this session - no conflict
+    if (!localEtag) {
+      console.log('[S3StoragePlugin] checkForConflict - No local etag, no conflict (first save)')
+      return { hasConflict: false, localEtag: null, remoteEtag, remoteLastModified }
+    }
+
+    // No remote file - no conflict
+    if (!remoteEtag) {
+      console.log('[S3StoragePlugin] checkForConflict - No remote etag, no conflict')
+      return { hasConflict: false, localEtag, remoteEtag: null, remoteLastModified: null }
+    }
+
+    // Compare ETags - if different, remote was modified elsewhere
+    let hasConflict = localEtag !== remoteEtag
+    console.log('[S3StoragePlugin] checkForConflict - ETags match:', localEtag === remoteEtag, 'hasConflict:', hasConflict)
+    
+    // Secondary check: Use timestamps to avoid false positives from S3 eventual consistency
+    // If remote file was modified BEFORE our last save, it's not a real conflict
+    // (the list API might be returning stale data)
+    if (hasConflict && remoteLastModified) {
+      const lastSaveAt = await this.getLastSaveTime()
+      console.log('[S3StoragePlugin] checkForConflict - Timestamp check:', { lastSaveAt, remoteLastModified })
+      if (lastSaveAt) {
+        const remoteTime = new Date(remoteLastModified).getTime()
+        const localSaveTime = new Date(lastSaveAt).getTime()
+        
+        console.log('[S3StoragePlugin] checkForConflict - Times:', { remoteTime, localSaveTime, diff: remoteTime - localSaveTime })
+        
+        // If remote was modified before our last save, it's likely stale data - not a conflict
+        // Add 5 second buffer for clock skew
+        if (remoteTime <= localSaveTime + 5000) {
+          console.log('[S3StoragePlugin] Ignoring stale conflict - remote modified before our last save')
+          hasConflict = false
+        }
+      }
+    }
+    
+    if (hasConflict) {
+      console.warn('[S3StoragePlugin] ⚠️ Conflict detected! Local etag:', localEtag, 'Remote etag:', remoteEtag)
+    }
+
+    return { hasConflict, localEtag, remoteEtag, remoteLastModified }
+  }
+
+  /**
    * Save the current workspace to cloud (immediate save to autosave slot)
    * This is a manual trigger for the autosave functionality
+   * Includes conflict detection - will emit conflictDetected event if remote was modified
    */
   async saveToCloud(): Promise<void> {
     console.log('[S3StoragePlugin] Manual save to cloud triggered')
@@ -580,6 +763,17 @@ export class S3StoragePlugin extends Plugin {
     const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
     if (!workspaceRemoteId) {
       throw new Error('No workspace remote ID configured')
+    }
+    
+    // Check for conflicts before saving
+    const conflictInfo = await this.checkForConflict()
+    if (conflictInfo.hasConflict) {
+      console.warn('[S3StoragePlugin] ⚠️ Conflict detected on manual save')
+      this.emit('conflictDetected', {
+        ...conflictInfo,
+        source: 'manual'
+      })
+      return // Don't save - let user resolve via modal
     }
     
     // Get workspace name for filename
@@ -598,12 +792,77 @@ export class S3StoragePlugin extends Plugin {
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const filename = `${sanitizedName}-autosave.zip`
     
-    await this.createBackup(filename, folder)
+    const { etag } = await this.createBackup(filename, folder)
     await this.updateLastSaveTime()
+    if (etag) {
+      await this.updateLastKnownEtag(etag)
+    }
     
-    console.log('[S3Storage] Emitting saveCompleted event', { workspaceRemoteId })
-    this.emit('saveCompleted', { workspaceRemoteId })
+    console.log('[S3Storage] Emitting saveCompleted event', { workspaceRemoteId, etag })
+    this.emit('saveCompleted', { workspaceRemoteId, etag })
     await this.call('notification', 'toast', '✅ Saved to cloud')
+  }
+  
+  /**
+   * Force save to cloud, bypassing conflict detection
+   * Used when user explicitly chooses to overwrite remote
+   */
+  async forceSaveToCloud(): Promise<void> {
+    console.log('[S3StoragePlugin] Force save to cloud (bypassing conflict check)')
+    
+    const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
+    if (!workspaceRemoteId) {
+      throw new Error('No workspace remote ID configured')
+    }
+    
+    let workspaceName = 'workspace'
+    try {
+      const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
+      workspaceName = currentWorkspace?.name || 'workspace'
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get workspace name:', e)
+    }
+
+    await this.call('notification', 'toast', '☁️ Saving to cloud...')
+    
+    const folder = `${workspaceRemoteId}/autosave`
+    const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
+    const filename = `${sanitizedName}-autosave.zip`
+    
+    const { etag } = await this.createBackup(filename, folder)
+    await this.updateLastSaveTime()
+    if (etag) {
+      await this.updateLastKnownEtag(etag)
+    }
+    
+    this.emit('saveCompleted', { workspaceRemoteId, etag })
+    await this.call('notification', 'toast', '✅ Saved to cloud')
+  }
+  
+  /**
+   * Save to cloud with conflict detection
+   * Returns true if saved successfully, false if conflict detected
+   */
+  async saveToCloudWithConflictCheck(): Promise<{ saved: boolean; conflict?: { localEtag: string | null; remoteEtag: string | null; remoteLastModified: string | null } }> {
+    // Check for conflicts first
+    const conflictInfo = await this.checkForConflict()
+    
+    if (conflictInfo.hasConflict) {
+      console.warn('[S3StoragePlugin] ⚠️ Conflict detected, not saving automatically')
+      this.emit('conflictDetected', conflictInfo)
+      return { 
+        saved: false, 
+        conflict: { 
+          localEtag: conflictInfo.localEtag, 
+          remoteEtag: conflictInfo.remoteEtag, 
+          remoteLastModified: conflictInfo.remoteLastModified 
+        } 
+      }
+    }
+    
+    // No conflict, proceed with save
+    await this.saveToCloud()
+    return { saved: true }
   }
   
   onDeactivation(): void {

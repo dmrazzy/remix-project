@@ -52,6 +52,7 @@ export interface CurrentWorkspaceCloudStatus {
   ownedByCurrentUser: boolean
   linkedToAnotherUser: boolean
   canSave: boolean
+  hasConflict: boolean
 }
 
 const defaultWorkspaceStatus: CurrentWorkspaceCloudStatus = {
@@ -66,7 +67,8 @@ const defaultWorkspaceStatus: CurrentWorkspaceCloudStatus = {
   isLinking: false,
   ownedByCurrentUser: true,
   linkedToAnotherUser: false,
-  canSave: true
+  canSave: true,
+  hasConflict: false
 }
 
 // Per-workspace backup data structure
@@ -132,8 +134,17 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   private async computeCurrentStatus(): Promise<CloudStatus> {
     console.log('[CloudWorkspaces] computeCurrentStatus - isAuthenticated:', this.state.isAuthenticated)
     
-    // Check if any remote activity is in progress
+    // Check if there's a conflict - highest priority
     const status = this.state.currentWorkspaceStatus
+    if (status.hasConflict) {
+      return { 
+        key: 'error', 
+        title: 'Sync conflict - cloud was modified elsewhere', 
+        type: 'error' 
+      }
+    }
+    
+    // Check if any remote activity is in progress
     if (status.isSaving || status.isBackingUp || status.isRestoring || status.isLinking) {
       const activity = status.isSaving ? 'Saving' : 
                        status.isBackingUp ? 'Backing up' : 
@@ -281,6 +292,17 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       await this.updateStatus()
     })
     
+    // Listen for conflict detection
+    this.on('s3Storage', 'conflictDetected', async (conflictInfo: { hasConflict: boolean; localEtag: string | null; remoteEtag: string | null; remoteLastModified: string | null; source?: string }) => {
+      console.warn('[CloudWorkspaces] Conflict detected!', conflictInfo)
+      // Set conflict flag in state
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, hasConflict: true }
+      this.renderComponent()
+      await this.updateStatus()
+      // Show modal
+      await this.showConflictResolutionModal(conflictInfo)
+    })
+    
     // Initial status update
     console.log('[CloudWorkspaces] Calling initial updateStatus')
     await this.loadCurrentWorkspaceStatus()
@@ -293,6 +315,60 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.off('s3Storage', 'backupCompleted')
     this.off('s3Storage', 'saveCompleted')
     this.off('s3Storage', 'autosaveChanged')
+    this.off('s3Storage', 'conflictDetected')
+  }
+  
+  /**
+   * Show conflict resolution modal when remote was modified by another session
+   */
+  private async showConflictResolutionModal(conflictInfo: { remoteLastModified: string | null }): Promise<void> {
+    const remoteModifiedAt = conflictInfo.remoteLastModified 
+      ? new Date(conflictInfo.remoteLastModified).toLocaleString()
+      : 'unknown time'
+    
+    const clearConflictFlag = async () => {
+      this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, hasConflict: false }
+      this.renderComponent()
+      await this.updateStatus()
+    }
+    
+    const modal = {
+      id: 'cloudConflictModal',
+      title: '⚠️ Cloud Sync Conflict',
+      message: `The cloud version of this workspace was modified at ${remoteModifiedAt} (possibly from another browser tab or device).\n\nWhat would you like to do?`,
+      modalType: 'modal',
+      okLabel: 'Overwrite Cloud (Use My Version)',
+      cancelLabel: 'Discard Local (Use Cloud Version)',
+      okFn: async () => {
+        // Force save, overwriting the remote version (bypasses conflict check)
+        try {
+          await clearConflictFlag()
+          await this.call('s3Storage', 'forceSaveToCloud')
+          await this.call('notification', 'toast', '✅ Cloud version overwritten with your local changes')
+        } catch (e) {
+          console.error('[CloudWorkspaces] Force save failed:', e)
+          await this.call('notification', 'toast', `❌ Save failed: ${e.message}`)
+        }
+      },
+      cancelFn: async () => {
+        // Restore from cloud, discarding local changes
+        try {
+          await clearConflictFlag()
+          await this.call('s3Storage', 'restoreWorkspace')
+          await this.call('notification', 'toast', '✅ Restored from cloud - local changes discarded')
+        } catch (e) {
+          console.error('[CloudWorkspaces] Restore failed:', e)
+          await this.call('notification', 'toast', `❌ Restore failed: ${e.message}`)
+        }
+      },
+      hideFn: async () => {
+        // User dismissed modal - clear flag so UI isn't stuck, but don't sync
+        await clearConflictFlag()
+        console.log('[CloudWorkspaces] Conflict modal dismissed - sync paused until next action')
+      }
+    }
+    
+    await this.call('notification', 'modal', modal)
   }
 
   private async checkAuthAndLoad(): Promise<void> {
@@ -354,7 +430,9 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         isSaving: false,
         isBackingUp: false,
         isRestoring: false,
-        isLinking: false
+        isLinking: false,
+        // Preserve conflict flag - only cleared by explicit resolution
+        hasConflict: this.state.currentWorkspaceStatus.hasConflict
       }
       
       console.log('[CloudWorkspaces] Current workspace status loaded:', this.state.currentWorkspaceStatus)

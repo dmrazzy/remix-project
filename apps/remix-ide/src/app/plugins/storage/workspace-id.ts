@@ -93,6 +93,8 @@ export interface RemoteWorkspaceConfig {
   lastSaveAt?: string
   /** Last backup timestamp */
   lastBackupAt?: string
+  /** ETag of last saved autosave file (for conflict detection) */
+  lastKnownEtag?: string
 }
 
 /**

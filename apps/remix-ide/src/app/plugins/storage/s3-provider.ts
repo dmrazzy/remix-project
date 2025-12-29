@@ -153,8 +153,82 @@ export class S3StorageProvider implements IStorageProvider {
       throw new Error(`S3 upload failed: ${uploadResponse.status} - ${errorText}`)
     }
     
-    console.log(`[S3StorageProvider] Upload successful: ${key}`)
+    // Get ETag from response headers (S3 returns it after successful upload)
+    const etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '') || null
+    
+    console.log(`[S3StorageProvider] Upload successful: ${key}, ETag: ${etag}`)
     return key
+  }
+  
+  /**
+   * Upload with ETag return - same as upload but returns { key, etag }
+   */
+  async uploadWithEtag(path: string, content: string | Uint8Array, contentType?: string, metadata?: Record<string, string>): Promise<{ key: string; etag: string | null }> {
+    await this.ensureToken()
+    
+    const { folder, filename } = parsePath(path)
+    const mimeType = contentType || getMimeType(filename)
+    
+    // Convert content to appropriate format
+    let body: Blob | string
+    let size: number
+    
+    if (typeof content === 'string') {
+      body = content
+      size = new Blob([content]).size
+    } else {
+      // Create a new ArrayBuffer copy for Blob compatibility
+      const buffer = new ArrayBuffer(content.length)
+      new Uint8Array(buffer).set(content)
+      body = new Blob([buffer])
+      size = content.length
+    }
+    
+    // 1. Get presigned upload URL
+    const presignResponse = await this.storageApi.getUploadUrl({
+      filename,
+      folder: folder || undefined,
+      contentType: mimeType,
+      fileSize: size,
+      metadata
+    })
+    
+    if (!presignResponse.ok || !presignResponse.data) {
+      throw new Error(presignResponse.error || 'Failed to get presigned upload URL')
+    }
+    
+    const { url, headers, key } = presignResponse.data
+    
+    // Build the request headers
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': mimeType
+    }
+    
+    if (headers) {
+      for (const [hkey, value] of Object.entries(headers)) {
+        const lowerKey = hkey.toLowerCase()
+        if (!['host', 'content-length'].includes(lowerKey)) {
+          requestHeaders[hkey] = value
+        }
+      }
+    }
+    
+    const uploadResponse = await fetch(url, {
+      method: 'PUT',
+      headers: requestHeaders,
+      body
+    })
+    
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text().catch(() => 'Unknown error')
+      throw new Error(`S3 upload failed: ${uploadResponse.status} - ${errorText}`)
+    }
+    
+    // Get ETag from response headers
+    const etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '') || null
+    
+    console.log(`[S3StorageProvider] Upload successful: ${key}, ETag: ${etag}`)
+    return { key, etag }
   }
   
   async download(path: string): Promise<string> {
