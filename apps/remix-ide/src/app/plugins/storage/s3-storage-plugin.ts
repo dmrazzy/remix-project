@@ -1220,6 +1220,7 @@ export class S3StoragePlugin extends Plugin {
   /**
    * Download a file from cloud storage to user's computer
    * Triggers browser download
+   * If the file is encrypted (.enc), it will be decrypted before download
    * 
    * @param filename - Name of the file
    * @param folder - Folder path
@@ -1228,7 +1229,28 @@ export class S3StoragePlugin extends Plugin {
     try {
       console.log(`[S3StoragePlugin] Downloading to computer: ${folder}/${filename}`)
       
-      const content = await this.downloadBinary(filename, folder)
+      let content = await this.downloadBinary(filename, folder)
+      let downloadFilename = filename
+      
+      // Check if file is encrypted
+      if (filename.endsWith('.enc')) {
+        console.log('[S3StoragePlugin] 🔐 File is encrypted, decrypting...')
+        
+        const passphrase = this.getPassphraseOrPrompt()
+        if (!passphrase) {
+          throw new Error('Passphrase required to download encrypted file. Please set your encryption passphrase.')
+        }
+        
+        try {
+          content = await decryptFromBytes(content, passphrase)
+          // Remove .enc from filename for download
+          downloadFilename = filename.replace(/\.enc$/, '')
+          console.log('[S3StoragePlugin] ✅ Decryption successful')
+        } catch (decryptError) {
+          console.error('[S3StoragePlugin] Decryption failed:', decryptError)
+          throw new Error('Failed to decrypt file. Please check your passphrase.')
+        }
+      }
       
       // Create blob and trigger download
       const blob = new Blob([content.buffer as ArrayBuffer], { type: 'application/zip' })
@@ -1236,14 +1258,14 @@ export class S3StoragePlugin extends Plugin {
       
       const a = document.createElement('a')
       a.href = url
-      a.download = filename
+      a.download = downloadFilename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       
       URL.revokeObjectURL(url)
       
-      await this.call('notification', 'toast', `📥 Downloaded ${filename}`)
+      await this.call('notification', 'toast', `📥 Downloaded ${downloadFilename}`)
     } catch (error) {
       console.error('[S3StoragePlugin] Download to computer failed:', error)
       throw error
