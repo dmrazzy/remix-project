@@ -36,6 +36,17 @@ import {
   RemoteWorkspaceConfig 
 } from './workspace-id'
 import JSZip from 'jszip'
+import {
+  encryptToBytes,
+  decryptFromBytes,
+  generatePassphrase,
+  storePassphraseInSession,
+  getPassphraseFromSession,
+  clearPassphraseFromSession,
+  isEncryptionEnabled,
+  setEncryptionEnabled,
+  hasPassphraseAvailable
+} from './encryption'
 
 const REMIX_CONFIG_FILE = 'remix.config.json'
 const LOCK_FILE_NAME = 'session.lock'
@@ -143,7 +154,15 @@ const profile = {
     'isAutosaveEnabled',
     'setAutosaveEnabled',
     'startAutosave',
-    'stopAutosave'
+    'stopAutosave',
+    // Encryption
+    'isEncryptionEnabled',
+    'enableEncryption',
+    'disableEncryption',
+    'setEncryptionPassphrase',
+    'hasEncryptionPassphrase',
+    'generateEncryptionPassphrase',
+    'clearEncryptionPassphrase'
   ],
   events: [
     'fileUploaded',
@@ -158,7 +177,9 @@ const profile = {
     'restoreCompleted',
     'autosaveChanged',
     'conflictDetected',
-    'autosaveStarted'
+    'autosaveStarted',
+    'encryptionChanged',
+    'passphraseRequired'
   ]
 }
 
@@ -289,6 +310,88 @@ export class S3StoragePlugin extends Plugin {
     }
   }
   
+  // ==================== Encryption ====================
+  
+  /**
+   * Check if encryption is enabled for cloud storage
+   */
+  isEncryptionEnabled(): boolean {
+    return isEncryptionEnabled()
+  }
+  
+  /**
+   * Enable encryption for cloud storage
+   * User must set a passphrase after enabling
+   */
+  enableEncryption(): void {
+    setEncryptionEnabled(true)
+    this.emit('encryptionChanged', { enabled: true })
+    console.log('[S3StoragePlugin] 🔐 Encryption enabled')
+  }
+  
+  /**
+   * Disable encryption for cloud storage
+   * WARNING: Future uploads will be unencrypted
+   */
+  disableEncryption(): void {
+    setEncryptionEnabled(false)
+    clearPassphraseFromSession()
+    this.emit('encryptionChanged', { enabled: false })
+    console.log('[S3StoragePlugin] 🔓 Encryption disabled')
+  }
+  
+  /**
+   * Set the encryption passphrase for this session
+   * The passphrase is stored in sessionStorage (survives refresh, cleared on tab close)
+   * 
+   * @param passphrase - The user's encryption passphrase
+   */
+  setEncryptionPassphrase(passphrase: string): void {
+    if (!passphrase || passphrase.length < 8) {
+      throw new Error('Passphrase must be at least 8 characters')
+    }
+    storePassphraseInSession(passphrase)
+    console.log('[S3StoragePlugin] 🔑 Encryption passphrase set')
+  }
+  
+  /**
+   * Check if a passphrase is available in the current session
+   */
+  hasEncryptionPassphrase(): boolean {
+    return hasPassphraseAvailable()
+  }
+  
+  /**
+   * Generate a random passphrase that users can save
+   * Format: 6 random words separated by dashes (e.g., "alpha-coral-frost-lunar-storm-yacht")
+   * 
+   * @returns A randomly generated passphrase
+   */
+  generateEncryptionPassphrase(): string {
+    return generatePassphrase()
+  }
+  
+  /**
+   * Clear the passphrase from session storage
+   * User will need to re-enter it to access encrypted data
+   */
+  clearEncryptionPassphrase(): void {
+    clearPassphraseFromSession()
+    console.log('[S3StoragePlugin] 🔑 Encryption passphrase cleared')
+  }
+  
+  /**
+   * Get the passphrase from session, or emit event if not available
+   * @returns The passphrase or null if not available
+   */
+  private getPassphraseOrPrompt(): string | null {
+    const passphrase = getPassphraseFromSession()
+    if (!passphrase && isEncryptionEnabled()) {
+      this.emit('passphraseRequired', {})
+    }
+    return passphrase
+  }
+  
   /**
    * Run a single autosave backup
    */
@@ -356,6 +459,7 @@ export class S3StoragePlugin extends Plugin {
   /**
    * Create a backup with a specific filename
    * This is a helper used by both backupWorkspace and autosave
+   * If encryption is enabled and passphrase is available, encrypts the backup
    */
   private async createBackup(filename: string, folder: string): Promise<string> {
     const provider = this.ensureProvider()
@@ -397,15 +501,35 @@ export class S3StoragePlugin extends Plugin {
     zip.file('_backup_metadata.json', JSON.stringify(zipMetadata, null, 2))
     
     // Generate compressed zip
-    const zipContent = await zip.generateAsync({
+    let zipContent = await zip.generateAsync({
       type: 'uint8array',
       compression: 'DEFLATE',
       compressionOptions: { level: 6 }
     })
     
+    // Check if encryption is enabled
+    let finalFilename = filename
+    let contentType = 'application/zip'
+    
+    if (isEncryptionEnabled()) {
+      const passphrase = this.getPassphraseOrPrompt()
+      if (passphrase) {
+        console.log('[S3StoragePlugin] 🔐 Encrypting backup...')
+        zipContent = await encryptToBytes(zipContent, passphrase)
+        // Add .enc suffix to indicate encrypted
+        finalFilename = filename.replace('.zip', '.zip.enc')
+        contentType = 'application/octet-stream'
+        console.log('[S3StoragePlugin] ✅ Backup encrypted')
+      } else {
+        // Encryption enabled but no passphrase - emit event and skip upload
+        console.warn('[S3StoragePlugin] ⚠️ Encryption enabled but no passphrase available')
+        throw new Error('Encryption is enabled but no passphrase is set. Please enter your passphrase.')
+      }
+    }
+    
     // Upload to S3
-    const fullPath = joinPath(folder, filename)
-    const key = await provider.upload(fullPath, zipContent, 'application/zip')
+    const fullPath = joinPath(folder, finalFilename)
+    const key = await provider.upload(fullPath, zipContent, contentType)
     
     return key
   }
@@ -1328,8 +1452,6 @@ export class S3StoragePlugin extends Plugin {
    * console.log('Backup saved to:', backupKey)
    */
   async backupWorkspace(): Promise<string> {
-    const provider = this.ensureProvider()
-    
     // Check if user is authenticated
     const user = await this.call('auth', 'getUser')
     if (!user) {
@@ -1356,74 +1478,29 @@ export class S3StoragePlugin extends Plugin {
     
     console.log(`[S3StoragePlugin] 📦 Starting workspace backup for: ${workspaceRemoteId}`)
     
-    // Collect all files
-    const files = await this.collectWorkspaceFiles()
-    
-    console.log(`[S3StoragePlugin] Found ${files.length} files to backup`)
-    
-    if (files.length === 0) {
-      throw new Error('No files found in workspace to backup')
-    }
-    
-    // Create zip file
-    const zip = new JSZip()
-    
-    // Add metadata
-    const metadata = {
-      workspaceRemoteId,
-      createdAt: new Date().toISOString(),
-      fileCount: files.length,
-      version: '1.0'
-    }
-    zip.file('_backup_metadata.json', JSON.stringify(metadata, null, 2))
-    
-    // Add all files to zip
-    for (const file of files) {
-      // Remove leading slash for zip paths
-      const zipPath = file.path.replace(/^\//, '')
-      zip.file(zipPath, file.content)
-    }
-    
-    // Generate compressed blob
-    console.log('[S3StoragePlugin] Compressing workspace...')
-    const blob = await zip.generateAsync({ 
-      type: 'blob',
-      compression: 'DEFLATE',
-      compressionOptions: { level: 6 }
-    })
-    
-    console.log(`[S3StoragePlugin] Compressed size: ${(blob.size / 1024).toFixed(2)} KB`)
-    
-    // Convert blob to Uint8Array for upload
-    const arrayBuffer = await blob.arrayBuffer()
-    const content = new Uint8Array(arrayBuffer)
-    
-    // Upload to S3 with workspace name in filename
+    // Use the createBackup helper which handles encryption
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const backupFilename = `${sanitizedName}-${timestamp}.zip`
-    const backupPath = `${workspaceRemoteId}/backups/${backupFilename}`
+    const folder = `${workspaceRemoteId}/backups`
     
-    console.log(`[S3StoragePlugin] 🚀 Uploading backup: ${backupPath}`)
-    
-    const key = await this.upload(backupFilename, content, { 
-      folder: `${workspaceRemoteId}/backups`,
-      contentType: 'application/zip'
-    })
+    const key = await this.createBackup(backupFilename, folder)
     
     console.log(`[S3StoragePlugin] ✅ Backup complete: ${key}`)
     
     // Update the last backup time in config
     await this.updateLastBackupTime()
     
+    // Get file count for notification
+    const files = await this.collectWorkspaceFiles()
+    
     this.emit('backupCompleted', { 
       key, 
       fileCount: files.length, 
-      size: blob.size,
       workspaceRemoteId 
     })
     
-    await this.call('notification', 'toast', `☁️ Workspace backed up (${files.length} files, ${(blob.size / 1024).toFixed(1)} KB)`)
+    await this.call('notification', 'toast', `☁️ Workspace backed up (${files.length} files)`)
     
     return key
   }
@@ -1486,9 +1563,24 @@ export class S3StoragePlugin extends Plugin {
     console.log(`[S3StoragePlugin] 📥 Downloading backup: ${backupFolder}/${backupFilename}`)
     
     // Download the backup using folder and filename
-    const content = await this.downloadBinary(backupFilename, backupFolder)
+    let content = await this.downloadBinary(backupFilename, backupFolder)
     
     console.log(`[S3StoragePlugin] Downloaded ${(content.length / 1024).toFixed(2)} KB`)
+    
+    // Check if the file is encrypted (ends with .enc)
+    if (backupFilename.endsWith('.enc')) {
+      console.log('[S3StoragePlugin] 🔐 Backup is encrypted, decrypting...')
+      const passphrase = this.getPassphraseOrPrompt()
+      if (!passphrase) {
+        throw new Error('This backup is encrypted. Please enter your encryption passphrase.')
+      }
+      try {
+        content = await decryptFromBytes(content, passphrase)
+        console.log('[S3StoragePlugin] ✅ Backup decrypted')
+      } catch (e) {
+        throw new Error('Failed to decrypt backup. Wrong passphrase or corrupted data.')
+      }
+    }
     
     // Unzip
     const zip = await JSZip.loadAsync(content)
@@ -1564,9 +1656,24 @@ export class S3StoragePlugin extends Plugin {
     console.log(`[S3StoragePlugin] 📥 Downloading backup for new workspace: ${backupPath}`)
     
     // Download the backup using folder and filename
-    const content = await this.downloadBinary(backupFilename, backupFolder)
+    let content = await this.downloadBinary(backupFilename, backupFolder)
     
     console.log(`[S3StoragePlugin] Downloaded ${(content.length / 1024).toFixed(2)} KB`)
+    
+    // Check if the file is encrypted (ends with .enc)
+    if (backupFilename.endsWith('.enc')) {
+      console.log('[S3StoragePlugin] 🔐 Backup is encrypted, decrypting...')
+      const passphrase = this.getPassphraseOrPrompt()
+      if (!passphrase) {
+        throw new Error('This backup is encrypted. Please enter your encryption passphrase.')
+      }
+      try {
+        content = await decryptFromBytes(content, passphrase)
+        console.log('[S3StoragePlugin] ✅ Backup decrypted')
+      } catch (e) {
+        throw new Error('Failed to decrypt backup. Wrong passphrase or corrupted data.')
+      }
+    }
     
     // Unzip to get metadata for workspace name
     const zip = await JSZip.loadAsync(content)

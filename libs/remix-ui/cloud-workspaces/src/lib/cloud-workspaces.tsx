@@ -29,6 +29,11 @@ export interface CloudWorkspacesProps {
   onEnableCloud: () => Promise<void>
   onToggleAutosave: (enabled: boolean) => Promise<void>
   onUpdateRemoteId: (workspaceName: string, remoteId: string) => Promise<void>
+  // Encryption handlers
+  onToggleEncryption: (enabled: boolean) => Promise<void>
+  onSetEncryptionPassphrase: (passphrase: string) => Promise<boolean>
+  onGeneratePassphrase: () => Promise<string>
+  onClearPassphrase: () => Promise<void>
 }
 
 export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
@@ -53,7 +58,11 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
   onLinkToCurrentUser,
   onEnableCloud,
   onToggleAutosave,
-  onUpdateRemoteId
+  onUpdateRemoteId,
+  onToggleEncryption,
+  onSetEncryptionPassphrase,
+  onGeneratePassphrase,
+  onClearPassphrase
 }) => {
   // Create context value from props
   const contextValue: CloudWorkspacesContextValue = {
@@ -68,7 +77,11 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
     enableCloud: onEnableCloud,
     toggleAutosave: onToggleAutosave,
     setWorkspaceRemoteId: onUpdateRemoteId,
-    refresh: async () => { onRefresh() }
+    refresh: async () => { onRefresh() },
+    toggleEncryption: onToggleEncryption,
+    setEncryptionPassphrase: onSetEncryptionPassphrase,
+    generateNewPassphrase: onGeneratePassphrase,
+    clearEncryptionPassphrase: onClearPassphrase
   }
 
   if (!isAuthenticated) {

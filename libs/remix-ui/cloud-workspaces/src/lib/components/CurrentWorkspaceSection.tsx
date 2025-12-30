@@ -20,13 +20,24 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     linkToCurrentUser,
     enableCloud,
     toggleAutosave,
-    setWorkspaceRemoteId
+    setWorkspaceRemoteId,
+    toggleEncryption,
+    setEncryptionPassphrase,
+    generateNewPassphrase,
+    clearEncryptionPassphrase
   } = useCloudWorkspaces()
   
   const [isEditingName, setIsEditingName] = useState(false)
   const [editedName, setEditedName] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
   const [, setTick] = useState(0) // Force re-render for time updates
+  
+  // Encryption modal state
+  const [showPassphraseModal, setShowPassphraseModal] = useState(false)
+  const [passphraseInput, setPassphraseInput] = useState('')
+  const [generatedPassphrase, setGeneratedPassphrase] = useState('')
+  const [passphraseError, setPassphraseError] = useState<string | null>(null)
+  const [isCopied, setIsCopied] = useState(false)
 
   // Update relative times every 30 seconds
   useEffect(() => {
@@ -139,6 +150,91 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     } catch (e) {
       setLocalError(e.message || 'Failed to rename')
     }
+  }
+
+  // ==================== Encryption Handlers ====================
+  
+  const handleOpenPassphraseModal = async () => {
+    setPassphraseInput('')
+    setGeneratedPassphrase('')
+    setPassphraseError(null)
+    setIsCopied(false)
+    setShowPassphraseModal(true)
+  }
+
+  const handleGeneratePassphrase = async () => {
+    try {
+      const newPassphrase = await generateNewPassphrase()
+      setGeneratedPassphrase(newPassphrase)
+      setPassphraseInput(newPassphrase)
+      setIsCopied(false)
+    } catch (e) {
+      setPassphraseError(e.message || 'Failed to generate passphrase')
+    }
+  }
+
+  const handleSavePassphrase = async () => {
+    const passphrase = passphraseInput.trim()
+    if (passphrase.length < 8) {
+      setPassphraseError(intl.formatMessage({ 
+        id: 'cloudWorkspaces.passphraseTooShort', 
+        defaultMessage: 'Passphrase must be at least 8 characters' 
+      }))
+      return
+    }
+    
+    setPassphraseError(null)
+    try {
+      const success = await setEncryptionPassphrase(passphrase)
+      if (success) {
+        setShowPassphraseModal(false)
+        await plugin.call('notification', 'toast', '🔐 Encryption passphrase set')
+      }
+    } catch (e) {
+      setPassphraseError(e.message || 'Failed to set passphrase')
+    }
+  }
+
+  const handleCopyPassphrase = async () => {
+    try {
+      await navigator.clipboard.writeText(passphraseInput)
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
+    } catch (e) {
+      console.error('Failed to copy:', e)
+    }
+  }
+
+  const handleToggleEncryption = async (enabled: boolean) => {
+    if (enabled && !status.hasEncryptionPassphrase) {
+      // If enabling and no passphrase set, open modal first
+      handleOpenPassphraseModal()
+      return
+    }
+    
+    if (!enabled) {
+      // Show warning before disabling
+      const disableModal = {
+        id: 'disableEncryptionModal',
+        title: intl.formatMessage({ id: 'cloudWorkspaces.disableEncryption', defaultMessage: 'Disable Encryption' }),
+        message: intl.formatMessage({ 
+          id: 'cloudWorkspaces.disableEncryptionWarning', 
+          defaultMessage: 'Disabling encryption will mean future backups are stored unencrypted. Existing encrypted backups will still require your passphrase to restore. Continue?' 
+        }),
+        modalType: 'modal',
+        okLabel: intl.formatMessage({ id: 'cloudWorkspaces.disable', defaultMessage: 'Disable' }),
+        cancelLabel: intl.formatMessage({ id: 'cloudWorkspaces.cancel', defaultMessage: 'Cancel' }),
+        okFn: async () => {
+          await toggleEncryption(false)
+        },
+        cancelFn: () => null,
+        hideFn: () => null
+      }
+      await plugin.call('notification', 'modal', disableModal)
+      return
+    }
+    
+    await toggleEncryption(enabled)
   }
 
   const formatRelativeTime = (dateStr: string | null): string => {
@@ -416,7 +512,166 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
             />
           </div>
         )}
+
+        {/* Encryption toggle - only show when linked */}
+        {status.remoteId && status.ownedByCurrentUser && (
+          <div className="mt-2 d-flex align-items-center justify-content-between px-1">
+            <span 
+              className="small text-muted mb-0 d-flex align-items-center"
+              style={{ fontSize: '0.75rem' }}
+            >
+              <i className={`fas ${status.encryptionEnabled ? 'fa-lock text-warning' : 'fa-lock-open text-muted'} me-1`}></i>
+              <FormattedMessage id="cloudWorkspaces.encryption" defaultMessage="Encrypt" />
+              {status.encryptionEnabled && !status.hasEncryptionPassphrase && (
+                <CustomTooltip
+                  placement="top"
+                  tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.passphraseRequired', defaultMessage: 'Passphrase required' })}
+                >
+                  <i className="fas fa-exclamation-circle text-warning ms-1" style={{ fontSize: '0.65rem' }}></i>
+                </CustomTooltip>
+              )}
+            </span>
+            <div className="d-flex align-items-center gap-1">
+              {status.encryptionEnabled && (
+                <CustomTooltip
+                  placement="top"
+                  tooltipText={intl.formatMessage({ 
+                    id: 'cloudWorkspaces.setPassphraseTip', 
+                    defaultMessage: status.hasEncryptionPassphrase ? 'Change passphrase' : 'Set passphrase' 
+                  })}
+                >
+                  <button
+                    className={`btn btn-sm p-0 ${status.hasEncryptionPassphrase ? 'text-muted' : 'text-warning'}`}
+                    onClick={handleOpenPassphraseModal}
+                    style={{ border: 'none', background: 'none', fontSize: '0.7rem' }}
+                  >
+                    <i className="fas fa-key"></i>
+                  </button>
+                </CustomTooltip>
+              )}
+              <ToggleSwitch
+                id="cloud-encryption-toggle"
+                isOn={status.encryptionEnabled}
+                onClick={() => handleToggleEncryption(!status.encryptionEnabled)}
+                onstyle="text-warning"
+                offstyle="text-secondary"
+                size="md"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Encryption warning */}
+        {status.remoteId && status.ownedByCurrentUser && status.encryptionEnabled && !status.hasEncryptionPassphrase && (
+          <div className="alert alert-warning py-1 px-2 mt-2 small" style={{ fontSize: '0.7rem' }}>
+            <i className="fas fa-key me-1"></i>
+            <FormattedMessage 
+              id="cloudWorkspaces.setPassphraseWarning" 
+              defaultMessage="Set a passphrase to enable encrypted backups" 
+            />
+            <button
+              className="btn btn-sm btn-link p-0 ms-1"
+              onClick={handleOpenPassphraseModal}
+              style={{ fontSize: '0.7rem' }}
+            >
+              <FormattedMessage id="cloudWorkspaces.setPassphrase" defaultMessage="Set Passphrase" />
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Passphrase Modal */}
+      {showPassphraseModal && (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setShowPassphraseModal(false)}>
+          <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content">
+              <div className="modal-header py-2">
+                <h6 className="modal-title">
+                  <i className="fas fa-key me-2"></i>
+                  <FormattedMessage id="cloudWorkspaces.encryptionPassphrase" defaultMessage="Encryption Passphrase" />
+                </h6>
+                <button type="button" className="btn-close" onClick={() => setShowPassphraseModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                {/* Warning */}
+                <div className="alert alert-danger py-2 mb-3" style={{ fontSize: '0.8rem' }}>
+                  <i className="fas fa-exclamation-triangle me-1"></i>
+                  <strong><FormattedMessage id="cloudWorkspaces.warning" defaultMessage="Warning" />:</strong>{' '}
+                  <FormattedMessage 
+                    id="cloudWorkspaces.passphraseWarning" 
+                    defaultMessage="If you lose this passphrase, your encrypted data cannot be recovered. Save it securely!" 
+                  />
+                </div>
+
+                {/* Generate button */}
+                <div className="mb-3">
+                  <button 
+                    className="btn btn-outline-primary btn-sm w-100"
+                    onClick={handleGeneratePassphrase}
+                  >
+                    <i className="fas fa-random me-1"></i>
+                    <FormattedMessage id="cloudWorkspaces.generateSecurePassphrase" defaultMessage="Generate Secure Passphrase" />
+                  </button>
+                </div>
+
+                {/* Generated passphrase display */}
+                {generatedPassphrase && (
+                  <div className="mb-3 p-2 bg-light rounded border">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <code className="text-break" style={{ fontSize: '0.85rem' }}>{generatedPassphrase}</code>
+                      <button 
+                        className="btn btn-sm btn-outline-secondary ms-2"
+                        onClick={handleCopyPassphrase}
+                      >
+                        <i className={`fas ${isCopied ? 'fa-check text-success' : 'fa-copy'}`}></i>
+                      </button>
+                    </div>
+                    <small className="text-muted d-block mt-1">
+                      <FormattedMessage id="cloudWorkspaces.copyAndSave" defaultMessage="Copy and save this passphrase securely" />
+                    </small>
+                  </div>
+                )}
+
+                {/* Manual entry */}
+                <div className="mb-3">
+                  <label className="form-label small text-muted">
+                    <FormattedMessage id="cloudWorkspaces.orEnterOwn" defaultMessage="Or enter your own passphrase (min 8 characters):" />
+                  </label>
+                  <input
+                    type="password"
+                    className="form-control form-control-sm"
+                    value={passphraseInput}
+                    onChange={(e) => setPassphraseInput(e.target.value)}
+                    placeholder={intl.formatMessage({ id: 'cloudWorkspaces.enterPassphrase', defaultMessage: 'Enter passphrase...' })}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSavePassphrase()}
+                  />
+                </div>
+
+                {/* Error display */}
+                {passphraseError && (
+                  <div className="alert alert-danger py-1 px-2 small">
+                    <i className="fas fa-exclamation-triangle me-1"></i>
+                    {passphraseError}
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer py-2">
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowPassphraseModal(false)}>
+                  <FormattedMessage id="cloudWorkspaces.cancel" defaultMessage="Cancel" />
+                </button>
+                <button 
+                  className="btn btn-primary btn-sm"
+                  onClick={handleSavePassphrase}
+                  disabled={passphraseInput.length < 8}
+                >
+                  <i className="fas fa-check me-1"></i>
+                  <FormattedMessage id="cloudWorkspaces.savePassphrase" defaultMessage="Save Passphrase" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

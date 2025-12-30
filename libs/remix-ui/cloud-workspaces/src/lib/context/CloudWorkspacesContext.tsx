@@ -16,6 +16,9 @@ export interface CurrentWorkspaceCloudStatus {
   ownedByCurrentUser: boolean
   linkedToAnotherUser: boolean
   canSave: boolean
+  // Encryption state
+  encryptionEnabled: boolean
+  hasEncryptionPassphrase: boolean
 }
 
 /**
@@ -40,6 +43,11 @@ export interface CloudWorkspacesContextActions {
   toggleAutosave: (enabled: boolean) => Promise<void>
   setWorkspaceRemoteId: (workspaceName: string, remoteId: string) => Promise<void>
   refresh: () => Promise<void>
+  // Encryption actions
+  toggleEncryption: (enabled: boolean) => Promise<void>
+  setEncryptionPassphrase: (passphrase: string) => Promise<boolean>
+  generateNewPassphrase: () => Promise<string>
+  clearEncryptionPassphrase: () => Promise<void>
 }
 
 export type CloudWorkspacesContextValue = CloudWorkspacesContextState & CloudWorkspacesContextActions
@@ -56,7 +64,9 @@ const defaultStatus: CurrentWorkspaceCloudStatus = {
   isLinking: false,
   ownedByCurrentUser: true,
   linkedToAnotherUser: false,
-  canSave: true
+  canSave: true,
+  encryptionEnabled: false,
+  hasEncryptionPassphrase: false
 }
 
 const defaultContext: CloudWorkspacesContextValue = {
@@ -71,7 +81,11 @@ const defaultContext: CloudWorkspacesContextValue = {
   enableCloud: async () => {},
   toggleAutosave: async () => {},
   setWorkspaceRemoteId: async () => {},
-  refresh: async () => {}
+  refresh: async () => {},
+  toggleEncryption: async () => {},
+  setEncryptionPassphrase: async () => false,
+  generateNewPassphrase: async () => '',
+  clearEncryptionPassphrase: async () => {}
 }
 
 export const CloudWorkspacesContext = createContext<CloudWorkspacesContextValue>(defaultContext)

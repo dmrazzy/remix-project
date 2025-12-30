@@ -8,28 +8,32 @@ import { BackupItemProps, formatSize, formatDate } from '../types'
  * Filename formats:
  * - New: "myproject-2025-12-27T18-11-29.zip" or "myproject-autosave.zip"
  * - Old: "backup-2025-12-27T18-11-29-248Z.zip" or "2025-12-27T18-11-29-248Z.zip"
+ * - Encrypted: any of the above with .enc suffix (e.g., "myproject-2025-12-27T18-11-29.zip.enc")
  */
-const parseBackupFilename = (filename: string): { workspaceName: string; isAutosave: boolean } => {
-  // Remove .zip extension
-  const name = filename.replace(/\.zip$/i, '')
+const parseBackupFilename = (filename: string): { workspaceName: string; isAutosave: boolean; isEncrypted: boolean } => {
+  // Check if encrypted (ends with .enc)
+  const isEncrypted = filename.endsWith('.enc')
+  
+  // Remove .zip.enc or .zip extension
+  const name = filename.replace(/\.zip(\.enc)?$/i, '')
   
   // Check if it's an autosave
   const isAutosave = name.endsWith('-autosave') || name === 'autosave-backup'
   
   // Old format: starts with "backup-" followed by timestamp
   if (name.startsWith('backup-') || /^\d{4}-\d{2}-\d{2}T/.test(name)) {
-    return { workspaceName: 'unknown', isAutosave }
+    return { workspaceName: 'unknown', isAutosave, isEncrypted }
   }
   
   // New format: "workspacename-timestamp" or "workspacename-autosave"
   // Find the last occurrence of a timestamp pattern or "-autosave"
   const timestampMatch = name.match(/^(.+?)-(?:\d{4}-\d{2}-\d{2}T|autosave$)/)
   if (timestampMatch) {
-    return { workspaceName: timestampMatch[1], isAutosave }
+    return { workspaceName: timestampMatch[1], isAutosave, isEncrypted }
   }
   
   // Couldn't parse, return the whole name
-  return { workspaceName: name, isAutosave }
+  return { workspaceName: name, isAutosave, isEncrypted }
 }
 
 export const BackupItem: React.FC<BackupItemProps> = ({
@@ -39,15 +43,23 @@ export const BackupItem: React.FC<BackupItemProps> = ({
   onDownload
 }) => {
   const intl = useIntl()
-  const { workspaceName } = parseBackupFilename(backup.filename)
+  const { workspaceName, isEncrypted } = parseBackupFilename(backup.filename)
   const backupDate = formatDate(backup.lastModified)
 
   return (
     <div className="d-flex align-items-center py-1 px-2 border-bottom">
       <i className="fas fa-archive me-1 text-muted" style={{ fontSize: '0.75rem' }}></i>
+      {isEncrypted && (
+        <CustomTooltip
+          placement="top"
+          tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.encryptedBackup', defaultMessage: 'Encrypted backup' })}
+        >
+          <i className="fas fa-lock me-1 text-warning" style={{ fontSize: '0.65rem' }}></i>
+        </CustomTooltip>
+      )}
       <CustomTooltip
         placement="top"
-        tooltipText={`${workspaceName} • ${backupDate}`}
+        tooltipText={`${workspaceName} • ${backupDate}${isEncrypted ? ' 🔐' : ''}`}
       >
         <div className="flex-grow-1 text-truncate" style={{ minWidth: 0, cursor: 'default' }}>
           <span className="small">

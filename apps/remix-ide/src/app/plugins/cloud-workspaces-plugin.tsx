@@ -53,6 +53,9 @@ export interface CurrentWorkspaceCloudStatus {
   linkedToAnotherUser: boolean
   canSave: boolean
   hasConflict: boolean
+  // Encryption state
+  encryptionEnabled: boolean
+  hasEncryptionPassphrase: boolean
 }
 
 const defaultWorkspaceStatus: CurrentWorkspaceCloudStatus = {
@@ -68,7 +71,9 @@ const defaultWorkspaceStatus: CurrentWorkspaceCloudStatus = {
   ownedByCurrentUser: true,
   linkedToAnotherUser: false,
   canSave: true,
-  hasConflict: false
+  hasConflict: false,
+  encryptionEnabled: false,
+  hasEncryptionPassphrase: false
 }
 
 // Per-workspace backup data structure
@@ -413,6 +418,10 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       const autosaveEnabled = await this.call('s3Storage', 'isAutosaveEnabled')
       const ownership = await this.call('s3Storage', 'getWorkspaceOwnership')
       
+      // Get encryption status
+      const encryptionEnabled = await this.call('s3Storage', 'isEncryptionEnabled')
+      const hasEncryptionPassphrase = await this.call('s3Storage', 'hasEncryptionPassphrase')
+      
       console.log('[CloudWorkspaces] Ownership result:', ownership)
 
       this.state.currentWorkspaceStatus = {
@@ -430,7 +439,10 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         isRestoring: false,
         isLinking: false,
         // Preserve conflict flag - only cleared by explicit resolution
-        hasConflict: this.state.currentWorkspaceStatus.hasConflict
+        hasConflict: this.state.currentWorkspaceStatus.hasConflict,
+        // Encryption state
+        encryptionEnabled,
+        hasEncryptionPassphrase
       }
       
       console.log('[CloudWorkspaces] Current workspace status loaded:', this.state.currentWorkspaceStatus)
@@ -594,6 +606,68 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     }
   }
 
+  // ==================== Encryption Actions ====================
+
+  /**
+   * Toggle cloud encryption on/off
+   */
+  async toggleEncryption(enabled: boolean): Promise<void> {
+    try {
+      if (enabled) {
+        await this.call('s3Storage', 'enableEncryption')
+      } else {
+        await this.call('s3Storage', 'disableEncryption')
+      }
+      await this.loadCurrentWorkspaceStatus()
+    } catch (e) {
+      this.state.error = e.message || 'Failed to toggle encryption'
+      this.renderComponent()
+    }
+  }
+
+  /**
+   * Set the encryption passphrase
+   * @returns true if passphrase was set successfully
+   */
+  async setEncryptionPassphrase(passphrase: string): Promise<boolean> {
+    try {
+      await this.call('s3Storage', 'setEncryptionPassphrase', passphrase)
+      await this.loadCurrentWorkspaceStatus()
+      return true
+    } catch (e) {
+      this.state.error = e.message || 'Failed to set passphrase'
+      this.renderComponent()
+      return false
+    }
+  }
+
+  /**
+   * Generate a new random passphrase
+   * @returns the generated passphrase
+   */
+  async generateNewPassphrase(): Promise<string> {
+    try {
+      return await this.call('s3Storage', 'generateEncryptionPassphrase')
+    } catch (e) {
+      this.state.error = e.message || 'Failed to generate passphrase'
+      this.renderComponent()
+      return ''
+    }
+  }
+
+  /**
+   * Clear the stored encryption passphrase
+   */
+  async clearEncryptionPassphrase(): Promise<void> {
+    try {
+      await this.call('s3Storage', 'clearEncryptionPassphrase')
+      await this.loadCurrentWorkspaceStatus()
+    } catch (e) {
+      this.state.error = e.message || 'Failed to clear passphrase'
+      this.renderComponent()
+    }
+  }
+
   /**
    * Update workspace remote ID (rename in cloud)
    */
@@ -706,7 +780,18 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       
       const backups = backupsResult.files || []
       const autosaveFiles = autosaveResult.files || []
-      const autosave = autosaveFiles.length > 0 ? autosaveFiles[0] : null
+      
+      // Find the latest autosave (could be .zip or .zip.enc)
+      // Sort by lastModified descending and take the first one
+      let autosave = null
+      if (autosaveFiles.length > 0) {
+        const sortedAutosaves = [...autosaveFiles].sort((a, b) => {
+          const dateA = new Date(a.lastModified).getTime()
+          const dateB = new Date(b.lastModified).getTime()
+          return dateB - dateA // Descending order (latest first)
+        })
+        autosave = sortedAutosaves[0]
+      }
       
       // Update this workspace's backup data
       this.state.workspaceBackups[workspaceId] = {
@@ -898,6 +983,10 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         onEnableCloud={() => this.enableCloud()}
         onToggleAutosave={(enabled) => this.toggleAutosave(enabled)}
         onUpdateRemoteId={(workspaceName, remoteId) => this.updateWorkspaceRemoteId(workspaceName, remoteId)}
+        onToggleEncryption={(enabled) => this.toggleEncryption(enabled)}
+        onSetEncryptionPassphrase={(passphrase) => this.setEncryptionPassphrase(passphrase)}
+        onGeneratePassphrase={() => this.generateNewPassphrase()}
+        onClearPassphrase={() => this.clearEncryptionPassphrase()}
       />
     )
   }
