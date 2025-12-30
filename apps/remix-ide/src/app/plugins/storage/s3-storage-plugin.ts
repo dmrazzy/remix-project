@@ -38,14 +38,51 @@ import {
 import JSZip from 'jszip'
 
 const REMIX_CONFIG_FILE = 'remix.config.json'
+const LOCK_FILE_NAME = 'session.lock'
+const LOCK_EXPIRY_MS = 2 * 60 * 1000 // 2 minutes - lock expires if not refreshed
 
 /**
- * Normalize an ETag by stripping surrounding quotes.
- * S3 returns ETags with quotes like "abc123" - this removes them for consistent comparison.
+ * Generate a unique session ID for this browser tab
  */
-function normalizeEtag(etag: string | null | undefined): string | null {
-  if (!etag) return null
-  return etag.replace(/^"|"$/g, '')
+function generateSessionId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+}
+
+/**
+ * Get browser/platform info for lock file metadata
+ */
+function getBrowserInfo(): { browser: string; platform: string } {
+  const ua = navigator.userAgent
+  let browser = 'Unknown'
+  
+  if (ua.includes('Firefox')) browser = 'Firefox'
+  else if (ua.includes('Edg')) browser = 'Edge'
+  else if (ua.includes('Chrome')) browser = 'Chrome'
+  else if (ua.includes('Safari')) browser = 'Safari'
+  
+  const platform = navigator.platform || 'Unknown'
+  
+  return { browser, platform }
+}
+
+/**
+ * Lock file structure stored in S3
+ */
+interface LockFile {
+  sessionId: string
+  lockedAt: string  // ISO timestamp (UTC)
+  browser: string
+  platform: string
+}
+
+/**
+ * Lock check result
+ */
+interface LockCheckResult {
+  isLocked: boolean
+  ownedByUs: boolean
+  lockInfo: LockFile | null
+  expired: boolean
 }
 
 // Folders/patterns to exclude from workspace backup
@@ -117,8 +154,14 @@ export class S3StoragePlugin extends Plugin {
   private storageApi: StorageApiService | null = null
   private config: StorageConfig | null = null
   
+  // Session ID for lock-based conflict detection
+  // Unique per browser tab, regenerated on refresh/reload
+  private readonly sessionId: string = generateSessionId()
+  private readonly browserInfo = getBrowserInfo()
+  
   constructor() {
     super(profile)
+    console.log('[S3StoragePlugin] Session ID:', this.sessionId)
   }
   
   async onActivation(): Promise<void> {
@@ -212,13 +255,23 @@ export class S3StoragePlugin extends Plugin {
   }
   
   /**
-   * Stop the autosave interval
+   * Stop the autosave interval and release the lock
    */
-  stopAutosave(): void {
+  async stopAutosave(): Promise<void> {
     if (this.autosaveIntervalId) {
       clearInterval(this.autosaveIntervalId)
       this.autosaveIntervalId = null
       console.log('[S3StoragePlugin] ⏹️ Autosave stopped')
+      
+      // Release lock when autosave is disabled
+      try {
+        const workspaceRemoteId = await this.getWorkspaceRemoteId()
+        if (workspaceRemoteId) {
+          await this.releaseLock(workspaceRemoteId)
+        }
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not release lock on stop:', e)
+      }
     }
   }
   
@@ -240,12 +293,13 @@ export class S3StoragePlugin extends Plugin {
         return
       }
       
-      // Check for conflicts before autosave
-      const conflictInfo = await this.checkForConflict()
-      if (conflictInfo.hasConflict) {
-        console.warn('[S3StoragePlugin] ⚠️ Conflict detected during autosave, skipping this cycle')
+      // Check for lock conflicts before autosave
+      const lockCheck = await this.checkLock(workspaceRemoteId)
+      if (lockCheck.isLocked && !lockCheck.ownedByUs && !lockCheck.expired) {
+        console.warn('[S3StoragePlugin] ⚠️ Workspace is locked by another session')
         this.emit('conflictDetected', {
-          ...conflictInfo,
+          hasConflict: true,
+          lockInfo: lockCheck.lockInfo,
           source: 'autosave'
         })
         return
@@ -263,19 +317,19 @@ export class S3StoragePlugin extends Plugin {
       console.log('[S3StoragePlugin] 💾 Running autosave backup...')
       this.emit('autosaveStarted', { workspaceRemoteId })
       
+      // Acquire/refresh the lock
+      await this.acquireLock(workspaceRemoteId)
+      
       // Create backup with workspace name in filename (overwrites previous autosave)
       const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
-      const { key: backupKey, etag } = await this.createBackup(
+      const backupKey = await this.createBackup(
         `${sanitizedName}-autosave.zip`,
         `${workspaceRemoteId}/autosave`
       )
       
-      // Update last save time and etag for conflict detection
+      // Update last save time
       await this.updateLastSaveTime()
-      if (etag) {
-        await this.updateLastKnownEtag(etag)
-      }
-      this.emit('saveCompleted', { workspaceRemoteId, etag })
+      this.emit('saveCompleted', { workspaceRemoteId })
       
       console.log(`[S3StoragePlugin] ✅ Autosave completed: ${backupKey}`)
       
@@ -289,7 +343,7 @@ export class S3StoragePlugin extends Plugin {
    * Create a backup with a specific filename
    * This is a helper used by both backupWorkspace and autosave
    */
-  private async createBackup(filename: string, folder: string): Promise<{ key: string; etag: string | null }> {
+  private async createBackup(filename: string, folder: string): Promise<string> {
     const provider = this.ensureProvider()
     
     // Get current workspace name for metadata
@@ -335,36 +389,11 @@ export class S3StoragePlugin extends Plugin {
       compressionOptions: { level: 6 }
     })
     
-    // Upload to S3 with etag tracking for conflict detection
+    // Upload to S3
     const fullPath = joinPath(folder, filename)
+    const key = await provider.upload(fullPath, zipContent, 'application/zip')
     
-    // Upload the file
-    let key: string
-    let etag: string | null = null
-    
-    // Try uploadWithEtag first (gets etag from S3 response header if CORS allows)
-    if (provider.uploadWithEtag) {
-      const result = await provider.uploadWithEtag(fullPath, zipContent, 'application/zip')
-      key = result.key
-      etag = result.etag
-    } else {
-      key = await provider.upload(fullPath, zipContent, 'application/zip')
-    }
-    
-    // If etag is null (CORS doesn't expose it), fetch it via list API
-    if (!etag) {
-      console.log('[S3StoragePlugin] ETag not in response, fetching via list API...')
-      try {
-        const listResult = await this.list({ folder })
-        const uploadedFile = listResult.files.find(f => f.filename === filename)
-        etag = normalizeEtag(uploadedFile?.etag)
-        console.log('[S3StoragePlugin] Fetched ETag from list:', etag)
-      } catch (e) {
-        console.warn('[S3StoragePlugin] Could not fetch ETag from list:', e)
-      }
-    }
-    
-    return { key, etag }
+    return key
   }
   
   // ==================== Workspace Remote ID Management ====================
@@ -616,138 +645,109 @@ export class S3StoragePlugin extends Plugin {
     await this.saveRemixConfig(config)
   }
 
+  // ==================== Lock-based Conflict Detection ====================
+
   /**
-   * Update the last known etag after a successful save
+   * Acquire or refresh the lock for this workspace
+   * Updates the lock file with our session ID
    */
-  private async updateLastKnownEtag(etag: string): Promise<void> {
-    let config = await this.getRemixConfig()
-    if (!config || !config['remote-workspace']) return
+  private async acquireLock(workspaceRemoteId: string): Promise<void> {
+    const provider = this.ensureProvider()
     
-    config['remote-workspace'].lastKnownEtag = etag
-    await this.saveRemixConfig(config)
+    const lockData: LockFile = {
+      sessionId: this.sessionId,
+      lockedAt: new Date().toISOString(),
+      browser: this.browserInfo.browser,
+      platform: this.browserInfo.platform
+    }
+    
+    const lockPath = `${workspaceRemoteId}/${LOCK_FILE_NAME}`
+    await provider.upload(lockPath, JSON.stringify(lockData, null, 2), 'application/json')
+    console.log('[S3StoragePlugin] 🔒 Lock acquired/refreshed:', lockPath)
   }
 
   /**
-   * Get the last known etag from config
+   * Check if the workspace is locked by another session
+   * Uses S3's lastModified timestamp (server time) to avoid clock skew issues
    */
-  private async getLastKnownEtag(): Promise<string | null> {
-    const config = await this.getRemixConfig()
-    return config?.['remote-workspace']?.lastKnownEtag || null
-  }
-
-  /**
-   * Get the current remote etag for the autosave file
-   * Returns null if file doesn't exist
-   */
-  private async getRemoteAutosaveEtag(workspaceRemoteId: string, workspaceName: string): Promise<string | null> {
+  private async checkLock(workspaceRemoteId: string): Promise<LockCheckResult> {
     try {
-      const folder = `${workspaceRemoteId}/autosave`
-      const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
-      const filename = `${sanitizedName}-autosave.zip`
-      
+      const folder = workspaceRemoteId
       const result = await this.list({ folder })
-      const autosaveFile = result.files.find(f => f.filename === filename)
+      const lockFile = result.files.find(f => f.filename === LOCK_FILE_NAME)
       
-      return autosaveFile?.etag || null
+      if (!lockFile) {
+        // No lock file exists
+        return { isLocked: false, ownedByUs: false, lockInfo: null, expired: false }
+      }
+      
+      // Check if lock is expired using S3's lastModified (server time)
+      const lockTime = new Date(lockFile.lastModified || lockFile.uploadedAt).getTime()
+      const now = Date.now()
+      const expired = (now - lockTime) > LOCK_EXPIRY_MS
+      
+      // Download lock file to check session ID
+      const provider = this.ensureProvider()
+      const lockContent = await provider.download(`${workspaceRemoteId}/${LOCK_FILE_NAME}`)
+      const lockInfo: LockFile = JSON.parse(lockContent)
+      
+      const ownedByUs = lockInfo.sessionId === this.sessionId
+      
+      console.log('[S3StoragePlugin] 🔍 Lock check:', { 
+        ownedByUs, 
+        expired, 
+        lockSessionId: lockInfo.sessionId, 
+        ourSessionId: this.sessionId,
+        lockAge: Math.round((now - lockTime) / 1000) + 's'
+      })
+      
+      return { 
+        isLocked: true, 
+        ownedByUs, 
+        lockInfo, 
+        expired 
+      }
     } catch (e) {
-      console.warn('[S3StoragePlugin] Could not get remote autosave etag:', e)
-      return null
+      // Error reading lock - treat as no lock
+      console.log('[S3StoragePlugin] Could not read lock file, treating as unlocked:', e)
+      return { isLocked: false, ownedByUs: false, lockInfo: null, expired: false }
+    }
+  }
+
+  /**
+   * Release the lock for this workspace
+   * Called when autosave is disabled or on cleanup
+   */
+  private async releaseLock(workspaceRemoteId: string): Promise<void> {
+    try {
+      const provider = this.ensureProvider()
+      await provider.delete(`${workspaceRemoteId}/${LOCK_FILE_NAME}`)
+      console.log('[S3StoragePlugin] 🔓 Lock released')
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not release lock:', e)
     }
   }
 
   /**
    * Check if there's a conflict with the remote version
-   * Returns conflict info if remote was modified by another session
+   * Returns conflict info if workspace is locked by another session
    */
-  async checkForConflict(): Promise<{ hasConflict: boolean; localEtag: string | null; remoteEtag: string | null; remoteLastModified: string | null }> {
-    // TEMPORARILY DISABLED for testing - always return no conflict
-    console.log('[S3StoragePlugin] checkForConflict - DISABLED for testing, returning no conflict')
-    return { hasConflict: false, localEtag: null, remoteEtag: null, remoteLastModified: null }
-    
+  async checkForConflict(): Promise<{ hasConflict: boolean; lockInfo: LockFile | null }> {
     const workspaceRemoteId = await this.getWorkspaceRemoteId()
     if (!workspaceRemoteId) {
-      return { hasConflict: false, localEtag: null, remoteEtag: null, remoteLastModified: null }
+      return { hasConflict: false, lockInfo: null }
     }
 
-    let workspaceName = 'workspace'
-    try {
-      const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
-      workspaceName = currentWorkspace?.name || 'workspace'
-    } catch (e) {
-      console.warn('[S3StoragePlugin] Could not get workspace name:', e)
-    }
-
-    const localEtag = await this.getLastKnownEtag()
+    const lockCheck = await this.checkLock(workspaceRemoteId)
     
-    // Get remote file info
-    const folder = `${workspaceRemoteId}/autosave`
-    const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
-    const filename = `${sanitizedName}-autosave.zip`
-    
-    let remoteEtag: string | null = null
-    let remoteLastModified: string | null = null
-    
-    try {
-      const result = await this.list({ folder })
-      const autosaveFile = result.files.find(f => f.filename === filename)
-      remoteEtag = normalizeEtag(autosaveFile?.etag)
-      remoteLastModified = autosaveFile?.lastModified || null
-      console.log('[S3StoragePlugin] checkForConflict - Remote file found:', { 
-        filename, 
-        remoteEtag, 
-        remoteLastModified,
-        allFiles: result.files.map(f => ({ filename: f.filename, etag: f.etag }))
-      })
-    } catch (e) {
-      // File doesn't exist - no conflict
-      console.log('[S3StoragePlugin] checkForConflict - No remote file, no conflict')
-      return { hasConflict: false, localEtag, remoteEtag: null, remoteLastModified: null }
-    }
-
-    console.log('[S3StoragePlugin] checkForConflict - Comparing:', { localEtag, remoteEtag })
-
-    // No local etag means this is first save from this session - no conflict
-    if (!localEtag) {
-      console.log('[S3StoragePlugin] checkForConflict - No local etag, no conflict (first save)')
-      return { hasConflict: false, localEtag: null, remoteEtag, remoteLastModified }
-    }
-
-    // No remote file - no conflict
-    if (!remoteEtag) {
-      console.log('[S3StoragePlugin] checkForConflict - No remote etag, no conflict')
-      return { hasConflict: false, localEtag, remoteEtag: null, remoteLastModified: null }
-    }
-
-    // Compare ETags - if different, remote was modified elsewhere
-    let hasConflict = localEtag !== remoteEtag
-    console.log('[S3StoragePlugin] checkForConflict - ETags match:', localEtag === remoteEtag, 'hasConflict:', hasConflict)
-    
-    // Secondary check: Use timestamps to avoid false positives from S3 eventual consistency
-    // If remote file was modified BEFORE our last save, it's not a real conflict
-    // (the list API might be returning stale data)
-    if (hasConflict && remoteLastModified) {
-      const lastSaveAt = await this.getLastSaveTime()
-      console.log('[S3StoragePlugin] checkForConflict - Timestamp check:', { lastSaveAt, remoteLastModified })
-      if (lastSaveAt) {
-        const remoteTime = new Date(remoteLastModified).getTime()
-        const localSaveTime = new Date(lastSaveAt).getTime()
-        
-        console.log('[S3StoragePlugin] checkForConflict - Times:', { remoteTime, localSaveTime, diff: remoteTime - localSaveTime })
-        
-        // If remote was modified before our last save, it's likely stale data - not a conflict
-        // Add 5 second buffer for clock skew
-        if (remoteTime <= localSaveTime + 5000) {
-          console.log('[S3StoragePlugin] Ignoring stale conflict - remote modified before our last save')
-          hasConflict = false
-        }
-      }
-    }
+    // Conflict if locked by another session and not expired
+    const hasConflict = lockCheck.isLocked && !lockCheck.ownedByUs && !lockCheck.expired
     
     if (hasConflict) {
-      console.warn('[S3StoragePlugin] ⚠️ Conflict detected! Local etag:', localEtag, 'Remote etag:', remoteEtag)
+      console.warn('[S3StoragePlugin] ⚠️ Conflict detected! Workspace locked by:', lockCheck.lockInfo)
     }
 
-    return { hasConflict, localEtag, remoteEtag, remoteLastModified }
+    return { hasConflict, lockInfo: lockCheck.lockInfo }
   }
 
   /**
@@ -769,7 +769,7 @@ export class S3StoragePlugin extends Plugin {
       throw new Error('No workspace remote ID configured')
     }
     
-    // Check for conflicts before saving
+    // Check for lock conflicts before saving
     const conflictInfo = await this.checkForConflict()
     if (conflictInfo.hasConflict) {
       console.warn('[S3StoragePlugin] ⚠️ Conflict detected on manual save')
@@ -791,28 +791,27 @@ export class S3StoragePlugin extends Plugin {
 
     await this.call('notification', 'toast', '☁️ Saving to cloud...')
     
-    // Use the same createBackup logic but save to autosave slot
+    // Acquire lock and save
+    await this.acquireLock(workspaceRemoteId)
+    
     const folder = `${workspaceRemoteId}/autosave`
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const filename = `${sanitizedName}-autosave.zip`
     
-    const { etag } = await this.createBackup(filename, folder)
+    await this.createBackup(filename, folder)
     await this.updateLastSaveTime()
-    if (etag) {
-      await this.updateLastKnownEtag(etag)
-    }
     
-    console.log('[S3Storage] Emitting saveCompleted event', { workspaceRemoteId, etag })
-    this.emit('saveCompleted', { workspaceRemoteId, etag })
+    console.log('[S3Storage] Emitting saveCompleted event', { workspaceRemoteId })
+    this.emit('saveCompleted', { workspaceRemoteId })
     await this.call('notification', 'toast', '✅ Saved to cloud')
   }
   
   /**
    * Force save to cloud, bypassing conflict detection
-   * Used when user explicitly chooses to overwrite remote
+   * Used when user explicitly chooses to overwrite remote (takes over the lock)
    */
   async forceSaveToCloud(): Promise<void> {
-    console.log('[S3StoragePlugin] Force save to cloud (bypassing conflict check)')
+    console.log('[S3StoragePlugin] Force save to cloud (taking over lock)')
     
     const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
     if (!workspaceRemoteId) {
@@ -829,17 +828,17 @@ export class S3StoragePlugin extends Plugin {
 
     await this.call('notification', 'toast', '☁️ Saving to cloud...')
     
+    // Force acquire lock (takes over from other session)
+    await this.acquireLock(workspaceRemoteId)
+    
     const folder = `${workspaceRemoteId}/autosave`
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const filename = `${sanitizedName}-autosave.zip`
     
-    const { etag } = await this.createBackup(filename, folder)
+    await this.createBackup(filename, folder)
     await this.updateLastSaveTime()
-    if (etag) {
-      await this.updateLastKnownEtag(etag)
-    }
     
-    this.emit('saveCompleted', { workspaceRemoteId, etag })
+    this.emit('saveCompleted', { workspaceRemoteId })
     await this.call('notification', 'toast', '✅ Saved to cloud')
   }
   
@@ -847,7 +846,7 @@ export class S3StoragePlugin extends Plugin {
    * Save to cloud with conflict detection
    * Returns true if saved successfully, false if conflict detected
    */
-  async saveToCloudWithConflictCheck(): Promise<{ saved: boolean; conflict?: { localEtag: string | null; remoteEtag: string | null; remoteLastModified: string | null } }> {
+  async saveToCloudWithConflictCheck(): Promise<{ saved: boolean; conflict?: { lockInfo: LockFile | null } }> {
     // Check for conflicts first
     const conflictInfo = await this.checkForConflict()
     
@@ -857,9 +856,7 @@ export class S3StoragePlugin extends Plugin {
       return { 
         saved: false, 
         conflict: { 
-          localEtag: conflictInfo.localEtag, 
-          remoteEtag: conflictInfo.remoteEtag, 
-          remoteLastModified: conflictInfo.remoteLastModified 
+          lockInfo: conflictInfo.lockInfo
         } 
       }
     }

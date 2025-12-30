@@ -293,7 +293,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     })
     
     // Listen for conflict detection
-    this.on('s3Storage', 'conflictDetected', async (conflictInfo: { hasConflict: boolean; localEtag: string | null; remoteEtag: string | null; remoteLastModified: string | null; source?: string }) => {
+    this.on('s3Storage', 'conflictDetected', async (conflictInfo: { hasConflict: boolean; lockInfo?: { sessionId: string; browser: string; platform: string; lockedAt: string } | null; source?: string }) => {
       console.warn('[CloudWorkspaces] Conflict detected!', conflictInfo)
       // Set conflict flag in state
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, hasConflict: true }
@@ -319,12 +319,16 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   }
   
   /**
-   * Show conflict resolution modal when remote was modified by another session
+   * Show conflict resolution modal when workspace is locked by another session
    */
-  private async showConflictResolutionModal(conflictInfo: { remoteLastModified: string | null }): Promise<void> {
-    const remoteModifiedAt = conflictInfo.remoteLastModified 
-      ? new Date(conflictInfo.remoteLastModified).toLocaleString()
+  private async showConflictResolutionModal(conflictInfo: { lockInfo?: { sessionId: string; browser: string; platform: string; lockedAt: string } | null }): Promise<void> {
+    const lockInfo = conflictInfo.lockInfo
+    const lockedAt = lockInfo?.lockedAt 
+      ? new Date(lockInfo.lockedAt).toLocaleString()
       : 'unknown time'
+    const lockedBy = lockInfo 
+      ? `${lockInfo.browser} on ${lockInfo.platform}` 
+      : 'another session'
     
     const clearConflictFlag = async () => {
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, hasConflict: false }
@@ -335,34 +339,28 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     const modal = {
       id: 'cloudConflictModal',
       title: '⚠️ Cloud Sync Conflict',
-      message: `The cloud version of this workspace was modified at ${remoteModifiedAt} (possibly from another browser tab or device).\n\nWhat would you like to do?`,
+      message: `This workspace is being edited by ${lockedBy} (last active: ${lockedAt}).\n\nIf this is you in another tab, you can close that tab first. Or take over the session here.`,
       modalType: 'modal',
-      okLabel: 'Overwrite Cloud (Use My Version)',
-      cancelLabel: 'Discard Local (Use Cloud Version)',
+      okLabel: 'Take Over Session',
+      cancelLabel: 'Cancel',
       okFn: async () => {
-        // Force save, overwriting the remote version (bypasses conflict check)
+        // Take over: force acquire lock and save
         try {
           await clearConflictFlag()
           await this.call('s3Storage', 'forceSaveToCloud')
-          await this.call('notification', 'toast', '✅ Cloud version overwritten with your local changes')
+          await this.call('notification', 'toast', '✅ Session taken over - now syncing from this browser')
         } catch (e) {
-          console.error('[CloudWorkspaces] Force save failed:', e)
-          await this.call('notification', 'toast', `❌ Save failed: ${e.message}`)
+          console.error('[CloudWorkspaces] Take over failed:', e)
+          await this.call('notification', 'toast', `❌ Take over failed: ${e.message}`)
         }
       },
       cancelFn: async () => {
-        // Restore from cloud, discarding local changes
-        try {
-          await clearConflictFlag()
-          await this.call('s3Storage', 'restoreWorkspace')
-          await this.call('notification', 'toast', '✅ Restored from cloud - local changes discarded')
-        } catch (e) {
-          console.error('[CloudWorkspaces] Restore failed:', e)
-          await this.call('notification', 'toast', `❌ Restore failed: ${e.message}`)
-        }
+        // Cancel: just clear the flag, sync will retry on next interval or manual save
+        await clearConflictFlag()
+        await this.call('notification', 'toast', 'ℹ️ Sync paused - close other sessions or try again later')
       },
       hideFn: async () => {
-        // User dismissed modal - clear flag so UI isn't stuck, but don't sync
+        // User dismissed modal (X button) - same as cancel
         await clearConflictFlag()
         console.log('[CloudWorkspaces] Conflict modal dismissed - sync paused until next action')
       }
