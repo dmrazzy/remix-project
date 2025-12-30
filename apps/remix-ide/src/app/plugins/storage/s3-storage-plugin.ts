@@ -40,12 +40,26 @@ import JSZip from 'jszip'
 const REMIX_CONFIG_FILE = 'remix.config.json'
 const LOCK_FILE_NAME = 'session.lock'
 const LOCK_EXPIRY_MS = 2 * 60 * 1000 // 2 minutes - lock expires if not refreshed
+const SESSION_STORAGE_KEY = 'remix-cloud-session-id'
 
 /**
- * Generate a unique session ID for this browser tab
+ * Get or create a session ID for this browser tab.
+ * Uses sessionStorage so the ID survives page refreshes but is unique per tab.
+ * When the tab is closed, sessionStorage is cleared so a new ID is generated.
  */
-function generateSessionId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+function getOrCreateSessionId(): string {
+  try {
+    let sessionId = sessionStorage.getItem(SESSION_STORAGE_KEY)
+    if (!sessionId) {
+      sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId)
+    }
+    return sessionId
+  } catch (e) {
+    // sessionStorage might not be available (e.g., private browsing)
+    // Fall back to generating a new ID each time
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  }
 }
 
 /**
@@ -155,8 +169,8 @@ export class S3StoragePlugin extends Plugin {
   private config: StorageConfig | null = null
   
   // Session ID for lock-based conflict detection
-  // Unique per browser tab, regenerated on refresh/reload
-  private readonly sessionId: string = generateSessionId()
+  // Persisted in sessionStorage - survives page refresh but unique per tab
+  private readonly sessionId: string = getOrCreateSessionId()
   private readonly browserInfo = getBrowserInfo()
   
   constructor() {
