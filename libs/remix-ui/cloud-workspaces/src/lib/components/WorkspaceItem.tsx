@@ -96,7 +96,7 @@ export const WorkspaceItem: React.FC<WorkspaceItemProps> = ({
               {autosave && (
                 <AutosaveItem autosave={autosave} onRestore={onRestore} onDownload={onDownload} />
               )}
-              {backups.map((backup, index) => (
+              {backups.reverse().map((backup, index) => (
                 <BackupItem 
                   key={backup.key || index}
                   backup={backup} 
