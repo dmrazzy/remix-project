@@ -521,7 +521,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
               style={{ fontSize: '0.75rem' }}
             >
               <i className={`fas ${status.encryptionEnabled ? 'fa-lock text-warning' : 'fa-lock-open text-muted'} me-1`}></i>
-              <FormattedMessage id="cloudWorkspaces.encryption" defaultMessage="Encrypt" />
+              <FormattedMessage id="cloudWorkspaces.encryption" defaultMessage="Encryption" />
               {status.encryptionEnabled && !status.hasEncryptionPassphrase && (
                 <CustomTooltip
                   placement="top"
