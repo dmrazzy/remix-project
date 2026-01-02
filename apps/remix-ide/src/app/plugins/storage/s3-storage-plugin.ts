@@ -50,8 +50,46 @@ import {
 
 const REMIX_CONFIG_FILE = 'remix.config.json'
 const LOCK_FILE_NAME = 'session.lock'
+const CONTENT_HASH_FILE_NAME = 'content-hash.json'
 const LOCK_EXPIRY_MS = 2 * 60 * 1000 // 2 minutes - lock expires if not refreshed
 const SESSION_STORAGE_KEY = 'remix-cloud-session-id'
+
+/**
+ * Compute a SHA-256 hash of workspace files content
+ * Sorts files by path for consistent ordering
+ * Excludes remix.config.json from hash since it contains lastSaveTime which changes on every save
+ */
+async function computeWorkspaceHash(files: Array<{ path: string; content: string }>): Promise<string> {
+  // Filter out remix.config.json - it changes on every save (lastSaveTime, lastBackupTime)
+  // We still want to back it up, but it shouldn't affect the "has content changed" check
+  const hashableFiles = files.filter(f => !f.path.endsWith('remix.config.json'))
+  
+  // Sort files by path for consistent ordering
+  const sortedFiles = [...hashableFiles].sort((a, b) => a.path.localeCompare(b.path))
+  
+  // Create a concatenated string of path:content pairs
+  const contentStr = sortedFiles.map(f => `${f.path}:${f.content}`).join('\n')
+  
+  // Compute SHA-256 hash using Web Crypto API
+  const encoder = new TextEncoder()
+  const data = encoder.encode(contentStr)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  
+  // Convert to hex string
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  
+  return hashHex
+}
+
+/**
+ * Content hash metadata stored in S3
+ */
+interface ContentHashInfo {
+  hash: string
+  updatedAt: string
+  fileCount: number
+}
 
 /**
  * Get or create a session ID for this browser tab.
@@ -193,6 +231,9 @@ export class S3StoragePlugin extends Plugin {
   // Persisted in sessionStorage - survives page refresh but unique per tab
   private readonly sessionId: string = getOrCreateSessionId()
   private readonly browserInfo = getBrowserInfo()
+  
+  // Content hash cache - tracks last saved hash per workspace to avoid unnecessary uploads
+  private lastSavedHashCache: Map<string, string> = new Map()
   
   constructor() {
     super(profile)
@@ -392,6 +433,84 @@ export class S3StoragePlugin extends Plugin {
     return passphrase
   }
   
+  // ==================== Content Hash (Deduplication) ====================
+  
+  /**
+   * Get the content hash for a workspace from S3
+   * @param workspaceRemoteId - The workspace remote ID
+   * @returns The stored hash info or null if not found
+   */
+  private async getRemoteContentHash(workspaceRemoteId: string): Promise<ContentHashInfo | null> {
+    try {
+      const provider = this.ensureProvider()
+      const hashPath = joinPath(`${workspaceRemoteId}/autosave`, CONTENT_HASH_FILE_NAME)
+      
+      const content = await provider.download(hashPath)
+      return JSON.parse(content) as ContentHashInfo
+    } catch (e) {
+      // File doesn't exist or couldn't be parsed - that's fine, just means no previous hash
+      return null
+    }
+  }
+  
+  /**
+   * Save the content hash for a workspace to S3
+   * @param workspaceRemoteId - The workspace remote ID
+   * @param hash - The computed content hash
+   * @param fileCount - Number of files in the workspace
+   */
+  private async saveRemoteContentHash(workspaceRemoteId: string, hash: string, fileCount: number): Promise<void> {
+    try {
+      const provider = this.ensureProvider()
+      const hashInfo: ContentHashInfo = {
+        hash,
+        updatedAt: new Date().toISOString(),
+        fileCount
+      }
+      const hashPath = joinPath(`${workspaceRemoteId}/autosave`, CONTENT_HASH_FILE_NAME)
+      await provider.upload(hashPath, JSON.stringify(hashInfo, null, 2), 'application/json')
+      
+      // Update local cache
+      this.lastSavedHashCache.set(workspaceRemoteId, hash)
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not save content hash:', e)
+    }
+  }
+  
+  /**
+   * Check if workspace content has changed since last save
+   * Uses both memory cache (fast) and S3 hash file (for cross-tab/refresh scenarios)
+   * 
+   * @param workspaceRemoteId - The workspace remote ID
+   * @param files - The current workspace files
+   * @returns true if content has changed or hash is unknown, false if unchanged
+   */
+  private async hasContentChanged(
+    workspaceRemoteId: string, 
+    files: Array<{ path: string; content: string }>
+  ): Promise<{ changed: boolean; currentHash: string }> {
+    const currentHash = await computeWorkspaceHash(files)
+    
+    // First check memory cache (fastest)
+    const cachedHash = this.lastSavedHashCache.get(workspaceRemoteId)
+    if (cachedHash === currentHash) {
+      console.log('[S3StoragePlugin] 📋 Content unchanged (memory cache hit)')
+      return { changed: false, currentHash }
+    }
+    
+    // If not in memory cache, check S3 (for cross-tab or after refresh)
+    const remoteHashInfo = await this.getRemoteContentHash(workspaceRemoteId)
+    if (remoteHashInfo?.hash === currentHash) {
+      // Update memory cache for future checks
+      this.lastSavedHashCache.set(workspaceRemoteId, currentHash)
+      console.log('[S3StoragePlugin] 📋 Content unchanged (S3 hash match)')
+      return { changed: false, currentHash }
+    }
+    
+    console.log('[S3StoragePlugin] 📝 Content has changed, will upload')
+    return { changed: true, currentHash }
+  }
+
   /**
    * Run a single autosave backup
    */
@@ -407,6 +526,16 @@ export class S3StoragePlugin extends Plugin {
       const workspaceRemoteId = await this.getWorkspaceRemoteId()
       if (!workspaceRemoteId) {
         console.log('[S3StoragePlugin] No workspace remote ID, skipping autosave')
+        return
+      }
+      
+      // Collect files first to check if content has changed
+      const files = await this.collectWorkspaceFiles()
+      
+      // Check if content has actually changed since last save
+      const { changed, currentHash } = await this.hasContentChanged(workspaceRemoteId, files)
+      if (!changed) {
+        console.log('[S3StoragePlugin] ⏭️ Skipping autosave - no content changes')
         return
       }
       
@@ -439,10 +568,14 @@ export class S3StoragePlugin extends Plugin {
       
       // Create backup with workspace name in filename (overwrites previous autosave)
       const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
-      const backupKey = await this.createBackup(
+      const backupKey = await this.createBackupFromFiles(
+        files,
         `${sanitizedName}-autosave.zip`,
         `${workspaceRemoteId}/autosave`
       )
+      
+      // Save the content hash to S3 (for cross-tab deduplication)
+      await this.saveRemoteContentHash(workspaceRemoteId, currentHash, files.length)
       
       // Update last save time
       await this.updateLastSaveTime()
@@ -462,6 +595,20 @@ export class S3StoragePlugin extends Plugin {
    * If encryption is enabled and passphrase is available, encrypts the backup
    */
   private async createBackup(filename: string, folder: string): Promise<string> {
+    // Get all files in workspace (excluding .deps, artifacts, etc.)
+    const files = await this.collectWorkspaceFiles()
+    return this.createBackupFromFiles(files, filename, folder)
+  }
+  
+  /**
+   * Create a backup from pre-collected files
+   * Used when files are already collected (e.g., for hash checking before upload)
+   */
+  private async createBackupFromFiles(
+    files: Array<{ path: string; content: string }>,
+    filename: string, 
+    folder: string
+  ): Promise<string> {
     const provider = this.ensureProvider()
     
     // Get current workspace name for metadata
@@ -472,9 +619,6 @@ export class S3StoragePlugin extends Plugin {
     } catch (e) {
       console.warn('[S3StoragePlugin] Could not get workspace name:', e)
     }
-    
-    // Get all files in workspace (excluding .deps, artifacts, etc.)
-    const files = await this.collectWorkspaceFiles()
     
     // Create zip with compression
     const zip = new JSZip()
@@ -929,6 +1073,10 @@ export class S3StoragePlugin extends Plugin {
 
     await this.call('notification', 'toast', '☁️ Saving to cloud...')
     
+    // Collect files for backup and hash
+    const files = await this.collectWorkspaceFiles()
+    const currentHash = await computeWorkspaceHash(files)
+    
     // Acquire lock and save
     await this.acquireLock(workspaceRemoteId)
     
@@ -936,7 +1084,11 @@ export class S3StoragePlugin extends Plugin {
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const filename = `${sanitizedName}-autosave.zip`
     
-    await this.createBackup(filename, folder)
+    await this.createBackupFromFiles(files, filename, folder)
+    
+    // Save content hash for future deduplication
+    await this.saveRemoteContentHash(workspaceRemoteId, currentHash, files.length)
+    
     await this.updateLastSaveTime()
     
     console.log('[S3Storage] Emitting saveCompleted event', { workspaceRemoteId })
@@ -966,6 +1118,10 @@ export class S3StoragePlugin extends Plugin {
 
     await this.call('notification', 'toast', '☁️ Saving to cloud...')
     
+    // Collect files for backup and hash
+    const files = await this.collectWorkspaceFiles()
+    const currentHash = await computeWorkspaceHash(files)
+    
     // Force acquire lock (takes over from other session)
     await this.acquireLock(workspaceRemoteId)
     
@@ -973,7 +1129,11 @@ export class S3StoragePlugin extends Plugin {
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const filename = `${sanitizedName}-autosave.zip`
     
-    await this.createBackup(filename, folder)
+    await this.createBackupFromFiles(files, filename, folder)
+    
+    // Save content hash for future deduplication
+    await this.saveRemoteContentHash(workspaceRemoteId, currentHash, files.length)
+    
     await this.updateLastSaveTime()
     
     this.emit('saveCompleted', { workspaceRemoteId })
