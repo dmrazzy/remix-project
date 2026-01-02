@@ -9,6 +9,7 @@ import { useIntl } from 'react-intl'
 import * as remixLib from '@remix-project/remix-lib'
 import { deployContract } from '../actions'
 import { ToggleSwitch } from '@remix-ui/toggle'
+import { ContractKebabMenu } from './contractKebabMenu'
 
 const txFormat = remixLib.execution.txFormat
 const txHelper = remixLib.execution.txHelper
@@ -24,6 +25,8 @@ function DeployPortraitView() {
   const [inputValues, setInputValues] = useState<{[key: number]: string}>({})
   const [deployWithProxy, setDeployWithProxy] = useState<boolean>(false)
   const [upgradeWithProxy, setUpgradeWithProxy] = useState<boolean>(false)
+  const [isContractMenuOpen, setIsContractMenuOpen] = useState(false)
+  const contractKebabIconRef = useRef<HTMLElement>(null)
   const intl = useIntl()
 
   useEffect(() => {
@@ -103,17 +106,30 @@ function DeployPortraitView() {
     deployContract(selectedContract?.contractData, args, { deployWithProxy, upgradeWithProxy }, plugin, intl, dispatch)
   }
 
+  const handleKebabClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (selectedContract) {
+      setIsContractMenuOpen(prev => !prev)
+    }
+  }
+
+  const getABI = () => {
+    if (!selectedContract?.contractData?.object?.abi) {
+      return intl.formatMessage({ id: 'udapp.noABIAvailable' })
+    }
+    return JSON.stringify(selectedContract.contractData.object.abi, null, 2)
+  }
+
+  const getBytecode = () => {
+    if (!selectedContract?.contractData?.bytecodeObject) {
+      return intl.formatMessage({ id: 'udapp.noBytecodeAvailable' })
+    }
+    return selectedContract.contractData.bytecodeObject
+  }
+
   return (
     <>
-      <style>{`
-        .input-with-copy-hover:hover .copy-icon-hover {
-          opacity: 1 !important;
-        }
-        .contract-dropdown-item-hover:hover .unit-dropdown-item:hover .unit-dropdown-item-hover:hover {
-          background-color: var(--custom-onsurface-layer-3) !important;
-          border: 1px solid var(--bs-border-color) !important;
-        }
-      `}</style>
       <div className="card ms-2 mt-2" style={{ backgroundColor: 'var(--custom-onsurface-layer-1)' }}>
         <div className="p-3 d-flex align-items-center justify-content-between" onClick={() => setIsExpanded(!isExpanded)} style={{ cursor: 'pointer' }}>
           <div className='d-flex align-items-center gap-2'>
@@ -174,7 +190,12 @@ function DeployPortraitView() {
                       </div>
                     </div>
                   </Dropdown.Toggle>
-                  <span className="ms-2" style={{ color: 'var(--bs-tertiary-color)', position: 'relative' }}>
+                  <span
+                    ref={contractKebabIconRef}
+                    className="ms-2"
+                    style={{ color: 'var(--bs-tertiary-color)', position: 'relative' }}
+                    onClick={handleKebabClick}
+                  >
                     <i className="fas fa-ellipsis-v px-1" style={{ cursor: 'pointer', fontSize: '1rem' }}></i>
                   </span>
                 </div>
@@ -225,6 +246,14 @@ function DeployPortraitView() {
                   </Dropdown.Menu>
                 )}
               </Dropdown>
+              <ContractKebabMenu
+                show={isContractMenuOpen && contractKebabIconRef.current !== null}
+                target={contractKebabIconRef.current}
+                onHide={() => setIsContractMenuOpen(false)}
+                onCopyABI={getABI}
+                onCopyBytecode={getBytecode}
+                menuIndex="contract"
+              />
             </div>
             {/* Proxy Options */}
             { selectedContract?.isUpgradeable && (
