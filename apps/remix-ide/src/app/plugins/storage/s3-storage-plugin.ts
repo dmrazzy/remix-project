@@ -262,13 +262,22 @@ export class S3StoragePlugin extends Plugin {
     
     // Start autosave on activation if user is already logged in and setting is enabled
     await this.startAutosaveIfEnabled()
+    
+    // Track file save activity for idle detection
+    this.on('fileManager', 'fileSaved', () => {
+      this.lastFileActivityTime = Date.now()
+    })
   }
   
   // ==================== Autosave Functionality ====================
   
   private autosaveIntervalId: ReturnType<typeof setInterval> | null = null
   private static readonly AUTOSAVE_BACKUP_NAME = 'autosave-backup.zip'
-  private static readonly DEFAULT_AUTOSAVE_INTERVAL = 1 * 60 * 1000 // 5 minutes
+  private static readonly DEFAULT_AUTOSAVE_INTERVAL = 1 * 60 * 1000 // 1 minute
+  private static readonly IDLE_TIME_BEFORE_AUTOSAVE = 30 * 1000 // 30 seconds of inactivity required
+  
+  /** Timestamp of last file save activity - used for idle detection */
+  private lastFileActivityTime: number = 0
   
   /**
    * Check if autosave is enabled in settings
@@ -516,6 +525,14 @@ export class S3StoragePlugin extends Plugin {
    */
   private async runAutosave(): Promise<void> {
     try {
+      // Check if user has been idle long enough
+      // Don't autosave while user is actively editing - wait for idle time
+      const timeSinceLastActivity = Date.now() - this.lastFileActivityTime
+      if (this.lastFileActivityTime > 0 && timeSinceLastActivity < S3StoragePlugin.IDLE_TIME_BEFORE_AUTOSAVE) {
+        console.log(`[S3StoragePlugin] ⏳ User active (${Math.round(timeSinceLastActivity / 1000)}s ago), deferring autosave`)
+        return
+      }
+      
       // Check if user is still authenticated
       const isAuth = await this.call('auth', 'isAuthenticated')
       if (!isAuth) {
