@@ -688,9 +688,14 @@ export class S3StoragePlugin extends Plugin {
       }
     }
     
-    // Upload to S3
+    // Upload to S3 with metadata
     const fullPath = joinPath(folder, finalFilename)
-    const key = await provider.upload(fullPath, zipContent, contentType)
+    const s3Metadata: Record<string, string> = {
+      'workspace-name': workspaceName,
+      'file-count': String(files.length),
+      'is-encrypted': String(isEncryptionEnabled() && !!this.getPassphraseOrPrompt())
+    }
+    const key = await provider.upload(fullPath, zipContent, contentType, s3Metadata)
     
     return key
   }
