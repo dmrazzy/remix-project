@@ -158,34 +158,63 @@ function DeployPortraitView() {
                               <span className="small">{extractNameFromKey(selectedContract?.filePath) || 'No contract selected'}</span>
                             </div>
                           </div>
-                          <div onClick={async (e) => {
-                            e.stopPropagation()
-                            if (selectedContract?.filePath) {
-                              dispatch({ type: 'SET_COMPILING', payload: selectedContract.filePath })
-                              try {
-                                await plugin.call('solidity', 'compile', selectedContract.filePath)
-                              } catch (error) {
-                                console.error('Compilation error: ', error)
+                          {selectedContract && !selectedContract?.isCompiled && !selectedContract?.isCompiling && (
+                            <button
+                              className="btn btn-primary d-flex align-items-center justify-content-center"
+                              data-id="compile-action"
+                              style={{
+                                padding: "4px 8px",
+                                height: "28px",
+                                fontFamily: "Nunito Sans, sans-serif",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                lineHeight: "14px",
+                                whiteSpace: "nowrap"
+                              }}
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                if (selectedContract?.filePath) {
+                                  dispatch({ type: 'SET_COMPILING', payload: selectedContract.filePath })
+                                  try {
+                                    await plugin.call('solidity', 'compile', selectedContract.filePath)
+                                  } catch (error) {
+                                    console.error('Compilation error: ', error)
+                                    dispatch({ type: 'SET_COMPILING', payload: selectedContract.filePath })
+                                  }
+                                }
+                              }}
+                            >
+                              <i className="fas fa-play"></i>
+                              <span className="ms-2" style={{ lineHeight: "12px", position: "relative", top: "1px" }}>
+                              Compile
+                              </span>
+                            </button>
+                          )}
+                          {selectedContract?.isCompiled && (
+                            <div onClick={async (e) => {
+                              e.stopPropagation()
+                              if (selectedContract?.filePath) {
                                 dispatch({ type: 'SET_COMPILING', payload: selectedContract.filePath })
+                                try {
+                                  await plugin.call('solidity', 'compile', selectedContract.filePath)
+                                } catch (error) {
+                                  console.error('Compilation error: ', error)
+                                  dispatch({ type: 'SET_COMPILING', payload: selectedContract.filePath })
+                                }
                               }
-                            }
-                          }}>
-                            {selectedContract?.isCompiled && (
+                            }}>
                               <span className={`badge border p-2 text-success`} style={{ fontWeight: 'light', backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
                                 <i className="fas fa-check"></i> Compiled
                               </span>
-                            )}
-                            {selectedContract?.isCompiling && (
+                            </div>
+                          )}
+                          {selectedContract?.isCompiling && (
+                            <div>
                               <span className={`badge border p-2 text-info`} style={{ fontWeight: 'light', backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
                                 <i className="fas fa-spinner fa-spin"></i> Compiling
                               </span>
-                            )}
-                            {selectedContract && !selectedContract?.isCompiled && !selectedContract?.isCompiling && (
-                              <span className={`badge border p-2 text-secondary`} style={{ fontWeight: 'light', backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
-                              Not compiled
-                              </span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -214,16 +243,7 @@ function DeployPortraitView() {
                                 <span className="small">{extractNameFromKey(contract.filePath)}</span>
                               </div>
                             </div>
-                            <div onClick={async (e) => {
-                              e.stopPropagation()
-                              dispatch({ type: 'SET_COMPILING', payload: contract.filePath })
-                              try {
-                                await plugin.call('solidity', 'compile', contract.filePath)
-                              } catch (error) {
-                                console.error('Compilation error: ', error)
-                                dispatch({ type: 'SET_COMPILING', payload: contract.filePath })
-                              }
-                            }}>
+                            <div>
                               {contract.isCompiled && (
                                 <span className={`badge border p-2 text-success`} style={{ fontWeight: 'light', backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
                                   <i className="fas fa-check"></i> Compiled
