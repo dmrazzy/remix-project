@@ -163,8 +163,8 @@ export const createInstance = async (selectedContract: ContractData, args, deplo
       title: 'Contract code size over limit',
       message: isOverSizePrompt(overSize),
       okLabel: 'Force Send',
-      okFn: () => {
-        // deployContract(plugin, selectedContract, currentParams, contractMetadata, compilerContracts)
+      okFn: async () => {
+        await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
       },
       cancelLabel: 'Cancel',
       cancelFn: () => {
@@ -174,18 +174,20 @@ export const createInstance = async (selectedContract: ContractData, args, deplo
     })
     return
   }
+  const contract = await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
 
+  console.log('contract: ', contract)
+}
+
+const deployOnBlockchain = async (selectedContract: ContractData, args: string, contractMetadata: any, compilerContracts: any, plugin: Plugin) => {
   // trackMatomoEvent(plugin, { category: 'udapp', action: 'DeployContractTo', name: plugin.REACT_API.networkName, isClick: true })
   if (!contractMetadata || (contractMetadata && contractMetadata.autoDeployLib)) {
-    await plugin.call('blockchain', 'deployContractAndLibraries', selectedContract, args, contractMetadata, compilerContracts)
-    return
+    return await plugin.call('blockchain', 'deployContractAndLibraries', selectedContract, args, contractMetadata, compilerContracts)
   }
   if (Object.keys(selectedContract.bytecodeLinkReferences).length) {
     // statusCb(`linking ${JSON.stringify(selectedContract.bytecodeLinkReferences, null, '\t')} using ${JSON.stringify(contractMetadata.linkReferences, null, '\t')}`)
   }
-  const contract = await plugin.call('blockchain', 'deployContractWithLibrary', selectedContract, args, contractMetadata, compilerContracts)
-
-  console.log('contract: ', contract)
+  return await plugin.call('blockchain', 'deployContractWithLibrary', selectedContract, args, contractMetadata, compilerContracts)
 }
 // const statusCb = (msg: string) => {
 //   const log = logBuilder(msg)

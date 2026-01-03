@@ -319,48 +319,50 @@ export class Blockchain extends Plugin {
 
   async deployContractAndLibraries(selectedContract, args, contractMetadata, compilerContracts) {
     const constructor = selectedContract.getConstructorInterface()
-
-    try {
-      const data = await txFormat.buildData(
-        selectedContract.name,
-        selectedContract.object,
-        compilerContracts,
-        true,
-        constructor,
-        args,
-        (data, runTxCallback) => {
+    const data = await txFormat.buildData(
+      selectedContract.name,
+      selectedContract.object,
+      compilerContracts,
+      true,
+      constructor,
+      args,
+      async (data, runTxCallback) => {
         // called for libraries deployment
-          this.runTx(data)
+        try {
+          const result = await this.runTx(data)
+          // Pass result.txResult because deployLibrary expects txResult.receipt.contractAddress
+          runTxCallback(null, result.txResult)
+        } catch (error) {
+          runTxCallback(error, null)
         }
-      )
-      // statusCb(`creation of ${selectedContract.name} pending...`)
-      this.createContract(selectedContract, data)
-    } catch (error) {
-      if (error) {
-        // statusCb(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error.error ? error.error : error}`)
-        throw new Error(error)
       }
-      return
-    }
+    )
+    // statusCb(`creation of ${selectedContract.name} pending...`)
+    return await this.createContract(selectedContract, data)
+    // statusCb(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error.error ? error.error : error}`)
   }
 
   deployContractWithLibrary(selectedContract, args, contractMetadata) {
     const constructor = selectedContract.getConstructorInterface()
-    txFormat.encodeConstructorCallAndLinkLibraries(
-      selectedContract.object,
-      args,
-      constructor,
-      contractMetadata.linkReferences,
-      selectedContract.bytecodeLinkReferences,
-      (error, data) => {
-        if (error) {
-          // return statusCb(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error.error ? error.error : error}`)
-        }
 
-        // statusCb(`creation of ${selectedContract.name} pending...`)
-        this.createContract(selectedContract, data)
-      }
-    )
+    return new Promise((resolve, reject) => {
+      txFormat.encodeConstructorCallAndLinkLibraries(
+        selectedContract.object,
+        args,
+        constructor,
+        contractMetadata.linkReferences,
+        selectedContract.bytecodeLinkReferences,
+        async (error, data) => {
+          if (error) {
+            reject(error)
+          }
+
+          // statusCb(`creation of ${selectedContract.name} pending...`)
+          const result = await this.createContract(selectedContract, data)
+          resolve(result)
+        }
+      )
+    })
   }
 
   async deployProxy(proxyData, implementationContractObject) {
@@ -712,9 +714,15 @@ export class Blockchain extends Plugin {
         false,
         funABI,
         callType,
-        (data) => {
+        async (data, runTxCallback) => {
         // called for libraries deployment
-          this.runTx(data)
+          try {
+            const result = await this.runTx(data)
+            // Pass result.txResult because deployLibrary expects txResult.receipt.contractAddress
+            runTxCallback(null, result.txResult)
+          } catch (error) {
+            runTxCallback(error, null)
+          }
         }
       )
       if (!lookupOnly) {
@@ -1054,7 +1062,9 @@ export class Blockchain extends Plugin {
       value: queryValue,
       gasLimit: gasLimit,
       timestamp: args.data.timestamp,
-      authorizationList: args.authorizationList
+      authorizationList: args.authorizationList,
+      web3: await this.getWeb3(), // Pass web3 to avoid circular callback
+      provider: this.getProvider() // Pass provider to avoid circular callback deadlock
     }
     const payLoad = {
       funAbi: args.data.funAbi,

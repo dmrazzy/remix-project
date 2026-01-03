@@ -47,7 +47,8 @@ export class TxRunnerWeb3 {
     }
 
     const isCreation = !tx.to
-    const isPersonalMode = await this._api.call('blockchain', 'getProvider') === 'web3' ? (Registry.getInstance().get('config').api).get('settings/personal-mode') : false
+    const provider = tx.provider
+    const isPersonalMode = provider === 'web3' ? (Registry.getInstance().get('config').api).get('settings/personal-mode') : false
 
     if (isPersonalMode) {
       return new Promise((resolve, reject) => {
@@ -59,7 +60,7 @@ export class TxRunnerWeb3 {
           okLabel: 'OK',
           okFn: async (value) => {
             try {
-              const web3 = await this._api.call('blockchain', 'getWeb3')
+              const web3 = tx.web3
               const res = await (await web3.getSigner(tx.from || 0)).sendTransaction({ ...tx, value })
               resolve(await this.broadcastTx(tx, res.hash, isCreation, false, null))
 
@@ -81,12 +82,12 @@ export class TxRunnerWeb3 {
       try {
         if (tx.fromSmartAccount) {
           const { txHash, contractAddress } = await this.sendUserOp(tx, network.id)
-          return this.broadcastTx(tx, txHash, isCreation, true, contractAddress)
+          return await this.broadcastTx(tx, txHash, isCreation, true, contractAddress)
         } else {
-          const web3 = await this._api.call('blockchain', 'getWeb3')
+          const web3 = tx.web3
           const res = await (await web3.getSigner(tx.from)).sendTransaction(tx)
 
-          return this.broadcastTx(tx, res.hash, isCreation, false, null)
+          return await this.broadcastTx(tx, res.hash, isCreation, false, null)
         }
       } catch (e) {
         if (!e.message) e.message = ''
@@ -96,7 +97,7 @@ export class TxRunnerWeb3 {
         console.log(`Send transaction failed: ${e.message} . if you use an injected provider, please check it is properly unlocked. `)
         // in case the receipt is available, we consider that only the execution failed but the transaction went through.
         // So we don't consider this to be an error.
-        if (e.receipt) return this.broadcastTx(tx, e.receipt.hash, isCreation, false, null)
+        if (e.receipt) return await this.broadcastTx(tx, e.receipt.hash, isCreation, false, null)
         else throw (e)
       }
     }
@@ -107,9 +108,10 @@ export class TxRunnerWeb3 {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
       try {
-        const receipt = await tryTillReceiptAvailable(resp, await this._api.call('blockchain', 'getWeb3'))
+        const web3 = tx.web3
+        const receipt = await tryTillReceiptAvailable(resp, web3)
         const originTo = tx.to
-        tx = await tryTillTxAvailable(resp, await this._api.call('blockchain', 'getWeb3'))
+        tx = await tryTillTxAvailable(resp, web3)
         if (isCreation && !receipt.contractAddress) {
           // if it is a isCreation, contractAddress should be defined.
           // if it's not the case look for the event ContractCreated(uint256,address,uint256,bytes32) and extract the address
@@ -139,17 +141,17 @@ export class TxRunnerWeb3 {
   }
 
   async execute (args: InternalTransaction) {
-    const result = await this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp)
+    const result = await this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp, args.web3, args.provider)
 
     return result
   }
 
-  async runInNode (from, fromSmartAccount, deployedBytecode, to, data, value, gasLimit, useCall, timestamp) {
-    const tx = { from: from, fromSmartAccount, deployedBytecode, to: to, data: data, value: value }
+  async runInNode (from, fromSmartAccount, deployedBytecode, to, data, value, gasLimit, useCall, timestamp, web3Provider?: any, provider?: string) {
+    const tx = { from: from, fromSmartAccount, deployedBytecode, to: to, data: data, value: value, web3: web3Provider, provider: provider }
     if (!from) throw new Error('the value of "from" is not defined. Please make sure an account is selected.')
     if (useCall) {
       const isVM = await this._api.call('blockchain', 'isVM')
-      const web3 = await this._api.call('blockchain', 'getWeb3')
+      const web3 = tx.web3
       if (isVM) {
         web3.remix.registerCallId(timestamp)
       }
@@ -173,7 +175,7 @@ export class TxRunnerWeb3 {
         txCopy.gasPrice = undefined
       }
     }
-    const ethersProvider = await this._api.call('blockchain', 'getWeb3')
+    const ethersProvider = tx.web3
     const config = Registry.getInstance().get('config').api
 
     try {
@@ -195,7 +197,7 @@ export class TxRunnerWeb3 {
       }
 
       if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
-        return this._executeTx(tx, network, null)
+        return await this._executeTx(tx, network, null)
       }
 
       // confirmCb(network, tx, tx['gasLimit'], (txFee) => {
@@ -205,9 +207,9 @@ export class TxRunnerWeb3 {
       // })
       // }, callback)
       if (network.name !== 'Main') {
-        return this._executeTx(tx, network, null)
+        return await this._executeTx(tx, network, null)
       }
-      await this.confirmTransaction(tx, network, gasEstimation)
+      return await this.confirmTransaction(tx, network, gasEstimation)
     } catch (err) {
       if (err && err.error && err.error.indexOf('Invalid JSON RPC response') !== -1) {
         // // @todo(#378) this should be removed when https://github.com/WalletConnect/walletconnect-monorepo/issues/334 is fixed
@@ -220,9 +222,9 @@ export class TxRunnerWeb3 {
         tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
 
         if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
-          return this._executeTx(tx, network, null)
+          return await this._executeTx(tx, network, null)
         }
-        await this.confirmTransaction(tx, network, tx['gasLimit'])
+        return await this.confirmTransaction(tx, network, tx['gasLimit'])
       } else {
         if (tx.fromSmartAccount && tx.value === "0" &&
               err && err.message && err.message.includes('missing revert data')
@@ -235,7 +237,7 @@ export class TxRunnerWeb3 {
           tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
 
           if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
-            return this._executeTx(tx, network, null)
+            return await this._executeTx(tx, network, null)
           }
 
           return await this.confirmTransaction(tx, network, tx['gasLimit'])
@@ -256,18 +258,26 @@ export class TxRunnerWeb3 {
 
           if (msg.includes('invalid opcode')) msg += '\nThe EVM version used by the selected environment is not compatible with the compiler EVM version.'
 
-          return this._api.call('notification', 'modal', {
-            id: 'gas-estimation-failed',
-            title: 'Gas estimation failed',
-            message: await this._api.call('udappDeploy', 'getGasEstimationPrompt', msg),
-            okLabel: 'Send Transaction',
-            okFn: () => {
-              return this._executeTx(tx, network, null)
-            },
-            cancelLabel: 'Cancel Transaction',
-            cancelFn: () => {
-              throw new Error('Transaction canceled by user.')
-            }
+          const gasEstimationPrompt = await this._api.call('udappDeploy', 'getGasEstimationPrompt', msg)
+          return new Promise((resolve, reject) => {
+            this._api.call('notification', 'modal', {
+              id: 'gas-estimation-failed',
+              title: 'Gas estimation failed',
+              message: gasEstimationPrompt,
+              okLabel: 'Send Transaction',
+              okFn: async () => {
+                try {
+                  const result = await this._executeTx(tx, network, null)
+                  resolve(result)
+                } catch (error) {
+                  reject(error)
+                }
+              },
+              cancelLabel: 'Cancel Transaction',
+              cancelFn: () => {
+                reject(new Error('Transaction canceled by user.'))
+              }
+            })
           })
         }
       }
@@ -278,36 +288,43 @@ export class TxRunnerWeb3 {
     const amount = await this._api.call('blockchain', 'fromWei', tx.value, true, 'ether')
     const content = await this._api.call('udappDeploy', 'getMainnetPrompt', tx, network, amount, gasEstimation)
 
-    this._api.call('notification', 'modal', {
-      id: 'confirm-transaction',
-      title: 'Confirm transaction',
-      message: content,
-      okLabel: 'Confirm',
-      cancelLabel: 'Cancel',
-      okFn: async () => {
-        // @ts-ignore
-        const confirmSettings = await this._api.call('udappDeploy', 'getConfirmSettings')
-        // @ts-ignore
-        const gasPriceStatus = await this._api.call('udappDeploy', 'getGasPriceStatus')
-        // @ts-ignore
-        const maxFee = await this._api.call('udappDeploy', 'getMaxFee')
-        // @ts-ignore
-        const maxPriorityFee = await this._api.call('udappDeploy', 'getMaxPriorityFee')
-        // @ts-ignore
-        const baseFeePerGas = await this._api.call('udappDeploy', 'getBaseFeePerGas')
-        // @ts-ignore
-        const gasPrice = await this._api.call('udappDeploy', 'getGasPrice')
+    return new Promise((resolve, reject) => {
+      this._api.call('notification', 'modal', {
+        id: 'confirm-transaction',
+        title: 'Confirm transaction',
+        message: content,
+        okLabel: 'Confirm',
+        cancelLabel: 'Cancel',
+        okFn: async () => {
+          try {
+            // @ts-ignore
+            const confirmSettings = await this._api.call('udappDeploy', 'getConfirmSettings')
+            // @ts-ignore
+            const gasPriceStatus = await this._api.call('udappDeploy', 'getGasPriceStatus')
+            // @ts-ignore
+            const maxFee = await this._api.call('udappDeploy', 'getMaxFee')
+            // @ts-ignore
+            const maxPriorityFee = await this._api.call('udappDeploy', 'getMaxPriorityFee')
+            // @ts-ignore
+            const baseFeePerGas = await this._api.call('udappDeploy', 'getBaseFeePerGas')
+            // @ts-ignore
+            const gasPrice = await this._api.call('udappDeploy', 'getGasPrice')
 
-        (Registry.getInstance().get('config').api).setUnpersistedProperty('doNotShowTransactionConfirmationAgain', confirmSettings)
-        if (!gasPriceStatus) {
-          throw new Error('Given transaction fee is not correct')
-        } else {
-          return this._executeTx(tx, network, { maxFee, maxPriorityFee, baseFeePerGas, gasPrice })
+            (Registry.getInstance().get('config').api).setUnpersistedProperty('doNotShowTransactionConfirmationAgain', confirmSettings)
+            if (!gasPriceStatus) {
+              reject(new Error('Given transaction fee is not correct'))
+            } else {
+              const result = await this._executeTx(tx, network, { maxFee, maxPriorityFee, baseFeePerGas, gasPrice })
+              resolve(result)
+            }
+          } catch (error) {
+            reject(error)
+          }
+        },
+        cancelFn: () => {
+          reject(new Error('Transaction canceled by user.'))
         }
-      },
-      cancelFn: () => {
-        throw new Error('Transaction canceled by user.')
-      }
+      })
     })
   }
 

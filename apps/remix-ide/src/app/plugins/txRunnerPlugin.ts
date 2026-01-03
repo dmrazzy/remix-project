@@ -30,6 +30,10 @@ export class TxRunnerPlugin extends Plugin {
   }
 
   async rawRun (args: Transaction) {
+    if (!this.internalRunner) {
+      throw new Error('TxRunner internal runner not initialized. Call resetInternalRunner() first.')
+    }
+
     const result = await this.run(args, args.timestamp || Date.now())
 
     return result
@@ -42,7 +46,9 @@ export class TxRunnerPlugin extends Plugin {
       args.deployedBytecode = '0x' + args.deployedBytecode
     }
 
-    return await this.internalRunner.execute(args)
+    const result = await this.internalRunner.execute(args)
+
+    return result
   }
 
   async run (tx: Transaction, stamp) {
