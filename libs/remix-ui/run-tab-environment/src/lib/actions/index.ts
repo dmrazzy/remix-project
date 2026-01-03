@@ -78,7 +78,7 @@ export async function forkState (plugin: EnvironmentPlugin, dispatch: React.Disp
 
   // trackMatomoEvent(plugin, { category: 'blockchain', action: 'providerPinned', name: name, isClick: false })
   // this.emit('providersChanged')
-  await plugin.call('blockchain', 'changeExecutionContext', { context: name }, null, null, null)
+  await plugin.call('blockchain', 'changeExecutionContext', { context: name })
   plugin.call('notification', 'toast', `New environment '${currentStateDb.stateName}' created with forked state.`)
 
   // we also need to copy the pinned contracts:
@@ -94,37 +94,31 @@ export async function forkState (plugin: EnvironmentPlugin, dispatch: React.Disp
 export async function setExecutionContext (provider: Provider, plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
   if (provider.name !== widgetState.providers.selectedProvider) {
     if (provider.name === 'walletconnect') {
-      await setWalletConnectExecutionContext(plugin, { context: provider.name, fork: provider.config.fork })
+      await plugin.call('walletconnect', 'openModal')
+      plugin.on('walletconnect', 'connectionSuccessful', async () => {
+        await plugin.call('blockchain', 'changeExecutionContext', { context: provider.name, fork: provider.config.fork })
+        dispatch({ type: 'SET_CURRENT_PROVIDER', payload: provider.name })
+        plugin.emit('providersChanged', provider)
+      })
+      plugin.on('walletconnect', 'connectionFailed', (msg) => {
+        plugin.call('notification', 'toast', msg)
+        cleanupWalletConnectEvents(plugin)
+      })
+      plugin.on('walletconnect', 'connectionDisconnected', (msg) => {
+        plugin.call('notification', 'toast', msg)
+        cleanupWalletConnectEvents(plugin)
+      })
     } else {
-      await plugin.call('blockchain', 'changeExecutionContext', { context: provider.name, fork: provider.config.fork }, null, (alertMsg) => {
-        plugin.call('notification', 'toast', alertMsg)
-      }, async () => {})
-    }
-    dispatch({ type: 'SET_CURRENT_PROVIDER', payload: provider.name })
-    plugin.emit('providersChanged', provider)
-    if (provider.category === 'Browser Extension') {
-      await plugin.call('layout', 'maximiseSidePanel', 0.25)
-    } else {
-      await plugin.call('layout', 'resetSidePanel')
+      await plugin.call('blockchain', 'changeExecutionContext', { context: provider.name, fork: provider.config.fork })
+      dispatch({ type: 'SET_CURRENT_PROVIDER', payload: provider.name })
+      plugin.emit('providersChanged', provider)
+      if (provider.category === 'Browser Extension') {
+        await plugin.call('layout', 'maximiseSidePanel', 0.25)
+      } else {
+        await plugin.call('layout', 'resetSidePanel')
+      }
     }
   }
-}
-
-async function setWalletConnectExecutionContext (plugin: Plugin, executionContext: { context: string, fork: string }) {
-  await plugin.call('walletconnect', 'openModal')
-  plugin.on('walletconnect', 'connectionSuccessful', () => {
-    plugin.call('blockchain', 'changeExecutionContext', executionContext, null, (alertMsg) => {
-      plugin.call('notification', 'toast', alertMsg)
-    }, async () => {})
-  })
-  plugin.on('walletconnect', 'connectionFailed', (msg) => {
-    plugin.call('notification', 'toast', msg)
-    cleanupWalletConnectEvents(plugin)
-  })
-  plugin.on('walletconnect', 'connectionDisconnected', (msg) => {
-    plugin.call('notification', 'toast', msg)
-    cleanupWalletConnectEvents(plugin)
-  })
 }
 
 function cleanupWalletConnectEvents (plugin: Plugin) {
@@ -179,20 +173,20 @@ export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: Reac
       defaultAccounts.push({
         alias: alias,
         account: account,
-        balance: parseFloat(balance).toFixed(4),
+        balance: parseFloat(balance).toFixed(3),
         symbol: plugin.blockchain['networkNativeCurrency'].symbol
       })
     else
       defaultAccounts.push({
         alias: alias,
         account: account,
-        balance: parseFloat(balance).toFixed(4),
+        balance: parseFloat(balance).toFixed(3),
         symbol: plugin.blockchain['networkNativeCurrency'].symbol
       })
     if (safeAddresses.length && safeAddresses.includes(account)) smartAccounts.push({
       alias: alias,
       account: account,
-      balance: parseFloat(balance).toFixed(4)
+      balance: parseFloat(balance).toFixed(3)
     })
     index++
   }

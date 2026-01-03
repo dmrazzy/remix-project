@@ -171,6 +171,18 @@ function EnvironmentPortraitView() {
     setOpenKebabMenuId(null)
   }
 
+  const handleRenameAccount = (account: Account) => {
+    setOpenKebabMenuId(null)
+    const accountId = account.account === selectedAccount?.account ? 'selected' : `account-${widgetState.accounts.defaultAccounts.findIndex(a => a.account === account.account)}`
+    setEditingAccountId(accountId)
+    setEditingAlias(account.alias)
+    setTimeout(() => {
+      if (editingInputRef.current) {
+        editingInputRef.current.select()
+      }
+    }, 0)
+  }
+
   const handleDeleteAccount = (account: Account) => {
     plugin.call('notification', 'modal', {
       id: 'deleteAccount',
@@ -353,6 +365,7 @@ function EnvironmentPortraitView() {
                 onHide={() => setOpenKebabMenuId(null)}
                 account={selectedAccount}
                 menuIndex="selected"
+                onRenameAccount={handleRenameAccount}
                 onNewAccount={handleNewAccount}
                 onCreateSmartAccount={handleCreateSmartAccount}
                 onAuthorizeDelegation={handleAuthorizeDelegation}
@@ -368,8 +381,22 @@ function EnvironmentPortraitView() {
                       <div key={index}>
                         <Dropdown.Item className="d-flex align-items-center justify-content-between p-1 m-1 account-item-hover" onClick={() => handleAccountSelection(account)} style={{ cursor: 'pointer' }}>
                           <div className='d-flex flex-column align-items-start'>
-                            <div className="text-truncate text-dark">
-                              <span>{account?.alias}</span>
+                            <div className="text-truncate text-dark d-flex align-items-center">
+                              {editingAccountId === accountId ? (
+                                <input
+                                  ref={editingInputRef}
+                                  type="text"
+                                  className="form-control form-control-sm"
+                                  style={{ width: '150px' }}
+                                  value={editingAlias}
+                                  onChange={(e) => setEditingAlias(e.target.value)}
+                                  onKeyDown={(e) => handleAliasKeyDown(e, account?.account)}
+                                  onBlur={() => handleSaveAlias(account?.account)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              ) : (
+                                <span>{account?.alias}</span>
+                              )}
                             </div>
                             <div style={{ color: 'var(--bs-tertiary-color)', position: 'relative' }}>
                               <span className="small">{shortenAddress(account?.account)}</span>
@@ -396,10 +423,7 @@ function EnvironmentPortraitView() {
                           onHide={() => setOpenKebabMenuId(null)}
                           account={account}
                           menuIndex={index}
-                          onNewAccount={handleNewAccount}
-                          onCreateSmartAccount={handleCreateSmartAccount}
-                          onAuthorizeDelegation={handleAuthorizeDelegation}
-                          onSignUsingAccount={handleSignUsingAccount}
+                          onRenameAccount={handleRenameAccount}
                           onDeleteAccount={handleDeleteAccount}
                         />
                       </div>

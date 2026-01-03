@@ -8,11 +8,12 @@ interface AccountKebabMenuProps {
   onHide: () => void
   account: Account
   menuIndex?: string | number
-  onNewAccount: () => void
-  onCreateSmartAccount: (account: Account) => void
-  onAuthorizeDelegation: (account: Account) => void
-  onSignUsingAccount: (account: Account) => void
-  onDeleteAccount: (account: Account) => void
+  onRenameAccount?: (account: Account) => void
+  onNewAccount?: () => void
+  onCreateSmartAccount?: (account: Account) => void
+  onAuthorizeDelegation?: (account: Account) => void
+  onSignUsingAccount?: (account: Account) => void
+  onDeleteAccount?: (account: Account) => void
 }
 
 const MenuContent = React.forwardRef<HTMLElement, any>((props, ref) => {
@@ -40,12 +41,58 @@ export const AccountKebabMenu: React.FC<AccountKebabMenuProps> = ({
   onHide,
   account,
   menuIndex = 'default',
+  onRenameAccount,
   onNewAccount,
   onCreateSmartAccount,
   onAuthorizeDelegation,
   onSignUsingAccount,
   onDeleteAccount
 }) => {
+  const menuItems = [
+    onRenameAccount && {
+      id: 'renameAccount',
+      label: 'Rename',
+      icon: 'fas fa-pen',
+      color: 'var(--bs-body-color)',
+      onClick: () => onRenameAccount(account)
+    },
+    onNewAccount && {
+      id: 'newAccount',
+      label: 'New account',
+      icon: 'fas fa-plus',
+      color: 'var(--bs-body-color)',
+      onClick: () => onNewAccount()
+    },
+    onCreateSmartAccount && {
+      id: 'createSmartAccount',
+      label: 'Create smart account',
+      icon: 'fas fa-plus',
+      color: 'var(--bs-body-color)',
+      onClick: () => onCreateSmartAccount(account)
+    },
+    onAuthorizeDelegation && {
+      id: 'authorizeDelegation',
+      label: 'Authorize delegation',
+      icon: 'fas fa-check',
+      color: 'var(--bs-body-color)',
+      onClick: () => onAuthorizeDelegation(account)
+    },
+    onSignUsingAccount && {
+      id: 'signUsingAccount',
+      label: 'Sign using this account',
+      icon: 'fa-regular fa-pen-to-square',
+      color: 'var(--bs-body-color)',
+      onClick: () => onSignUsingAccount(account)
+    },
+    onDeleteAccount && {
+      id: 'deleteAccount',
+      label: 'Delete account',
+      icon: 'fas fa-trash',
+      color: 'var(--bs-danger)',
+      onClick: () => onDeleteAccount(account)
+    }
+  ].filter(Boolean)
+
   return (
     <Overlay
       show={show}
@@ -67,105 +114,30 @@ export const AccountKebabMenu: React.FC<AccountKebabMenuProps> = ({
         <MenuContent {...props} data-id={`accountKebabMenu-${menuIndex}`}>
           <div className="p-0 rounded w-100" style={{ backgroundColor: 'var(--bs-light)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}>
             <div className="d-flex flex-column">
-              <div
-                className="d-flex align-items-center px-3 py-2"
-                data-id="newAccount"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onNewAccount()
-                }}
-                style={{
-                  color: 'var(--bs-body-color)',
-                  cursor: 'pointer',
-                  borderTopLeftRadius: 8,
-                  borderTopRightRadius: 8,
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bs-secondary-bg)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <span className="me-2">
-                  <i className="fas fa-plus" />
-                </span>
-                <span>New account</span>
-              </div>
-              <div
-                className="d-flex align-items-center px-3 py-2"
-                data-id="createSmartAccount"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onCreateSmartAccount(account)
-                }}
-                style={{
-                  color: 'var(--bs-body-color)',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bs-secondary-bg)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <span className="me-2">
-                  <i className="fas fa-plus" />
-                </span>
-                <span>Create smart account</span>
-              </div>
-              <div
-                className="d-flex align-items-center px-3 py-2"
-                data-id="authorizeDelegation"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onAuthorizeDelegation(account)
-                }}
-                style={{
-                  color: 'var(--bs-body-color)',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bs-secondary-bg)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <span className="me-2">
-                  <i className="fas fa-check" />
-                </span>
-                <span>Authorize delegation</span>
-              </div>
-              <div
-                className="d-flex align-items-center px-3 py-2"
-                data-id="signUsingAccount"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onSignUsingAccount(account)
-                }}
-                style={{
-                  color: 'var(--bs-body-color)',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bs-secondary-bg)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <span className="me-2">
-                  <i className="fa-regular fa-pen-to-square" />
-                </span>
-                <span>Sign using this account</span>
-              </div>
-              <div
-                className="d-flex align-items-center px-3 py-2"
-                data-id="deleteAccount"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDeleteAccount(account)
-                }}
-                style={{
-                  color: 'var(--bs-danger)',
-                  cursor: 'pointer',
-                  borderBottomLeftRadius: 8,
-                  borderBottomRightRadius: 8,
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bs-secondary-bg)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <span className="me-2">
-                  <i className="fas fa-trash" />
-                </span>
-                <span>Delete account</span>
-              </div>
+              {menuItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="d-flex align-items-center px-3 py-2"
+                  data-id={item.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    item.onClick()
+                  }}
+                  style={{
+                    color: item.color,
+                    cursor: 'pointer',
+                    ...(index === 0 && { borderTopLeftRadius: 8, borderTopRightRadius: 8 }),
+                    ...(index === menuItems.length - 1 && { borderBottomLeftRadius: 8, borderBottomRightRadius: 8 })
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bs-secondary-bg)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <span className="me-2">
+                    <i className={item.icon} />
+                  </span>
+                  <span>{item.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </MenuContent>

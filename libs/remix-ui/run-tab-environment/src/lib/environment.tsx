@@ -74,30 +74,6 @@ function EnvironmentWidget({ plugin }: { plugin: EnvironmentPlugin }) {
       }
     })
 
-    plugin.on('blockchain', 'networkStatus', async ({ error, network }) => {
-      // if (error) {
-      //   const netUI = 'can\'t detect network'
-      //   setNetworkNameFromProvider(dispatch, netUI)
-      //   return
-      // }
-      // const networkProvider = await plugin.call('network', 'getNetworkProvider')
-      // const isVM = networkProvider().startsWith('vm') ? true : false
-      // const netUI = !isVM ? `${network.name} (${network.id || '-'}) network` : 'VM'
-      // const pinnedChainId = !isVM ? network.id : networkProvider()
-      // setNetworkNameFromProvider(dispatch, netUI)
-      // setPinnedChainId(dispatch, pinnedChainId)
-
-      // // Check if provider is changed or network is changed for same provider e.g; Metamask
-      // if (currentNetwork.provider !== networkProvider() || (!isVM && currentNetwork.chainId !== network.id)) {
-      //   currentNetwork.provider = networkProvider()
-      //   if (!isVM) {
-      //     fillAccountsList(plugin, dispatch)
-      //     currentNetwork.chainId = network.id
-      //     await loadPinnedContracts(plugin, dispatch, pinnedChainId)
-      //   }
-      // }
-    })
-
     plugin.on('blockchain', 'contextChanged', async (context) => {
       await getAccountsList(plugin, dispatch, widgetState)
       dispatch({ type: 'COMPLETED_LOADING_ALL_ACCOUNTS', payload: null })

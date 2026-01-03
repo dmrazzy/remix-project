@@ -127,9 +127,9 @@ export class ExecutionContext {
     }
   }
 
-  removeProvider (name) {
+  async removeProvider (name) {
     if (name && this.customNetWorks[name]) {
-      if (this.executionContext === name) this.setContext('vm-osaka', null, null, null)
+      if (this.executionContext === name) await this.setContext('vm-osaka')
       delete this.customNetWorks[name]
       this.event.trigger('removeProvider', [name])
     }
@@ -149,12 +149,12 @@ export class ExecutionContext {
     return provider
   }
 
-  setContext (context, endPointUrl, confirmCb, infoCb) {
+  async setContext (context) {
     this.executionContext = context
-    this.executionContextChange(context, endPointUrl, confirmCb, infoCb, null)
+    await this.executionContextChange(context)
   }
 
-  async executionContextChange (value, endPointUrl, confirmCb, infoCb, cb) {
+  async executionContextChange (value) {
     // Track provider change event
     track({
       category: 'udapp',
@@ -163,9 +163,6 @@ export class ExecutionContext {
       isClick: false
     })
     const context = value.context
-    if (!cb) cb = () => { /* Do nothing. */ }
-    if (!confirmCb) confirmCb = () => { /* Do nothing. */ }
-    if (!infoCb) infoCb = () => { /* Do nothing. */ }
     if (this.customNetWorks[context]) {
       this.isConnected = false
       var network = this.customNetWorks[context]
@@ -177,10 +174,9 @@ export class ExecutionContext {
         this.executionContext = context
         this.isConnected = await this._updateChainContext()
         this.event.trigger('contextChanged', [context])
-        cb()
       } catch (e) {
         console.error(e)
-        cb(false)
+        throw e
       }
     }
   }
