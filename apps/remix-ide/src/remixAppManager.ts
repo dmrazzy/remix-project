@@ -102,7 +102,8 @@ let requiredModules = [
   's3Storage',
   'resolutionIndex',
   'vega',
-  'chartjs'
+  'chartjs',
+  'storageMonitor'
 ]
 
 // dependentModules shouldn't be manually activated (e.g hardhat is activated by remixd)
