@@ -47,7 +47,7 @@ export class TxRunnerWeb3 {
     }
 
     const isCreation = !tx.to
-    const provider = tx.provider
+    const provider = tx.provider || await this._api.call('blockchain', 'getProvider')
     const isPersonalMode = provider === 'web3' ? (Registry.getInstance().get('config').api).get('settings/personal-mode') : false
 
     if (isPersonalMode) {
@@ -60,7 +60,7 @@ export class TxRunnerWeb3 {
           okLabel: 'OK',
           okFn: async (value) => {
             try {
-              const web3 = tx.web3
+              const web3 = tx.web3 || await this._api.call('blockchain', 'getWeb3')
               const res = await (await web3.getSigner(tx.from || 0)).sendTransaction({ ...tx, value })
               resolve(await this.broadcastTx(tx, res.hash, isCreation, false, null))
 
@@ -84,7 +84,7 @@ export class TxRunnerWeb3 {
           const { txHash, contractAddress } = await this.sendUserOp(tx, network.id)
           return await this.broadcastTx(tx, txHash, isCreation, true, contractAddress)
         } else {
-          const web3 = tx.web3
+          const web3 = tx.web3 || await this._api.call('blockchain', 'getWeb3')
           const res = await (await web3.getSigner(tx.from)).sendTransaction(tx)
 
           return await this.broadcastTx(tx, res.hash, isCreation, false, null)
@@ -108,7 +108,7 @@ export class TxRunnerWeb3 {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve, reject) => {
       try {
-        const web3 = tx.web3
+        const web3 = tx.web3 || await this._api.call('blockchain', 'getWeb3')
         const receipt = await tryTillReceiptAvailable(resp, web3)
         const originTo = tx.to
         tx = await tryTillTxAvailable(resp, web3)
@@ -151,7 +151,7 @@ export class TxRunnerWeb3 {
     if (!from) throw new Error('the value of "from" is not defined. Please make sure an account is selected.')
     if (useCall) {
       const isVM = await this._api.call('blockchain', 'isVM')
-      const web3 = tx.web3
+      const web3 = tx.web3 || await this._api.call('blockchain', 'getWeb3')
       if (isVM) {
         web3.remix.registerCallId(timestamp)
       }
@@ -175,7 +175,7 @@ export class TxRunnerWeb3 {
         txCopy.gasPrice = undefined
       }
     }
-    const ethersProvider = tx.web3
+    const ethersProvider = tx.web3 || await this._api.call('blockchain', 'getWeb3')
     const config = Registry.getInstance().get('config').api
 
     try {
@@ -218,14 +218,11 @@ export class TxRunnerWeb3 {
         return
       }
       if (network.name === 'VM') {
-        const defaultGasLimit = 3000000
-        tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
-
-        if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
-          return await this._executeTx(tx, network, null)
-        }
-        return await this.confirmTransaction(tx, network, tx['gasLimit'])
+        return await this._executeTx(tx, network, null)
       } else {
+        const defaultGasLimit = 3000000
+
+        tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
         if (tx.fromSmartAccount && tx.value === "0" &&
               err && err.message && err.message.includes('missing revert data')
         ) {
@@ -239,7 +236,6 @@ export class TxRunnerWeb3 {
           if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
             return await this._executeTx(tx, network, null)
           }
-
           return await this.confirmTransaction(tx, network, tx['gasLimit'])
         } else {
           let msg = ''

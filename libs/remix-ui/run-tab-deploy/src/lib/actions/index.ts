@@ -109,8 +109,15 @@ export function deployContract(selectedContract: ContractData, args: string, dep
         title: 'Deploy Implementation & Proxy (ERC1967)',
         message: deployWithProxyMsg(),
         okLabel: intl.formatMessage({ id: 'udapp.proceed' }),
-        okFn: () => {
-          createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
+        okFn: async () => {
+          try {
+            const contract = await createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
+            const initABI = contract.selectedContract.abi.find(abi => abi.name === 'initialize')
+
+            plugin.call('openzeppelin-proxy', 'executeUUPSProxy', contract.address, args, initABI, contract.selectedContract)
+          } catch (error) {
+            console.error(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error}`)
+          }
         },
         cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
         cancelFn: () => {}
@@ -158,25 +165,24 @@ export const createInstance = async (selectedContract: ContractData, args, deplo
     // return statusCb(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error}`)
   }
   if (overSize && (overSize.overSizeEip170 || overSize.overSizeEip3860)) {
-    plugin.call('notification', 'modal', {
-      id: 'contractCodeSizeOverLimit',
-      title: 'Contract code size over limit',
-      message: isOverSizePrompt(overSize),
-      okLabel: 'Force Send',
-      okFn: async () => {
-        await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
-      },
-      cancelLabel: 'Cancel',
-      cancelFn: () => {
-        // const log = logBuilder(`creation of ${selectedContract.name} canceled by user.`)
-        // return terminalLogger(plugin, log)
-      }
+    return new Promise((resolve, reject) => {
+      plugin.call('notification', 'modal', {
+        id: 'contractCodeSizeOverLimit',
+        title: 'Contract code size over limit',
+        message: isOverSizePrompt(overSize),
+        okLabel: 'Force Send',
+        okFn: async () => {
+          await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
+          resolve(undefined)
+        },
+        cancelLabel: 'Cancel',
+        cancelFn: () => {
+          reject(`creation of ${selectedContract.name} canceled by user.`)
+        }
+      })
     })
-    return
   }
-  const contract = await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
-
-  console.log('contract: ', contract)
+  return await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
 }
 
 const deployOnBlockchain = async (selectedContract: ContractData, args: string, contractMetadata: any, compilerContracts: any, plugin: Plugin) => {

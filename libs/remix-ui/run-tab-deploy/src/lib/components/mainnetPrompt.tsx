@@ -91,7 +91,7 @@ export function MainnetPrompt({ udappDeploy, tx, network, amount, gasEstimation 
           </span>
           <span>{tx.gasLimit}</span>
         </div>
-        {network.lastBlock.baseFeePerGas ? (
+        {network?.lastBlock?.baseFeePerGas ? (
           <div>
             <div className="align-items-center my-1" title={intl.formatMessage({ id: 'udapp.title1' })}>
               <div className="d-flex">
