@@ -867,34 +867,68 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
             }
           },
           cancelFn: async () => {
-            try {
-              await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath)
-            } catch (e) {
-              console.error('[CloudWorkspacesPlugin] Restore to new workspace failed:', e)
-              await this.call('notification', 'alert', {
-                id: 'restoreError',
-                title: 'Restore Failed',
-                message: e.message || 'Failed to restore backup to new workspace'
-              })
-            }
+            await this.restoreToNewWorkspaceWithNameCheck(backupPath)
           },
           hideFn: () => null
         }
         await this.call('notification', 'modal', restoreModal)
       } else {
-        // Only option is to restore to a new workspace - show confirmation
-        const confirmModal = {
-          id: 'restoreToNewWorkspaceModal',
-          title: 'Restore to New Workspace',
-          message: 'This will create a new workspace and restore the backup to it. Continue?',
+        // Only option is to restore to a new workspace
+        await this.restoreToNewWorkspaceWithNameCheck(backupPath)
+      }
+    } catch (e) {
+      console.error('[CloudWorkspacesPlugin] Restore failed:', e)
+      throw e
+    }
+  }
+
+  /**
+   * Smart restore to new workspace - checks if workspace name exists and prompts user
+   */
+  private async restoreToNewWorkspaceWithNameCheck(backupPath: string): Promise<void> {
+    try {
+      // Get backup metadata to find the original workspace name
+      const backupInfo = await this.call('s3Storage', 'getBackupInfo', backupPath)
+      const originalName = backupInfo.workspaceName
+      
+      // Check if a workspace with this name already exists
+      const workspaceExists = await this.call('filePanel', 'workspaceExists', originalName)
+      
+      if (!workspaceExists) {
+        // Workspace doesn't exist - restore directly to original name
+        await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
+          targetWorkspaceName: originalName
+        })
+      } else {
+        // Workspace exists - ask user what to do
+        const conflictModal = {
+          id: 'restoreWorkspaceConflictModal',
+          title: 'Workspace Already Exists',
+          message: `A workspace named "${originalName}" already exists. What would you like to do?`,
           modalType: 'modal',
-          okLabel: 'Yes, Create New Workspace',
-          cancelLabel: 'Cancel',
+          okLabel: 'Overwrite Existing',
+          cancelLabel: 'Create with New Name',
           okFn: async () => {
             try {
+              await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
+                targetWorkspaceName: originalName,
+                overwriteIfExists: true
+              })
+            } catch (e) {
+              console.error('[CloudWorkspacesPlugin] Restore with overwrite failed:', e)
+              await this.call('notification', 'alert', {
+                id: 'restoreError',
+                title: 'Restore Failed',
+                message: e.message || 'Failed to restore backup'
+              })
+            }
+          },
+          cancelFn: async () => {
+            try {
+              // Let the plugin auto-generate a unique name
               await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath)
             } catch (e) {
-              console.error('[CloudWorkspacesPlugin] Restore to new workspace failed:', e)
+              console.error('[CloudWorkspacesPlugin] Restore with new name failed:', e)
               await this.call('notification', 'alert', {
                 id: 'restoreError',
                 title: 'Restore Failed',
@@ -902,14 +936,17 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
               })
             }
           },
-          cancelFn: () => null,
           hideFn: () => null
         }
-        await this.call('notification', 'modal', confirmModal)
+        await this.call('notification', 'modal', conflictModal)
       }
     } catch (e) {
-      console.error('[CloudWorkspacesPlugin] Restore failed:', e)
-      throw e
+      console.error('[CloudWorkspacesPlugin] Restore to new workspace failed:', e)
+      await this.call('notification', 'alert', {
+        id: 'restoreError',
+        title: 'Restore Failed',
+        message: e.message || 'Failed to restore backup to new workspace'
+      })
     }
   }
 

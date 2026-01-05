@@ -183,6 +183,7 @@ const profile = {
     'backupWorkspace',
     'restoreWorkspace',
     'restoreBackupToNewWorkspace',
+    'getBackupInfo',
     'saveToCloud',
     'forceSaveToCloud',
     'saveToCloudWithConflictCheck',
@@ -1832,11 +1833,98 @@ export class S3StoragePlugin extends Plugin {
   }
 
   /**
+   * Get metadata information from a backup without fully restoring it
+   * Useful for determining workspace name before restore
+   * @param backupPath - Full path like "workspace-id/backups/backup-123.zip"
+   * @returns Backup metadata including original workspace name
+   */
+  async getBackupInfo(backupPath: string): Promise<{
+    workspaceName: string;
+    createdAt: string | null;
+    fileCount: number;
+    isEncrypted: boolean;
+    remoteWorkspaceId: string;
+  }> {
+    const provider = this.ensureProvider()
+    
+    // Parse the backup path into folder and filename
+    const lastSlashIndex = backupPath.lastIndexOf('/')
+    if (lastSlashIndex === -1) {
+      throw new Error('Invalid backup path format')
+    }
+    
+    const backupFolder = backupPath.substring(0, lastSlashIndex)
+    const backupFilename = backupPath.substring(lastSlashIndex + 1)
+    const remoteWorkspaceId = backupPath.split('/')[0]
+    const isEncrypted = backupFilename.endsWith('.enc')
+    
+    // Try to get S3 metadata first (faster, doesn't require download)
+    try {
+      const s3Metadata = await provider.getMetadata(backupPath)
+      if (s3Metadata?.metadata?.['workspace-name']) {
+        return {
+          workspaceName: s3Metadata.metadata['workspace-name'],
+          createdAt: s3Metadata.lastModified || null,
+          fileCount: parseInt(s3Metadata.metadata['file-count'] || '0', 10),
+          isEncrypted,
+          remoteWorkspaceId
+        }
+      }
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not get S3 metadata, will download backup:', e)
+    }
+    
+    // Fallback: Download and extract metadata from zip
+    let content = await this.downloadBinary(backupFilename, backupFolder)
+    
+    if (isEncrypted) {
+      const passphrase = this.getPassphraseOrPrompt()
+      if (!passphrase) {
+        throw new Error('This backup is encrypted. Please enter your encryption passphrase.')
+      }
+      content = await decryptFromBytes(content, passphrase)
+    }
+    
+    const zip = await JSZip.loadAsync(content)
+    const metadataFile = zip.file('_backup_metadata.json')
+    
+    let workspaceName = 'restored-workspace'
+    let createdAt: string | null = null
+    let fileCount = 0
+    
+    if (metadataFile) {
+      try {
+        const metadataStr = await metadataFile.async('string')
+        const metadata = JSON.parse(metadataStr)
+        workspaceName = metadata.workspaceName || workspaceName
+        createdAt = metadata.createdAt || null
+        fileCount = metadata.fileCount || 0
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not parse backup metadata:', e)
+      }
+    }
+    
+    return {
+      workspaceName,
+      createdAt,
+      fileCount,
+      isEncrypted,
+      remoteWorkspaceId
+    }
+  }
+
+  /**
    * Restore a backup to a NEW workspace
    * Creates a new workspace and restores the backup content to it
    * @param backupPath - Full path like "workspace-id/backups/backup-123.zip" or "workspace-id/autosave/autosave-backup.zip"
+   * @param options - Optional settings for restore
+   * @param options.targetWorkspaceName - Name for the new workspace (if not provided, uses metadata name or generates one)
+   * @param options.overwriteIfExists - If true and workspace exists, overwrite it; if false, fail
    */
-  async restoreBackupToNewWorkspace(backupPath: string): Promise<void> {
+  async restoreBackupToNewWorkspace(
+    backupPath: string,
+    options?: { targetWorkspaceName?: string; overwriteIfExists?: boolean }
+  ): Promise<void> {
     const provider = this.ensureProvider()
     
     // Check if user is authenticated
@@ -1897,9 +1985,33 @@ export class S3StoragePlugin extends Plugin {
       }
     }
     
-    // Generate a unique name for the new workspace
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const newWorkspaceName = `${originalWorkspaceName}-restored-${timestamp}`
+    // Determine the target workspace name
+    let newWorkspaceName: string
+    
+    if (options?.targetWorkspaceName) {
+      // Use the provided target name
+      newWorkspaceName = options.targetWorkspaceName
+    } else {
+      // Default: use original name if available
+      newWorkspaceName = originalWorkspaceName
+    }
+    
+    // Check if workspace already exists
+    const workspaceExists = await this.call('filePanel', 'workspaceExists', newWorkspaceName)
+    
+    if (workspaceExists) {
+      if (options?.overwriteIfExists) {
+        // Delete the existing workspace first
+        console.log(`[S3StoragePlugin] Overwriting existing workspace: ${newWorkspaceName}`)
+        await this.call('filePanel', 'deleteWorkspace', newWorkspaceName)
+      } else if (!options?.targetWorkspaceName) {
+        // No explicit target given, so auto-generate a unique name
+        newWorkspaceName = await this.call('filePanel', 'getAvailableWorkspaceName', originalWorkspaceName)
+      } else {
+        // Explicit target given but exists and overwrite not allowed - error
+        throw new Error(`Workspace "${newWorkspaceName}" already exists. Use overwriteIfExists option or choose a different name.`)
+      }
+    }
     
     // Create the new workspace (blank template, no need for git)
     await this.call('filePanel', 'createWorkspace', newWorkspaceName, 'blank')
