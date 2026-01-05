@@ -51,7 +51,7 @@ export class EnvironmentPlugin extends Plugin {
   }
 
   getSelectedProvider () {
-    const state = this.getWidgetState?.()
+    const state = this.getWidgetState()
 
     return state?.providers?.selectedProvider
   }

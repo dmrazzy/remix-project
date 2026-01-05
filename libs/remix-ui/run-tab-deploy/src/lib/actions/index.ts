@@ -1,16 +1,18 @@
-import { Actions, CompilationRawResult, OZDeployMode, VisitedContract } from "../types"
-import { Plugin } from "@remixproject/engine"
+import { Actions, CompilationRawResult, OZDeployMode, VisitedContract, NetworkDeploymentFile } from "../types"
 import { trackMatomoEvent } from "@remix-api"
 import { CompilerAbstract } from "@remix-project/remix-solidity"
 import type { ContractData } from "@remix-project/core-plugin"
 import { execution } from '@remix-project/remix-lib'
 import { IntlShape } from "react-intl"
 import { deployWithProxyMsg, isOverSizePrompt } from "@remix-ui/helper"
+// eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
+import type { DeployPlugin } from "apps/remix-ide/src/app/udapp/udappDeploy"
+import { WidgetState } from "@remix-ui/run-tab-environment"
 
-export async function broadcastCompilationResult (compilerName: string, compileRawResult: CompilationRawResult, plugin: Plugin, dispatch: React.Dispatch<Actions>) {
+export async function broadcastCompilationResult (compilerName: string, compileRawResult: CompilationRawResult, plugin: DeployPlugin, dispatch: React.Dispatch<Actions>) {
   const { file, source, languageVersion, data, input } = compileRawResult
   await trackMatomoEvent(plugin, { category: 'udapp', action: 'broadcastCompilationResult', name: compilerName, isClick: false })
-  // TODO check whether the tab is configured
+
   const compiler = new CompilerAbstract(languageVersion, data, source, input)
   await plugin.call('compilerArtefacts', 'saveCompilerAbstract', file, compiler)
 
@@ -22,18 +24,17 @@ export async function broadcastCompilationResult (compilerName: string, compileR
       } else {
         const isUpgradeable = await plugin.call('openzeppelin-proxy', 'isConcerned', data.sources && data.sources[file] ? data.sources[file].ast : {})
 
-        let proxyOptions = null
+        let deployOptions = null
         if (isUpgradeable) {
           try {
             const contractProxyOptions = await plugin.call('openzeppelin-proxy', 'getProxyOptions', data, file)
 
-            proxyOptions = contractProxyOptions[contract.name].initializeOptions.inputs
+            deployOptions = contractProxyOptions[contract.name].initializeOptions.inputs
           } catch (error) {
             console.error('Error fetching proxy options:', error)
           }
         }
-
-        dispatch({ type: 'UPDATE_COMPILED_CONTRACT', payload: { name: contract.name, filePath: file, contractData: contract, isUpgradeable: isUpgradeable, proxyOptions } })
+        dispatch({ type: 'UPDATE_COMPILED_CONTRACT', payload: { name: contract.name, filePath: file, contractData: contract, isUpgradeable: isUpgradeable, deployOptions } })
       }
     })
   }
@@ -91,7 +92,7 @@ function getContractData (contractName: string, compiler: CompilerAbstract): Con
   }
 }
 
-export function deployContract(selectedContract: ContractData, args: string, deployMode: OZDeployMode, plugin: Plugin, intl: IntlShape, dispatch: React.Dispatch<Actions>) {
+export function deployContract(selectedContract: ContractData, args: string, deployMode: OZDeployMode, plugin: DeployPlugin, intl: IntlShape, dispatch: React.Dispatch<Actions>) {
   const isProxyDeployment = deployMode.deployWithProxy
   const isContractUpgrade = deployMode.upgradeWithProxy
 
@@ -131,7 +132,7 @@ export function deployContract(selectedContract: ContractData, args: string, dep
     //       intl.formatMessage({ id: 'udapp.proceed' }),
     //       () => {
     //         props.createInstance(
-    //           loadedContractData,
+    //           loadedContractData,for="upgradeImplementation"
     //           props.gasEstimationPrompt,
     //           props.passphrasePrompt,
     //           props.publishToStorage,
@@ -151,7 +152,7 @@ export function deployContract(selectedContract: ContractData, args: string, dep
   }
 }
 
-export const createInstance = async (selectedContract: ContractData, args, deployMode: OZDeployMode, isVerifyChecked: boolean, plugin: Plugin, dispatch: React.Dispatch<Actions>) => {
+async function createInstance(selectedContract: ContractData, args, deployMode: OZDeployMode, isVerifyChecked: boolean, plugin: DeployPlugin, dispatch: React.Dispatch<Actions>) {
   let contractMetadata
   try {
     contractMetadata = await plugin.call('compilerMetadata', 'deployMetadataOf', selectedContract.name, selectedContract.contract.file)
@@ -187,7 +188,7 @@ export const createInstance = async (selectedContract: ContractData, args, deplo
   return await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
 }
 
-const deployOnBlockchain = async (selectedContract: ContractData, args: string, contractMetadata: any, compilerContracts: any, plugin: Plugin) => {
+async function deployOnBlockchain (selectedContract: ContractData, args: string, contractMetadata: any, compilerContracts: any, plugin: DeployPlugin) {
   // trackMatomoEvent(plugin, { category: 'udapp', action: 'DeployContractTo', name: plugin.REACT_API.networkName, isClick: true })
   if (!contractMetadata || (contractMetadata && contractMetadata.autoDeployLib)) {
     return await plugin.call('blockchain', 'deployContractAndLibraries', selectedContract, args, contractMetadata, compilerContracts)
@@ -196,6 +197,28 @@ const deployOnBlockchain = async (selectedContract: ContractData, args: string, 
     // statusCb(`linking ${JSON.stringify(selectedContract.bytecodeLinkReferences, null, '\t')} using ${JSON.stringify(contractMetadata.linkReferences, null, '\t')}`)
   }
   return await plugin.call('blockchain', 'deployContractWithLibrary', selectedContract, args, contractMetadata, compilerContracts)
+}
+
+export async function getNetworkProxyAddresses (plugin: DeployPlugin) {
+  const networkStatus = await plugin.call('blockchain', 'detectNetwork')
+  const networkName = networkStatus.name === 'VM' ? await plugin.call('blockchain', 'getProvider') : networkStatus.name
+  const identifier = networkName === 'custom' ? networkName + '-' + networkStatus.id : networkName
+  const networkDeploymentsExists = await plugin.call('fileManager', 'exists', `.deploys/upgradeable-contracts/${identifier}/UUPS.json`)
+
+  if (networkDeploymentsExists) {
+    const networkFile: string = await plugin.call('fileManager', 'readFile', `.deploys/upgradeable-contracts/${identifier}/UUPS.json`)
+    const parsedNetworkFile: NetworkDeploymentFile = JSON.parse(networkFile)
+    const deployments = []
+
+    for (const proxyAddress of Object.keys(parsedNetworkFile.deployments)) {
+      if (parsedNetworkFile.deployments[proxyAddress] && parsedNetworkFile.deployments[proxyAddress].implementationAddress) {
+        const solcBuildExists = await plugin.call('fileManager', 'exists', `.deploys/upgradeable-contracts/${identifier}/solc-${parsedNetworkFile.deployments[proxyAddress].implementationAddress}.json`)
+
+        if (solcBuildExists) deployments.push({ address: proxyAddress, date: parsedNetworkFile.deployments[proxyAddress].date, contractName: parsedNetworkFile.deployments[proxyAddress].contractName })
+      }
+    }
+    return deployments
+  }
 }
 // const statusCb = (msg: string) => {
 //   const log = logBuilder(msg)

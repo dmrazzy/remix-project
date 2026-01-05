@@ -6,14 +6,11 @@ import { Plugin, Engine } from '@remixproject/engine'
 import { Actions, DeployWidgetState } from './types'
 import { broadcastCompilationResult } from './actions'
 import "./css/index.css"
+// eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
+import type { DeployPlugin } from 'apps/remix-ide/src/app/udapp/udappDeploy'
 
 interface DeployWidgetProps {
-  plugin: Plugin & {
-    engine: Engine,
-    editor: any,
-    setStateGetter?: (getter: () => DeployWidgetState) => void,
-    setDispatchGetter?: (getter: () => React.Dispatch<Actions>) => void
-  }
+  plugin: DeployPlugin
 }
 
 function DeployWidget({ plugin }: DeployWidgetProps) {

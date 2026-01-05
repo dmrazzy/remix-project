@@ -7,7 +7,7 @@ import { DeployAppContext } from '../contexts'
 import { Provider } from '@remix-ui/run-tab-environment'
 import { useIntl } from 'react-intl'
 import * as remixLib from '@remix-project/remix-lib'
-import { deployContract } from '../actions'
+import { deployContract, getNetworkProxyAddresses } from '../actions'
 import { ToggleSwitch } from '@remix-ui/toggle'
 import { ContractKebabMenu } from './contractKebabMenu'
 
@@ -28,6 +28,7 @@ function DeployPortraitView() {
   const [deployWithProxy, setDeployWithProxy] = useState<boolean>(true)
   const [upgradeWithProxy, setUpgradeWithProxy] = useState<boolean>(false)
   const [isContractMenuOpen, setIsContractMenuOpen] = useState(false)
+  const [proxyDeployments, setProxyDeployments] = useState<Array<{ address: string, date: Date, contractName: string }>>([])
   const contractKebabIconRef = useRef<HTMLElement>(null)
   const intl = useIntl()
 
@@ -46,6 +47,16 @@ function DeployPortraitView() {
   const selectedContract = useMemo(() => {
     return widgetState.contracts.contractList[selectedContractIndex] || null
   }, [widgetState.contracts.contractList, selectedContractIndex])
+
+  useEffect(() => {
+    (async () => {
+      const deployments = await getNetworkProxyAddresses(plugin)
+
+      console.log('deployments: ', deployments)
+
+      setProxyDeployments(deployments || [])
+    })()
+  }, [selectedProvider, selectedContract])
 
   const constructorInterface = useMemo(() => {
     return selectedContract?.contractData?.getConstructorInterface() || null
@@ -350,10 +361,10 @@ function DeployPortraitView() {
 
             {/* Proxy Options Parameters */}
             {
-              selectedContract?.isUpgradeable && selectedContract?.proxyOptions && selectedContract.proxyOptions.inputs && selectedContract.proxyOptions.inputs.length > 0 && (deployWithProxy || upgradeWithProxy) && (
+              selectedContract?.isUpgradeable && selectedContract?.deployOptions && selectedContract.deployOptions.inputs && selectedContract.deployOptions.inputs.length > 0 && (deployWithProxy || upgradeWithProxy) && (
                 <div className='border-top mt-3'>
                   {
-                    selectedContract.proxyOptions.inputs.map((input, index) => {
+                    selectedContract.deployOptions.inputs.map((input, index) => {
                       const isExpanded = expandedProxyInputs.has(index)
                       const currentValue = proxyInputValues[index] || ''
                       return (

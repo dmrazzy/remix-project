@@ -2,11 +2,13 @@ import { Engine, Plugin } from "@remixproject/engine"
 import { Dispatch } from 'react'
 import { CompilationResult, CompilationSourceCode } from '@remix-project/remix-solidity'
 import type { ContractData, DeployOption } from "@remix-project/core-plugin"
+// eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
+import type { DeployPlugin } from 'apps/remix-ide/src/app/udapp/udappDeploy'
 
 type FilePath = string
 
 export interface DeployAppContextType {
-  plugin: Plugin & { engine: Engine, editor: any }
+  plugin: DeployPlugin
   widgetState: DeployWidgetState
   dispatch: Dispatch<Actions>
 }
@@ -70,7 +72,7 @@ export type CompiledContractPayload = {
   filePath: FilePath,
   contractData: ContractData,
   isUpgradeable: boolean,
-  proxyOptions?: DeployOption['inputs']
+  deployOptions?: DeployOption['inputs']
 }
 
 export type DeployUdappTx = {
@@ -91,5 +93,17 @@ export type OZDeployMode = {
   deployWithProxy: boolean,
   upgradeWithProxy: boolean,
   deployArgs?: string
+}
+export interface NetworkDeploymentFile {
+  id: string,
+  network: string,
+  deployments: {
+      [proxyAddress: string]: {
+          date: Date,
+          contractName: string,
+          fork: string,
+          implementationAddress: string
+      }
+  }[]
 }
 
