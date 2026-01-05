@@ -289,7 +289,12 @@ function DeployPortraitView() {
                       <ToggleSwitch
                         id={`deployWithProxyToggle`}
                         isOn={deployWithProxy}
-                        onClick={() => setDeployWithProxy(!deployWithProxy)}
+                        onClick={() => {
+                          if (!deployWithProxy) {
+                            setUpgradeWithProxy(false)
+                          }
+                          setDeployWithProxy(!deployWithProxy)
+                        }}
                       />
                     </div>
                   </div>
@@ -305,7 +310,12 @@ function DeployPortraitView() {
                       <ToggleSwitch
                         id={`upgradeWithProxyToggle`}
                         isOn={upgradeWithProxy}
-                        onClick={() => setUpgradeWithProxy(!upgradeWithProxy)}
+                        onClick={() => {
+                          if (!upgradeWithProxy) {
+                            setDeployWithProxy(false)
+                          }
+                          setUpgradeWithProxy(!upgradeWithProxy)
+                        }}
                       />
                     </div>
                   </div>
