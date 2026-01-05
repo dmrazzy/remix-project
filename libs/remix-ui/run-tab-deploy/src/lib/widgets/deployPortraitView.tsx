@@ -102,8 +102,11 @@ function DeployPortraitView() {
 
   const handleDeployClick = () => {
     const args = getMultiValsString(Object.values(inputValues))
+    const proxyOptions = selectedContract?.isUpgradeable
+      ? { deployWithProxy, upgradeWithProxy }
+      : { deployWithProxy: false, upgradeWithProxy: false }
 
-    deployContract(selectedContract?.contractData, args, { deployWithProxy, upgradeWithProxy }, plugin, intl, dispatch)
+    deployContract(selectedContract?.contractData, args, proxyOptions, plugin, intl, dispatch)
   }
 
   const handleKebabClick = (e: React.MouseEvent) => {
