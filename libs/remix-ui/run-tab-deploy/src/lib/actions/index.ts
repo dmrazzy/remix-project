@@ -13,8 +13,6 @@ export async function broadcastCompilationResult (compilerName: string, compileR
   // TODO check whether the tab is configured
   const compiler = new CompilerAbstract(languageVersion, data, source, input)
   await plugin.call('compilerArtefacts', 'saveCompilerAbstract', file, compiler)
-  // plugin.compilersArtefacts[languageVersion] = compiler
-  // plugin.compilersArtefacts.__last = compiler
 
   const contracts = getCompiledContracts(compiler)
   if (contracts.length > 0) {
@@ -23,18 +21,22 @@ export async function broadcastCompilationResult (compilerName: string, compileR
         dispatch({ type: 'UPDATE_COMPILED_CONTRACT', payload: { name: contract.name, filePath: file, contractData: contract, isUpgradeable: false } })
       } else {
         const isUpgradeable = await plugin.call('openzeppelin-proxy', 'isConcerned', data.sources && data.sources[file] ? data.sources[file].ast : {})
-        dispatch({ type: 'UPDATE_COMPILED_CONTRACT', payload: { name: contract.name, filePath: file, contractData: contract, isUpgradeable: isUpgradeable } })
+
+        let proxyOptions = null
+        if (isUpgradeable) {
+          try {
+            const contractProxyOptions = await plugin.call('openzeppelin-proxy', 'getProxyOptions', data, file)
+
+            proxyOptions = contractProxyOptions[contract.name].initializeOptions.inputs
+          } catch (error) {
+            console.error('Error fetching proxy options:', error)
+          }
+        }
+
+        dispatch({ type: 'UPDATE_COMPILED_CONTRACT', payload: { name: contract.name, filePath: file, contractData: contract, isUpgradeable: isUpgradeable, proxyOptions } })
       }
     })
   }
-
-  // if (isUpgradeable) {
-  //   const options = await plugin.call('openzeppelin-proxy', 'getProxyOptions', data, file)
-
-  //   dispatch(addDeployOption({ [file]: options }))
-  // } else {
-  //   dispatch(addDeployOption({ [file]: {} }))
-  // }
 }
 
 function getCompiledContracts (compiler: CompilerAbstract) {
@@ -114,7 +116,7 @@ export function deployContract(selectedContract: ContractData, args: string, dep
             const contract = await createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
             const initABI = contract.selectedContract.abi.find(abi => abi.name === 'initialize')
 
-            plugin.call('openzeppelin-proxy', 'executeUUPSProxy', contract.address, args, initABI, contract.selectedContract)
+            plugin.call('openzeppelin-proxy', 'executeUUPSProxy', contract.address, deployMode.deployArgs, initABI, contract.selectedContract)
           } catch (error) {
             console.error(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error}`)
           }

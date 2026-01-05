@@ -44,6 +44,7 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
       filePath: action.payload.filePath,
       contractData: action.payload.contractData,
       isUpgradeable: action.payload.isUpgradeable,
+      proxyOptions: action.payload.proxyOptions,
       isCompiled: true,
       isCompiling: false
     }
@@ -52,6 +53,7 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
     if (existingContract) {
       existingContract.contractData = action.payload.contractData
       existingContract.isUpgradeable = action.payload.isUpgradeable
+      existingContract.proxyOptions = action.payload.proxyOptions
       existingContract.isCompiled = true
       existingContract.isCompiling = false
     } else {

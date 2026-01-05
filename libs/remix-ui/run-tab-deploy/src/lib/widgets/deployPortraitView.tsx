@@ -23,7 +23,9 @@ function DeployPortraitView() {
   const [selectedContractIndex, setSelectedContractIndex] = useState<number | null>(0)
   const [expandedInputs, setExpandedInputs] = useState<Set<number>>(new Set())
   const [inputValues, setInputValues] = useState<{[key: number]: string}>({})
-  const [deployWithProxy, setDeployWithProxy] = useState<boolean>(false)
+  const [expandedProxyInputs, setExpandedProxyInputs] = useState<Set<number>>(new Set())
+  const [proxyInputValues, setProxyInputValues] = useState<{[key: number]: string}>({})
+  const [deployWithProxy, setDeployWithProxy] = useState<boolean>(true)
   const [upgradeWithProxy, setUpgradeWithProxy] = useState<boolean>(false)
   const [isContractMenuOpen, setIsContractMenuOpen] = useState(false)
   const contractKebabIconRef = useRef<HTMLElement>(null)
@@ -100,10 +102,30 @@ function DeployPortraitView() {
     }))
   }
 
+  const toggleProxyInputExpansion = (index: number) => {
+    setExpandedProxyInputs(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
+
+  const handleProxyInputChange = (index: number, value: string) => {
+    setProxyInputValues(prev => ({
+      ...prev,
+      [index]: value
+    }))
+  }
+
   const handleDeployClick = () => {
     const args = getMultiValsString(Object.values(inputValues))
+    const deployArgs = getMultiValsString(Object.values(proxyInputValues))
     const proxyOptions = selectedContract?.isUpgradeable
-      ? { deployWithProxy, upgradeWithProxy }
+      ? { deployWithProxy, upgradeWithProxy, deployArgs }
       : { deployWithProxy: false, upgradeWithProxy: false }
 
     deployContract(selectedContract?.contractData, args, proxyOptions, plugin, intl, dispatch)
@@ -235,7 +257,7 @@ function DeployPortraitView() {
                 {widgetState.contracts.contractList.length > 0 && (
                   <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
                     {widgetState.contracts.contractList.map((contract, index) => (
-                      <Dropdown.Item key={contract.filePath} className="d-flex align-items-center contract-dropdown-item-hover" onClick={() => setSelectedContractIndex(index)}>
+                      <Dropdown.Item key={`${contract.filePath}:${contract.name}`} className="d-flex align-items-center contract-dropdown-item-hover" onClick={() => setSelectedContractIndex(index)}>
                         <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                           <div className="d-flex align-items-center justify-content-between w-100">
                             <div className='d-flex flex-column align-items-start'>
@@ -325,6 +347,72 @@ function DeployPortraitView() {
                 </div>
               </>
             )}
+
+            {/* Proxy Options Parameters */}
+            {
+              selectedContract?.isUpgradeable && selectedContract?.proxyOptions && selectedContract.proxyOptions.inputs && selectedContract.proxyOptions.inputs.length > 0 && (deployWithProxy || upgradeWithProxy) && (
+                <div className='border-top mt-3'>
+                  {
+                    selectedContract.proxyOptions.inputs.map((input, index) => {
+                      const isExpanded = expandedProxyInputs.has(index)
+                      const currentValue = proxyInputValues[index] || ''
+                      return (
+                        <div key={index} className="my-3">
+                          <div className="d-flex gap-2">
+                            <div
+                              className='btn border-0 p-0'
+                              style={{ minWidth: '120px', cursor: 'pointer' }}
+                              onClick={() => toggleProxyInputExpansion(index)}
+                            >
+                              <div className='d-flex flex-column align-items-start'>
+                                <span className="small text-white">{input.name}</span>
+                                <span className="text-secondary font-weight-light" style={{ fontSize: '0.7rem' }}>{input.type}</span>
+                              </div>
+                            </div>
+                            {!isExpanded && (
+                              <div className="position-relative flex-fill input-with-copy-hover">
+                                <input
+                                  type="text"
+                                  className="form-control form-control-sm border-0"
+                                  placeholder={input.type}
+                                  value={currentValue}
+                                  onChange={(e) => handleProxyInputChange(index, e.target.value)}
+                                  style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '30px' }}
+                                />
+                                <div className="copy-icon-hover" style={{ position: 'absolute', right: '8px', top: '40%', transform: 'translateY(-50%)', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
+                                  <CopyToClipboard tip="Copy" icon="fa-copy" direction="top" getContent={() => currentValue}>
+                                    <span style={{ pointerEvents: 'auto' }}>
+                                      <i className="far fa-copy" style={{ color: 'var(--bs-secondary)', fontSize: '0.75rem' }}></i>
+                                    </span>
+                                  </CopyToClipboard>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {isExpanded && (
+                            <div className="mt-2 position-relative input-with-copy-hover">
+                              <textarea
+                                className="form-control form-control-sm border-0"
+                                placeholder={input.type}
+                                value={currentValue}
+                                onChange={(e) => handleProxyInputChange(index, e.target.value)}
+                                style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '80px', resize: 'vertical' }}
+                              />
+                              <div className="copy-icon-hover" style={{ position: 'absolute', right: '8px', top: '8px', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
+                                <CopyToClipboard tip="Copy" icon="fa-copy" direction="top" getContent={() => currentValue}>
+                                  <span style={{ pointerEvents: 'auto' }}>
+                                    <i className="far fa-copy" style={{ color: 'var(--bs-secondary)', fontSize: '0.75rem' }}></i>
+                                  </span>
+                                </CopyToClipboard>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              )}
 
             {/* Constructor Parameters */}
             {

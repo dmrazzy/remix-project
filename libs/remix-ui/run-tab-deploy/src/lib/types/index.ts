@@ -1,7 +1,7 @@
 import { Engine, Plugin } from "@remixproject/engine"
 import { Dispatch } from 'react'
 import { CompilationResult, CompilationSourceCode } from '@remix-project/remix-solidity'
-import type { ContractData } from "@remix-project/core-plugin"
+import type { ContractData, DeployOption } from "@remix-project/core-plugin"
 
 type FilePath = string
 
@@ -69,7 +69,8 @@ export type CompiledContractPayload = {
   name: string,
   filePath: FilePath,
   contractData: ContractData,
-  isUpgradeable: boolean
+  isUpgradeable: boolean,
+  proxyOptions?: DeployOption['inputs']
 }
 
 export type DeployUdappTx = {
@@ -88,6 +89,7 @@ export type DeployUdappNetwork = {
 
 export type OZDeployMode = {
   deployWithProxy: boolean,
-  upgradeWithProxy: boolean
+  upgradeWithProxy: boolean,
+  deployArgs?: string
 }
 

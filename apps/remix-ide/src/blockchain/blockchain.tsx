@@ -389,17 +389,12 @@ export class Blockchain extends Plugin {
 
   async runProxyTx(proxyData, implementationContractObject) {
     const args = { useCall: false, data: proxyData }
-    let networkInfo
-    const confirmationCb = (network, tx, gasEstimation, continueTxExecution, cancelCb) => {
-      networkInfo = network
-      // continue using original authorization given by user
-      continueTxExecution(null)
-    }
+
     try {
       const result = await this.runTx(args)
       const { address } = result
 
-      await this.saveDeployedContractStorageLayout(implementationContractObject, address, networkInfo)
+      await this.saveDeployedContractStorageLayout(implementationContractObject, address)
       this.events.emit('newProxyDeployment', address, new Date().toISOString(), implementationContractObject.contractName)
       trackMatomoEvent(this, { category: 'blockchain', action: 'deployWithProxy', name: 'Proxy deployment successful', isClick: false })
       this.call('udapp', 'addInstance', addressToString(address), implementationContractObject.abi, implementationContractObject.name, implementationContractObject)
@@ -434,15 +429,10 @@ export class Blockchain extends Plugin {
 
   async runUpgradeTx(proxyAddress, data, newImplementationContractObject) {
     const args = { useCall: false, data, to: proxyAddress }
-    let networkInfo
-    const confirmationCb = (network, tx, gasEstimation, continueTxExecution, cancelCb) => {
-      // continue using original authorization given by user
-      networkInfo = network
-      continueTxExecution(null)
-    }
+
     try {
       await this.runTx(args)
-      await this.saveDeployedContractStorageLayout(newImplementationContractObject, proxyAddress, networkInfo)
+      await this.saveDeployedContractStorageLayout(newImplementationContractObject, proxyAddress)
       trackMatomoEvent(this, { category: 'blockchain', action: 'upgradeWithProxy', name: 'Upgrade Successful', isClick: false })
       this.call('udapp', 'addInstance', addressToString(proxyAddress), newImplementationContractObject.abi, newImplementationContractObject.name, newImplementationContractObject)
     } catch (error) {
@@ -452,7 +442,8 @@ export class Blockchain extends Plugin {
     }
   }
 
-  async saveDeployedContractStorageLayout(contractObject, proxyAddress, networkInfo) {
+  async saveDeployedContractStorageLayout(contractObject, proxyAddress) {
+    const networkInfo = this.getCurrentNetworkStatus().network
     const { contractName, implementationAddress } = contractObject
     const networkName = networkInfo.name === 'custom' ? networkInfo.name + '-' + networkInfo.id : networkInfo.name === 'VM' ? networkInfo.name.toLowerCase() + '-' + this.getCurrentFork() : networkInfo.name
     const hasPreviousDeploys = await this.call('fileManager', 'exists', `.deploys/upgradeable-contracts/${networkName}/UUPS.json`)
@@ -471,7 +462,7 @@ export class Blockchain extends Plugin {
       parsedDeployments.deployments[proxyAddress] = {
         date: new Date().toISOString(),
         contractName: contractName,
-        fork: networkInfo.currentFork,
+        fork: this.getCurrentFork(),
         implementationAddress: implementationAddress,
         solcOutput: contractObject.compiler.data,
         solcInput: contractObject.compiler.source
@@ -516,7 +507,7 @@ export class Blockchain extends Plugin {
               [proxyAddress]: {
                 date: new Date().toISOString(),
                 contractName: contractName,
-                fork: networkInfo.currentFork,
+                fork: this.getCurrentFork(),
                 implementationAddress: implementationAddress
               }
             }
