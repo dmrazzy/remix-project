@@ -135,7 +135,6 @@ export const widgetReducer = (state = widgetInitialState, action: Actions): Widg
   }
 
   case 'SET_ACCOUNTS': {
-    console.log('SET_ACCOUNTS', action.payload)
     return {
       ...state,
       accounts: {

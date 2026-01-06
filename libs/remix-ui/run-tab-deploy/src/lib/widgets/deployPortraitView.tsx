@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { FormattedMessage } from 'react-intl'
 import { Dropdown } from 'react-bootstrap'
-import { AddressToggle, CustomMenu, CustomToggle, extractNameFromKey, getMultiValsString } from '@remix-ui/helper'
+import { AddressToggle, CustomMenu, CustomToggle, extractNameFromKey, getMultiValsString, ProxyAddressToggle, ProxyDropdownMenu, shortenDate, shortenProxyAddress } from '@remix-ui/helper'
 import { CopyToClipboard } from '@remix-ui/clipboard'
 import { DeployAppContext } from '../contexts'
 import { Provider } from '@remix-ui/run-tab-environment'
@@ -29,6 +29,8 @@ function DeployPortraitView() {
   const [upgradeWithProxy, setUpgradeWithProxy] = useState<boolean>(false)
   const [isContractMenuOpen, setIsContractMenuOpen] = useState(false)
   const [proxyDeployments, setProxyDeployments] = useState<Array<{ address: string, date: Date, contractName: string }>>([])
+  const [proxyAddress, setProxyAddress] = useState<string>('')
+  const [showProxyDropdown, setShowProxyDropdown] = useState<boolean>(false)
   const contractKebabIconRef = useRef<HTMLElement>(null)
   const intl = useIntl()
 
@@ -51,8 +53,6 @@ function DeployPortraitView() {
   useEffect(() => {
     (async () => {
       const deployments = await getNetworkProxyAddresses(plugin)
-
-      console.log('deployments: ', deployments)
 
       setProxyDeployments(deployments || [])
     })()
@@ -134,7 +134,7 @@ function DeployPortraitView() {
 
   const handleDeployClick = () => {
     const args = getMultiValsString(Object.values(inputValues))
-    const deployArgs = getMultiValsString(Object.values(proxyInputValues))
+    const deployArgs = deployWithProxy ?getMultiValsString(Object.values(proxyInputValues)) : proxyAddress
     const proxyOptions = selectedContract?.isUpgradeable
       ? { deployWithProxy, upgradeWithProxy, deployArgs }
       : { deployWithProxy: false, upgradeWithProxy: false }
@@ -162,6 +162,20 @@ function DeployPortraitView() {
       return intl.formatMessage({ id: 'udapp.noBytecodeAvailable' })
     }
     return selectedContract.contractData.bytecodeObject
+  }
+
+  const switchProxyAddress = (address: string) => {
+    setProxyAddress(address)
+    setShowProxyDropdown(false)
+  }
+
+  const toggleProxyDropdown = (isOpen: boolean) => {
+    setShowProxyDropdown(isOpen)
+  }
+
+  const handleProxyAddressChange = (e: any) => {
+    const address = e.target.value
+    setProxyAddress(address)
   }
 
   return (
@@ -359,9 +373,56 @@ function DeployPortraitView() {
               </>
             )}
 
-            {/* Proxy Options Parameters */}
+            {/* Proxy Dropdown - Only show when upgrading with proxy */}
             {
-              selectedContract?.isUpgradeable && selectedContract?.deployOptions && selectedContract.deployOptions.inputs && selectedContract.deployOptions.inputs.length > 0 && (deployWithProxy || upgradeWithProxy) && (
+              selectedContract?.isUpgradeable && upgradeWithProxy && (
+                <div className='border-top my-3 pt-3'>
+                  <div data-id="proxy-dropdown-items">
+                    <Dropdown onToggle={toggleProxyDropdown} show={showProxyDropdown}>
+                      <Dropdown.Toggle
+                        id="dropdown-custom-proxy-components"
+                        as={ProxyAddressToggle}
+                        address={proxyAddress}
+                        onChange={handleProxyAddressChange}
+                        className="d-inline-block border border-dark"
+                        style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', width: '100%' }}
+                      />
+
+                      {proxyDeployments.length > 0 && (
+                        <Dropdown.Menu as={ProxyDropdownMenu} className="w-100 form-select" style={{ overflow: 'hidden', backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
+                          {proxyDeployments.map((deployment, index) => (
+                            <Dropdown.Item
+                              key={index}
+                              onClick={() => {
+                                switchProxyAddress(deployment.address)
+                              }}
+                              data-id={`proxyAddress${index}`}
+                              className="d-flex align-items-center px-2"
+                              style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}
+                            >
+                              <span style={{ color: 'white' }}>
+                                {proxyAddress === deployment.address ? (
+                                  <span>&#10003; {deployment.contractName + ' ' + shortenProxyAddress(deployment.address)} </span>
+                                ) : (
+                                  <span>{deployment.contractName + ' ' + shortenProxyAddress(deployment.address)}</span>
+                                )}
+                              </span>
+                              <span className="ms-2 text-secondary small">
+                                {shortenDate(deployment.date.toString())}
+                              </span>
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      )}
+                    </Dropdown>
+                  </div>
+                </div>
+              )
+            }
+
+            {/* Proxy Options Parameters - Only show when deploying with proxy */}
+            {
+              selectedContract?.isUpgradeable && selectedContract?.deployOptions && selectedContract.deployOptions.inputs && selectedContract.deployOptions.inputs.length > 0 && deployWithProxy && (
                 <div className='border-top mt-3'>
                   {
                     selectedContract.deployOptions.inputs.map((input, index) => {

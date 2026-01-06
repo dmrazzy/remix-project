@@ -4,6 +4,7 @@ import { CompilationResult, CompilationSourceCode } from '@remix-project/remix-s
 import type { ContractData, DeployOption } from "@remix-project/core-plugin"
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import type { DeployPlugin } from 'apps/remix-ide/src/app/udapp/udappDeploy'
+import { SolcInput, SolcOutput } from "@openzeppelin/upgrades-core"
 
 type FilePath = string
 
@@ -107,3 +108,7 @@ export interface NetworkDeploymentFile {
   }[]
 }
 
+export interface SolcBuildFile {
+  solcInput: SolcInput,
+  solcOutput: SolcOutput
+}

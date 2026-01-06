@@ -190,7 +190,7 @@ export const ProxyAddressToggle = React.forwardRef(
           className="udapp_input form-control"
           value={address}
           placeholder={intl.formatMessage({ id: 'udapp.enterProxyAddress' })}
-          style={{ width: '100%' }}
+          style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', width: '100%' }}
           data-id="ERC1967AddressInput"
         />
       </div>

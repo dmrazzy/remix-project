@@ -1,13 +1,16 @@
 import { Actions, CompilationRawResult, OZDeployMode, VisitedContract, NetworkDeploymentFile } from "../types"
 import { trackMatomoEvent } from "@remix-api"
 import { CompilerAbstract } from "@remix-project/remix-solidity"
-import type { ContractData } from "@remix-project/core-plugin"
+import type { ContractData, SolcBuildFile } from "@remix-project/core-plugin"
 import { execution } from '@remix-project/remix-lib'
 import { IntlShape } from "react-intl"
-import { deployWithProxyMsg, isOverSizePrompt } from "@remix-ui/helper"
+import { deployWithProxyMsg, isOverSizePrompt, unavailableProxyLayoutMsg, upgradeReportMsg, upgradeWithProxyMsg } from "@remix-ui/helper"
+import { SolcInput, SolcOutput } from "@openzeppelin/upgrades-core"
+import { isAddress } from "ethers"
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import type { DeployPlugin } from "apps/remix-ide/src/app/udapp/udappDeploy"
-import { WidgetState } from "@remix-ui/run-tab-environment"
+// Used direct path to UpgradeableContract class to fix cyclic dependency error from @openzeppelin/upgrades-core library
+import { UpgradeableContract } from '../../../../../../node_modules/@openzeppelin/upgrades-core/dist/standalone'
 
 export async function broadcastCompilationResult (compilerName: string, compileRawResult: CompilationRawResult, plugin: DeployPlugin, dispatch: React.Dispatch<Actions>) {
   const { file, source, languageVersion, data, input } = compileRawResult
@@ -92,7 +95,7 @@ function getContractData (contractName: string, compiler: CompilerAbstract): Con
   }
 }
 
-export function deployContract(selectedContract: ContractData, args: string, deployMode: OZDeployMode, plugin: DeployPlugin, intl: IntlShape, dispatch: React.Dispatch<Actions>) {
+export async function deployContract(selectedContract: ContractData, args: string, deployMode: OZDeployMode, plugin: DeployPlugin, intl: IntlShape, dispatch: React.Dispatch<Actions>) {
   const isProxyDeployment = deployMode.deployWithProxy
   const isContractUpgrade = deployMode.upgradeWithProxy
 
@@ -126,26 +129,48 @@ export function deployContract(selectedContract: ContractData, args: string, dep
         cancelFn: () => {}
       })
     } else if (isContractUpgrade) {
-    //     props.modal(
-    //       'Deploy Implementation & Update Proxy',
-    //       upgradeWithProxyMsg(),
-    //       intl.formatMessage({ id: 'udapp.proceed' }),
-    //       () => {
-    //         props.createInstance(
-    //           loadedContractData,for="upgradeImplementation"
-    //           props.gasEstimationPrompt,
-    //           props.passphrasePrompt,
-    //           props.publishToStorage,
-    //           props.mainnetPrompt,
-    //           isOverSizePrompt,
-    //           args,
-    //           deployMode,
-    //           isVerifyChecked
-    //         )
-    //       },
-    //       intl.formatMessage({ id: 'udapp.cancel' }),
-    //       () => {}
-    //     )
+      if (deployMode.deployArgs === '') {
+        console.error('Proxy address is required')
+      } else {
+        const isValidProxyAddress = await isValidContractAddress(plugin, deployMode.deployArgs)
+
+        if (isValidProxyAddress) {
+          const solcVersion = selectedContract.metadata ? JSON.parse(selectedContract.metadata).compiler.version : ''
+          const upgradeReport: any = await isValidContractUpgrade(plugin, deployMode.deployArgs, selectedContract.name, selectedContract.compiler.source, selectedContract.compiler.data, solcVersion)
+
+          if (upgradeReport.ok) {
+            showUpgradeModal(selectedContract, args, deployMode, plugin, intl, dispatch)
+          } else {
+            if (upgradeReport.warning) {
+              plugin.call('notification', 'modal', {
+                id: 'proxyUpgradeWarning',
+                title: 'Proxy Upgrade Warning',
+                message: unavailableProxyLayoutMsg(),
+                okLabel: 'Proceed',
+                okFn: () => {
+                  showUpgradeModal(selectedContract, args, deployMode, plugin, intl, dispatch)
+                },
+                cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
+                cancelFn: () => {}
+              })
+            } else {
+              plugin.call('notification', 'modal', {
+                id: 'proxyUpgradeError',
+                title: 'Proxy Upgrade Error',
+                message: upgradeReportMsg(upgradeReport),
+                okLabel: 'Continue anyway ',
+                okFn: () => {
+                  showUpgradeModal(selectedContract, args, deployMode, plugin, intl, dispatch)
+                },
+                cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
+                cancelFn: () => {}
+              })
+            }
+          }
+        } else {
+          console.error(intl.formatMessage({ id: 'udapp.proxyAddressError2' }))
+        }
+      }
     } else {
       createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
     }
@@ -199,6 +224,21 @@ async function deployOnBlockchain (selectedContract: ContractData, args: string,
   return await plugin.call('blockchain', 'deployContractWithLibrary', selectedContract, args, contractMetadata, compilerContracts)
 }
 
+function showUpgradeModal(selectedContract: ContractData, args: string, deployMode: OZDeployMode, plugin: DeployPlugin, intl: IntlShape, dispatch: React.Dispatch<Actions>) {
+  plugin.call('notification', 'modal', {
+    id: 'deployImplementationAndUpdateProxy',
+    title: 'Deploy Implementation & Update Proxy',
+    message: upgradeWithProxyMsg(),
+    okLabel: intl.formatMessage({ id: 'udapp.proceed' }),
+    okFn: async () => {
+      const contract = await createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
+      plugin.call('openzeppelin-proxy', 'executeUUPSContractUpgrade', deployMode.deployArgs, contract.address, contract.selectedContract)
+    },
+    cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
+    cancelFn: () => {}
+  })
+}
+
 export async function getNetworkProxyAddresses (plugin: DeployPlugin) {
   const networkStatus = await plugin.call('blockchain', 'detectNetwork')
   const networkName = networkStatus.name === 'VM' ? await plugin.call('blockchain', 'getProvider') : networkStatus.name
@@ -220,6 +260,51 @@ export async function getNetworkProxyAddresses (plugin: DeployPlugin) {
     return deployments
   }
 }
+
+async function isValidContractAddress (plugin: DeployPlugin, address: string) {
+  if (!address) {
+    return false
+  } else {
+    if (isAddress(address)) {
+      return (await plugin.call('blockchain', 'web3')).getCode(address) !== '0x'
+    } else {
+      return false
+    }
+  }
+}
+
+export const isValidContractUpgrade = async (plugin: DeployPlugin, proxyAddress: string, newContractName: string, solcInput: SolcInput, solcOutput: SolcOutput, solcVersion: string) => {
+  // build current contract first to get artefacts.
+  const network = plugin.blockchain.networkStatus.network
+  const identifier = network.name === 'custom' ? network.name + '-' + network.id : network.name === 'VM' ? plugin.blockchain.getProvider() : network.name
+  const networkDeploymentsExists = await plugin.call('fileManager', 'exists', `.deploys/upgradeable-contracts/${identifier}/UUPS.json`)
+
+  if (networkDeploymentsExists) {
+    const networkFile: string = await plugin.call('fileManager', 'readFile', `.deploys/upgradeable-contracts/${identifier}/UUPS.json`)
+    const parsedNetworkFile: NetworkDeploymentFile = JSON.parse(networkFile)
+
+    if (parsedNetworkFile.deployments[proxyAddress] && parsedNetworkFile.deployments[proxyAddress].implementationAddress) {
+      const solcBuildExists = await plugin.call('fileManager', 'exists', `.deploys/upgradeable-contracts/${identifier}/solc-${parsedNetworkFile.deployments[proxyAddress].implementationAddress}.json`)
+
+      if (solcBuildExists) {
+        const solcFile: string = await plugin.call('fileManager', 'readFile', `.deploys/upgradeable-contracts/${identifier}/solc-${parsedNetworkFile.deployments[proxyAddress].implementationAddress}.json`)
+        const parsedSolcFile: SolcBuildFile = JSON.parse(solcFile)
+        const oldImpl = new UpgradeableContract(parsedNetworkFile.deployments[proxyAddress].contractName, parsedSolcFile.solcInput, parsedSolcFile.solcOutput, { kind: 'uups' }, solcVersion)
+        const newImpl = new UpgradeableContract(newContractName, solcInput, solcOutput, { kind: 'uups' }, solcVersion)
+        const report = oldImpl.getStorageUpgradeReport(newImpl, { kind: 'uups' })
+
+        return report
+      } else {
+        return { ok: false, pass: false, warning: true }
+      }
+    } else {
+      return { ok: false, pass: false, warning: true }
+    }
+  } else {
+    return { ok: false, pass: false, warning: true }
+  }
+}
+
 // const statusCb = (msg: string) => {
 //   const log = logBuilder(msg)
 
