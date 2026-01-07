@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useCallback, useRef, useImperativeHandle, MutableRefObject, useContext } from 'react'
 import '../css/remix-ai-assistant.css'
 
-import { ChatCommandParser, GenerationParams, ChatHistory, HandleStreamResponse, listModels, isOllamaAvailable } from '@remix/remix-ai-core'
+import { ChatCommandParser, GenerationParams, ChatHistory, HandleStreamResponse, listModels, isOllamaAvailable, AIModel, AVAILABLE_MODELS, getDefaultModel } from '@remix/remix-ai-core'
 import { HandleOpenAIResponse, HandleMistralAIResponse, HandleAnthropicResponse, HandleOllamaResponse } from '@remix/remix-ai-core'
+import { useModelAccess } from '../hooks/useModelAccess'
 import '../css/color.css'
 import { Plugin } from '@remixproject/engine'
 import { ModalTypes } from '@remix-ui/app'
@@ -45,11 +46,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [showContextOptions, setShowContextOptions] = useState(false)
-  const [showAssistantOptions, setShowAssistantOptions] = useState(false)
-  const [showModelOptions, setShowModelOptions] = useState(false)
-  const [assistantChoice, setAssistantChoice] = useState<'openai' | 'mistralai' | 'anthropic' | 'ollama'>(
-    'mistralai'
-  )
+  const [showModelSelector, setShowModelSelector] = useState(false)
+  const [showOllamaModelSelector, setShowOllamaModelSelector] = useState(false)
+  const [selectedModelId, setSelectedModelId] = useState<string>(getDefaultModel().id)
+  const [selectedModel, setSelectedModel] = useState<AIModel>(getDefaultModel())
+  const [ollamaModels, setOllamaModels] = useState<string[]>([])
+  const [selectedOllamaModel, setSelectedOllamaModel] = useState<string | null>(null)
   const [contextChoice, setContextChoice] = useState<'none' | 'current' | 'opened' | 'workspace'>(
     'none'
   )
@@ -64,8 +66,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const trackMatomoEvent = <T extends MatomoEvent = AIEvent>(event: T) => {
     baseTrackEvent?.<T>(event)
   }
-  const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const modelAccess = useModelAccess()
   const [isOllamaFailureFallback, setIsOllamaFailureFallback] = useState(false)
   const [aiMode, setAiMode] = useState<'ask' | 'edit'>('ask')
   const [themeTracker, setThemeTracker] = useState(null)
@@ -78,6 +79,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const aiChatRef = useRef<HTMLDivElement>(null)
   const userHasScrolledRef = useRef(false)
   const lastMessageCountRef = useRef(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Audio transcription hook
   const {
@@ -148,9 +150,9 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   }, [isTranscribing])
 
-  useOnClickOutside([modelBtnRef, contextBtnRef], () => setShowAssistantOptions(false))
+  useOnClickOutside([modelBtnRef, contextBtnRef], () => setShowModelSelector(false))
   useOnClickOutside([modelBtnRef, contextBtnRef], () => setShowContextOptions(false))
-  useOnClickOutside([modelSelectorBtnRef], () => setShowModelOptions(false))
+  useOnClickOutside([modelSelectorBtnRef], () => setShowOllamaModelSelector(false))
 
   const getBoundingRect = (ref: MutableRefObject<any>) => ref.current?.getBoundingClientRect()
   const calcAndConvertToDvh = (coordValue: number) => (coordValue / window.innerHeight) * 100
@@ -185,37 +187,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       icon: 'fa-solid fa-check',
       stateValue: 'workspace',
       dataId: 'workspace-context-option'
-    }
-  ]
-
-  const aiAssistantGroupList: groupListType[] = [
-    {
-      label: 'OpenAI',
-      bodyText: 'Better for general purpose coding tasks',
-      icon: 'fa-solid fa-check',
-      stateValue: 'openai',
-      dataId: 'composer-ai-assistant-openai'
-    },
-    {
-      label: 'MistralAI',
-      bodyText: 'Better for more complex coding tasks with solidity, typescript and more',
-      icon: 'fa-solid fa-check',
-      stateValue: 'mistralai',
-      dataId: 'composer-ai-assistant-mistralai'
-    },
-    {
-      label: 'Anthropic',
-      bodyText: 'Best for complex coding tasks but most demanding on resources',
-      icon: 'fa-solid fa-check',
-      stateValue: 'anthropic',
-      dataId: 'composer-ai-assistant-anthropic'
-    },
-    {
-      label: 'Ollama',
-      bodyText: 'Local AI models running on your machine (requires Ollama installation)',
-      icon: 'fa-solid fa-check',
-      stateValue: 'ollama',
-      dataId: 'composer-ai-assistant-ollama'
     }
   ]
 
@@ -290,15 +261,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   }, [contextChoice, refreshContext, props.plugin])
 
-  // useEffect(() => {
-  //   const fetchAssistantChoice = async () => {
-  //     console.log('Fetching assistant choice from plugin')
-  //     const choice = await props.plugin.call('remixAI', 'getAssistantProvider')
-  //     setAssistantChoice(choice || 'openai')
-  //   }
-  //   fetchAssistantChoice()
-  // }, [props.plugin])
-
   useEffect(() => {
     props.plugin.on('theme', 'themeChanged', (theme) => {
       setThemeTracker(theme)
@@ -307,6 +269,27 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       props.plugin.off('theme', 'themeChanged')
     }
   })
+
+  // Listen for auth state changes and refresh model access
+  useEffect(() => {
+    const handleAuthChange = async (authState: { isAuthenticated: boolean; user: any; token: string | null }) => {
+      // Refresh model access permissions
+      await modelAccess.refreshAccess()
+
+      // If user logged out, revert to default model
+      if (!authState.isAuthenticated) {
+        const defaultModel = getDefaultModel()
+        setSelectedModelId(defaultModel.id)
+        setSelectedModel(defaultModel)
+        await props.plugin.call('remixAI', 'setModel', defaultModel.id)
+      }
+    }
+
+    props.plugin.on('auth', 'authStateChanged', handleAuthChange)
+    return () => {
+      props.plugin.off('auth', 'authStateChanged')
+    }
+  }, [props.plugin, modelAccess])
 
   // bubble messages up to parent
   useEffect(() => {
@@ -537,12 +520,18 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           response.uiToolCallback = uiToolCallback
         }
 
-        switch (assistantChoice) {
+        // Use the selected model's provider to determine handler
+        const provider = selectedModel.provider
+        switch (provider) {
         case 'openai':
           HandleOpenAIResponse(
             response,
-            (chunk: string) => appendAssistantChunk(assistantId, chunk),
+            (chunk: string) => {
+              if (abortControllerRef.current?.signal.aborted) return
+              appendAssistantChunk(assistantId, chunk)
+            },
             (finalText: string, threadId) => {
+              if (abortControllerRef.current?.signal.aborted) return
               ChatHistory.pushHistory(trimmed, finalText)
               setIsStreaming(false)
               props.plugin.call('remixAI', 'setAssistantThrId', threadId)
@@ -552,8 +541,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         case 'mistralai':
           HandleMistralAIResponse(
             response,
-            (chunk: string) => appendAssistantChunk(assistantId, chunk),
+            (chunk: string) => {
+              if (abortControllerRef.current?.signal.aborted) return
+              appendAssistantChunk(assistantId, chunk)
+            },
             (finalText: string, threadId) => {
+              if (abortControllerRef.current?.signal.aborted) return
               ChatHistory.pushHistory(trimmed, finalText)
               setIsStreaming(false)
               props.plugin.call('remixAI', 'setAssistantThrId', threadId)
@@ -563,8 +556,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         case 'anthropic':
           HandleAnthropicResponse(
             response,
-            (chunk: string) => appendAssistantChunk(assistantId, chunk),
+            (chunk: string) => {
+              if (abortControllerRef.current?.signal.aborted) return
+              appendAssistantChunk(assistantId, chunk)
+            },
             (finalText: string, threadId) => {
+              if (abortControllerRef.current?.signal.aborted) return
               ChatHistory.pushHistory(trimmed, finalText)
               setIsStreaming(false)
               props.plugin.call('remixAI', 'setAssistantThrId', threadId)
@@ -575,6 +572,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         {
           // Create a reasoning callback that updates the assistant message
           const reasoningCallback = (status: string) => {
+            if (abortControllerRef.current?.signal.aborted) return
             setMessages(prev =>
               prev.map(m => (m.id === assistantId ? { ...m, content: `${status}` } : m))
             )
@@ -582,8 +580,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
 
           HandleOllamaResponse(
             response,
-            (chunk: string) => appendAssistantChunk(assistantId, chunk),
+            (chunk: string) => {
+              if (abortControllerRef.current?.signal.aborted) return
+              appendAssistantChunk(assistantId, chunk)
+            },
             (finalText: string) => {
+              if (abortControllerRef.current?.signal.aborted) return
               ChatHistory.pushHistory(trimmed, finalText)
               setIsStreaming(false)
             },
@@ -594,8 +596,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         default:
           HandleStreamResponse(
             response,
-            (chunk: string) => appendAssistantChunk(assistantId, chunk),
+            (chunk: string) => {
+              if (abortControllerRef.current?.signal.aborted) return
+              appendAssistantChunk(assistantId, chunk)
+            },
             (finalText: string) => {
+              if (abortControllerRef.current?.signal.aborted) return
               ChatHistory.pushHistory(trimmed, finalText)
               setIsStreaming(false)
             }
@@ -619,7 +625,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         ])
       }
     },
-    [isStreaming, props.plugin]
+    [isStreaming, props.plugin, selectedModel]
   )
 
   const handleGenerateWorkspaceWithPrompt = useCallback(async (prompt: string) => {
@@ -643,46 +649,15 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   // Added handlers for special command buttons (assumed to exist)
   const handleAddContext = useCallback(() => {
     dispatchActivity('button', 'addContext')
-    setShowAssistantOptions(false)
+    setShowModelSelector(false)
     setShowContextOptions(prev => !prev)
   }, [])
 
-  const handleSetAssistant = useCallback(() => {
-    dispatchActivity('button', 'setAssistant')
+  const handleSetModel = useCallback(() => {
+    dispatchActivity('button', 'setModel')
     setShowContextOptions(false)
-    setShowAssistantOptions(prev => !prev)
+    setShowModelSelector(prev => !prev)
   }, [])
-
-  // Only send the /setAssistant command when the choice actually changes
-  useEffect(() => {
-    const fetchAssistantChoice = async () => {
-      const choiceSetting = await props.plugin.call('remixAI', 'getAssistantProvider')
-      if (choiceSetting !== assistantChoice) {
-        // Don't send success messages if this is a fallback from Ollama failure
-        if (!isOllamaFailureFallback) {
-          dispatchActivity('button', 'setAssistant')
-          setMessages([])
-          sendPrompt(`/setAssistant ${assistantChoice}`)
-          trackMatomoEvent<AIEvent>({ category: 'ai', action: 'SetAIProvider', name: assistantChoice, isClick: true })
-          // Log specific Ollama selection
-          if (assistantChoice === 'ollama') {
-            trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_provider_selected', value: `from:${choiceSetting || 'unknown'}`, isClick: false })
-          }
-        } else {
-          // This is a fallback, just update the backend silently
-          trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_fallback_to_provider', value: `${assistantChoice}|from:${choiceSetting}`, isClick: false })
-          await props.plugin.call('remixAI', 'setAssistantProvider', assistantChoice)
-        }
-        setAssistantChoice(assistantChoice || 'mistralai')
-
-        // Reset the fallback flag after handling
-        if (isOllamaFailureFallback) {
-          setIsOllamaFailureFallback(false)
-        }
-      }
-    }
-    fetchAssistantChoice()
-  }, [assistantChoice, isOllamaFailureFallback])
 
   useEffect(() => {
     const handleMCPToggle = async () => {
@@ -712,15 +687,15 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   }, [mcpEnhanced, mcpEnabled])
 
-  // Fetch available models everytime Ollama is selected
+  // Fetch available Ollama models when Ollama model is selected
   useEffect(() => {
-    const fetchModels = async () => {
-      if (assistantChoice === 'ollama') {
+    const fetchOllamaModels = async () => {
+      if (selectedModel.provider === 'ollama') {
         try {
           const available = await isOllamaAvailable()
           if (available) {
             const models = await listModels()
-            setAvailableModels(models)
+            setOllamaModels(models)
             if (models.length === 0) {
               // Ollama is running but no models installed
               setMessages(prev => [...prev, {
@@ -731,9 +706,9 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                 sentiment: 'none'
               }])
             } else {
-              if (!selectedModel && models.length > 0) {
+              if (!selectedOllamaModel && models.length > 0) {
                 const defaultModel = models.find(m => m.includes('codestral')) || models[0]
-                setSelectedModel(defaultModel)
+                setSelectedOllamaModel(defaultModel)
                 trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_default_model_selected', value: `${defaultModel}|codestral|total:${models.length}`, isClick: false })
                 // Sync the default model with the backend
                 try {
@@ -752,55 +727,97 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             }
           } else {
             // Ollama is not available
-            setAvailableModels([])
+            setOllamaModels([])
             setMessages(prev => [...prev, {
               id: crypto.randomUUID(),
               role: 'assistant',
-              content: '**Ollama is not available.**\n\nTo use Ollama with Remix IDE:\n\n1. **Install Ollama**: Visit [ollama.ai](https://ollama.ai) to download\n2. **Start Ollama**: Run `ollama serve` in your terminal\n3. **Install a model**: Run `ollama pull codestral:latest`\n4. **Configure CORS**: e.g `OLLAMA_ORIGINS=https://remix.ethereum.org ollama serve`\n\nSee the [Ollama Setup Guide](https://github.com/ethereum/remix-project/blob/master/OLLAMA_SETUP.md) for detailed instructions.\n\n*Switching back to previous model for now.*',
+              content: '**Ollama is not available.**\n\nTo use Ollama with Remix IDE:\n\n1. **Install Ollama**: Visit [ollama.ai](https://ollama.ai) to download\n2. **Start Ollama**: Run `ollama serve` in your terminal\n3. **Install a model**: Run `ollama pull codestral:latest`\n4. **Configure CORS**: e.g `OLLAMA_ORIGINS=https://remix.ethereum.org ollama serve`\n\nSee the [Ollama Setup Guide](https://github.com/ethereum/remix-project/blob/master/OLLAMA_SETUP.md) for detailed instructions.\n\n*Switching back to default model for now.*',
               timestamp: Date.now(),
               sentiment: 'none'
             }])
             // Log Ollama unavailable event
-            trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_unavailable', value: 'switching_to_mistralai', isClick: false })
+            trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_unavailable', value: 'switching_to_default', isClick: false })
             // Set failure flag before switching back to prevent success message
             setIsOllamaFailureFallback(true)
-            // Automatically switch back to mistralai
-            setAssistantChoice('mistralai')
+            // Automatically switch back to default model
+            const defaultModel = getDefaultModel()
+            setSelectedModelId(defaultModel.id)
+            setSelectedModel(defaultModel)
           }
         } catch (error) {
           console.warn('Failed to fetch Ollama models:', error)
-          setAvailableModels([])
+          setOllamaModels([])
           setMessages(prev => [...prev, {
             id: crypto.randomUUID(),
             role: 'assistant',
-            content: `**Failed to connect to Ollama.**\n\nError: ${error.message || 'Unknown error'}\n\nPlease ensure:\n- Ollama is running (\`ollama serve\`)\n- The ollama CORS setting is configured for Remix IDE. e.g \`OLLAMA_ORIGINS=https://remix.ethereum.org ollama serve\` Please see [Ollama Setup Guide](https://github.com/ethereum/remix-project/blob/master/OLLAMA_SETUP.md) for detailed instructions.\n- At least one model is installed\n\nSee the [Ollama Setup Guide](https://github.com/ethereum/remix-project/blob/master/OLLAMA_SETUP.md) for help.\n\n*Switching back to previous model.*`,
+            content: `**Failed to connect to Ollama.**\n\nError: ${error.message || 'Unknown error'}\n\nPlease ensure:\n- Ollama is running (\`ollama serve\`)\n- The ollama CORS setting is configured for Remix IDE. e.g \`OLLAMA_ORIGINS=https://remix.ethereum.org ollama serve\` Please see [Ollama Setup Guide](https://github.com/ethereum/remix-project/blob/master/OLLAMA_SETUP.md) for detailed instructions.\n- At least one model is installed\n\nSee the [Ollama Setup Guide](https://github.com/ethereum/remix-project/blob/master/OLLAMA_SETUP.md) for help.\n\n*Switching back to default model.*`,
             timestamp: Date.now(),
             sentiment: 'none'
           }])
           // Log Ollama connection error
-          trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_connection_error', value: `${error.message || 'unknown'}|switching_to_mistralai`, isClick: false })
+          trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_connection_error', value: `${error.message || 'unknown'}|switching_to_default`, isClick: false })
           // Set failure flag before switching back to prevent success message
           setIsOllamaFailureFallback(true)
-          // Switch back to mistralai on error
-          setAssistantChoice('mistralai')
+          // Switch back to default model on error
+          const defaultModel = getDefaultModel()
+          setSelectedModelId(defaultModel.id)
+          setSelectedModel(defaultModel)
         }
       } else {
-        setAvailableModels([])
-        setSelectedModel(null)
+        setOllamaModels([])
+        setSelectedOllamaModel(null)
       }
     }
-    fetchModels()
-  }, [assistantChoice, selectedModel])
+    fetchOllamaModels()
+  }, [selectedModel.provider, selectedOllamaModel])
 
-  const handleSetModel = useCallback(() => {
-    dispatchActivity('button', 'setModel')
-    setShowModelOptions(prev => !prev)
-  }, [])
+  const handleModelSelection = useCallback(async (modelId: string) => {
+    const model = AVAILABLE_MODELS.find(m => m.id === modelId)
+    if (!model) return
 
-  const handleModelSelection = useCallback(async (modelName: string) => {
-    const previousModel = selectedModel
-    setSelectedModel(modelName)
-    setShowModelOptions(false)
+    // Check access
+    if (!modelAccess.checkAccess(modelId)) {
+      // Show login/upgrade prompt
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `**Authentication Required**\n\nThe model "${model.name}" requires authentication. Please sign in to access premium models.`,
+        timestamp: Date.now(),
+        sentiment: 'none'
+      }])
+      return
+    }
+
+    setSelectedModelId(modelId)
+    setSelectedModel(model)
+
+    // Special handling for Ollama
+    if (model.provider === 'ollama') {
+      // Fetch available Ollama models
+      try {
+        const models = await props.plugin.call('remixAI', 'getOllamaModels')
+        setOllamaModels(models)
+        setShowOllamaModelSelector(true)
+      } catch (err) {
+        console.error('Ollama not available:', err)
+      }
+    } else {
+      // Set model in plugin
+      try {
+        await props.plugin.call('remixAI', 'setModel', modelId)
+        trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'model_selected', value: modelId, isClick: true })
+      } catch (error) {
+        console.warn('Failed to set model:', error)
+      }
+    }
+
+    setShowModelSelector(false)
+  }, [props.plugin, modelAccess])
+
+  const handleOllamaModelSelection = useCallback(async (modelName: string) => {
+    const previousModel = selectedOllamaModel
+    setSelectedOllamaModel(modelName)
+    setShowOllamaModelSelector(false)
     trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_model_selected', value: `${modelName}|from:${previousModel || 'none'}`, isClick: true })
     // Update the model in the backend
     try {
@@ -810,8 +827,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       console.warn('Failed to set model:', error)
       trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_model_set_backend_failed', value: `${modelName}|${error.message || 'unknown'}`, isClick: false })
     }
-    trackMatomoEvent<AIEvent>({ category: 'ai', action: 'SetOllamaModel', name: modelName, isClick: true })
-  }, [props.plugin, selectedModel])
+    trackMatomoEvent<AIEvent>({ category: 'ai', action: 'remixAI', name: 'ollama_model_selected_final', value: modelName, isClick: true })
+  }, [props.plugin, selectedOllamaModel])
 
   // refresh context whenever selection changes (even if selector is closed)
   useEffect(() => {
@@ -936,17 +953,23 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       </section>
       <section id="remix-ai-prompt-area" className="mt-1" style={{ flex: 1 }}
       >
-        {showAssistantOptions && (
+        {showModelSelector && (
           <div
             className="pt-2 mb-2 z-3 bg-light border border-text w-75"
             style={{ borderRadius: '8px' }}
           >
-            <div className="text-uppercase ms-2 mb-2 small">AI Assistant Provider</div>
+            <div className="text-uppercase ms-2 mb-2 small">AI Model</div>
             <GroupListMenu
-              setChoice={setAssistantChoice}
-              setShowOptions={setShowAssistantOptions}
-              choice={assistantChoice}
-              groupList={aiAssistantGroupList}
+              setChoice={handleModelSelection}
+              setShowOptions={setShowModelSelector}
+              choice={selectedModelId}
+              groupList={AVAILABLE_MODELS.map(model => ({
+                label: model.name,
+                bodyText: model.description,
+                icon: 'fa-solid fa-check',
+                stateValue: model.id,
+                dataId: `ai-model-${model.id.replace(/[^a-zA-Z0-9]/g, '-')}`
+              }))}
             />
             {mcpEnabled && (
               <div className="border-top mt-2 pt-2">
@@ -970,17 +993,17 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             )}
           </div>
         )}
-        {showModelOptions && assistantChoice === 'ollama' && (
+        {showOllamaModelSelector && selectedModel.provider === 'ollama' && (
           <div
             className="pt-2 mb-2 z-3 bg-light border border-text w-75"
             style={{ borderRadius: '8px' }}
           >
             <div className="text-uppercase ml-2 mb-2 small">Ollama Model</div>
             <GroupListMenu
-              setChoice={handleModelSelection}
-              setShowOptions={setShowModelOptions}
-              choice={selectedModel}
-              groupList={availableModels.map(model => ({
+              setChoice={handleOllamaModelSelection}
+              setShowOptions={setShowOllamaModelSelector}
+              choice={selectedOllamaModel}
+              groupList={ollamaModels.map(model => ({
                 label: model,
                 bodyText: `Use ${model} model`,
                 icon: 'fa-solid fa-check',
@@ -998,22 +1021,21 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           handleSend={handleSend}
           showContextOptions={showContextOptions}
           setShowContextOptions={setShowContextOptions}
-          showAssistantOptions={showAssistantOptions}
-          setShowAssistantOptions={setShowAssistantOptions}
-          showModelOptions={showModelOptions}
-          setShowModelOptions={setShowModelOptions}
+          showModelSelector={showModelSelector}
+          setShowModelSelector={setShowModelSelector}
+          showOllamaModelSelector={showOllamaModelSelector}
+          setShowOllamaModelSelector={setShowOllamaModelSelector}
           contextChoice={contextChoice}
           setContextChoice={setContextChoice}
-          assistantChoice={assistantChoice}
-          setAssistantChoice={setAssistantChoice}
-          availableModels={availableModels}
           selectedModel={selectedModel}
+          ollamaModels={ollamaModels}
+          selectedOllamaModel={selectedOllamaModel}
           contextFiles={contextFiles}
           clearContext={clearContext}
           handleAddContext={handleAddContext}
-          handleSetAssistant={handleSetAssistant}
           handleSetModel={handleSetModel}
           handleModelSelection={handleModelSelection}
+          handleOllamaModelSelection={handleOllamaModelSelection}
           handleGenerateWorkspace={handleGenerateWorkspace}
           handleRecord={handleRecord}
           isRecording={isRecording}
@@ -1022,12 +1044,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           modelBtnRef={modelBtnRef}
           modelSelectorBtnRef={modelSelectorBtnRef}
           aiContextGroupList={aiContextGroupList}
-          aiAssistantGroupList={aiAssistantGroupList}
           textareaRef={textareaRef}
           aiMode={aiMode}
           setAiMode={setAiMode}
           isMaximized={isMaximized}
           setIsMaximized={setIsMaximized}
+          modelAccess={modelAccess}
         />
       </section>
     </div>
