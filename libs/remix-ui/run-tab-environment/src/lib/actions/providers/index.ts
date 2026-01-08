@@ -9,7 +9,7 @@ import { ForkedVMStateProvider } from "./vm-provider"
 import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
 import * as packageJson from '../../../../../../../package.json'
 
-export async function addProvider (providerDetails: ProviderDetails, plugin: Plugin, dispatch: React.Dispatch<Actions>) {
+export async function addProvider (providerDetails: ProviderDetails, plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>) {
   const { position, name, displayName, category, providerConfig, dataId = '', title = '' } = providerDetails
   const provider = {
     position,
@@ -46,7 +46,7 @@ export async function addProvider (providerDetails: ProviderDetails, plugin: Plu
   })
 }
 
-export async function addCustomInjectedProvider (providerDetails: ProviderDetails, plugin: Plugin & { engine: Engine }, dispatch: React.Dispatch<Actions>) {
+export async function addCustomInjectedProvider (providerDetails: ProviderDetails, plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>) {
   const { position, event, name, displayName, networkId, urls, nativeCurrency } = providerDetails
   // name = `${name} through ${event.detail.info.name}`
   const parent = 'injected-' + event.detail.info.name
@@ -54,7 +54,7 @@ export async function addCustomInjectedProvider (providerDetails: ProviderDetail
   await addProvider({ position, name, displayName: displayName + ' - ' + event.detail.info.name, category: 'Browser Extension', providerConfig: { isInjected: true, isVM: false, isRpcForkedState: false, fork: '' } }, plugin, dispatch)
 }
 
-export async function registerInjectedProvider (event: ProviderDetailsEvent, plugin: Plugin & { engine: Engine }, dispatch: React.Dispatch<Actions>) {
+export async function registerInjectedProvider (event: ProviderDetailsEvent, plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>) {
   const name = 'injected-' + event.detail.info.name
   const displayName = 'Injected Provider - ' + event.detail.info.name
   await plugin.engine.register([new InjectedProviderDefault(event.detail.provider, name)])

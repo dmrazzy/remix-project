@@ -75,7 +75,7 @@ function EnvironmentWidget({ plugin }: { plugin: EnvironmentPlugin }) {
     })
 
     plugin.on('blockchain', 'contextChanged', async (context) => {
-      await getAccountsList(plugin, dispatch, widgetState)
+      await getAccountsList(plugin, dispatch)
       dispatch({ type: 'COMPLETED_LOADING_ALL_ACCOUNTS', payload: null })
     })
 

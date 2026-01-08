@@ -40,7 +40,7 @@ export async function resetVmState (plugin: EnvironmentPlugin, widgetState: Widg
   // Clear account preferences (aliases and deleted accounts)
   clearAccountPreferences()
   // Refresh account list to show default names and all accounts
-  await getAccountsList(plugin, dispatch, widgetState)
+  await getAccountsList(plugin, dispatch)
   plugin.call('notification', 'toast', `VM state reset successfully.`)
   trackMatomoEvent(plugin, { category: 'udapp', action: 'deleteState', name: 'VM state reset', isClick: false })
 }
@@ -127,39 +127,38 @@ function cleanupWalletConnectEvents (plugin: Plugin) {
   plugin.off('walletconnect', 'connectionSuccessful')
 }
 
-export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>, widgetState: WidgetState) {
+export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>) {
   let accounts = await plugin.call('blockchain', 'getAccounts')
   const provider = await plugin.call('blockchain', 'getProvider')
   let safeAddresses = []
 
   if (provider && provider.startsWith('injected') && accounts?.length) {
     const smartAccountsStr = localStorage.getItem(aaLocalStorageKey)
-    let smartAccounts = {}
-
+    let smartAccounts = []
+    const networkStatus = await plugin.call('blockchain', 'getCurrentNetworkStatus')
+    const currentChainId = networkStatus?.network?.id
     if (smartAccountsStr) {
       const smartAccountsObj = JSON.parse(smartAccountsStr)
-
-      if (smartAccountsObj[widgetState.network.chainId]) {
-        smartAccounts = smartAccountsObj[widgetState.network.chainId]
+      if (smartAccountsObj[currentChainId]) {
+        smartAccounts = smartAccountsObj[currentChainId]
       } else {
-        smartAccountsObj[widgetState.network.chainId] = {}
+        smartAccountsObj[currentChainId] = {}
         localStorage.setItem(aaLocalStorageKey, JSON.stringify(smartAccountsObj))
       }
     } else {
       const objToStore = {}
-      objToStore[widgetState.network.chainId] = {}
+      objToStore[currentChainId] = {}
       localStorage.setItem(aaLocalStorageKey, JSON.stringify(objToStore))
     }
     if (Object.keys(smartAccounts).length) {
-      safeAddresses = Object.keys(smartAccounts)
+      safeAddresses = smartAccounts.map(account => account.account)
       accounts.push(...safeAddresses)
     }
   }
   if (!accounts) accounts = []
 
   // Filter out deleted accounts
-  accounts = accounts.filter(account => !isAccountDeleted(account))
-
+  accounts = accounts.filter((account: string) => !isAccountDeleted(account))
   const defaultAccounts = []
   const smartAccounts = []
   let index = 1
@@ -195,12 +194,12 @@ export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: Reac
   dispatch({ type: 'SET_SMART_ACCOUNTS', payload: smartAccounts })
 }
 
-export async function createNewAccount (plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
+export async function createNewAccount (plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>) {
   try {
     const address = await plugin.call('blockchain', 'newAccount')
 
     plugin.call('notification', 'toast', `account ${address} created`)
-    await getAccountsList(plugin, dispatch, widgetState)
+    await getAccountsList(plugin, dispatch)
   } catch (error) {
     return plugin.call('notification', 'toast', 'Cannot create an account: ' + error)
   }
@@ -209,12 +208,11 @@ export async function createNewAccount (plugin: EnvironmentPlugin, widgetState: 
 export async function createSmartAccount (plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
   plugin.call('notification', 'toast', `Preparing tx to sign...`)
   const chainId = widgetState.network.chainId
-  console.log('chainId: ', chainId)
   const chain = chains[aaSupportedNetworks[chainId].name]
   const PUBLIC_NODE_URL = aaSupportedNetworks[chainId].publicNodeUrl
   const BUNDLER_URL = getPimlicoBundlerURL(chainId)
   const safeAddresses: string[] = widgetState.accounts.smartAccounts.map(account => account.account)
-  let salt
+  let salt: number = 0
 
   // @ts-ignore
   const [account] = await window.ethereum!.request({ method: 'eth_requestAccounts' })
@@ -233,9 +231,9 @@ export async function createSmartAccount (plugin: EnvironmentPlugin, widgetState
   const safeAddressesLength = safeAddresses.length
   if (safeAddressesLength) {
     const lastSafeAddress: string = safeAddresses[safeAddressesLength - 1]
-    const lastSmartAccount = widgetState.accounts.smartAccounts.find(account => account.account === lastSafeAddress)
-    salt = lastSmartAccount.salt + 1
-  } else salt = 0
+    const lastSmartAccount = widgetState.accounts.smartAccounts.find(acc => acc.account === lastSafeAddress)
+    salt = lastSmartAccount?.salt != null ? lastSmartAccount.salt + 1 : 0
+  }
 
   try {
     const safeAccount = await toSafeSmartAccount({
@@ -279,8 +277,6 @@ export async function createSmartAccount (plugin: EnvironmentPlugin, widgetState
 
     console.log('safeAccount: ', safeAccount)
 
-    // To verify creation, check if there is a contract code at this address
-    const safeAddress = safeAccount.address
     const sAccount: SmartAccount = {
       alias: `Smart Account ${safeAddressesLength + 1}`,
       account : safeAccount.address,
@@ -301,7 +297,7 @@ export async function createSmartAccount (plugin: EnvironmentPlugin, widgetState
       smartAccountsObj[chainId] = smartAccounts
       localStorage.setItem(aaLocalStorageKey, JSON.stringify(smartAccountsObj))
     }
-    await getAccountsList(plugin, dispatch, widgetState)
+    await getAccountsList(plugin, dispatch)
     await trackMatomoEvent(plugin, { category: 'udapp', action: 'safeSmartAccount', name: `createdSuccessfullyForChainID:${chainId}`, isClick: false })
     return plugin.call('notification', 'toast', `Safe account ${safeAccount.address} created for owner ${account}`)
   } catch (error) {
@@ -425,7 +421,7 @@ export async function deleteAccountAction (
   deleteAccountFromStorage(accountAddress)
 
   // Refresh accounts list
-  await getAccountsList(plugin, dispatch, widgetState)
+  await getAccountsList(plugin, dispatch)
 
   plugin.call('notification', 'toast', `Account ${accountAddress} deleted`)
 }
@@ -434,14 +430,13 @@ export async function updateAccountAlias (
   accountAddress: string,
   newAlias: string,
   plugin: EnvironmentPlugin,
-  widgetState: WidgetState,
   dispatch: React.Dispatch<Actions>
 ) {
   // Save alias to localStorage
   setAccountAlias(accountAddress, newAlias)
 
   // Refresh accounts list to show updated alias
-  await getAccountsList(plugin, dispatch, widgetState)
+  await getAccountsList(plugin, dispatch)
 
   plugin.call('notification', 'toast', `Account alias updated to "${newAlias}"`)
 }

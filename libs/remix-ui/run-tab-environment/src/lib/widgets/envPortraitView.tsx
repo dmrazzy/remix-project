@@ -60,7 +60,7 @@ function EnvironmentPortraitView() {
   }
 
   const handleNewAccount = () => {
-    createNewAccount(plugin, widgetState, dispatch)
+    createNewAccount(plugin, dispatch)
     setOpenKebabMenuId(null)
   }
 
@@ -71,7 +71,7 @@ function EnvironmentPortraitView() {
       message: <SmartAccountPrompt plugin={plugin} />,
       okLabel: intl.formatMessage({ id: 'udapp.continue' }),
       cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
-      okFn: () => {
+      okFn: function () {
         trackMatomoEvent({ category: 'udapp', action: 'safeSmartAccount', name: 'createClicked', isClick: true })
         createSmartAccount(plugin, widgetState, dispatch)
       }
@@ -212,7 +212,7 @@ function EnvironmentPortraitView() {
 
   const handleSaveAlias = async (accountAddress: string) => {
     if (editingAlias.trim()) {
-      await updateAccountAlias(accountAddress, editingAlias.trim(), plugin, widgetState, dispatch)
+      await updateAccountAlias(accountAddress, editingAlias.trim(), plugin, dispatch)
     }
     setEditingAccountId(null)
     setEditingAlias('')
