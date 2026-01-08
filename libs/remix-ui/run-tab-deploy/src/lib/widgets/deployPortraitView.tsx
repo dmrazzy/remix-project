@@ -10,6 +10,7 @@ import * as remixLib from '@remix-project/remix-lib'
 import { deployContract, getNetworkProxyAddresses } from '../actions'
 import { ToggleSwitch } from '@remix-ui/toggle'
 import { ContractKebabMenu } from './contractKebabMenu'
+import { VerificationSettingsUI } from '../components/verificationSettingsUI'
 
 const txFormat = remixLib.execution.txFormat
 const txHelper = remixLib.execution.txHelper
@@ -31,6 +32,8 @@ function DeployPortraitView() {
   const [proxyDeployments, setProxyDeployments] = useState<Array<{ address: string, date: Date, contractName: string }>>([])
   const [proxyAddress, setProxyAddress] = useState<string>('')
   const [showProxyDropdown, setShowProxyDropdown] = useState<boolean>(false)
+  const [isVerifyChecked, setVerifyChecked] = useState<boolean>(false)
+  const [isNetworkSupported, setNetworkSupported] = useState<boolean>(false)
   const contractKebabIconRef = useRef<HTMLElement>(null)
   const intl = useIntl()
 
@@ -57,6 +60,48 @@ function DeployPortraitView() {
       setProxyDeployments(deployments || [])
     })()
   }, [selectedProvider, selectedContract])
+
+  useEffect(() => {
+    const checkVerificationSupport = async () => {
+      if (selectedProvider) {
+        try {
+          const supportedChain = await getSupportedChain(plugin)
+          const chainExistsInList = !!supportedChain
+
+          let isConfigValid = false
+          if (chainExistsInList) {
+            const status = await plugin.call('blockchain', 'detectNetwork')
+            const currentChainId = status?.id?.toString()
+            if (currentChainId) {
+              isConfigValid = await plugin.call(
+                'contract-verification',
+                'isVerificationSupportedForChain',
+                currentChainId
+              )
+            }
+          }
+
+          const isSupported = chainExistsInList && isConfigValid
+          setNetworkSupported(isSupported)
+
+          if (isSupported) {
+            const saved = window.localStorage.getItem('deploy-verify-contract-checked')
+            setVerifyChecked(saved !== null ? JSON.parse(saved) : true)
+          } else {
+            setVerifyChecked(false)
+          }
+        } catch (e) {
+          console.error("Failed to check verification support:", e)
+          setNetworkSupported(false)
+          setVerifyChecked(false)
+        }
+      } else {
+        setNetworkSupported(false)
+        setVerifyChecked(false)
+      }
+    }
+    checkVerificationSupport()
+  }, [selectedProvider])
 
   const constructorInterface = useMemo(() => {
     return selectedContract?.contractData?.getConstructorInterface() || null
@@ -139,7 +184,7 @@ function DeployPortraitView() {
       ? { deployWithProxy, upgradeWithProxy, deployArgs }
       : { deployWithProxy: false, upgradeWithProxy: false }
 
-    deployContract(selectedContract?.contractData, args, proxyOptions, plugin, intl, dispatch)
+    deployContract(selectedContract?.contractData, args, proxyOptions, isVerifyChecked, plugin, intl, dispatch)
   }
 
   const handleKebabClick = (e: React.MouseEvent) => {
@@ -176,6 +221,28 @@ function DeployPortraitView() {
   const handleProxyAddressChange = (e: any) => {
     const address = e.target.value
     setProxyAddress(address)
+  }
+
+  const getSupportedChain = async (plugin: any): Promise<any> => {
+    try {
+      const response = await fetch('https://chainid.network/chains.json')
+      if (!response.ok) return null
+      const allChains = await response.json()
+
+      const status = await plugin.call('blockchain', 'detectNetwork')
+      if (!status || !status.id || status.id === '-') return null
+
+      const currentChainId = parseInt(status.id)
+      return allChains.find((chain: any) => chain.chainId === currentChainId) || null
+    } catch (e) {
+      console.error(e)
+      return null
+    }
+  }
+
+  const handleVerifyCheckedChange = (isChecked: boolean) => {
+    setVerifyChecked(isChecked)
+    window.localStorage.setItem('deploy-verify-contract-checked', JSON.stringify(isChecked))
   }
 
   return (
@@ -485,6 +552,16 @@ function DeployPortraitView() {
                   }
                 </div>
               )}
+
+            {/* Verification Settings - Only show for supported networks */}
+            {isNetworkSupported && (
+              <div className='border-top pt-2'>
+                <VerificationSettingsUI
+                  isVerifyChecked={isVerifyChecked}
+                  onVerifyCheckedChange={handleVerifyCheckedChange}
+                />
+              </div>
+            )}
 
             {/* Constructor Parameters */}
             {

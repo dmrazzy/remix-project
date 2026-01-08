@@ -17,6 +17,7 @@ export async function broadcastCompilationResult (compilerName: string, compileR
   await trackMatomoEvent(plugin, { category: 'udapp', action: 'broadcastCompilationResult', name: compilerName, isClick: false })
 
   const compiler = new CompilerAbstract(languageVersion, data, source, input)
+  console.log('file: ', file)
   await plugin.call('compilerArtefacts', 'saveCompilerAbstract', file, compiler)
 
   const contracts = getCompiledContracts(compiler)
@@ -95,7 +96,7 @@ function getContractData (contractName: string, compiler: CompilerAbstract): Con
   }
 }
 
-export async function deployContract(selectedContract: ContractData, args: string, deployMode: OZDeployMode, plugin: DeployPlugin, intl: IntlShape, dispatch: React.Dispatch<Actions>) {
+export async function deployContract(selectedContract: ContractData, args: string, deployMode: OZDeployMode, isVerifyChecked: boolean, plugin: DeployPlugin, intl: IntlShape, dispatch: React.Dispatch<Actions>) {
   const isProxyDeployment = deployMode.deployWithProxy
   const isContractUpgrade = deployMode.upgradeWithProxy
 
@@ -117,7 +118,7 @@ export async function deployContract(selectedContract: ContractData, args: strin
         okLabel: intl.formatMessage({ id: 'udapp.proceed' }),
         okFn: async () => {
           try {
-            const contract = await createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
+            const contract = await createInstance(selectedContract, args, deployMode, false, plugin)
             const initABI = contract.selectedContract.abi.find(abi => abi.name === 'initialize')
 
             plugin.call('openzeppelin-proxy', 'executeUUPSProxy', contract.address, deployMode.deployArgs, initABI, contract.selectedContract)
@@ -172,12 +173,12 @@ export async function deployContract(selectedContract: ContractData, args: strin
         }
       }
     } else {
-      createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
+      createInstance(selectedContract, args, deployMode, isVerifyChecked, plugin)
     }
   }
 }
 
-async function createInstance(selectedContract: ContractData, args, deployMode: OZDeployMode, isVerifyChecked: boolean, plugin: DeployPlugin, dispatch: React.Dispatch<Actions>) {
+async function createInstance(selectedContract: ContractData, args, deployMode: OZDeployMode, isVerifyChecked: boolean, plugin: DeployPlugin) {
   let contractMetadata
   try {
     contractMetadata = await plugin.call('compilerMetadata', 'deployMetadataOf', selectedContract.name, selectedContract.contract.file)
@@ -210,7 +211,53 @@ async function createInstance(selectedContract: ContractData, args, deployMode: 
       })
     })
   }
-  return await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
+  const result = await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
+
+  if (isVerifyChecked) {
+    // trackMatomoEvent(plugin, { category: 'udapp', action: 'DeployAndPublish', name: plugin.REACT_API.networkName, isClick: true })
+
+    try {
+      const status = await plugin.call('blockchain', 'detectNetwork')
+      const currentChainId = parseInt(status.id)
+      const response = await fetch('https://chainid.network/chains.json')
+
+      if (!response.ok) throw new Error('Could not fetch chains list from chainid.network.')
+      const allChains = await response.json()
+      const currentChain = allChains.find(chain => chain.chainId === currentChainId)
+
+      if (!currentChain) {
+        console.error('Could not find chain data for Chain ID: ', currentChainId)
+        // const errorMsg = `Could not find chain data for Chain ID: ${currentChainId}. Verification cannot proceed.`
+        // const errorLog = logBuilder(errorMsg)
+        // terminalLogger(plugin, errorLog)
+        return
+      }
+
+      const etherscanApiKey = await plugin.call('config', 'getAppParameter', 'etherscan-access-token')
+
+      const verificationData = {
+        chainId: currentChainId.toString(),
+        currentChain: currentChain,
+        address: result.address,
+        contractName: selectedContract.name,
+        filePath: selectedContract.contract.file,
+        compilationResult: await plugin.call('compilerArtefacts', 'getCompilerAbstract', selectedContract.contract.file),
+        constructorArgs: args,
+        etherscanApiKey: etherscanApiKey
+      }
+
+      setTimeout(async () => {
+        await plugin.call('contract-verification', 'verifyOnDeploy', verificationData)
+      }, 1500)
+
+    } catch (e) {
+      console.error('Verification setup failed: ', e)
+      // const errorMsg = `Verification setup failed: ${e.message}`
+      // const errorLog = logBuilder(errorMsg)
+      // terminalLogger(plugin, errorLog)
+    }
+  }
+  return result
 }
 
 async function deployOnBlockchain (selectedContract: ContractData, args: string, contractMetadata: any, compilerContracts: any, plugin: DeployPlugin) {
@@ -231,7 +278,7 @@ function showUpgradeModal(selectedContract: ContractData, args: string, deployMo
     message: upgradeWithProxyMsg(),
     okLabel: intl.formatMessage({ id: 'udapp.proceed' }),
     okFn: async () => {
-      const contract = await createInstance(selectedContract, args, deployMode, false, plugin, dispatch)
+      const contract = await createInstance(selectedContract, args, deployMode, false, plugin)
       plugin.call('openzeppelin-proxy', 'executeUUPSContractUpgrade', deployMode.deployArgs, contract.address, contract.selectedContract)
     },
     cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
@@ -275,8 +322,9 @@ async function isValidContractAddress (plugin: DeployPlugin, address: string) {
 
 export const isValidContractUpgrade = async (plugin: DeployPlugin, proxyAddress: string, newContractName: string, solcInput: SolcInput, solcOutput: SolcOutput, solcVersion: string) => {
   // build current contract first to get artefacts.
-  const network = plugin.blockchain.networkStatus.network
-  const identifier = network.name === 'custom' ? network.name + '-' + network.id : network.name === 'VM' ? plugin.blockchain.getProvider() : network.name
+  const networkStatus = await plugin.call('blockchain', 'detectNetwork')
+  const networkName = networkStatus.name === 'VM' ? await plugin.call('blockchain', 'getProvider') : networkStatus.name
+  const identifier = networkName === 'custom' ? networkName + '-' + networkStatus.id : networkName
   const networkDeploymentsExists = await plugin.call('fileManager', 'exists', `.deploys/upgradeable-contracts/${identifier}/UUPS.json`)
 
   if (networkDeploymentsExists) {

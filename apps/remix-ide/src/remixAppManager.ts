@@ -112,7 +112,8 @@ let requiredModules = [
   'invitationManager',
   'feedback',
   'cloudWorkspaces',
-  'udappEnv'
+  'udappEnv',
+  'udappDeploy'
 ]
 
 // dependentModules shouldn't be manually activated (e.g hardhat is activated by remixd)
@@ -184,7 +185,8 @@ export function isNative(name) {
     'vega',
     'chartjs',
     'quick-dapp-v2',
-    'udappEnv'
+    'udappEnv',
+    'udappDeploy'
   ]
   return nativePlugins.includes(name) || requiredModules.includes(name) || isInjectedProvider(name) || isVM(name) || isScriptRunner(name)
 }

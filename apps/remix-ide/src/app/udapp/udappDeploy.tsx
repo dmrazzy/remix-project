@@ -17,8 +17,6 @@ const profile = {
 
 export class DeployPlugin extends Plugin {
   engine: Engine
-  blockchain: Blockchain
-  compilersArtefacts: CompilerArtefacts
   editor: any
   fileManager: any
   private getWidgetState: (() => DeployWidgetState) | null = null
@@ -99,10 +97,8 @@ export class DeployPlugin extends Plugin {
     this.getDispatch()({ type: 'SET_MAX_FEE', payload: fee })
   }
 
-  getUI(engine: Engine, blockchain: Blockchain, editor: any) {
+  getUI(engine: Engine, editor: any) {
     this.engine = engine
-    this.blockchain = blockchain
-    // this.compilersArtefacts = compilersArtefacts
     this.editor = editor
     // this.fileManager = fileManager
     return <DeployWidget plugin={this} />
