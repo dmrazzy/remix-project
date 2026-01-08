@@ -33,6 +33,7 @@ function EnvironmentPortraitView() {
   const delegationAuthorizationAddressRef = useRef<string>('')
   const messageRef = useRef<string>('')
   const editingInputRef = useRef<HTMLInputElement>(null)
+  const aaSupportedChainIds = ["11155111", "100"] // AA01: Add chain id here to show 'Create Smart Account' button in Udapp
 
   const handleResetClick = () => {
     trackMatomoEvent({ category: 'udapp', action: 'deleteState', name: 'deleteState clicked', isClick: true })
@@ -254,6 +255,10 @@ function EnvironmentPortraitView() {
     return widgetState.accounts.defaultAccounts.find(account => account.account === widgetState.accounts.selectedAccount) || widgetState.accounts.defaultAccounts[0]
   }, [widgetState.accounts.selectedAccount, widgetState.accounts.defaultAccounts])
 
+  const isSmartAccountSupported = useMemo(() => {
+    return aaSupportedChainIds.includes(widgetState.network.chainId)
+  }, [widgetState.network.chainId])
+
   return (
     <>
       <div className='card ms-2' style={{ backgroundColor: 'var(--custom-onsurface-layer-1)' }}>
@@ -367,7 +372,7 @@ function EnvironmentPortraitView() {
                 menuIndex="selected"
                 onRenameAccount={handleRenameAccount}
                 onNewAccount={handleNewAccount}
-                onCreateSmartAccount={handleCreateSmartAccount}
+                onCreateSmartAccount={isSmartAccountSupported ? handleCreateSmartAccount : undefined}
                 onAuthorizeDelegation={handleAuthorizeDelegation}
                 onSignUsingAccount={handleSignUsingAccount}
                 onDeleteAccount={handleDeleteAccount}

@@ -15,6 +15,11 @@ export interface IEnvWidgetContext {
   plugin: EnvironmentPlugin
 }
 
+export type NetworkStatus = {
+  chainId: string,
+  name: string
+}
+
 export interface WidgetState {
   providers: {
     defaultProvider: string,
@@ -41,10 +46,7 @@ export interface WidgetState {
     isSuccessful: boolean,
     error: string
   },
-  network: {
-    chainId: string,
-    name: string
-  },
+  network: NetworkStatus,
   matchPassphrase: string
 }
 
@@ -66,7 +68,8 @@ export interface ActionPayloadTypes {
   REQUEST_FORK: undefined,
   COMPLETED_FORK: undefined,
   ERROR_FORK: string,
-  SET_MATCH_PASSPHRASE: string
+  SET_MATCH_PASSPHRASE: string,
+  SET_NETWORK_STATUS: NetworkStatus
 }
 export interface Action<T extends keyof ActionPayloadTypes> {
   type: T

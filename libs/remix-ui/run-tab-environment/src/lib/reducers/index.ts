@@ -259,6 +259,13 @@ export const widgetReducer = (state = widgetInitialState, action: Actions): Widg
     }
   }
 
+  case 'SET_NETWORK_STATUS': {
+    return {
+      ...state,
+      network: action.payload
+    }
+  }
+
   default:
     throw new Error()
   }

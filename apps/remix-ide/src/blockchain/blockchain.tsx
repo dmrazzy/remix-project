@@ -70,27 +70,8 @@ export class Blockchain extends Plugin {
     this.active = false
     this.event = new EventManager()
     this.executionContext = new ExecutionContext()
-
     this.events = new EventEmitter()
     this.config = config
-    // const web3Runner = new TxRunnerWeb3(
-    //   {
-    //     config: this.config,
-    //     detectNetwork: (cb) => {
-    //       this.executionContext.detectNetwork(cb)
-    //     },
-    //     isVM: () => {
-    //       return this.executionContext.isVM()
-    //     },
-    //     personalMode: () => {
-    //       return this.getProvider() === 'web3' ? this.config.get('settings/personal-mode') : false
-    //     }
-    //   },
-    //   (_) => this.executionContext.web3(),
-    //   (_) => this.executionContext.currentblockGasLimit()
-    // )
-    // this.txRunner = new TxRunner(web3Runner, {})
-    // this.call('txRunner', 'setInternalRunner', web3Runner)
     this.networkcallid = 0
     this.registeredPluginEvents = []
     // the first item in the list should be latest fork.

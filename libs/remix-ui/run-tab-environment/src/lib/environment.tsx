@@ -79,6 +79,10 @@ function EnvironmentWidget({ plugin }: { plugin: EnvironmentPlugin }) {
       dispatch({ type: 'COMPLETED_LOADING_ALL_ACCOUNTS', payload: null })
     })
 
+    plugin.on('blockchain', 'networkStatus', async (networkStatus: any) => {
+      dispatch({ type: 'SET_NETWORK_STATUS', payload: { chainId: networkStatus.network.id, name: networkStatus.network.name } })
+    })
+
   }, [])
 
   return (
