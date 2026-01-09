@@ -190,21 +190,25 @@ export function UniversalDappUI(props: UdappProps) {
     const functionName = funcABI.type === 'function' ? funcABI.name : `(${funcABI.type})`
     const logMsg = `${lookupOnly ? 'call' : 'transact'} to ${props.instance.name}.${functionName}`
 
-    props.runTransactions(
-      props.index,
-      lookupOnly,
-      funcABI,
-      inputsValues,
-      props.instance.name,
-      contractABI,
-      props.instance.contractData,
-      address,
-      logMsg,
-      props.mainnetPrompt,
-      props.gasEstimationPrompt,
-      props.passphrasePrompt,
-      funcIndex
-    )
+    const getMainnetPrompt = async (tx, network, amount, gasEstimation, gasFees, determineGasPrice) => {
+      return await props.plugin.call('udappDeploy', 'getMainnetPrompt', tx, network, amount, gasEstimation)
+    }
+
+    // props.runTransactions(
+    //   props.index,
+    //   lookupOnly,
+    //   funcABI,
+    //   inputsValues,
+    //   props.instance.name,
+    //   contractABI,
+    //   props.instance.contractData,
+    //   address,
+    //   logMsg,
+    //   getMainnetPrompt,
+    //   props.gasEstimationPrompt,
+    //   props.passphrasePrompt,
+    //   funcIndex
+    // )
   }
 
   const extractDataDefault = (item, parent?) => {

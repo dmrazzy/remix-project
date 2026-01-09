@@ -53,7 +53,6 @@ export function InstanceContainerUI(props: InstanceContainerProps) {
                 index={index}
                 gasEstimationPrompt={props.gasEstimationPrompt}
                 passphrasePrompt={props.passphrasePrompt}
-                mainnetPrompt={props.mainnetPrompt}
                 runTransactions={props.runTransactions}
                 sendValue={props.sendValue}
                 getFuncABIInputs={props.getFuncABIInputs}
