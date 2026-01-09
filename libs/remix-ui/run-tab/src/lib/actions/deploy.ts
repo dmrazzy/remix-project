@@ -268,7 +268,7 @@ export const syncContractsInternal = async (plugin: RunTab) => {
   }
 }
 
-export const runTransactions = (
+export const runTransactions = async (
   plugin: RunTab,
   dispatch: React.Dispatch<any>,
   instanceIndex: number,
@@ -278,10 +278,6 @@ export const runTransactions = (
   contractName: string,
   contractABI, contract,
   address,
-  logMsg: string,
-  mainnetPrompt: MainnetPrompt,
-  gasEstimationPrompt: (msg: string) => JSX.Element,
-  passphrasePrompt: (msg: string) => JSX.Element,
   funcIndex?: number) => {
   let callinfo = ''
   let eventAction
@@ -298,36 +294,13 @@ export const runTransactions = (
   trackMatomoEvent(plugin, { category: 'udapp', action: eventAction, name: plugin.REACT_API.networkName, isClick: true })
 
   const params = funcABI.type !== 'fallback' ? inputsValues : ''
-  plugin.blockchain.runOrCallContractMethod(
-    contractName,
-    contractABI,
-    funcABI,
-    contract,
-    inputsValues,
-    address,
-    params,
-    lookupOnly,
-    logMsg,
-    (msg) => {
-      const log = logBuilder(msg)
+  const result = await plugin.call('blockchain', 'runOrCallContractMethod', contractName, contractABI, funcABI, contract, inputsValues, address, params, lookupOnly)
 
-      return terminalLogger(plugin, log)
-    },
-    (returnValue) => {
-      const response = txFormat.decodeResponse(returnValue, funcABI)
+  if (lookupOnly) {
+    const response = txFormat.decodeResponse(result.returnValue, funcABI)
 
-      dispatch(setDecodedResponse(instanceIndex, response, funcIndex))
-    },
-    (network, tx, gasEstimation, continueTxExecution, cancelCb) => {
-      confirmationHandler(plugin, dispatch, mainnetPrompt, network, tx, gasEstimation, continueTxExecution, cancelCb)
-    },
-    (error, continueTxExecution, cancelCb) => {
-      continueHandler(dispatch, gasEstimationPrompt, error, continueTxExecution, cancelCb)
-    },
-    (okCb, cancelCb) => {
-      promptHandler(dispatch, passphrasePrompt, okCb, cancelCb)
-    }
-  )
+    dispatch(setDecodedResponse(instanceIndex, response, funcIndex))
+  }
 }
 
 export const getFuncABIInputs = (plugin: RunTab, funcABI: FuncABI) => {

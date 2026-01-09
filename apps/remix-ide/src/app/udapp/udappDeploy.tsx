@@ -11,7 +11,7 @@ const profile = {
   name: 'udappDeploy',
   displayName: 'Udapp Deploy',
   description: 'Handles contract deployment UI and state',
-  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'getMaxFee', 'getMaxPriorityFee', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue', 'getGasEstimationPrompt', 'getMainnetPrompt', 'getGasPriceStatus'],
+  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'getMaxFee', 'getMaxPriorityFee', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue', 'getGasEstimationPrompt', 'getMainnetPrompt', 'getGasPriceStatus', 'setValue', 'setValueUnit'],
   events: []
 }
 
@@ -95,6 +95,14 @@ export class DeployPlugin extends Plugin {
 
   setMaxFee(fee: string) {
     this.getDispatch()({ type: 'SET_MAX_FEE', payload: fee })
+  }
+
+  setValue(value: string) {
+    this.getDispatch()({ type: 'SET_VALUE', payload: parseInt(value) })
+  }
+
+  setValueUnit(unit: 'wei' | 'gwei' | 'finney' | 'ether') {
+    this.getDispatch()({ type: 'SET_VALUE_UNIT', payload: unit })
   }
 
   getUI(engine: Engine, editor: any) {

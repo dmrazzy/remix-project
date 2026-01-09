@@ -8,7 +8,7 @@ const profile = {
   name: 'udappEnv',
   displayName: 'Udapp Environment',
   description: 'Maintains the schema for deployment and execution environment',
-  methods: ['getUI', 'getSelectedAccount', 'isSmartAccount', 'getDefaultProvider', 'getPassphrasePrompt'],
+  methods: ['getUI', 'getSelectedAccount', 'isSmartAccount', 'getDefaultProvider', 'getPassphrasePrompt', 'getSelectedProvider'],
   events: []
 }
 
@@ -54,6 +54,11 @@ export class EnvironmentPlugin extends Plugin {
     const state = this.getWidgetState()
 
     return state?.providers?.selectedProvider
+  }
+
+  getNetwork () {
+    const state = this.getWidgetState()
+    return state?.network
   }
 
   getUI(engine: Engine, blockchain: Blockchain) {

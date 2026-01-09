@@ -367,7 +367,7 @@ export async function authorizeDelegation (contractAddress: string, plugin: Envi
           object: artefact.contract
         }
       }
-      // plugin.call('udapp', 'addInstance', widgetState.accounts.selectedAccount, artefact.contract.abi, 'Delegated ' + artefact.name, contractObject)
+      await plugin.call('udapp', 'addInstance', widgetState.accounts.selectedAccount, artefact.contract.abi, 'Delegated ' + artefact.name, contractObject)
       await plugin.call('compilerArtefacts', 'addResolvedContract', widgetState.accounts.selectedAccount, data)
       plugin.call('terminal', 'log', { type: 'info',
         value: `Contract interation with ${widgetState.accounts.selectedAccount} has been added to the deployed contracts. Please make sure the contract is pinned.` })

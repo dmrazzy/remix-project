@@ -1,7 +1,6 @@
 // eslint-disable-next-line no-use-before-define
 import React, { Fragment, useEffect, useReducer, useState } from 'react'
 import semver from 'semver'
-import { FormattedMessage } from 'react-intl'
 import { InstanceContainerUI } from './components/instanceContainerUI'
 import { RecorderUI } from './components/recorderCardUI'
 import { RunTabProps } from './types'
@@ -20,7 +19,6 @@ import {
   getFuncABIValues
 } from './actions'
 import './css/run-tab.css'
-import { PassphrasePrompt } from './components/passphrase'
 import { ScenarioPrompt } from './components/scenario'
 import { ChainCompatibleInfo, getCompatibleChain, HardFork, isChainCompatible } from './actions/evmmap'
 
@@ -30,7 +28,6 @@ export function RunTabUI(props: RunTabProps) {
   const { plugin } = props
   const initialState = props.initialState || runTabInitialState
 
-  initialState.selectExEnv = plugin.blockchain.getProvider()
   const [runTab, dispatch] = useReducer(runTabReducer, initialState)
   const REACT_API = { runTab }
   const currentfile = plugin.config.get('currentFile')
@@ -74,11 +71,12 @@ export function RunTabUI(props: RunTabProps) {
   }
 
   const checkEvmChainCompatibility = async () => {
+    const network = await plugin.call('udappEnv', 'getNetwork')
     const fetchDetails = await plugin.call('solidity', 'getCompilerQueryParameters')
     const compilerState = await plugin.call('solidity', 'getCompilerState')
 
     if (compilerState.target !== null) {
-      const targetChainId = runTab.chainId
+      const targetChainId = network?.chainId
       const ideDefault = fetchDetails && fetchDetails.evmVersion !== null ? fetchDetails.evmVersion : 'osaka'
       const IsCompatible = isChainCompatible(ideDefault, targetChainId)
       const chain = await returnCompatibleChain(ideDefault, targetChainId)
@@ -124,19 +122,6 @@ export function RunTabUI(props: RunTabProps) {
     plugin.call('pluginStateLogger', 'logPluginState', 'udapp', runTab)
   }, [REACT_API])
 
-  const gasEstimationPrompt = (msg: string) => {
-    return (
-      <div>
-        <FormattedMessage id="udapp.gasEstimationPromptText" /> <br />
-        {msg}
-      </div>
-    )
-  }
-
-  const passphrasePrompt = (message: string) => {
-    return <PassphrasePrompt message={message} setPassphrase={() => {}} defaultValue={runTab.passphrase} />
-  }
-
   const scenarioPrompt = (message: string, defaultValue: string) => {
     return <ScenarioPrompt message={message} setScenarioPath={setScenarioPath} defaultValue={defaultValue} />
   }
@@ -147,8 +132,6 @@ export function RunTabUI(props: RunTabProps) {
         <div className="list-group pb-4 list-group-flush">
           <RecorderUI
             plugin={plugin}
-            gasEstimationPrompt={gasEstimationPrompt}
-            passphrasePrompt={passphrasePrompt}
             storeScenario={storeNewScenario}
             runCurrentScenario={runScenario}
             scenarioPrompt={scenarioPrompt}
@@ -166,21 +149,17 @@ export function RunTabUI(props: RunTabProps) {
             pinInstance={pinUnpinnedInstance}
             removeInstance={removeSingleInstance}
             getContext={getExecutionContext}
-            gasEstimationPrompt={gasEstimationPrompt}
-            passphrasePrompt={passphrasePrompt}
             runTransactions={executeTransactions}
-            sendValue={runTab.sendValue}
             solcVersion={solcVersion}
             getVersion={getVersion}
             getFuncABIInputs={getFuncABIValues}
-            exEnvironment={runTab.selectExEnv}
-            editInstance={(addressOrInstance, abi, name, devdoc, metadata, htmlTemplate) => {
-
+            editInstance={async (addressOrInstance, abi, name, devdoc, metadata, htmlTemplate) => {
+              const network = await plugin.call('udappEnv', 'getNetwork')
               const payload = {
                 address: '',
                 abi: null,
                 name: '',
-                network: runTab.networkName,
+                network: network?.name,
                 devdoc: null,
                 methodIdentifiers: null,
                 solcVersion: '',

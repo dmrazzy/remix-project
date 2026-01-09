@@ -4,18 +4,12 @@ import { createPortal } from 'react-dom'
 import { RunTabUI } from '@remix-ui/run-tab'
 import { trackMatomoEvent } from '@remix-api'
 import { ViewPlugin } from '@remixproject/engine-web'
-import isElectron from 'is-electron'
 import { addressToString, PluginViewWrapper } from '@remix-ui/helper'
-import { InjectedProviderDefault } from '../providers/injected-provider-default'
-import { InjectedCustomProvider } from '../providers/injected-custom-provider'
 import * as packageJson from '../../../../../package.json'
 import { EventManager } from '@remix-project/remix-lib'
 import type { Blockchain } from '../../blockchain/blockchain'
-import { ProviderConfig } from '@remix-ui/environment-explorer'
 import type { CompilerArtefacts } from '@remix-project/core-plugin'
-import { ForkedVMStateProvider } from '../providers/vm-provider'
 import { Recorder } from '../tabs/runTab/model/recorder'
-import { EnvDropdownLabelStateType } from 'libs/remix-ui/run-tab/src/lib/types'
 
 export const providerLogos = {
   'injected-metamask-optimism': ['assets/img/optimism-ethereum-op-logo.png', 'assets/img/metamask.png'],

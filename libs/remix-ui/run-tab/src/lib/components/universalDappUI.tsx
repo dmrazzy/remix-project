@@ -35,6 +35,7 @@ export function UniversalDappUI(props: UdappProps) {
 
   const isGenerating = useRef(false)
   const [useNewAiBuilder, setUseNewAiBuilder] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<string>('')
 
   const checkUrlParams = useCallback(() => {
     const qp = new QueryParams()
@@ -49,12 +50,11 @@ export function UniversalDappUI(props: UdappProps) {
   }, [])
 
   useEffect(() => {
-    checkUrlParams()
-    window.addEventListener('hashchange', checkUrlParams)
-    return () => {
-      window.removeEventListener('hashchange', checkUrlParams)
-    }
-  }, [checkUrlParams])
+    (async () => {
+      const selectedProvider = await props.plugin.call('udappEnv', 'getSelectedProvider')
+      setSelectedProvider(selectedProvider)
+    })()
+  }, [])
 
   useEffect(() => {
     if (!props.instance.abi) {
@@ -86,7 +86,7 @@ export function UniversalDappUI(props: UdappProps) {
     }
   }, [props.instance.balance])
 
-  const sendData = () => {
+  const sendData = async () => {
     setLlIError('')
     const fallback = txHelper.getFallbackInterface(contractABI)
     const receive = txHelper.getReceiveInterface(contractABI)
@@ -96,7 +96,7 @@ export function UniversalDappUI(props: UdappProps) {
       contractName: props.instance.name,
       contractABI: contractABI
     }
-    const amount = props.sendValue
+    const amount = await props.plugin.call('udappDeploy', 'getValue')
 
     if (amount !== '0') {
       // check for numeric and receive/fallback
@@ -185,30 +185,11 @@ export function UniversalDappUI(props: UdappProps) {
     props.pinInstance(props.index, objToSave.pinnedAt, objToSave.filePath)
   }
 
-  const runTransaction = (lookupOnly, funcABI: FuncABI, valArr, inputsValues, funcIndex?: number) => {
+  const runTransaction = async (lookupOnly, funcABI: FuncABI, valArr, inputsValues, funcIndex?: number) => {
     if (props.instance.isPinned) trackMatomoEvent({ category: 'udapp', action: 'pinContracts', name: 'interactWithPinned', isClick: false })
-    const functionName = funcABI.type === 'function' ? funcABI.name : `(${funcABI.type})`
-    const logMsg = `${lookupOnly ? 'call' : 'transact'} to ${props.instance.name}.${functionName}`
-
-    const getMainnetPrompt = async (tx, network, amount, gasEstimation, gasFees, determineGasPrice) => {
-      return await props.plugin.call('udappDeploy', 'getMainnetPrompt', tx, network, amount, gasEstimation)
-    }
-
-    // props.runTransactions(
-    //   props.index,
-    //   lookupOnly,
-    //   funcABI,
-    //   inputsValues,
-    //   props.instance.name,
-    //   contractABI,
-    //   props.instance.contractData,
-    //   address,
-    //   logMsg,
-    //   getMainnetPrompt,
-    //   props.gasEstimationPrompt,
-    //   props.passphrasePrompt,
-    //   funcIndex
-    // )
+    // const functionName = funcABI.type === 'function' ? funcABI.name : `(${funcABI.type})`
+    // const logMsg = `${lookupOnly ? 'call' : 'transact'} to ${props.instance.name}.${functionName}`
+    await props.runTransactions(props.index, lookupOnly, funcABI, inputsValues, props.instance.name, contractABI, props.instance.contractData, address, funcIndex)
   }
 
   const extractDataDefault = (item, parent?) => {
@@ -337,7 +318,7 @@ export function UniversalDappUI(props: UdappProps) {
             <div className="btn d-flex p-0 align-self-center">
 
               {/* [V2 Logic] New AI Builder Mode (Sparkles) */}
-              {useNewAiBuilder && props.exEnvironment && (
+              {useNewAiBuilder && selectedProvider && (
                 <CustomTooltip placement="top" tooltipClasses="text-nowrap" tooltipId="udapp_udappEditTooltip" tooltipText={<FormattedMessage id="udapp.tooltipTextEdit" />}>
                   <i
                     data-id="instanceEditIcon"
@@ -432,7 +413,7 @@ export function UniversalDappUI(props: UdappProps) {
               )}
 
               {/* [V1 Logic] Legacy Edit Mode (Pencil) */}
-              {!useNewAiBuilder && props.exEnvironment && props.exEnvironment.startsWith('injected') && (
+              {!useNewAiBuilder && selectedProvider.toLowerCase().startsWith('vm-') || selectedProvider.toLowerCase().includes('basic-http-provider') && (
                 <CustomTooltip placement="top" tooltipClasses="text-nowrap" tooltipId="udapp_udappEditTooltip" tooltipText={<FormattedMessage id="udapp.tooltipTextEdit" />}>
                   <i
                     data-id="instanceEditIcon"

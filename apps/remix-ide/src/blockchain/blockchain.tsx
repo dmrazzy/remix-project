@@ -690,7 +690,6 @@ export class Blockchain extends Plugin {
         // called for libraries deployment
           try {
             const result = await this.runTx(data)
-            // Pass result.txResult because deployLibrary expects txResult.receipt.contractAddress
             runTxCallback(null, result.txResult)
           } catch (error) {
             runTxCallback(error, null)
@@ -714,9 +713,7 @@ export class Blockchain extends Plugin {
       const useCall = funABI.stateMutability === 'view' || funABI.stateMutability === 'pure'
       const result = await this.runTx({ to: address, data, useCall })
       const { txResult, address: _address, returnValue } = result
-      if (lookupOnly) {
-        // outputCb(returnValue)
-      }
+
       return { txResult, address: _address, returnValue }
     } catch (error) {
       // return logCallback(`${logMsg} errored: ${error.message ? error.message : error.error ? error.error : error}`)
