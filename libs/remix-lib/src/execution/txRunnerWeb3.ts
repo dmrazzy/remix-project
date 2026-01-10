@@ -141,17 +141,18 @@ export class TxRunnerWeb3 {
   }
 
   async execute (args: InternalTransaction) {
-    const result = await this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp, args.web3, args.provider)
+    const result = await this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp, args.web3, args.provider, args.isVM)
 
     return result
   }
 
-  async runInNode (from, fromSmartAccount, deployedBytecode, to, data, value, gasLimit, useCall, timestamp, web3Provider?: any, provider?: string) {
-    const tx = { from: from, fromSmartAccount, deployedBytecode, to: to, data: data, value: value, web3: web3Provider, provider: provider }
+  async runInNode (from, fromSmartAccount, deployedBytecode, to, data, value, gasLimit, useCall, timestamp, web3Provider?: any, provider?: string, isVMParam?: boolean) {
+    const tx = { from: from, fromSmartAccount, deployedBytecode, to: to, data: data, value: value, web3: web3Provider, provider: provider, isVM: isVMParam }
     if (!from) throw new Error('the value of "from" is not defined. Please make sure an account is selected.')
     if (useCall) {
-      const isVM = await this._api.call('blockchain', 'isVM')
+      const isVM = tx.isVM !== undefined ? tx.isVM : await this._api.call('blockchain', 'isVM')
       const web3 = tx.web3 || await this._api.call('blockchain', 'getWeb3')
+
       if (isVM) {
         web3.remix.registerCallId(timestamp)
       }

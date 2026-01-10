@@ -22,6 +22,7 @@ export type Transaction = {
   type?: '0x1' | '0x2' | '0x4'
   web3?: any // Web3 provider to avoid circular callback deadlock
   provider?: string // Provider type to avoid circular callback deadlock
+  isVM?: boolean // VM flag to avoid circular callback deadlock
 }
 
 export type TxResult = {

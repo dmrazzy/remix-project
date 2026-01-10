@@ -1,14 +1,12 @@
 import { envChangeNotification } from "@remix-ui/helper"
 import { RunTab } from "../types/run-tab"
 import { trackMatomoEvent } from '@remix-api'
-import { setExecutionContext } from "./account"
 import { setAccount, addExternalProvider, addInstance, addNewProxyDeployment, removeExternalProvider, setNetworkNameFromProvider, setPinnedChainId, setExecEnv } from "./actions"
 import { addDeployOption, clearAllInstances, clearRecorderCount, setSelectedAccount, fetchContractListSuccess, resetProxyDeployments, resetUdapp, setCurrentContract, setCurrentFile, setLoadType, setRecorderCount, setRemixDActivated, setSendValue, fetchAccountsListSuccess, fetchAccountsListRequest, setSendUnit } from "./payload"
 import { updateInstanceBalance } from './deploy'
 import { CompilerAbstract } from '@remix-project/remix-solidity'
 import BN from 'bn.js'
 import { Plugin } from "@remixproject/engine"
-import { getNetworkProxyAddresses } from "./deploy"
 import { shortenAddress } from "@remix-ui/helper"
 import { parseUnits } from "ethers"
 
@@ -101,14 +99,14 @@ export const setupEvents = (plugin: RunTab) => {
     updateInstanceBalance(plugin, dispatch)
   })
 
-  plugin.on('desktopHost', 'disconnected', () => {
-    setExecutionContext(plugin, dispatch, { context: 'vm-cancun', fork: '' })
-  })
+  // plugin.on('desktopHost', 'disconnected', () => {
+  //   setExecutionContext(plugin, dispatch, { context: 'vm-cancun', fork: '' })
+  // })
 
-  plugin.on('udapp', 'setEnvironmentModeReducer', (env: { context: string, fork: string }, from: string) => {
-    plugin.call('notification', 'toast', envChangeNotification(env, from))
-    setExecutionContext(plugin, dispatch, env)
-  })
+  // plugin.on('udapp', 'setEnvironmentModeReducer', (env: { context: string, fork: string }, from: string) => {
+  //   plugin.call('notification', 'toast', envChangeNotification(env, from))
+  //   setExecutionContext(plugin, dispatch, env)
+  // })
 
   plugin.on('udapp', 'clearAllInstancesReducer', () => {
     dispatch(clearAllInstances())

@@ -5,7 +5,6 @@ import { resetAndInit, setupEvents, setEventsDispatch } from './events'
 import { clearInstances, removeInstance, pinInstance, unpinInstance, updateScenarioPath } from './actions'
 import { getContext, getFuncABIInputs, runTransactions } from './deploy'
 import { FuncABI } from "@remix-project/core-plugin"
-import { MainnetPrompt } from '../types'
 import { runCurrentScenario, storeScenario } from './recorder'
 
 let plugin: RunTab, dispatch: React.Dispatch<any> = () => {}

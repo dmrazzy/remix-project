@@ -678,46 +678,42 @@ export class Blockchain extends Plugin {
 
   async runOrCallContractMethod(contractName, contractAbi, funABI, contract, value, address, callType, lookupOnly) {
     // contractsDetails is used to resolve libraries
-    try {
-      const data = await txFormat.buildData(
-        contractName,
-        contractAbi,
-        {},
-        false,
-        funABI,
-        callType,
-        async (data, runTxCallback) => {
+    const data = await txFormat.buildData(
+      contractName,
+      contractAbi,
+      {},
+      false,
+      funABI,
+      callType,
+      async (data, runTxCallback) => {
         // called for libraries deployment
-          try {
-            const result = await this.runTx(data)
-            runTxCallback(null, result.txResult)
-          } catch (error) {
-            runTxCallback(error, null)
-          }
+        try {
+          const result = await this.runTx(data)
+          runTxCallback(null, result.txResult)
+        } catch (error) {
+          runTxCallback(error, null)
         }
-      )
-      if (!lookupOnly) {
-        // logCallback(`${logMsg} pending ... `)
-      } else {
-        // logCallback(`${logMsg}`)
       }
-      if (funABI.type === 'fallback') data.dataHex = value
-
-      if (data) {
-        data.contractName = contractName
-        // @ts-ignore
-        data.contractABI = contractAbi
-        // @ts-ignore
-        data.contract = contract
-      }
-      const useCall = funABI.stateMutability === 'view' || funABI.stateMutability === 'pure'
-      const result = await this.runTx({ to: address, data, useCall })
-      const { txResult, address: _address, returnValue } = result
-
-      return { txResult, address: _address, returnValue }
-    } catch (error) {
-      // return logCallback(`${logMsg} errored: ${error.message ? error.message : error.error ? error.error : error}`)
+    )
+    if (!lookupOnly) {
+      // logCallback(`${logMsg} pending ... `)
+    } else {
+      // logCallback(`${logMsg}`)
     }
+    if (funABI.type === 'fallback') data.dataHex = value
+
+    if (data) {
+      data.contractName = contractName
+      // @ts-ignore
+      data.contractABI = contractAbi
+      // @ts-ignore
+      data.contract = contract
+    }
+    const useCall = funABI.stateMutability === 'view' || funABI.stateMutability === 'pure'
+    const result = await this.runTx({ to: address, data, useCall })
+    const { txResult, address: _address, returnValue } = result
+
+    return { txResult, address: _address, returnValue }
   }
 
   context() {
@@ -1011,7 +1007,7 @@ export class Blockchain extends Plugin {
   async runTransaction(args) {
     const gasLimit = await this.call('udappDeploy', 'getGasLimit')
     const value = await this.call('udappDeploy', 'getValue')
-    const queryValue = !args.useCall ? value : 0
+    const queryValue = !args.useCall ? value : '0x0'
     let fromAddress
     let fromSmartAccount
     let authorizationList
@@ -1033,7 +1029,8 @@ export class Blockchain extends Plugin {
       timestamp: args.data.timestamp,
       authorizationList: args.authorizationList,
       web3: await this.getWeb3(), // Pass web3 to avoid circular callback
-      provider: this.getProvider() // Pass provider to avoid circular callback deadlock
+      provider: this.getProvider(), // Pass provider to avoid circular callback deadlock
+      isVM: this.executionContext.isVM() // Pass isVM to avoid circular callback deadlock
     }
     const payLoad = {
       funAbi: args.data.funAbi,
