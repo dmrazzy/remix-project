@@ -593,6 +593,7 @@ function DeployPortraitView() {
                                   value={currentValue}
                                   onChange={(e) => handleInputChange(index, e.target.value)}
                                   style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '30px' }}
+                                  data-id={`constructorInput${index}`}
                                 />
                                 <div className="copy-icon-hover" style={{ position: 'absolute', right: '8px', top: '40%', transform: 'translateY(-50%)', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
                                   <CopyToClipboard tip="Copy" icon="fa-copy" direction="top" getContent={() => currentValue}>
@@ -612,6 +613,7 @@ function DeployPortraitView() {
                                 value={currentValue}
                                 onChange={(e) => handleInputChange(index, e.target.value)}
                                 style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '80px', resize: 'vertical' }}
+                                data-id={`constructorInput${index}`}
                               />
                               <div className="copy-icon-hover" style={{ position: 'absolute', right: '8px', top: '8px', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
                                 <CopyToClipboard tip="Copy" icon="fa-copy" direction="top" getContent={() => currentValue}>
@@ -738,6 +740,7 @@ function DeployPortraitView() {
               <div>
                 <button
                   onClick={handleDeployClick}
+                  data-id="deployButton"
                   className="btn btn-primary w-100 py-2"
                   style={{ fontSize: '1rem', fontWeight: '500' }}
                 >

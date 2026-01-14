@@ -212,6 +212,7 @@ export class TxRunnerWeb3 {
       }
       return await this.confirmTransaction(tx, network, gasEstimation)
     } catch (err) {
+      console.error(err)
       if (err && err.error && err.error.indexOf('Invalid JSON RPC response') !== -1) {
         // // @todo(#378) this should be removed when https://github.com/WalletConnect/walletconnect-monorepo/issues/334 is fixed
         // Should log in terminal

@@ -286,13 +286,14 @@ function EnvironmentPortraitView() {
             <Dropdown className="w-100">
               <Dropdown.Toggle
                 as={EnvironmentToggle}
+                data-id="settingsSelectEnvOptions"
                 className="w-100 d-inline-block border form-control"
                 environmentUI={<EnvCategoryUI />}
                 style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}
               >
                 <div style={{ flexGrow: 1, overflow: 'hidden', display:'flex', justifyContent:'left' }}>
                   <div className="text-truncate text-secondary">
-                    <span> { selectedProvider?.category || selectedProvider?.displayName || 'Remix VM' }</span>
+                    <span data-id={`selected-provider-${widgetState.providers.selectedProvider}`}> { selectedProvider?.category || selectedProvider?.displayName || 'Remix VM' }</span>
                   </div>
                 </div>
               </Dropdown.Toggle>
@@ -301,7 +302,7 @@ function EnvironmentPortraitView() {
                 {
                   uniqueDropdownItems.map((provider, index) => {
                     return (
-                      <Dropdown.Item key={index} onClick={() => handleProviderSelection(provider)} className="environment-item-hover">
+                      <Dropdown.Item key={index} onClick={() => handleProviderSelection(provider)} data-id={`dropdown-item-${provider.name}`} className="environment-item-hover">
                         {provider.category ? provider.category : provider.displayName}
                       </Dropdown.Item>
                     )})
@@ -312,7 +313,7 @@ function EnvironmentPortraitView() {
         {!widgetState.fork.isVisible.resetUI && (
           <div className="d-flex px-3">
             <Dropdown className="w-100" onToggle={(isOpen) => setIsAccountDropdownOpen(isOpen)}>
-              <Dropdown.Toggle as={AddressToggle} className={`w-100 d-inline-block border form-control selected-account-hover ${isAccountDropdownOpen ? 'dropdown-open' : ''}`} style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
+              <Dropdown.Toggle as={AddressToggle} data-id="runTabSelectAccount" className={`w-100 d-inline-block border form-control selected-account-hover ${isAccountDropdownOpen ? 'dropdown-open' : ''}`} style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
                 <div className="d-flex align-items-center">
                   <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                     <div className="d-flex align-items-center justify-content-between w-100">
@@ -384,7 +385,7 @@ function EnvironmentPortraitView() {
                     const accountId = `account-${index}`
                     return (
                       <div key={index}>
-                        <Dropdown.Item className="d-flex align-items-center justify-content-between p-1 m-1 account-item-hover" onClick={() => handleAccountSelection(account)} style={{ cursor: 'pointer' }}>
+                        <Dropdown.Item data-id={account.account} className="d-flex align-items-center justify-content-between p-1 m-1 account-item-hover" onClick={() => handleAccountSelection(account)} style={{ cursor: 'pointer' }}>
                           <div className='d-flex flex-column align-items-start'>
                             <div className="text-truncate text-dark d-flex align-items-center">
                               {editingAccountId === accountId ? (
