@@ -11,7 +11,7 @@ module.exports = {
     return ''
   },
 
-  'Execute a call that retrieve previous block hashes #group1': function (browser: NightwatchBrowser) {
+  'Execute a call that retrieve previous block hashes #group1': '' + function (browser: NightwatchBrowser) {
     const code = `
       contract A {
         function foo(uint p) public view returns(bytes32) {
