@@ -308,7 +308,7 @@ export async function createSmartAccount (plugin: EnvironmentPlugin, widgetState
   }
 }
 
-export async function authorizeDelegation (contractAddress: string, plugin: EnvironmentPlugin, widgetState: WidgetState) {
+export async function authorizeDelegation (contractAddress: string, plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch?: React.Dispatch<Actions>) {
   try {
     if (!isAddress(toChecksumAddress(contractAddress))) {
       await plugin.call('terminal', 'log', { type: 'info', value: `Please use an ethereum address of a contract deployed in the current chain.` })
@@ -374,9 +374,19 @@ export async function authorizeDelegation (contractAddress: string, plugin: Envi
     }
     plugin.call('terminal', 'log', { type: 'info',
       value: `Delegation for ${widgetState.accounts.selectedAccount} activated. This account will be running the code located at ${contractAddress} .` })
+
+    // Update delegation state
+    if (dispatch) {
+      dispatch({ type: 'SET_DELEGATION', payload: { account: widgetState.accounts.selectedAccount, address: contractAddress } })
+    }
   } else {
     plugin.call('terminal', 'log', { type: 'info',
       value: `Delegation for ${widgetState.accounts.selectedAccount} removed.` })
+
+    // Remove delegation from state
+    if (dispatch) {
+      dispatch({ type: 'REMOVE_DELEGATION', payload: widgetState.accounts.selectedAccount })
+    }
   }
 
   await plugin.call('blockchain', 'dumpState')

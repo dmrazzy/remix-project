@@ -94,7 +94,7 @@ function EnvironmentPortraitView() {
       cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
       okFn: async () => {
         try {
-          await authorizeDelegation(delegationAuthorizationAddressRef.current, plugin, widgetState)
+          await authorizeDelegation(delegationAuthorizationAddressRef.current, plugin, widgetState, dispatch)
           trackMatomoEvent({ category: 'udapp', action: 'contractDelegation', name: 'create', isClick: false })
         } catch (e) {
           plugin.call('terminal', 'log', { type: 'error', value: e.message })
@@ -259,6 +259,32 @@ function EnvironmentPortraitView() {
     return aaSupportedChainIds.includes(widgetState.network.chainId)
   }, [widgetState.network.chainId])
 
+  const enableDelegationAuthorization = useMemo(() => {
+    return widgetState.providers.selectedProvider === 'vm-prague'
+  }, [widgetState.providers.selectedProvider])
+
+  const delegationAddress = useMemo(() => {
+    return widgetState.accounts.delegations?.[selectedAccount?.account]
+  }, [widgetState.accounts.delegations, selectedAccount])
+
+  const handleDeleteDelegation = async () => {
+    plugin.call('notification', 'modal', {
+      id: 'deleteDelegation',
+      title: 'Remove Delegation',
+      message: `Are you sure you want to remove the delegation for ${selectedAccount?.account}?`,
+      okLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      okFn: async () => {
+        try {
+          await authorizeDelegation('0x0000000000000000000000000000000000000000', plugin, widgetState, dispatch)
+          plugin.call('terminal', 'log', { type: 'info', value: `Delegation for ${selectedAccount?.account} removed.` })
+        } catch (e) {
+          plugin.call('terminal', 'log', { type: 'error', value: e.message })
+        }
+      }
+    })
+  }
+
   return (
     <>
       <div className='card ms-2' style={{ backgroundColor: 'var(--custom-onsurface-layer-1)' }}>
@@ -356,6 +382,7 @@ function EnvironmentPortraitView() {
                             if (el && selectedAccount) kebabIconRefs.current['selected'] = el
                           }}
                           className="selected-account-kebab-icon fas fa-ellipsis-v"
+                          data-id="selected-account-kebab-menu"
                           onClick={(e) => handleKebabClick(e, 'selected')}
                           style={{ cursor: 'pointer' }}
                         ></i>
@@ -374,7 +401,7 @@ function EnvironmentPortraitView() {
                 onRenameAccount={handleRenameAccount}
                 onNewAccount={handleNewAccount}
                 onCreateSmartAccount={isSmartAccountSupported ? handleCreateSmartAccount : undefined}
-                onAuthorizeDelegation={handleAuthorizeDelegation}
+                onAuthorizeDelegation={enableDelegationAuthorization && !delegationAddress ? handleAuthorizeDelegation : undefined}
                 onSignUsingAccount={handleSignUsingAccount}
                 onDeleteAccount={handleDeleteAccount}
               />
@@ -439,6 +466,25 @@ function EnvironmentPortraitView() {
               </Dropdown.Menu>
             </Dropdown>
           </div>)}
+        {enableDelegationAuthorization && delegationAddress && (
+          <div className="px-3 pb-2">
+            <div className="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-0" style={{ fontSize: '0.85rem' }}>
+              <div className="d-flex align-items-center">
+                <span className="me-2">Delegation:</span>
+                <span className="text-truncate" style={{ maxWidth: '150px' }}>{delegationAddress}</span>
+                <CopyToClipboard tip="Copy address" icon="fa-copy" direction="top" getContent={() => delegationAddress}>
+                  <i className="fa-solid fa-copy small ms-1" style={{ cursor: 'pointer' }}></i>
+                </CopyToClipboard>
+              </div>
+              <i
+                className="fas fa-times"
+                data-id="delete-delegation"
+                onClick={handleDeleteDelegation}
+                style={{ cursor: 'pointer' }}
+              ></i>
+            </div>
+          </div>
+        )}
         <div className="mx-auto py-3" style={{ color: 'var(--bs-tertiary-color)' }}>
           <span className="small me-1">Deployed Contracts</span><span className="small me-2 text-primary">{ 0 }</span>
           <span className="small me-1">Transactions recorded</span><span className="small text-primary">{ 0 }</span>

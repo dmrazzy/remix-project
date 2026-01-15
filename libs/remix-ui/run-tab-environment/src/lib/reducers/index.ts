@@ -13,6 +13,7 @@ export const widgetInitialState: WidgetState = {
     selectedAccount: '',
     smartAccounts: [],
     defaultAccounts: [],
+    delegations: {},
     isRequesting: false,
     isSuccessful: false,
     error: null
@@ -263,6 +264,31 @@ export const widgetReducer = (state = widgetInitialState, action: Actions): Widg
     return {
       ...state,
       network: action.payload
+    }
+  }
+
+  case 'SET_DELEGATION': {
+    return {
+      ...state,
+      accounts: {
+        ...state.accounts,
+        delegations: {
+          ...state.accounts.delegations,
+          [action.payload.account]: action.payload.address
+        }
+      }
+    }
+  }
+
+  case 'REMOVE_DELEGATION': {
+    const delegations = { ...state.accounts.delegations }
+    delete delegations[action.payload]
+    return {
+      ...state,
+      accounts: {
+        ...state.accounts,
+        delegations
+      }
     }
   }
 

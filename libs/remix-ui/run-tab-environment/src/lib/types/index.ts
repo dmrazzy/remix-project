@@ -33,6 +33,7 @@ export interface WidgetState {
     selectedAccount: string,
     defaultAccounts: Account[],
     smartAccounts: SmartAccount[],
+    delegations?: { [address: string]: string },
     isRequesting: boolean,
     isSuccessful: boolean,
     error: string
@@ -69,7 +70,9 @@ export interface ActionPayloadTypes {
   COMPLETED_FORK: undefined,
   ERROR_FORK: string,
   SET_MATCH_PASSPHRASE: string,
-  SET_NETWORK_STATUS: NetworkStatus
+  SET_NETWORK_STATUS: NetworkStatus,
+  SET_DELEGATION: { account: string, address: string },
+  REMOVE_DELEGATION: string
 }
 export interface Action<T extends keyof ActionPayloadTypes> {
   type: T

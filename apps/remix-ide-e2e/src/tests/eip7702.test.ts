@@ -30,7 +30,13 @@ module.exports = {
       .click('[data-id="deployAndRunClearInstances"]')
       .perform((done) => {
         browser
-          .click('*[data-id="create-delegation-authorization"]')
+          .waitForElementVisible('[data-id="runTabSelectAccount"]')
+          .moveToElement('[data-id="runTabSelectAccount"]', 10, 10)
+          .pause(500)
+          .waitForElementPresent('[data-id="selected-account-kebab-menu"]')
+          .click('[data-id="selected-account-kebab-menu"]')
+          .waitForElementVisible('[data-id="authorizeDelegation"]')
+          .click('[data-id="authorizeDelegation"]')
           .waitForElementVisible('*[data-id="create-delegation-authorization-input"]')
           .execute(() => {
             (document.querySelector('*[data-id="create-delegation-authorization-input"]') as any).focus()
@@ -38,7 +44,7 @@ module.exports = {
           .setValue('*[data-id="create-delegation-authorization-input"]', addressDelegate)
           .perform(() => done())
       })
-      .modalFooterOKClick('udappNotify')
+      .modalFooterOKClick('createDelegationAuthorization')
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'This account will be running the code located at')
       .clickInstance(0)
       .clickFunction('entryPoint - call')
@@ -60,7 +66,6 @@ module.exports = {
   'Should remove the delegation #group1': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="delete-delegation"]')
-      .click('*[data-id="remixDRValueLabel"]')
       .click('*[data-id="delete-delegation"]')
       .modalFooterOKClick('udappNotify')
       .waitForElementNotPresent('*[data-id="delete-delegation"]')
