@@ -118,3 +118,39 @@ export interface RefreshTokenResponse {
   access_token: string
   refresh_token?: string
 }
+
+// ==================== Permissions ====================
+
+export interface Permission {
+  feature_name: string
+  allowed: boolean
+  limit_value?: number
+  limit_unit?: string
+  category?: string
+}
+
+export interface PermissionsResponse {
+  features: Permission[]
+}
+
+export interface FeatureCheckRequest {
+  feature: string
+}
+
+export interface FeatureCheckResponse {
+  allowed: boolean
+  limit_value?: number
+  limit_unit?: string
+}
+
+export interface MultiFeatureCheckRequest {
+  features: string[]
+}
+
+export interface MultiFeatureCheckResponse {
+  results: Record<string, { allowed: boolean; limit_value?: number; limit_unit?: string }>
+}
+
+export interface CategoryFeaturesResponse {
+  features: Permission[]
+}

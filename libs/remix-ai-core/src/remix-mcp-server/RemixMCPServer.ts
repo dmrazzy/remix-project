@@ -43,6 +43,7 @@ import { CompilationResourceProvider } from './providers/CompilationResourceProv
 import { DeploymentResourceProvider } from './providers/DeploymentResourceProvider';
 import { TutorialsResourceProvider } from './providers/TutorialsResourceProvider';
 import { AmpResourceProvider } from './providers/AmpResourceProvider';
+import { DebuggingResourceProvider } from './providers/DebuggingResourceProvider';
 
 // Import middleware
 import { SecurityMiddleware } from './middleware/SecurityMiddleware';
@@ -846,6 +847,10 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
       // Register Amp resource provider
       const ampProvider = new AmpResourceProvider(this._plugin);
       this._resources.register(ampProvider);
+
+      // Register debugging resource provider
+      const debuggingProvider = new DebuggingResourceProvider(this._plugin);
+      this._resources.register(debuggingProvider);
 
       const totalProviders = this._resources.list().length;
 

@@ -5,16 +5,18 @@ import { TraceAnalyser } from './traceAnalyser'
 import { TraceCache } from './traceCache'
 import { TraceStepManager } from './traceStepManager'
 import { isCreateInstruction } from './traceHelper'
+import { DebugTraceTransactionResult } from '../types'
+// import { BrowserProvider } from 'ethers'
 
 export class TraceManager {
-  web3
+  web3: any
   fork: string
   isLoading: boolean
-  trace
-  traceCache
-  traceAnalyser
-  traceStepManager
-  tx
+  trace: DebugTraceTransactionResult['structLogs']
+  traceCache: TraceCache
+  traceAnalyser: TraceAnalyser
+  traceStepManager: TraceStepManager
+  tx: any
 
   constructor (options) {
     this.web3 = options.web3
@@ -60,7 +62,7 @@ export class TraceManager {
     }
   }
 
-  getTrace (txHash) {
+  getTrace (txHash): Promise<DebugTraceTransactionResult> {
     return new Promise((resolve, reject) => {
       const options = {
         disableStorage: true,
@@ -159,7 +161,7 @@ export class TraceManager {
         // we don't turn the stack coming from the VM into an array when the tx is executed
         // but now when the app needs it.
         const stack = []
-        for (const prop in this.trace[stepIndex].stack) {
+        for (const prop in this.trace[stepIndex].stack as any) {
           if (prop !== 'length') {
             stack.push(toHexPaddedString(this.trace[stepIndex].stack[prop]))
           }

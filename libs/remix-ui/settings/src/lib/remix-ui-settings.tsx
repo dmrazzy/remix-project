@@ -321,7 +321,11 @@ export const RemixUiSettings = (props: RemixUiSettingsProps) => {
     props.plugin.on('settings', 'openSection', onOpenSection)
 
     return () => {
-      props.plugin.off('settings', 'openSection')
+      try {
+        props.plugin.off('settings', 'openSection')
+      } catch (e) {
+        console.log(e)
+      }
     }
 
   }, [])

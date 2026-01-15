@@ -52,7 +52,7 @@ for (const file of files) {
         .join(', ');
 
       // Truncate description to max 50 characters
-      const description = tool.description.length > 200
+      const description = tool.description && tool.description.length > 200
         ? tool.description.substring(0, 200) + '...'
         : tool.description;
 
