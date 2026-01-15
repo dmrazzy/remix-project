@@ -12,21 +12,20 @@ module.exports = {
     return sources
   },
 
-  'Should launch debugger #group1': function (browser: NightwatchBrowser) {
+  'Should launch debugger #group1': '' + function (browser: NightwatchBrowser) {
     browser.addFile('blah.sol', sources[0]['blah.sol'])
       .pause(4000)
       // on autocompile sometimes the compiler returns invalid source, so we need to recompile to make sure the source is valid
       .clickLaunchIcon('solidity').click('*[data-id="compilerContainerCompileBtn"]')
       .pause(4000)
       .clickLaunchIcon('udapp')
-      .waitForElementPresent('*[data-bs-title="Deploy - transact (not payable)"]', 60000)
-      .click('*[data-bs-title="Deploy - transact (not payable)"]')
+      .createContract('')
       .debugTransaction(0)
       .waitForElementContainsText('*[data-id="sidePanelSwapitTitle"]', 'DEBUGGER', 60000)
       .clearConsole()
   },
 
-  'Should debug failing transaction #group1': function (browser: NightwatchBrowser) {
+  'Should debug failing transaction #group1': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
       .clickLaunchIcon('udapp')
       .clickInstance(0)
@@ -41,7 +40,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="solidityLocals"]', '999', 60000)
   },
 
-  'Should debug transaction using slider #group1': function (browser: NightwatchBrowser) {
+  'Should debug transaction using slider #group1': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
       .waitForElementVisible('*[data-id="slider"]')
       .goToVMTraceStep(51)
@@ -50,7 +49,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n51', 60000)
   },
 
-  'Should step back and forward transaction #group1': function (browser: NightwatchBrowser) {
+  'Should step back and forward transaction #group1': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
       .waitForElementPresent('*[data-id="buttonNavigatorIntoBack"]')
       .scrollAndClick('*[data-id="buttonNavigatorIntoBack"]')
@@ -63,7 +62,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="stepdetail"]', 'execution step:\n51', 60000)
   },
 
-  'Should jump through breakpoints #group1': function (browser: NightwatchBrowser) {
+  'Should jump through breakpoints #group1': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('#editorView')
       .execute(() => {
         (window as any).addRemixBreakpoint(11)
@@ -82,14 +81,13 @@ module.exports = {
       .waitForElementContainsText('*[data-id="stepdetail"]', 'execution step:\n352', 60000)
   },
 
-  'Should display solidity imported code while debugging github import #group2': function (browser: NightwatchBrowser) {
+  'Should display solidity imported code while debugging github import #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .clearConsole()
       .clearTransactions()
       .clickLaunchIcon('solidity')
       .testContracts('externalImport.sol', sources[1]['externalImport.sol'], ['ERC20'])
       .clickLaunchIcon('udapp')
-      .waitForElementPresent('*[data-bs-title="Deploy - transact (not payable)"]', 35000)
       .selectContract('ERC20')
       .createContract('"tokenName", "symbol"')
       .debugTransaction(0)
@@ -112,7 +110,7 @@ module.exports = {
       })
   },
 
-  'Should display correct source highlighting while debugging a contract which has ABIEncoderV2 #group2': function (browser: NightwatchBrowser) {
+  'Should display correct source highlighting while debugging a contract which has ABIEncoderV2 #group2': '' + function (browser: NightwatchBrowser) {
     /*
       localVariable_step266_ABIEncoder and localVariable_step717_ABIEncoder
       still contains unwanted values (related to decoding calldata types)
@@ -152,7 +150,7 @@ module.exports = {
       .clearTransactions()
   },
 
-  'Should load more solidity locals array #group3': function (browser: NightwatchBrowser) {
+  'Should load more solidity locals array #group3': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('solidity')
       .testContracts('locals.sol', sources[3]['locals.sol'], ['testLocals'])
@@ -181,7 +179,7 @@ module.exports = {
       .clearConsole().pause(2000)
   },
 
-  'Should debug using generated sources #group4': function (browser: NightwatchBrowser) {
+  'Should debug using generated sources #group4': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('solidity')
       .pause(2000)
@@ -204,7 +202,7 @@ module.exports = {
       .click('*[id="debuggerTransactionStartButtonContainer"]')
   },
   // depends on Should debug using generated sources
-  'Should call the debugger api: getTrace #group4': function (browser: NightwatchBrowser) {
+  'Should call the debugger api: getTrace #group4': '' + function (browser: NightwatchBrowser) {
     let txhash
     browser
       .clickLaunchIcon('udapp')
@@ -224,7 +222,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', '{"gas":"0x5752","return":"0x0000000000000000000000000000000000000000000000000000000000000000","structLogs":', 60000)
   },
   // depends on Should debug using generated sources
-  'Should call the debugger api: debug #group4': function (browser: NightwatchBrowser) {
+  'Should call the debugger api: debug #group4': '' + function (browser: NightwatchBrowser) {
     let txhash
     browser
       .clickLaunchIcon('udapp')
@@ -270,7 +268,7 @@ module.exports = {
       .checkVariableDebug('soliditystate', { number: { value: '0', type: 'uint256', constant: false, immutable: false } })
   },
 
-  'Should debug reverted transactions #group5': function (browser: NightwatchBrowser) {
+  'Should debug reverted transactions #group5': '' + function (browser: NightwatchBrowser) {
     browser
       .testContracts('reverted.sol', sources[6]['reverted.sol'], ['A', 'B', 'C'])
       .clickLaunchIcon('udapp')
