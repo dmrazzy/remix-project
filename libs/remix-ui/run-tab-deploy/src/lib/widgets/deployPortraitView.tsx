@@ -263,7 +263,7 @@ function DeployPortraitView() {
             <div className="d-flex pb-3">
               <Dropdown className="w-100">
                 <div className='d-flex align-items-center justify-content-between'>
-                  <Dropdown.Toggle as={AddressToggle} className="w-100 d-inline-block border form-control" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
+                  <Dropdown.Toggle as={AddressToggle} className="w-100 d-inline-block border form-control" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }} data-id="contractDropdownToggle">
                     <div className="d-flex align-items-center">
                       <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                         <div className="d-flex align-items-center justify-content-between w-100">
@@ -347,9 +347,9 @@ function DeployPortraitView() {
                 </div>
 
                 {widgetState.contracts.contractList.length > 0 && (
-                  <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
+                  <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }} data-id="contractDropdownMenu">
                     {widgetState.contracts.contractList.map((contract, index) => (
-                      <Dropdown.Item key={`${contract.filePath}:${contract.name}`} className="d-flex align-items-center contract-dropdown-item-hover" onClick={() => setSelectedContractIndex(index)}>
+                      <Dropdown.Item key={`${contract.filePath}:${contract.name}`} className="d-flex align-items-center contract-dropdown-item-hover" onClick={() => setSelectedContractIndex(index)} data-id={`contractDropdownItem-${contract.name}`}>
                         <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                           <div className="d-flex align-items-center justify-content-between w-100">
                             <div className='d-flex flex-column align-items-start'>

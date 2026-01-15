@@ -120,7 +120,7 @@ export async function deployContract(selectedContract: ContractData, args: strin
             const contract = await createInstance(selectedContract, args, deployMode, false, plugin)
             const initABI = contract.selectedContract.abi.find(abi => abi.name === 'initialize')
 
-            plugin.call('openzeppelin-proxy', 'executeUUPSProxy', contract.address, deployMode.deployArgs, initABI, contract.selectedContract)
+            await plugin.call('openzeppelin-proxy', 'executeUUPSProxy', contract.address, deployMode.deployArgs, initABI, contract.selectedContract)
           } catch (error) {
             console.error(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error}`)
           }
@@ -281,7 +281,7 @@ function showUpgradeModal(selectedContract: ContractData, args: string, deployMo
     okLabel: intl.formatMessage({ id: 'udapp.proceed' }),
     okFn: async () => {
       const contract = await createInstance(selectedContract, args, deployMode, false, plugin)
-      plugin.call('openzeppelin-proxy', 'executeUUPSContractUpgrade', deployMode.deployArgs, contract.address, contract.selectedContract)
+      await plugin.call('openzeppelin-proxy', 'executeUUPSContractUpgrade', deployMode.deployArgs, contract.address, contract.selectedContract)
     },
     cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
     cancelFn: () => {}
