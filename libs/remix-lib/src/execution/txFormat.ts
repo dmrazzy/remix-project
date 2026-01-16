@@ -154,14 +154,14 @@ export function linkLibraries (contract, linkLibraries, linkReferences) {
 * @param {Function} callbackDeployLibrary  - callbackDeployLibrary
 * @param {Function} callback    - callback
 */
-export async function encodeConstructorCallAndDeployLibraries (contractName, contract, contracts, params, funAbi) {
+export async function encodeConstructorCallAndDeployLibraries (contractName, contract, contracts, params, funAbi, callbackDeployLibrary?) {
   const encodedParam = encodeParams(params, funAbi)
   let dataHex = ''
   const contractBytecode = contract.evm.bytecode.object
   let bytecodeToDeploy = contract.evm.bytecode.object
   if (bytecodeToDeploy.indexOf('_') >= 0) {
     try {
-      const bytecode = await linkBytecode(contract, contracts)
+      const bytecode = await linkBytecode(contract, contracts, callbackDeployLibrary)
       bytecodeToDeploy = bytecode + dataHex
       return { dataHex: bytecodeToDeploy, funAbi, funArgs: encodedParam.funArgs, contractBytecode, contractName: contractName }
     } catch (err) {
