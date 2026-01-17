@@ -107,7 +107,7 @@ export function encodeFunctionCall (params, funAbi) {
 * @param {Object} linkReferences    - given by the compiler, contains the proper linkReferences
 * @param {Function} callback    - callback
 */
-export function encodeConstructorCallAndLinkLibraries (contract, params, funAbi, linkLibrariesAddresses, linkReferences, callback) {
+export function encodeConstructorCallAndLinkLibraries (contract, params, funAbi, linkLibrariesAddresses, linkReferences) {
   const encodedParam = encodeParams(params, funAbi)
   const bytecodeToDeploy = linkLibraries(contract, linkLibrariesAddresses, linkReferences)
 
@@ -186,7 +186,7 @@ export async function encodeConstructorCallAndDeployLibraries (contractName, con
 * @param {Function} callbackStep  - callbackStep
 * @param {Function} callbackDeployLibrary  - callbackDeployLibrary
 */
-export async function buildData (contractName, contract, contracts, isConstructor, funAbi, params, callbackDeployLibrary) {
+export async function buildData (contractName, contract, contracts, isConstructor, funAbi, params, callbackDeployLibrary?) {
   let funArgs = []
   let data: Buffer | string = ''
   let dataHex = ''
