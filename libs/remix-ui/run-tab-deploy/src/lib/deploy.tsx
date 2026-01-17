@@ -23,7 +23,7 @@ function DeployWidget({ plugin }: DeployWidgetProps) {
     if (plugin.setDispatchGetter) {
       plugin.setDispatchGetter(() => dispatch)
     }
-  }, [plugin])
+  }, [widgetState])
 
   useEffect(() => {
     plugin.on('fileManager', 'currentFileChanged', async (filePath: string) => {

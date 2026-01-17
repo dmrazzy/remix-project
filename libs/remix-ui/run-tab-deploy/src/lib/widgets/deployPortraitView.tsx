@@ -660,6 +660,7 @@ function DeployPortraitView() {
                 </label>
                 <div className="position-relative flex-fill">
                   <input
+                    id='value'
                     type="number"
                     className="form-control form-control-sm border-0"
                     placeholder="000000000000000000000000000000000"
