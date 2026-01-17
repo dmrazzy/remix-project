@@ -323,27 +323,19 @@ export class Blockchain extends Plugin {
     // statusCb(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error.error ? error.error : error}`)
   }
 
-  deployContractWithLibrary(selectedContract, args, contractMetadata) {
+  async deployContractWithLibrary(selectedContract, args, contractMetadata) {
     const constructor = selectedContract.getConstructorInterface()
+    const data = txFormat.encodeConstructorCallAndLinkLibraries(
+      selectedContract.object,
+      args,
+      constructor,
+      contractMetadata.linkReferences,
+      selectedContract.bytecodeLinkReferences
+    )
 
-    return new Promise((resolve, reject) => {
-      txFormat.encodeConstructorCallAndLinkLibraries(
-        selectedContract.object,
-        args,
-        constructor,
-        contractMetadata.linkReferences,
-        selectedContract.bytecodeLinkReferences,
-        async (error, data) => {
-          if (error) {
-            reject(error)
-          }
-
-          // statusCb(`creation of ${selectedContract.name} pending...`)
-          const result = await this.createContract(selectedContract, data)
-          resolve(result)
-        }
-      )
-    })
+    // statusCb(`creation of ${selectedContract.name} pending...`)
+    const result = await this.createContract(selectedContract, data)
+    return result
   }
 
   async deployProxy(proxyData, implementationContractObject) {
