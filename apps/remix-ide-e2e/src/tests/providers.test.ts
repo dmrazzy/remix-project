@@ -8,7 +8,7 @@ module.exports = {
     init(browser, done, 'http://127.0.0.1:8080', false)
   },
 
-  'Should switch to ganache provider, set a custom URL and fail to connect #group1': function (browser: NightwatchBrowser) {
+  'Should switch to ganache provider, set a custom URL and fail to connect #group1': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('div[data-id="remixIdeIconPanel"]', 10000)
       .clickLaunchIcon('udapp')
       .switchEnvironment('ganache-provider')
@@ -27,7 +27,7 @@ module.exports = {
       })
   },
 
-  'Should switch to ganache provider, use the default ganache URL and succeed to connect #group1': function (browser: NightwatchBrowser) {
+  'Should switch to ganache provider, use the default ganache URL and succeed to connect #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .switchEnvironment('vm-cancun')
       .pause(2000)
@@ -38,7 +38,7 @@ module.exports = {
       .waitForElementVisible({ selector: `[data-id="selected-provider-ganache-provider"]`, timeout: 10000 })
   },
 
-  'Should switch to foundry provider, set a custom URL and fail to connect #group1': function (browser: NightwatchBrowser) {
+  'Should switch to foundry provider, set a custom URL and fail to connect #group1': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('div[data-id="remixIdeIconPanel"]', 10000)
       .switchEnvironment('foundry-provider')
       .waitForElementVisible('*[data-id="foundry-providerModalDialogModalBody-react"]')
@@ -50,7 +50,7 @@ module.exports = {
       .modalFooterOKClick('foundry-provider')
       .pause(1000)
   },
-  'Should switch to foundry provider, use the default foundry URL and succeed to connect #group1': function (browser: NightwatchBrowser) {
+  'Should switch to foundry provider, use the default foundry URL and succeed to connect #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .switchEnvironment('vm-cancun')
       .pause(2000)
@@ -60,7 +60,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="settingsNetworkEnv"]', '1337) network')
   },
 
-  'Should switch to custom provider #group2': function (browser: NightwatchBrowser) {
+  'Should switch to custom provider #group2': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('div[data-id="remixIdeIconPanel"]', 10000)
       .clickLaunchIcon('udapp')
       .switchEnvironment('ganache-provider')
@@ -77,7 +77,7 @@ module.exports = {
       .pause(1000)
   },
 
-  'execute script #group2': function (browser: NightwatchBrowser) {
+  'execute script #group2': '' + function (browser: NightwatchBrowser) {
     browser.clickLaunchIcon('filePanel')
       .addFile('testScript.ts', { content: testScript })
       .clearConsole()

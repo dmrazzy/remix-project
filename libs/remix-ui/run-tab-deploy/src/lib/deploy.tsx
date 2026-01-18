@@ -52,25 +52,6 @@ function DeployWidget({ plugin }: DeployWidgetProps) {
     //   plugin.emit('newTransaction', tx, receipt)
     // })
 
-    // plugin.blockchain.event.register('transactionExecuted', (error, from, to, data, lookupOnly, txResult) => {
-    //   if (!lookupOnly) dispatch(setSendValue('0'))
-    //   if (error) return
-    //   updateAccountBalances(plugin, dispatch)
-    //   updateInstanceBalance(plugin, dispatch)
-    // })
-
-    // plugin.blockchain.event.register('contextChanged', async (context) => {
-    //   dispatch(resetProxyDeployments())
-    //   getNetworkProxyAddresses(plugin, dispatch)
-    //   setFinalContext(plugin, dispatch)
-    //   fillAccountsList(plugin, dispatch)
-    //   // 'contextChanged' & 'networkStatus' both are triggered on workspace & network change
-    //   // There is chance that pinned contracts state is overridden by other event
-    //   // We load pinned contracts for VM environment in this event
-    //   // and for other environments in 'networkStatus' event
-    //   if (context.startsWith('vm')) await loadPinnedContracts(plugin, dispatch, context)
-    // })
-
     // plugin.blockchain.event.register('networkStatus', async ({ error, network }) => {
     //   if (error) {
     //     const netUI = 'can\'t detect network'

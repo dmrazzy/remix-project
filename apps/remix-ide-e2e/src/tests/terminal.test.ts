@@ -47,7 +47,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', '2', 60000)
   },
 
-  'Should clear console #group1': function (browser: NightwatchBrowser) {
+  'Should clear console #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="terminalCli"]')
       .journalChildIncludes('Welcome to Remix')
@@ -55,7 +55,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', '', 60000)
   },
 
-  'Async/Await Script #group1': function (browser: NightwatchBrowser) {
+  'Async/Await Script #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('asyncAwait.js', { content: asyncAwait })
       .executeScriptInTerminal('remix.execute("asyncAwait.js")')
@@ -64,7 +64,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Promise Resolved', 60000)
   },
 
-  'Call Remix File Manager from a script #group2': function (browser: NightwatchBrowser) {
+  'Call Remix File Manager from a script #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="toggleBottomPanelIcon"]')
       .waitForElementVisible('.terminal-wrap', 5000)
@@ -73,14 +73,14 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'contract Ballot {', 60000)
   },
 
-  'Call web3.eth.getAccounts() using Remix VM #group2': function (browser: NightwatchBrowser) {
+  'Call web3.eth.getAccounts() using Remix VM #group2': '' + function (browser: NightwatchBrowser) {
     browser
       // Terminal should already be visible from "Call Remix File Manager from a script" test
       .executeScriptInTerminal('web3.eth.getAccounts()')
       .waitForElementContainsText('*[data-id="terminalJournal"]', '["0x5B38Da6a701c568545dCfcB03FcB875f56beddC4","0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2","0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db","0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB","0x617F2E2fD72FD9D5503197092aC168c91465E7f2","0x17F6AD8Ef982297579C203069C1DbfFE4348c372","0x5c6B0f7Bf3E7ce046039Bd8FABdfD3f9F5021678","0x03C6FcED478cBbC9a4FAB34eF9f40767739D1Ff7","0x1aE0EA34a72D944a8C7603FfB3eC30a6669E454C","0x0A098Eda01Ce92ff4A4CCb7A4fFFb5A43EBC70DC","0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c","0x14723A09ACff6D2A60DcdF7aA4AFf308FDDC160C","0x4B0897b0513fdC7C541B6d9D7E929C4e5364D2dB","0x583031D1113aD414F02576BD6afaBfb302140225","0xdD870fA1b7C4700F2BD7f44238821C26f7392148"]')
   },
 
-  'Call web3.eth.getAccounts() using External Http Provider #group5': function (browser: NightwatchBrowser) {
+  'Call web3.eth.getAccounts() using External Http Provider #group5': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="toggleBottomPanelIcon"]')
       .waitForElementVisible('.terminal-wrap', 5000)
@@ -96,7 +96,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', '","', 60000)
   },
 
-  'Call Remix File Resolver (external URL) from a script #group3': function (browser: NightwatchBrowser) {
+  'Call Remix File Resolver (external URL) from a script #group3': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="toggleBottomPanelIcon"]')
       .waitForElementVisible('.terminal-wrap', 5000)
@@ -109,7 +109,7 @@ module.exports = {
       .openFile('.deps/github/OpenZeppelin/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol')
   },
 
-  'Call Remix File Resolver (internal URL) from a script #group3': function (browser: NightwatchBrowser) {
+  'Call Remix File Resolver (internal URL) from a script #group3': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="terminalClearConsole"]') // clear the terminal
       .addFile('resolveUrl.js', { content: resolveUrl })
@@ -119,7 +119,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'contract Ballot {', 60000)
   },
 
-  'Call Remix File Resolver (internal URL) from a script and specify a path #group3': function (browser: NightwatchBrowser) {
+  'Call Remix File Resolver (internal URL) from a script and specify a path #group3': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="terminalClearConsole"]') // clear the terminal
       .addFile('resolveExternalUrlAndSaveToaPath.js', { content: resolveExternalUrlAndSaveToaPath })
@@ -131,7 +131,7 @@ module.exports = {
 
   },
 
-  'Deploy "Owner" using an ether.js script, listen to event and check event are logged in the terminal #group4': function (browser: NightwatchBrowser) {
+  'Deploy "Owner" using an ether.js script, listen to event and check event are logged in the terminal #group4': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('solidity')
       .click('.remixui_compilerConfigSection')
@@ -166,7 +166,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'newOwner', 60000)
       .waitForElementContainsText('*[data-id="terminalJournal"]', '0xd9145CCE52D386f254917e481eB44e9943F39138', 60000)
   },
-  'Run tests using Mocha script and check result logging in the terminal #group4': function (browser: NightwatchBrowser) {
+  'Run tests using Mocha script and check result logging in the terminal #group4': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('scripts/storage.test.js', { content: storageMochaTests })
       .pause(1000)
@@ -187,7 +187,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Passed: 2')
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Failed: 1')
   },
-  'Run tests using Mocha for a contract with library deployment and check result logging in the terminal #group4': function (browser: NightwatchBrowser) {
+  'Run tests using Mocha for a contract with library deployment and check result logging in the terminal #group4': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('scripts/storageWithLib.test.js', { content: storageWithLibMochaTests })
       .pause(1000)
@@ -209,7 +209,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Passed: 0')
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Failed: 1')
   },
-  'Should print hardhat logs #group4': function (browser: NightwatchBrowser) {
+  'Should print hardhat logs #group4': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('printHardhatlog.sol', { content: hardhatLog })
       .clickLaunchIcon('solidity')
@@ -235,7 +235,7 @@ module.exports = {
       .journalChildIncludes('inside getOwner', { shouldHaveOnlyOneOccurrence: true })
   },
 
-  'Emit 2 similar events and check the filtering is done properly #group11': function (browser: NightwatchBrowser) {
+  'Emit 2 similar events and check the filtering is done properly #group11': '' + function (browser: NightwatchBrowser) {
     let addressRef: string
     browser
       .addFile('contracts/contract_with_event.sol', { content: contract_with_event })
@@ -260,7 +260,7 @@ module.exports = {
 
   },
 
-  'Should display auto-complete menu #group4': function (browser: NightwatchBrowser) {
+  'Should display auto-complete menu #group4': '' + function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="terminalCli"]')
       .click('*[data-id="terminalCli"]')
@@ -268,7 +268,7 @@ module.exports = {
       .assert.visible('*[data-id="autoCompletePopUpAutoCompleteItem"]')
   },
 
-  'Should run a script right after compilation #group6': function (browser: NightwatchBrowser) {
+  'Should run a script right after compilation #group6': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('contracts/storage.sol', { content: scriptAutoExec.contract })
       .addFile('scripts/deploy_storage.js', { content: scriptAutoExec.script })
@@ -277,7 +277,7 @@ module.exports = {
       .journalLastChildIncludes('147')
   },
 
-  'Should run a script which log transaction and block using web3.js and ethers #group7': function (browser: NightwatchBrowser) {
+  'Should run a script which log transaction and block using web3.js and ethers #group7': '' + function (browser: NightwatchBrowser) {
     if (runMasterTests)
       browser
         .clickLaunchIcon('udapp')
@@ -303,7 +303,7 @@ module.exports = {
         .waitForElementContainsText('*[data-id="terminalJournal"]', '0x9db899cb75888a630ba50a1644c243b83d2eb38525eb828a06a5e8bb5663c0b0', 120000) // hash of 4757767
   },
 
-  'Should listen on all transactions #group8': function (browser: NightwatchBrowser) {
+  'Should listen on all transactions #group8': '' + function (browser: NightwatchBrowser) {
     const url = 'http://127.0.0.1:8545'
     const identifier = 'Custom'
     browser
@@ -362,7 +362,7 @@ module.exports = {
         })
   },
 
-  'Should connect to mainnet fork and run web3.eth.getCode in the terminal #group9': function (browser: NightwatchBrowser) {
+  'Should connect to mainnet fork and run web3.eth.getCode in the terminal #group9': '' + function (browser: NightwatchBrowser) {
     if (runMasterTests)
       browser
         .clickLaunchIcon('udapp')
@@ -380,7 +380,7 @@ module.exports = {
         .click('*[data-id="terminalClearConsole"]')
   },
 
-  'Should connect to the sepolia fork and run web3.eth.getCode in the terminal #group9': function (browser: NightwatchBrowser) {
+  'Should connect to the sepolia fork and run web3.eth.getCode in the terminal #group9': '' + function (browser: NightwatchBrowser) {
     if (runMasterTests)
       browser
         .switchEnvironment('vm-custom-fork')
@@ -411,7 +411,7 @@ module.exports = {
         .click('*[data-id="terminalClearConsole"]')
   },
 
-  'Should run a free function while being connected to mainnet #group9': function (browser: NightwatchBrowser) {
+  'Should run a free function while being connected to mainnet #group9': '' + function (browser: NightwatchBrowser) {
     const script = `
     import "https://github.com/ensdomains/ens-contracts/blob/master/contracts/utils/NameEncoder.sol";
     import "hardhat/console.sol";
@@ -457,7 +457,7 @@ module.exports = {
     }
   },
 
-  'Should run free function which logs in the terminal #group10': function (browser: NightwatchBrowser) {
+  'Should run free function which logs in the terminal #group10': '' + function (browser: NightwatchBrowser) {
     const script = `import "hardhat/console.sol";
 
     function runSomething () view {

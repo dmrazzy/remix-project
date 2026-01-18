@@ -73,7 +73,7 @@ module.exports = {
       })
     })
   },
-  'Use special functions receive/fallback - both are declared - fallback should fail cause not payable, sending data and wei #group1': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - both are declared - fallback should fail cause not payable, sending data and wei #group1': '' + function (browser: NightwatchBrowser) {
     // don't need to redeploy it, same contract
     browser.perform((done) => {
       browser.getAddressAtPosition(0, (address) => {
@@ -84,7 +84,7 @@ module.exports = {
       })
     })
   },
-  'Use special functions receive/fallback - only receive is declared, sending wei #group2': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - only receive is declared, sending wei #group2': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('#icon-panel', 10000)
       .testContracts('receiveOnly.sol', sources[1]['receiveOnly.sol'], ['CheckSpecials'])
       .clickLaunchIcon('udapp')
@@ -101,7 +101,7 @@ module.exports = {
         })
       })
   },
-  'Use special functions receive/fallback - only receive is declared, failing, fallback is not declared, sending data #group2': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - only receive is declared, failing, fallback is not declared, sending data #group2': '' + function (browser: NightwatchBrowser) {
     // don't need to redeploy it, same contract
     browser.perform((done) => {
       browser.getAddressAtPosition(0, (address) => {
@@ -112,7 +112,7 @@ module.exports = {
       })
     })
   },
-  'Use special functions receive/fallback - only fallback declared and is payable, sending wei #group3': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - only fallback declared and is payable, sending wei #group3': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('#icon-panel', 10000)
       .testContracts('fallbackOnlyPayable.sol', sources[2]['fallbackOnlyPayable.sol'], ['CheckSpecials'])
       .clickLaunchIcon('udapp')
@@ -129,7 +129,7 @@ module.exports = {
         })
       })
   },
-  'Use special functions receive/fallback - only fallback is declared and is payable, sending data and wei #group3': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - only fallback is declared and is payable, sending data and wei #group3': '' + function (browser: NightwatchBrowser) {
     // don't need to redeploy it, same contract
     browser.perform((done) => {
       browser.getAddressAtPosition(0, (address) => {
@@ -141,7 +141,7 @@ module.exports = {
       })
     })
   },
-  'Use special functions receive/fallback - only fallback is declared, fallback should fail cause not payable, sending wei #group4': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - only fallback is declared, fallback should fail cause not payable, sending wei #group4': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('#icon-panel', 10000)
       .testContracts('fallbackOnlyNotPayable.sol', sources[3]['fallbackOnlyNotPayable.sol'], ['CheckSpecials'])
       .clickLaunchIcon('udapp')
@@ -158,7 +158,7 @@ module.exports = {
         })
       })
   },
-  'Use special functions receive/fallback - receive and fallback are declared, sending data and wei #group6': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - receive and fallback are declared, sending data and wei #group6': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('#icon-panel', 10000)
       .testContracts('receiveAndFallbackBothPayable.sol', sources[4]['receiveAndFallbackBothPayable.sol'], ['CheckSpecials'])
       .clickLaunchIcon('udapp')
@@ -180,7 +180,7 @@ module.exports = {
         })
       })
   },
-  'Use special functions receive/fallback - receive and fallback are declared and payable, sending wei #group6': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - receive and fallback are declared and payable, sending wei #group6': '' + function (browser: NightwatchBrowser) {
     browser.perform((done) => {
       browser.getAddressAtPosition(0, (address) => {
         browser.sendLowLevelTx(address, '1', '')
@@ -192,7 +192,7 @@ module.exports = {
       })
     })
   },
-  'Use special functions receive/fallback - receive and fallback are not declared, sending nothing #group5': function (browser: NightwatchBrowser) {
+  'Use special functions receive/fallback - receive and fallback are not declared, sending nothing #group5': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('#icon-panel', 10000)
       .testContracts('notSpecial.sol', sources[5]['notSpecial.sol'], ['CheckSpecials'])
       .clickLaunchIcon('udapp')

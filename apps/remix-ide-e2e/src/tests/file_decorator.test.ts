@@ -8,7 +8,7 @@ module.exports = {
     init(browser, done)
   },
 
-  'Test decorators with script': function (browser: NightwatchBrowser) {
+  'Test decorators with script': '' + function (browser: NightwatchBrowser) {
     browser
       .openFile('contracts')
       .openFile('contracts/2_Owner.sol')
@@ -32,7 +32,7 @@ module.exports = {
     //.waitForElementContainsText('//*[@id="error-tooltip-contracts/2_Owner.sol"]', 'error on owner')
   },
 
-  'clear ballot decorator': function (browser: NightwatchBrowser) {
+  'clear ballot decorator': '' + function (browser: NightwatchBrowser) {
     browser
       .useCss()
       .addFile('scripts/clearballot.ts', { content: testScriptClearBallot })
@@ -41,7 +41,7 @@ module.exports = {
       .pause(4000)
       .waitForElementNotPresent('[data-id="file-decoration-custom-contracts/3_Ballot.sol"]', 10000)
   },
-  'clear all decorators': function (browser: NightwatchBrowser) {
+  'clear all decorators': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('scripts/clearall.ts', { content: testScriptClear })
       .pause(2000)

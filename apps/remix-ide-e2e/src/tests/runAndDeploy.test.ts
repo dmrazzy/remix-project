@@ -12,14 +12,14 @@ module.exports = {
     return sources
   },
 
-  'Should load run and deploy tab #group1 #group2': function (browser: NightwatchBrowser) {
+  'Should load run and deploy tab #group1 #group2': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementPresent('*[data-id="remixIdeSidePanel"]')
       .clickLaunchIcon('udapp')
       .waitForElementPresent('*[data-id="sidePanelSwapitTitle"]')
       .assert.containsText('*[data-id="sidePanelSwapitTitle"]', 'DEPLOY & RUN TRANSACTIONS')
   },
 
-  'Should load run and deploy tab and check value validation #group1': function (browser: NightwatchBrowser) {
+  'Should load run and deploy tab and check value validation #group1': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementPresent('*[data-id="remixIdeSidePanel"]')
       .assert.containsText('*[data-id="sidePanelSwapitTitle"]', 'DEPLOY & RUN TRANSACTIONS')
       .validateValueInput('*[data-id="dandrValue"]', ['9','9','9'], '999')
@@ -28,7 +28,7 @@ module.exports = {
       // .validateValueInput('*[data-id="dandrValue"]', 'dragon', '0') // only numbers
   },
 
-  'Should sign message using account key #group2': function (browser: NightwatchBrowser) {
+  'Should sign message using account key #group2': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="settingsRemixRunSignMsg"]')
       .waitForElementVisible('*[data-id="settingsRemixRunSignMsg"]', 30000)
       .click('*[data-id="settingsRemixRunSignMsg"]')
@@ -47,7 +47,7 @@ module.exports = {
       .click('[data-id="udappNotify-modal-footer-ok-react"]')
   },
 
-  'Should deploy contract on JavascriptVM #group3': function (browser: NightwatchBrowser) {
+  'Should deploy contract on JavascriptVM #group3': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="remixIdeSidePanel"]')
       .clickLaunchIcon('filePanel')
       .addFile('Greet.sol', sources[0]['Greet.sol'])
@@ -61,7 +61,7 @@ module.exports = {
       })
   },
 
-  'Should show and update balance for deployed contract on JavascriptVM #group3': function (browser: NightwatchBrowser) {
+  'Should show and update balance for deployed contract on JavascriptVM #group3': '' + function (browser: NightwatchBrowser) {
     let instanceAddress
     browser.waitForElementVisible('*[data-id="remixIdeSidePanel"]')
       .clickLaunchIcon('filePanel')
@@ -95,7 +95,7 @@ module.exports = {
       })
   },
 
-  'Should run low level interaction (fallback function) #group3': function (browser: NightwatchBrowser) {
+  'Should run low level interaction (fallback function) #group3': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementPresent('*[data-id="remixIdeSidePanel"]')
       .clickInstance(0)
       .waitForElementPresent('*[data-id="pluginManagerSettingsDeployAndRunLLTxSendTransaction"]')
@@ -110,7 +110,7 @@ module.exports = {
       .end()
   },
 
-  'Should ensure that save environment state is checked by default #group4 #group5': function (browser: NightwatchBrowser) {
+  'Should ensure that save environment state is checked by default #group4 #group5': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementPresent('*[data-id="remixIdeSidePanel"]')
       .waitForElementVisible('*[data-id="topbar-settingsIcon"]')
       .click('*[data-id="topbar-settingsIcon"]')
@@ -120,7 +120,7 @@ module.exports = {
       .waitForElementPresent('[data-id="save-evm-stateSwitch"] > .fa-toggle-on')
   },
 
-  'Should deploy default storage contract; store value and ensure that state is saved. #group4 #group5': function (browser: NightwatchBrowser) {
+  'Should deploy default storage contract; store value and ensure that state is saved. #group4 #group5': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('filePanel')
       .click('*[data-id="treeViewLitreeViewItemcontracts"]')
@@ -142,7 +142,7 @@ module.exports = {
       })
   },
 
-  'Should load state after page refresh #group4': function (browser: NightwatchBrowser) {
+  'Should load state after page refresh #group4': '' + function (browser: NightwatchBrowser) {
     browser.refreshPage()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]')
       .click('*[data-id="treeViewLitreeViewItemcontracts"]')
@@ -153,7 +153,7 @@ module.exports = {
       .waitForElementContainsText('[data-id="treeViewLi0"]', 'uint256: 10')
   },
 
-  'Should save state after running ethers script #group4': function (browser: NightwatchBrowser) {
+  'Should save state after running ethers script #group4': '' + function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="topbar-settingsIcon"]')
       .click('*[data-id="topbar-settingsIcon"]')
@@ -182,7 +182,7 @@ module.exports = {
       })
   },
 
-  'Should ensure that .states is not updated when save env option is unchecked #group5': function (browser: NightwatchBrowser) {
+  'Should ensure that .states is not updated when save env option is unchecked #group5': '' + function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="topbar-settingsIcon"]')
       .click('*[data-id="topbar-settingsIcon"]')
