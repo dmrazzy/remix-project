@@ -16,11 +16,11 @@ module.exports = {
     return sources
   },
 
-  'Should set the compiler version to 8.19': function(browser: NightwatchBrowser) {
+  'Should set the compiler version to 8.19': '' + function(browser: NightwatchBrowser) {
     browser.setSolidityCompilerVersion('soljson-v0.8.19+commit.7dd6d404.js')
   },
 
-  'Should show deploy proxy option for UUPS upgradeable contract #group1': function (browser: NightwatchBrowser) {
+  'Should show deploy proxy option for UUPS upgradeable contract #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('myTokenV1.sol', sources[0]['myTokenV1.sol'])
       .clickLaunchIcon('solidity')
@@ -37,7 +37,7 @@ module.exports = {
       .waitForElementPresent('[data-id="contractGUIUpgradeImplementationLabel"]')
   },
 
-  'Should show upgrade proxy option for child contract inheriting UUPS parent contract #group1': function (browser: NightwatchBrowser) {
+  'Should show upgrade proxy option for child contract inheriting UUPS parent contract #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('myTokenV2.sol', sources[1]['myTokenV2.sol'])
       .clickLaunchIcon('solidity')
@@ -51,7 +51,7 @@ module.exports = {
       .waitForElementPresent('[data-id="contractGUIUpgradeImplementationLabel"]')
   },
 
-  'Should deploy proxy without initialize parameters #group1': function (browser: NightwatchBrowser) {
+  'Should deploy proxy without initialize parameters #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .openFile('myTokenV1.sol')
       .clickLaunchIcon('solidity')
@@ -76,7 +76,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Deploying ERC1967 < 5.0.0 as proxy...', 60000)
   },
 
-  'Should interact with deployed contract via ERC1967 (proxy) #group1': function (browser: NightwatchBrowser) {
+  'Should interact with deployed contract via ERC1967 (proxy) #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .getAddressAtPosition(1, (address) => {
         firstProxyAddress = address
@@ -95,7 +95,7 @@ module.exports = {
       })
   },
 
-  'Should deploy proxy with initialize parameters #group1': function (browser: NightwatchBrowser) {
+  'Should deploy proxy with initialize parameters #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .waitForElementPresent('[data-id="deployAndRunClearInstances"]')
       .click('[data-id="deployAndRunClearInstances"]')
@@ -127,7 +127,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Deploying ERC1967 < 5.0.0 as proxy...', 60000)
   },
 
-  'Should interact with initialized contract to verify parameters #group1': function (browser: NightwatchBrowser) {
+  'Should interact with initialized contract to verify parameters #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .getAddressAtPosition(1, (address) => {
         lastProxyAddress = address
@@ -146,7 +146,7 @@ module.exports = {
       })
   },
 
-  'Should upgrade contract by selecting a previously deployed proxy address from dropdown (MyTokenV1 to MyTokenV2) #group1': function (browser: NightwatchBrowser) {
+  'Should upgrade contract by selecting a previously deployed proxy address from dropdown (MyTokenV1 to MyTokenV2) #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="terminalClearConsole"]') 
       .waitForElementPresent('[data-id="deployAndRunClearInstances"]')
@@ -182,7 +182,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Using ERC1967 < 5.0.0 for the proxy upgrade..', 60000)
   },
 
-  'Should interact with upgraded function in contract MyTokenV2 #group1': function (browser: NightwatchBrowser) {
+  'Should interact with upgraded function in contract MyTokenV2 #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .clickInstance(1)
       .perform((done) => {
@@ -192,7 +192,7 @@ module.exports = {
       })
   },
 
-  'Should upgrade contract by providing proxy address in input field (MyTokenV1 to MyTokenV2) #group1': function (browser: NightwatchBrowser) {
+  'Should upgrade contract by providing proxy address in input field (MyTokenV1 to MyTokenV2) #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="terminalClearConsole"]') 
       .waitForElementPresent('[data-id="deployAndRunClearInstances"]')
@@ -221,7 +221,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'Using ERC1967 < 5.0.0 for the proxy upgrade..', 60000)
   },
 
-  'Should interact with upgraded contract through provided proxy address #group1': function (browser: NightwatchBrowser) {
+  'Should interact with upgraded contract through provided proxy address #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .clearConsole()
       .clickInstance(1)
@@ -231,7 +231,7 @@ module.exports = {
         })
       })
   },
-  'Should debug the call': function(browser: NightwatchBrowser) {
+  'Should debug the call': '' + function(browser: NightwatchBrowser) {
     browser
     .debugTransaction(0)
     .waitForElementVisible({

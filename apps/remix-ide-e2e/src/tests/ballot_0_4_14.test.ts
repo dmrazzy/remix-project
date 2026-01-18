@@ -22,12 +22,12 @@ module.exports = {
       .setSolidityCompilerVersion('soljson-v0.4.14+commit.c2215d46.js')
   },
 
-  'Add Ballot': function (browser: NightwatchBrowser) {
+  'Add Ballot': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('Untitled.sol', sources[0]['Untitled.sol'])
   },
 
-  'Compile Ballot with compiler version 0.4.14': function (browser: NightwatchBrowser) {
+  'Compile Ballot with compiler version 0.4.14': '' + function (browser: NightwatchBrowser) {
     browser
       .testContracts('Untitled.sol', sources[0]['Untitled.sol'], ['Ballot'])
   },
