@@ -347,7 +347,7 @@ function DeployPortraitView() {
                 </div>
 
                 {widgetState.contracts.contractList.length > 0 && (
-                  <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }} data-id="contractDropdownMenu">
+                  <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties} data-id="contractDropdownMenu">
                     {widgetState.contracts.contractList.map((contract, index) => (
                       <Dropdown.Item key={`${contract.filePath}:${contract.name}`} className="d-flex align-items-center contract-dropdown-item-hover" onClick={() => setSelectedContractIndex(index)} data-id={`contractDropdownItem-${contract.name}`}>
                         <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
@@ -678,11 +678,11 @@ function DeployPortraitView() {
                     >
                       {widgetState.valueUnit}
                     </Dropdown.Toggle>
-                    <Dropdown.Menu style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
-                      <Dropdown.Item className="unit-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_VALUE_UNIT', payload: 'wei' })}>wei</Dropdown.Item>
-                      <Dropdown.Item className="unit-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_VALUE_UNIT', payload: 'gwei' })}>gwei</Dropdown.Item>
-                      <Dropdown.Item className="unit-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_VALUE_UNIT', payload: 'finney' })}>finney</Dropdown.Item>
-                      <Dropdown.Item className="unit-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_VALUE_UNIT', payload: 'ether' })}>ether</Dropdown.Item>
+                    <Dropdown.Menu style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties}>
+                      <Dropdown.Item className="unit-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_VALUE_UNIT', payload: 'wei' })} style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>wei</Dropdown.Item>
+                      <Dropdown.Item className="unit-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_VALUE_UNIT', payload: 'gwei' })} style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>gwei</Dropdown.Item>
+                      <Dropdown.Item className="unit-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_VALUE_UNIT', payload: 'finney' })} style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>finney</Dropdown.Item>
+                      <Dropdown.Item className="unit-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_VALUE_UNIT', payload: 'ether' })} style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>ether</Dropdown.Item>
                     </Dropdown.Menu>
                   </Dropdown>
                 </div>

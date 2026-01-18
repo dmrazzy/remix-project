@@ -7,7 +7,7 @@ import { setExecutionContext } from '../actions'
 import { EnvAppContext } from '../contexts'
 
 export function EnvCategoryUI () {
-  const { plugin, widgetState, dispatch } = useContext(EnvAppContext)
+  const { plugin, widgetState, dispatch, themeQuality } = useContext(EnvAppContext)
   const [subCategories, setSubCategories] = useState<Provider[]>([])
   const [provider, setProvider] = useState<Provider | null>(null)
 
@@ -37,10 +37,10 @@ export function EnvCategoryUI () {
         </div>
       </Dropdown.Toggle>
 
-      <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-3)', zIndex: 1000 }}>
+      <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-3)', zIndex: 1000, '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties}>
         {subCategories.map((provider) => {
           return (
-            <Dropdown.Item key={provider.name} onClick={() => handleCategorySelection(provider)} data-id={`dropdown-item-${provider.name}`} className="category-item-hover">
+            <Dropdown.Item key={provider.name} onClick={() => handleCategorySelection(provider)} data-id={`dropdown-item-${provider.name}`} className="category-item-hover" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>
               {provider.displayName}
             </Dropdown.Item>
           )
