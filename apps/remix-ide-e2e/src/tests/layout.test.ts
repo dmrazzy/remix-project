@@ -11,7 +11,7 @@ module.exports = {
     return sources
   },
 
-  'Should pin solidity compiler plugin to the right and switch focus for left side panel to the file-explorer': function (browser: NightwatchBrowser) {
+  'Should pin solidity compiler plugin to the right and switch focus for left side panel to the file-explorer': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('[data-id="movePluginToRight"]')
       .click('[data-id="movePluginToRight"]')
       .waitForElementVisible('[data-id="movePluginToLeft"]')
@@ -20,14 +20,14 @@ module.exports = {
       .assert.containsText('.sidepanel h6[data-id="sidePanelSwapitTitle"]', 'FILE EXPLORER')
       .assert.containsText('.right-side-panel h6[data-id="sidePanelSwapitTitle"]', 'SOLIDITY COMPILER')
   },
-  'Should unpin and focus on solidity compiler in the left side panel': function (browser: NightwatchBrowser) {
+  'Should unpin and focus on solidity compiler in the left side panel': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('[data-id="movePluginToLeft"]')
       .click('[data-id="movePluginToLeft"]')
       .waitForElementVisible('[data-id="movePluginToRight"]')
       .assert.containsText('.sidepanel h6[data-id="sidePanelSwapitTitle"]', 'SOLIDITY COMPILER')
       .waitForElementNotVisible('.right-side-panel h6[data-id="sidePanelSwapitTitle"]')
   },
-  'Should pin a plugin while an another plugin is already pinned': function (browser: NightwatchBrowser) {
+  'Should pin a plugin while an another plugin is already pinned': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('[data-id="movePluginToRight"]')
       .click('[data-id="movePluginToRight"]')
       .waitForElementVisible('[data-id="movePluginToLeft"]')
@@ -39,12 +39,12 @@ module.exports = {
       .assert.containsText('.right-side-panel h6[data-id="sidePanelSwapitTitle"]', 'DEPLOY & RUN TRANSACTIONS')
       .assert.containsText('.sidepanel h6[data-id="sidePanelSwapitTitle"]', 'SOLIDITY COMPILER')
   },
-  'Should pin a pinned plugin to the right after reloading the page': function (browser: NightwatchBrowser) {
+  'Should pin a pinned plugin to the right after reloading the page': '' + function (browser: NightwatchBrowser) {
     browser.refreshPage()
       .waitForElementVisible('.right-side-panel h6[data-id="sidePanelSwapitTitle"]')
       .assert.containsText('.right-side-panel h6[data-id="sidePanelSwapitTitle"]', 'DEPLOY & RUN TRANSACTIONS')
   },
-  'Should maintain logged state of udapp plugin after pinning and unpinning': function (browser: NightwatchBrowser) {
+  'Should maintain logged state of udapp plugin after pinning and unpinning': '' + function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="treeViewLitreeViewItemcontracts"]')
       .click('*[data-id="treeViewLitreeViewItemcontracts"]')
       .openFile('contracts/1_Storage.sol')
@@ -60,7 +60,7 @@ module.exports = {
       .clickInstance(0)
       .waitForElementContainsText('[data-id="treeViewLi0"]', 'uint256: 10')
   },
-  'Should maintain logged state of search plugin after pinning and unpinning': function (browser: NightwatchBrowser) {
+  'Should maintain logged state of search plugin after pinning and unpinning': '' + function (browser: NightwatchBrowser) {
     browser.clickLaunchIcon('search')
       .waitForElementVisible('*[id="search_input"]')
       .waitForElementVisible('*[id="search_include"]')

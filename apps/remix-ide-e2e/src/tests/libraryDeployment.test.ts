@@ -11,13 +11,13 @@ module.exports = {
     return sources
   },
 
-  'Add Lib Test File': function (browser: NightwatchBrowser) {
+  'Add Lib Test File': '' + function (browser: NightwatchBrowser) {
     browser.addFile('Untitled5.sol', sources[0]['Untitled5.sol'])
       .clickLaunchIcon('udapp')
       .selectAccount('0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c') // this account will be used for this test suite
   },
 
-  'Test Auto Deploy Lib': function (browser: NightwatchBrowser) {
+  'Test Auto Deploy Lib': '' + function (browser: NightwatchBrowser) {
     let addressRef: string
     browser.verifyContracts(['test'])
       .clickLaunchIcon('udapp')
@@ -36,7 +36,7 @@ module.exports = {
       })
   },
 
-  'Test Manual Deploy Lib': function (browser: NightwatchBrowser) {
+  'Test Manual Deploy Lib': '' + function (browser: NightwatchBrowser) {
     browser.click('*[data-id="deployAndRunClearInstances"]')
       .pause(5000)
       .waitForElementVisible('*[data-id="topbar-settingsIcon"]')

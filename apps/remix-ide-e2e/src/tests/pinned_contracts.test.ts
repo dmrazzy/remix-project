@@ -13,7 +13,7 @@ module.exports = {
       .assert.elementPresent('*[data-id="deployedContracts"]')
       .assert.textContains('*[data-id="deployedContractsBadge"]', '0')
   },
-  'Deploy & pin contract #group1': function (browser: NightwatchBrowser) {
+  'Deploy & pin contract #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('filePanel')
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemcontracts"]')
