@@ -7,7 +7,7 @@ module.exports = {
   before: function (browser: NightwatchBrowser, done: VoidFunction) {
     init(browser, done)
   },
-  'Should show badge in deployed contracts section #group1': function (browser: NightwatchBrowser) {
+  'Should show badge in deployed contracts section #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('udapp')
       .assert.elementPresent('*[data-id="deployedContracts"]')
@@ -30,7 +30,7 @@ module.exports = {
       .assert.elementPresent('*[data-id="universalDappUiUdappUnpin"]')
       .assert.elementPresent('*[data-id="pinnedInstance0xd9145CCE52D386f254917e481eB44e9943F39138"]')
   },
-  'Test pinned contracts loading on environment change #group1': function (browser: NightwatchBrowser) {
+  'Test pinned contracts loading on environment change #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .switchEnvironment('vm-cancun')
       .assert.elementPresent('*[data-id="deployedContracts"]')
@@ -39,7 +39,7 @@ module.exports = {
       .assert.textContains('*[data-id="deployedContractsBadge"]', '1')
       .assert.elementPresent('*[data-id="pinnedInstance0xd9145CCE52D386f254917e481eB44e9943F39138"]')
   },
-  'Test pinned contracts loading on workspace change #group1': function (browser: NightwatchBrowser) {
+  'Test pinned contracts loading on workspace change #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('filePanel')
       .click('*[data-id="workspacesSelect"]')
@@ -70,7 +70,7 @@ module.exports = {
       .assert.textContains('*[data-id="deployedContractsBadge"]', '1')
       .assert.elementPresent('*[data-id="pinnedInstance0xd9145CCE52D386f254917e481eB44e9943F39138"]')
   },
-  'Interact with pinned contract #group1': function (browser: NightwatchBrowser) {
+  'Interact with pinned contract #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="universalDappUiTitleExpander0"]')
       .assert.elementPresent('*[data-id="instanceContractBal"]')
@@ -96,7 +96,7 @@ module.exports = {
           'decoded output': { "0": "uint256: 35" }
         })
   },
-  'Unpin & interact #group1': function (browser: NightwatchBrowser) {
+  'Unpin & interact #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="universalDappUiUdappUnpin"]')
       .assert.not.elementPresent('*[data-id="instanceContractPinnedAt"]')
@@ -120,7 +120,7 @@ module.exports = {
           'decoded output': { "0": "uint256: 55" }
         })
   },
-  'Re-pin & remove from list #group1': function (browser: NightwatchBrowser) {
+  'Re-pin & remove from list #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="universalDappUiUdappPin"]')
       .assert.textContains('*[data-id="deployedContractsBadge"]', '1')

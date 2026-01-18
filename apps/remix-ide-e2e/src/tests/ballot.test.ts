@@ -20,7 +20,7 @@ module.exports = {
     browser
       .addFile('Untitled.sol', sources[0]['Untitled.sol'])
   },
-  'Deploy Ballot #group1': function (browser: NightwatchBrowser) {
+  'Deploy Ballot #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="remixIdeIconPanel"]', 10000)
       .clickLaunchIcon('solidity')
@@ -39,7 +39,7 @@ module.exports = {
         })
   },
 
-  'Call method from Ballot to check return value #group1': function (browser: NightwatchBrowser) {
+  'Call method from Ballot to check return value #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .clickFunction('winnerName - call')
       // Test in terminal
@@ -52,7 +52,7 @@ module.exports = {
       .assert.containsText('*[data-id="treeViewDiv0"]', 'bytes32: winnerName_ 0x48656c6c6f20576f726c64210000000000000000000000000000000000000000')
   },
 
-  'Debug Ballot / delegate #group1': function (browser: NightwatchBrowser) {
+  'Debug Ballot / delegate #group1': '' + function (browser: NightwatchBrowser) {
     browser.pause(500)
       .debugTransaction(1)
       .waitForElementVisible('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]')
@@ -65,7 +65,7 @@ module.exports = {
       .checkVariableDebug('soliditylocals', localsCheck)
   },
 
-  'Access Ballot via at address #group1': function (browser: NightwatchBrowser) {
+  'Access Ballot via at address #group1': '' + function (browser: NightwatchBrowser) {
     browser.clickLaunchIcon('udapp')
       .click('*[data-id="universalDappUiUdappClose"]')
       .addFile('ballot.abi', { content: ballotABI })
@@ -92,7 +92,7 @@ module.exports = {
         })
   },
 
-  'Compile with remappings set in remappings.txt file #group1': function (browser: NightwatchBrowser) {
+  'Compile with remappings set in remappings.txt file #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('filePanel')
       .click('*[data-id="workspacesSelect"]')
@@ -120,7 +120,7 @@ module.exports = {
       .verifyContracts(['Retriever', 'Storage'])
   },
 
-  'Deploy and use Ballot using external web3  #group2': function (browser: NightwatchBrowser) {
+  'Deploy and use Ballot using external web3  #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .openFile('Untitled.sol')
       .clickLaunchIcon('udapp')
@@ -135,7 +135,7 @@ module.exports = {
       .journalLastChildIncludes('data: 0x5c1...a733c')
   },
 
-  'Call method from Ballot to check return value using external web3  #group2': function (browser: NightwatchBrowser) {
+  'Call method from Ballot to check return value using external web3  #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .clickFunction('winnerName - call')
       // Test in terminal
@@ -148,7 +148,7 @@ module.exports = {
       .assert.containsText('*[data-id="treeViewDiv0"]', 'bytes32: winnerName_ 0x48656c6c6f20576f726c64210000000000000000000000000000000000000000')
   },
 
-  'Compile Ballot using config file  #group2': function (browser: NightwatchBrowser) {
+  'Compile Ballot using config file  #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .openFile('remix.config.json')
       .setEditorValue(configFile)
@@ -163,7 +163,7 @@ module.exports = {
       .verifyContracts(['Ballot'], { wait: 2000, runs: '300' })
   },
 
-  'Compile and deploy sample yul file  #group2': function (browser: NightwatchBrowser) {
+  'Compile and deploy sample yul file  #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .addFile('sample.yul', { content: yulSample })
       .clickLaunchIcon('solidity')

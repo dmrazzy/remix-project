@@ -8,7 +8,7 @@ module.exports = {
   before: function (browser: NightwatchBrowser, done: VoidFunction) {
     init(browser, done)
   },
-  'Should execute a contract that uses transient storage #group1': function (browser: NightwatchBrowser) {
+  'Should execute a contract that uses transient storage #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('udapp')
       .switchEnvironment('vm-cancun') // switch to a vm that know this eip.
@@ -33,7 +33,7 @@ module.exports = {
         })
   },
 
-  'Should clear transient storage after tx execution #group1' : function (browser: NightwatchBrowser) {
+  'Should clear transient storage after tx execution #group1' : '' + function (browser: NightwatchBrowser) {
     browser.addFile('clear_transient.sol', { content: clearTransient })
       .verifyContracts(['ClearTransient'])
       .clickLaunchIcon('udapp')
