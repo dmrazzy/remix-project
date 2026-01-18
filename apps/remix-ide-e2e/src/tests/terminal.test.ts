@@ -12,14 +12,14 @@ module.exports = {
     init(browser, done, 'http://127.0.0.1:8080?plugins=solidity,udapp', false, undefined, true, false)
   },
 
-  'Terminal dragbar should not be visible on load #group1': function (browser: NightwatchBrowser) {
+  'Terminal dragbar should not be visible on load #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="toggleBottomPanelIcon"]', 10000)
       .assert.hasClass('.terminal-wrap', 'd-none')
       .assert.not.elementPresent('.dragbar_terminal')
   },
 
-  'Terminal dragbar should be visible when terminal is visible #group1': function (browser: NightwatchBrowser) {
+  'Terminal dragbar should be visible when terminal is visible #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .click('*[data-id="toggleBottomPanelIcon"]')
       .waitForElementVisible('.terminal-wrap', 5000)
@@ -28,7 +28,7 @@ module.exports = {
       .assert.elementPresent('.dragbar_terminal')
   },
 
-  'Terminal dragbar should stay visible after reload when terminal is visible #group1': function (browser: NightwatchBrowser) {
+  'Terminal dragbar should stay visible after reload when terminal is visible #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .refresh()
       .waitForElementVisible('.terminal-wrap', 10000)
@@ -37,7 +37,7 @@ module.exports = {
       .assert.elementPresent('.dragbar_terminal')
   },
 
-  'Should execution a simple console command #group1': function (browser: NightwatchBrowser) {
+  'Should execution a simple console command #group1': '' + function (browser: NightwatchBrowser) {
     browser
       // Terminal should already be visible from previous test, but ensure it's showing
       .waitForElementVisible('.terminal-wrap', 5000)
