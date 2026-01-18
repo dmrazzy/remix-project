@@ -19,7 +19,7 @@ import { SignMessagePrompt, SignedMessagePrompt } from '../components/signMessag
 import { CopyToClipboard } from '@remix-ui/clipboard'
 
 function EnvironmentPortraitView() {
-  const { plugin, widgetState, dispatch } = useContext(EnvAppContext)
+  const { plugin, widgetState, dispatch, themeQuality } = useContext(EnvAppContext)
   const { trackMatomoEvent: baseTrackEvent } = useContext(TrackingContext)
   const trackMatomoEvent = <T extends MatomoEvent = UdappEvent>(event: T) => {
     baseTrackEvent?.<T>(event)
@@ -287,10 +287,10 @@ function EnvironmentPortraitView() {
 
   return (
     <>
-      <div className='card ms-2' style={{ backgroundColor: 'var(--custom-onsurface-layer-1)' }}>
+      <div className='card ms-2' style={{ backgroundColor: 'var(--custom-onsurface-layer-1)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties}>
         <div className="d-flex align-items-center justify-content-between p-3">
           <div className="d-flex align-items-center">
-            <h6 className="my-auto" style={{ color: 'white' }}>{intl.formatMessage({ id: 'udapp.environment' })}</h6>
+            <h6 className="my-auto" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>{intl.formatMessage({ id: 'udapp.environment' })}</h6>
           </div>
           <div className="toggle-container">
             {!widgetState.fork.isVisible.forkUI && !widgetState.fork.isVisible.resetUI && (

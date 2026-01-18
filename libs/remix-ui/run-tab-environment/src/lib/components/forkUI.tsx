@@ -5,7 +5,7 @@ import { forkState } from '../actions'
 import { Spinner } from 'react-bootstrap'
 
 export function ForkUI() {
-  const { plugin, widgetState, dispatch } = useContext(EnvAppContext)
+  const { plugin, widgetState, dispatch, themeQuality } = useContext(EnvAppContext)
   const intl = useIntl()
 
   const currentProvider = useMemo(() => {
@@ -52,7 +52,7 @@ export function ForkUI() {
   return (
     <div className='m-3 mt-0 p-3 pt-2 pb-0 rounded' style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
       <div className="d-flex justify-content-between align-items-center mb-2">
-        <p className="mb-0" style={{ color: 'white', fontSize: '0.9rem' }}>
+        <p className="mb-0" style={{ color: themeQuality === 'dark' ? 'white' : 'black', fontSize: '0.9rem' }}>
           {intl.formatMessage({ id: 'udapp.forkStateTitle' })}
         </p>
         <button
@@ -84,7 +84,7 @@ export function ForkUI() {
             value={forkName}
             onChange={(e) => setForkName(e.target.value)}
             disabled={widgetState.fork.isRequesting}
-            style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', flex: 1, padding: '0.75rem', paddingRight: '3.5rem', fontSize: '0.75rem' }}
+            style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '3.5rem', fontSize: '0.75rem' }}
             onKeyDown={handleKeyPress}
           />
           <button

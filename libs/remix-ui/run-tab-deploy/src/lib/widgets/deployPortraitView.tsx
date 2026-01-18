@@ -16,7 +16,7 @@ const txFormat = remixLib.execution.txFormat
 const txHelper = remixLib.execution.txHelper
 
 function DeployPortraitView() {
-  const { plugin, widgetState, dispatch } = useContext(DeployAppContext)
+  const { plugin, widgetState, dispatch, themeQuality } = useContext(DeployAppContext)
   // TODO: Move all state to reducer
   const [isExpanded, setIsExpanded] = useState(true)
   const [defaultProvider, setDefaultProvider] = useState<string | null>(null)
@@ -247,10 +247,10 @@ function DeployPortraitView() {
 
   return (
     <>
-      <div className="card ms-2 mt-2" style={{ backgroundColor: 'var(--custom-onsurface-layer-1)' }}>
+      <div className="card ms-2 mt-2" style={{ backgroundColor: 'var(--custom-onsurface-layer-1)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties}>
         <div className="p-3 d-flex align-items-center justify-content-between" onClick={() => setIsExpanded(!isExpanded)} style={{ cursor: 'pointer' }}>
           <div className='d-flex align-items-center gap-2'>
-            <h6 className="my-auto" style={{ color: 'white', margin: 0 }}>
+            <h6 className="my-auto" style={{ color: themeQuality === 'dark' ? 'white' : 'black', margin: 0 }}>
               <FormattedMessage id="udapp.deploy" defaultMessage="Deploy" />
             </h6>
             <span className="small text-secondary">{ selectedProvider && selectedProvider?.category ? `${selectedProvider.category} ${selectedProvider?.displayName}` : `Remix VM ${defaultProvider?.replace('vm-', '')}` }</span>
@@ -268,7 +268,7 @@ function DeployPortraitView() {
                       <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                         <div className="d-flex align-items-center justify-content-between w-100">
                           <div className='d-flex flex-column align-items-start'>
-                            <div className="text-truncate text-white">
+                            <div className="text-truncate" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>
                               <span>Contract</span>
                             </div>
                             <div style={{ color: 'var(--bs-tertiary-color)' }}>
@@ -353,7 +353,7 @@ function DeployPortraitView() {
                         <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                           <div className="d-flex align-items-center justify-content-between w-100">
                             <div className='d-flex flex-column align-items-start'>
-                              <div className="text-truncate text-white">
+                              <div className="text-truncate" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>
                                 <span>{contract.name}</span>
                               </div>
                               <div style={{ color: 'var(--bs-tertiary-color)' }}>
@@ -467,7 +467,7 @@ function DeployPortraitView() {
                               className="d-flex align-items-center px-2"
                               style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}
                             >
-                              <span style={{ color: 'white' }}>
+                              <span style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>
                                 {proxyAddress === deployment.address ? (
                                   <span>&#10003; {deployment.contractName + ' ' + shortenProxyAddress(deployment.address)} </span>
                                 ) : (
@@ -504,7 +504,7 @@ function DeployPortraitView() {
                               onClick={() => toggleProxyInputExpansion(index)}
                             >
                               <div className='d-flex flex-column align-items-start'>
-                                <span className="small text-white">{input.name}</span>
+                                <span className="small" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>{input.name}</span>
                                 <span className="text-secondary font-weight-light" style={{ fontSize: '0.7rem' }}>{input.type}</span>
                               </div>
                             </div>
@@ -516,7 +516,7 @@ function DeployPortraitView() {
                                   placeholder={input.type}
                                   value={currentValue}
                                   onChange={(e) => handleProxyInputChange(index, e.target.value)}
-                                  style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '30px' }}
+                                  style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '30px' }}
                                 />
                                 <div className="copy-icon-hover" style={{ position: 'absolute', right: '8px', top: '40%', transform: 'translateY(-50%)', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
                                   <CopyToClipboard tip="Copy" icon="fa-copy" direction="top" getContent={() => currentValue}>
@@ -535,7 +535,7 @@ function DeployPortraitView() {
                                 placeholder={input.type}
                                 value={currentValue}
                                 onChange={(e) => handleProxyInputChange(index, e.target.value)}
-                                style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '80px', resize: 'vertical' }}
+                                style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '80px', resize: 'vertical' }}
                               />
                               <div className="copy-icon-hover" style={{ position: 'absolute', right: '8px', top: '8px', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
                                 <CopyToClipboard tip="Copy" icon="fa-copy" direction="top" getContent={() => currentValue}>
@@ -580,7 +580,7 @@ function DeployPortraitView() {
                               onClick={() => toggleInputExpansion(index)}
                             >
                               <div className='d-flex flex-column align-items-start'>
-                                <span className="small text-white">{input.name}</span>
+                                <span className="small" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>{input.name}</span>
                                 <span className="text-secondary font-weight-light" style={{ fontSize: '0.7rem' }}>{input.type}</span>
                               </div>
                             </div>
@@ -592,7 +592,7 @@ function DeployPortraitView() {
                                   placeholder={input.type}
                                   value={currentValue}
                                   onChange={(e) => handleInputChange(index, e.target.value)}
-                                  style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '30px' }}
+                                  style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '30px' }}
                                   data-id={`constructorInput${index}`}
                                 />
                                 <div className="copy-icon-hover" style={{ position: 'absolute', right: '8px', top: '40%', transform: 'translateY(-50%)', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
@@ -612,7 +612,7 @@ function DeployPortraitView() {
                                 placeholder={input.type}
                                 value={currentValue}
                                 onChange={(e) => handleInputChange(index, e.target.value)}
-                                style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '80px', resize: 'vertical' }}
+                                style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', fontSize: '0.7rem', paddingRight: '1.5rem', minHeight: '80px', resize: 'vertical' }}
                                 data-id={`constructorInput${index}`}
                               />
                               <div className="copy-icon-hover" style={{ position: 'absolute', right: '8px', top: '8px', cursor: 'pointer', opacity: 0, transition: 'opacity 0.2s', pointerEvents: 'none' }}>
@@ -655,7 +655,7 @@ function DeployPortraitView() {
             <div className='border-top pt-3'>
               {/* Value */}
               <div className="d-flex align-items-center gap-3 mb-3">
-                <label className="text-white mb-2" style={{ fontSize: '0.9rem', minWidth: '75px' }}>
+                <label className="mb-2" style={{ fontSize: '0.9rem', minWidth: '75px', color: themeQuality === 'dark' ? 'white' : 'black' }}>
                   <FormattedMessage id="udapp.value" defaultMessage="Value" />
                 </label>
                 <div className="position-relative flex-fill">
@@ -666,13 +666,13 @@ function DeployPortraitView() {
                     placeholder="000000000000000000000000000000000"
                     value={widgetState.value}
                     onChange={(e) => dispatch({ type: 'SET_VALUE', payload: parseInt(e.target.value) || 0 })}
-                    style={{ backgroundColor: 'var(--bs-body-bg)', color: 'white', flex: 1, paddingRight: '4rem' }}
+                    style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, paddingRight: '4rem' }}
                   />
                   <Dropdown style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
                     <Dropdown.Toggle
                       as={CustomToggle}
                       className="btn-sm border-0 p-0 ps-1 text-secondary rounded"
-                      style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', color: 'white' }}
+                      style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', color: themeQuality === 'dark' ? 'white' : 'black' }}
                       icon="fas fa-caret-down ms-2"
                       useDefaultIcon={false}
                     >
@@ -690,7 +690,7 @@ function DeployPortraitView() {
 
               {/* Gas Limit */}
               <div className="d-flex align-items-center gap-3 mb-3">
-                <label className="text-white mb-2" style={{ fontSize: '0.9rem', minWidth: '75px' }}>
+                <label className="mb-2" style={{ fontSize: '0.9rem', minWidth: '75px', color: themeQuality === 'dark' ? 'white' : 'black' }}>
                   <FormattedMessage id="udapp.gasLimit" defaultMessage="Gas limit" />
                 </label>
                 <div className="position-relative flex-fill">
@@ -727,7 +727,7 @@ function DeployPortraitView() {
                     disabled={widgetState.gasLimit === 0}
                     style={{
                       backgroundColor: 'var(--bs-body-bg)',
-                      color: 'white',
+                      color: themeQuality === 'dark' ? 'white' : 'black',
                       flex: 1,
                       paddingLeft: '4rem',
                       opacity: widgetState.gasLimit === 0 ? 0.6 : 1,

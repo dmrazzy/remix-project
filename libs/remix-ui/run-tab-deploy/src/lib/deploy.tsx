@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer } from 'react'
+import React, { useEffect, useReducer, useState } from 'react'
 import { DeployAppContext } from './contexts'
 import { deployInitialState, deployReducer } from './reducers'
 import DeployPortraitView from './widgets/deployPortraitView'
@@ -15,6 +15,7 @@ interface DeployWidgetProps {
 
 function DeployWidget({ plugin }: DeployWidgetProps) {
   const [widgetState, dispatch] = useReducer(deployReducer, deployInitialState)
+  const [themeQuality, setThemeQuality] = useState<string>('dark')
 
   useEffect(() => {
     if (plugin.setStateGetter) {
@@ -24,6 +25,16 @@ function DeployWidget({ plugin }: DeployWidgetProps) {
       plugin.setDispatchGetter(() => dispatch)
     }
   }, [widgetState])
+
+  useEffect(() => {
+    plugin.call('theme', 'currentTheme').then((theme) => {
+      setThemeQuality(theme.quality)
+    })
+
+    plugin.on('theme', 'themeChanged', (theme: any) => {
+      setThemeQuality(theme.quality)
+    })
+  }, [])
 
   useEffect(() => {
     plugin.on('fileManager', 'currentFileChanged', async (filePath: string) => {
@@ -187,7 +198,7 @@ function DeployWidget({ plugin }: DeployWidgetProps) {
   }, [])
 
   return (
-    <DeployAppContext.Provider value={{ widgetState, dispatch, plugin }}>
+    <DeployAppContext.Provider value={{ widgetState, dispatch, plugin, themeQuality }}>
       <DeployPortraitView />
     </DeployAppContext.Provider>
   )

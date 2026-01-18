@@ -28,7 +28,7 @@
     padding-right: 0.5rem;
   }
   .account-kebab-icon:hover {
-    color: white !important;
+    color: var(--theme-text-color, white) !important;
   }
   .selected-account-balance-container {
     position: relative;
@@ -51,7 +51,7 @@
     padding-right: 0.5rem;
   }
   .selected-account-kebab-icon:hover {
-    color: white !important;
+    color: var(--theme-text-color, white) !important;
   }
   .account-balance-container.kebab-menu-open .account-balance-text {
     display: none;

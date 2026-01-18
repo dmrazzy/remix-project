@@ -12,6 +12,7 @@ export interface DeployAppContextType {
   plugin: DeployPlugin
   widgetState: DeployWidgetState
   dispatch: Dispatch<Actions>
+  themeQuality: string
 }
 
 export interface DeployWidgetState {

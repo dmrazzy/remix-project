@@ -10,12 +10,23 @@ import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
 
 function EnvironmentWidget({ plugin }: { plugin: EnvironmentPlugin }) {
   const [widgetState, dispatch] = useReducer(widgetReducer, widgetInitialState)
+  const [themeQuality, setThemeQuality] = useState<string>('dark')
 
   useEffect(() => {
     if (plugin.setStateGetter) {
       plugin.setStateGetter(() => widgetState)
     }
   }, [widgetState])
+
+  useEffect(() => {
+    plugin.call('theme', 'currentTheme').then((theme) => {
+      setThemeQuality(theme.quality)
+    })
+
+    plugin.on('theme', 'themeChanged', (theme: any) => {
+      setThemeQuality(theme.quality)
+    })
+  }, [])
 
   useEffect(() => {
     (async () => {
@@ -86,7 +97,7 @@ function EnvironmentWidget({ plugin }: { plugin: EnvironmentPlugin }) {
   }, [])
 
   return (
-    <EnvAppContext.Provider value={{ widgetState, dispatch, plugin }}>
+    <EnvAppContext.Provider value={{ widgetState, dispatch, plugin, themeQuality }}>
       <EnvironmentPortraitView />
     </EnvAppContext.Provider>
   )

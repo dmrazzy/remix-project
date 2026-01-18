@@ -7,6 +7,7 @@ export interface EnvironmentAppContext {
   plugin: EnvironmentPlugin
   widgetState: WidgetState
   dispatch: Dispatch<Actions>
+  themeQuality: string
 }
 
 export interface IEnvWidgetContext {

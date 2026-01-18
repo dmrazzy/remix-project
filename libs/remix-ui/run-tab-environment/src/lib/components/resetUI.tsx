@@ -5,7 +5,7 @@ import { resetVmState } from '../actions'
 import { Spinner } from 'react-bootstrap'
 
 export function ResetUI() {
-  const { plugin, widgetState, dispatch } = useContext(EnvAppContext)
+  const { plugin, widgetState, dispatch, themeQuality } = useContext(EnvAppContext)
   const intl = useIntl()
 
   const handleSubmit = async () => {
@@ -46,14 +46,14 @@ export function ResetUI() {
             {intl.formatMessage({ id: 'udapp.resetVmStateDesc1' })}
             {intl.formatMessage({ id: 'udapp.resetVmStateDesc2' })}
           </p>
-          <p className="mb-3" style={{ color: 'white' }}>{intl.formatMessage({ id: 'udapp.resetVmStateDesc3' })}</p>
+          <p className="mb-3" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>{intl.formatMessage({ id: 'udapp.resetVmStateDesc3' })}</p>
         </div>
         <div className="d-flex justify-content-between align-items-center gap-3">
           <button
             className="btn btn-sm btn-secondary rounded"
             onClick={() => dispatch({ type: 'HIDE_RESET_UI', payload: undefined })}
             disabled={widgetState.fork.isRequesting}
-            style={{ color: 'white', flex: 1 }}
+            style={{ color: themeQuality === 'dark' ? 'white' : 'black', flex: 1 }}
           >
             {intl.formatMessage({ id: 'udapp.cancelReset' })}
           </button>
