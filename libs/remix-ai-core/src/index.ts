@@ -14,6 +14,8 @@ import { FIMModelManager, FIMModelConfig, FIM_MODEL_CONFIGS } from './inferencer
 import { ChatHistory } from './prompts/chat'
 import { ChatCommandParser } from './helpers/chatCommandParser'
 import { mcpDefaultServersConfig } from './config/mcpDefaultServers'
+import { ChatHistoryStorageManager } from './storage/storageManager'
+import { IndexedDBChatHistoryBackend } from './storage/indexedDBBackend'
 export {
   ChatCommandParser,
   ModelType, ICompletions, IParams, IRemoteModel, buildChatPrompt,
@@ -22,7 +24,8 @@ export {
   InsertionParams, CompletionParams, GenerationParams, AssistantParams,
   ChatEntry, AIRequestType, ChatHistory, resetOllamaHostOnSettingsChange,
   mcpDefaultServersConfig,
-  AIModel, AVAILABLE_MODELS, getDefaultModel, getModelById
+  AIModel, AVAILABLE_MODELS, getDefaultModel, getModelById,
+  ChatHistoryStorageManager, IndexedDBChatHistoryBackend
 }
 
 export * from './types/types'
@@ -33,3 +36,4 @@ export * from './agents/completionAgent'
 export * from './agents/securityAgent'
 export * from './agents/contractAgent'
 export * from './agents/workspaceAgent'
+export * from './storage'
