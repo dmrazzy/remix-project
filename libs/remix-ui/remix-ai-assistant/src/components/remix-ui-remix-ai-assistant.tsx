@@ -1199,7 +1199,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           textareaRef={textareaRef}
           aiMode={aiMode}
           setAiMode={setAiMode}
-          isMaximized={isMaximized}
           setIsMaximized={setIsMaximized}
           modelAccess={modelAccess}
           isMaximized={props.isMaximized || false}
