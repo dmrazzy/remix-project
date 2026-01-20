@@ -670,42 +670,48 @@ export class Blockchain extends Plugin {
 
   async runOrCallContractMethod(contractName, contractAbi, funABI, contract, value, address, callType, lookupOnly) {
     // contractsDetails is used to resolve libraries
-    const data = await txFormat.buildData(
-      contractName,
-      contractAbi,
-      {},
-      false,
-      funABI,
-      callType,
-      async (data, runTxCallback) => {
+    try {
+      const data = await txFormat.buildData(
+        contractName,
+        contractAbi,
+        {},
+        false,
+        funABI,
+        callType,
+        async (data, runTxCallback) => {
         // called for libraries deployment
-        try {
-          const result = await this.runTx(data)
-          runTxCallback(null, result.txResult)
-        } catch (error) {
-          runTxCallback(error, null)
+          try {
+            const result = await this.runTx(data)
+            runTxCallback(null, result.txResult)
+          } catch (error) {
+            runTxCallback(error, null)
+          }
         }
-      }
-    )
-    if (!lookupOnly) {
+      )
+      if (!lookupOnly) {
       // logCallback(`${logMsg} pending ... `)
-    } else {
+      } else {
       // logCallback(`${logMsg}`)
-    }
-    if (funABI.type === 'fallback') data.dataHex = value
+      }
+      if (funABI.type === 'fallback') data.dataHex = value
 
-    if (data) {
-      data.contractName = contractName
-      // @ts-ignore
-      data.contractABI = contractAbi
-      // @ts-ignore
-      data.contract = contract
-    }
-    const useCall = funABI.stateMutability === 'view' || funABI.stateMutability === 'pure'
-    const result = await this.runTx({ to: address, data, useCall })
-    const { txResult, address: _address, returnValue } = result
+      if (data) {
+        data.contractName = contractName
+        // @ts-ignore
+        data.contractABI = contractAbi
+        // @ts-ignore
+        data.contract = contract
+      }
+      const useCall = funABI.stateMutability === 'view' || funABI.stateMutability === 'pure'
+      const result = await this.runTx({ to: address, data, useCall })
+      const { txResult, address: _address, returnValue } = result
 
-    return { txResult, address: _address, returnValue }
+      return { txResult, address: _address, returnValue }
+    } catch (err) {
+      const log = logBuilder(err.message)
+      this.call('terminal', 'log', log)
+      throw err
+    }
   }
 
   context() {
