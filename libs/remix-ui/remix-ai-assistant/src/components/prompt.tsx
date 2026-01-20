@@ -47,6 +47,7 @@ export interface PromptAreaProps {
   isMaximized: boolean
   setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
   modelAccess: ModelAccess
+  themeTracker: any
 }
 
 export const PromptArea: React.FC<PromptAreaProps> = ({
@@ -86,7 +87,8 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   setAiMode,
   isMaximized,
   setIsMaximized,
-  modelAccess
+  modelAccess,
+  themeTracker
 }) => {
   const { trackMatomoEvent: baseTrackEvent } = useContext(TrackingContext)
   const trackMatomoEvent = <T extends MatomoEvent = AIEvent>(event: T) => {
