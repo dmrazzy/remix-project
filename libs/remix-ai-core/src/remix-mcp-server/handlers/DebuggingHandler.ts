@@ -122,7 +122,7 @@ export class DecodeLocalVariableHandler extends BaseToolHandler {
   async execute(args: { variableId: number; stepIndex?: number }, plugin: Plugin): Promise<IMCPToolResult> {
     try {
       const result = await plugin.call('debugger', 'decodeLocalVariable', args.variableId, args.stepIndex);
-
+      console.log("debug local variable yielded", result)
       if (result === null) {
         return this.createErrorResult('Debugger backend is not initialized. Please start a debug session first.');
       }
@@ -185,6 +185,7 @@ export class DecodeStateVariableHandler extends BaseToolHandler {
   async execute(args: { variableId: number; stepIndex?: number }, plugin: Plugin): Promise<IMCPToolResult> {
     try {
       const result = await plugin.call('debugger', 'decodeStateVariable', args.variableId, args.stepIndex);
+      console.log("debug state variable yielded", result)
 
       if (result === null) {
         return this.createErrorResult('Debugger backend is not initialized. Please start a debug session first.');
