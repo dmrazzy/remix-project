@@ -11,7 +11,14 @@ export async function solidityLocals (vmtraceIndex, internalTreeCall, stack, mem
   let anonymousIncr = 1
   for (const local in scope.locals) {
     const variable = scope.locals[local]
-    if (variable.stackDepth < stack.length && (variable.sourceLocation.start <= currentSourceLocation.start || variable.isParameter)) {
+
+    // Check if the variable is safe to decode at this VM trace index
+    // For complex types (structs, arrays, etc.), we need to wait until initialization is complete
+    const isSafeToDecode = !variable.safeToDecodeAtStep || vmtraceIndex >= variable.safeToDecodeAtStep
+
+    if (isSafeToDecode &&
+        variable.stackDepth < stack.length &&
+        (variable.sourceLocation.start <= currentSourceLocation.start || variable.isParameter)) {
       let name = variable.name
       if (name.indexOf('$') !== -1) {
         name = '<' + anonymousIncr + '>'

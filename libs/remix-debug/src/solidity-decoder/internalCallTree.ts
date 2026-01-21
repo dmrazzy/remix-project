@@ -6,6 +6,7 @@ import { EventManager } from '../eventManager'
 import { parseType } from './decodeInfo'
 import { isContractCreation, isCallInstruction, isCreateInstruction, isRevertInstruction } from '../trace/traceHelper'
 import { extractLocationFromAstVariable } from './types/util'
+import { findSafeStepForVariable } from './variableInitializationHelper'
 
 /**
  * Represents detailed information about a single step in the VM execution trace.
@@ -615,13 +616,27 @@ async function includeVariableDeclaration (tree, step, sourceLocation, scopeId, 
             states = await tree.solidityProxy.extractStatesDefinitions(address)
             let location = extractLocationFromAstVariable(variableDeclaration)
             location = location === 'default' ? 'storage' : location
+
+            // Determine when the variable is safe to decode
+            // For complex types (structs, arrays, etc.), this may be several steps after declaration
+            const safeStep = await findSafeStepForVariable(
+              tree,
+              step,
+              variableDeclaration,
+              sourceLocation,
+              address
+            )
+
             // we push the new local variable in our tree
             const newVar = {
               name: variableDeclaration.name,
               type: parseType(variableDeclaration.typeDescriptions.typeString, states, contractObj.name, location),
               stackDepth: stack.length,
-              sourceLocation: sourceLocation
+              sourceLocation: sourceLocation,
+              declarationStep: step,
+              safeToDecodeAtStep: safeStep
             }
+            console.log('New local variable:', newVar)
             tree.scopes[scopeId].locals[variableDeclaration.name] = newVar
             tree.variables[variableDeclaration.id] = newVar
           }
@@ -746,7 +761,9 @@ function addParams (parameterList, tree, scopeId, states, contractObj, sourceLoc
         stackDepth: stackDepth,
         sourceLocation: sourceLocation,
         abi: contractObj.contract.abi,
-        isParameter: true
+        isParameter: true,
+        declarationStep: undefined, // Parameters are set at function entry
+        safeToDecodeAtStep: undefined // Parameters are immediately available
       }
       tree.scopes[scopeId].locals[attributesName] = newParam
       params.push(attributesName)
