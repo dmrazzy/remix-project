@@ -118,16 +118,8 @@ export class FileWriteHandler extends BaseToolHandler {
 
   async execute(args: FileWriteArgs, plugin: Plugin): Promise<IMCPToolResult> {
     try {
-      const exists = await plugin.call('fileManager', 'exists', args.path)
-      try {
-        if (!exists) {await plugin.call('fileManager', 'writeFile', args.path, "")}
-        await plugin.call('fileManager', 'open', args.path)
-      } catch (openError) {
-        console.warn(`Failed to open file in editor: ${openError.message}`);
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      await plugin.call('editor', 'showCustomDiff', args.path, args.content)
-      //await plugin.call('fileManager', 'writeFile', args.path, args.content);
+      // Write the file directly to ensure it's persisted
+      await plugin.call('fileManager', 'writeFile', args.path, args.content);
 
       const result: FileOperationResult = {
         success: true,
@@ -204,10 +196,8 @@ export class FileCreateHandler extends BaseToolHandler {
       if (args.type === 'directory') {
         await plugin.call('fileManager', 'mkdir', args.path);
       } else {
-        await plugin.call('fileManager', 'writeFile', args.path, '');
-        await plugin.call('fileManager', 'open', args.path)
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        await plugin.call('editor', 'showCustomDiff', args.path, args.content || "")
+        // Write the file directly with content to ensure it's persisted
+        await plugin.call('fileManager', 'writeFile', args.path, args.content || '');
       }
 
       const result: FileOperationResult = {
@@ -443,17 +433,17 @@ export class DirectoryListHandler extends BaseToolHandler {
         return this.createErrorResult(`Directory not found: ${args.path}`);
       }
 
-      const files = await await plugin.call('fileManager', 'readdir', args.path);
+      const files = await plugin.call('fileManager', 'readdir', args.path);
       const fileList = [];
 
       for (const file in files) {
         const fullPath = `${args.path}/${file}`;
         try {
-          const isDir = await await plugin.call('fileManager', 'isDirectory', fullPath);
+          const isDir = await plugin.call('fileManager', 'isDirectory', fullPath);
           let size = 0;
 
           if (!isDir) {
-            const content = await plugin.call('fileManager', 'readFile',fullPath);
+            const content = await plugin.call('fileManager', 'readFile', fullPath);
             size = content.length;
           }
 
