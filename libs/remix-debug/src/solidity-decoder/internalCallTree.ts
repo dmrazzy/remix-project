@@ -2,6 +2,7 @@
 import { AstWalker } from '@remix-project/remix-astwalker'
 import { util } from '@remix-project/remix-lib'
 import { SourceLocationTracker } from '../source/sourceLocationTracker'
+import { nodesAtPosition } from '../source/sourceMappingDecoder'
 import { EventManager } from '../eventManager'
 import { parseType } from './decodeInfo'
 import { isContractCreation, isCallInstruction, isCreateInstruction, isRevertInstruction } from '../trace/traceHelper'
@@ -45,7 +46,7 @@ export class InternalCallTree {
   /** Manager for accessing and navigating the execution trace */
   traceManager
   /** Tracker for mapping VM trace indices to source code locations */
-  sourceLocationTracker
+  sourceLocationTracker: SourceLocationTracker
   /** Map of scopes defined by range in the VM trace. Keys are scopeIds, values contain firstStep, lastStep, locals, isCreation, gasCost */
   scopes
   /** Map of VM trace indices to scopeIds, representing the start of each scope */
@@ -78,8 +79,11 @@ export class InternalCallTree {
   pendingConstructor
   /** Map tracking which constructors have started execution and at what source location offset */
   constructorsStartExecution
-  /** Map of variable IDs to their metadata (name, type, stackDepth, sourceLocation) */
+  /** Map of variable IDs to their metadata (name, type, stackDepth, sourceLocation, declarationStep, safeToDecodeAtStep) */
   variables: {
+    [Key: number]: any
+  }
+  handledPendingConstructorExecution: {
     [Key: number]: any
   }
 
@@ -186,6 +190,7 @@ export class InternalCallTree {
     let scopeId = this.findScopeId(vmtraceIndex)
     if (scopeId !== '' && !scopeId) return null
     let scope = this.scopes[scopeId]
+    console.log('findScope', this.scopes)
     while (scope.lastStep && scope.lastStep < vmtraceIndex && scope.firstStep > 0) {
       scopeId = this.parentScope(scopeId)
       scope = this.scopes[scopeId]
@@ -342,7 +347,7 @@ export class InternalCallTree {
  * @param {Object} [validSourceLocation] - Last valid source location
  * @returns {Promise<Object>} Object with outStep (next step to process) and optional error message
  */
-async function buildTree (tree, step, scopeId, isCreation, functionDefinition?, contractObj?, sourceLocation?, validSourceLocation?) {
+async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, functionDefinition?, contractObj?, sourceLocation?, validSourceLocation?) {
   let subScope = 1
   if (functionDefinition) {
     const address = tree.traceManager.getCurrentCalledAddressAt(step)
@@ -379,6 +384,20 @@ async function buildTree (tree, step, scopeId, isCreation, functionDefinition?, 
       included.file === source.file)
   }
 
+  /**
+   * Compare 2 source locations
+   *
+   * @param {Object} source - Outer source location to check against
+   * @param {Object} included - Inner source location to check
+   * @returns {boolean} True if included is completely within source
+   */
+  function compareSource (source, included) {
+    return (included.start === source.start &&
+      included.length === source.length &&
+      included.file === source.file &&
+      included.start === source.start)
+  }
+
   let currentSourceLocation = sourceLocation || { start: -1, length: -1, file: -1, jump: '-' }
   let previousSourceLocation = currentSourceLocation
   let previousValidSourceLocation = validSourceLocation || currentSourceLocation
@@ -391,9 +410,9 @@ async function buildTree (tree, step, scopeId, isCreation, functionDefinition?, 
 
     try {
       address = tree.traceManager.getCurrentCalledAddressAt(step)
-      sourceLocation = await tree.extractSourceLocation(step, address)
+      sourceLocation = await tree.extractValidSourceLocation(step, address)
 
-      if (!includedSource(sourceLocation, currentSourceLocation)) {
+      if (!compareSource(sourceLocation, currentSourceLocation)) {
         tree.reducedTrace.push(step)
         currentSourceLocation = sourceLocation
       }
@@ -454,10 +473,14 @@ async function buildTree (tree, step, scopeId, isCreation, functionDefinition?, 
     tree.locationAndOpcodePerVMTraceIndex[step] = { sourceLocation, stepDetail, lineColumnPos, contractAddress: address }
     tree.scopes[scopeId].gasCost += stepDetail.gasCost
 
+    
+
     const contractObj = await tree.solidityProxy.contractObjectAtAddress(address)
     const generatedSources = getGeneratedSources(tree, scopeId, contractObj)
-    const functionDefinition = await resolveFunctionDefinition(tree, sourceLocation, generatedSources, address)
-
+    const stackedNodes = await resolveAllNodes(tree, sourceLocation, generatedSources, address)
+    const reverseStackedNodes = stackedNodes.slice().reverse()
+    const functionDefinition = reverseStackedNodes.find((node) => node.nodeType === 'FunctionDefinition' || node.nodeType === 'YulFunctionDefinition')
+    
     const isInternalTxInstrn = isCallInstruction(stepDetail)
     const isCreateInstrn = isCreateInstruction(stepDetail)
     // we are checking if we are jumping in a new CALL or in an internal function
@@ -471,13 +494,13 @@ async function buildTree (tree, step, scopeId, isCreation, functionDefinition?, 
       // from now on we'll be waiting for a change in the source location which will mark the beginning of the constructor execution.
       // constructorsStartExecution allows to keep track on which constructor has already been executed.
     }
-    const internalfunctionCall = functionDefinition && previousSourceLocation.jump === 'i'
+    const internalfunctionCall = functionDefinition && previousSourceLocation.jump === 'i' && functionDefinition.kind !== 'constructor'
     if (constructorExecutionStarts || isInternalTxInstrn || internalfunctionCall) {
       try {
         const newScopeId = scopeId === '' ? subScope.toString() : scopeId + '.' + subScope
         tree.scopeStarts[step] = newScopeId
         const startExecution = lineColumnPos && lineColumnPos.start ? lineColumnPos.start.line + 1 : undefined
-        tree.scopes[newScopeId] = { firstStep: step, locals: {}, isCreation, gasCost: 0, startExecution }
+        tree.scopes[newScopeId] = { firstStep: step, locals: {}, isCreation, gasCost: 0, startExecution, functionDefinition }
         // for the ctor we are at the start of its trace, we have to replay this step in order to catch all the locals:
         const nextStep = constructorExecutionStarts ? step : step + 1
         if (constructorExecutionStarts) {
@@ -690,6 +713,15 @@ async function resolveFunctionDefinition (tree, sourceLocation, generatedSources
     }
   }
   return tree.functionDefinitionByFile[sourceLocation.file][sourceLocation.start + ':' + sourceLocation.length + ':' + sourceLocation.file]
+}
+
+async function resolveAllNodes (tree, sourceLocation, generatedSources, address) {
+  const ast = await tree.solidityProxy.ast(sourceLocation, generatedSources, address)
+  if (ast) {
+    return nodesAtPosition(null, sourceLocation.start, { ast })
+  } else {
+    return null
+  }
 }
 
 /**
