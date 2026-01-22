@@ -77,6 +77,8 @@ export class InternalCallTree {
   pendingConstructorId: number
   /** Pending constructor function definition waiting for execution */
   pendingConstructor
+  /** Pending constructor entry stack depth */
+  pendingConstructorEntryStackDepth
   /** Map tracking which constructors have started execution and at what source location offset */
   constructorsStartExecution
   /** Map of variable IDs to their metadata (name, type, stackDepth, sourceLocation, declarationStep, safeToDecodeAtStep) */
@@ -166,6 +168,7 @@ export class InternalCallTree {
     this.pendingConstructorExecutionAt = -1
     this.pendingConstructorId = -1
     this.constructorsStartExecution = {}
+    this.pendingConstructorEntryStackDepth = -1
     this.pendingConstructor = null
     this.variables = {}
   }
@@ -369,6 +372,34 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
   }
 
   /**
+   * Checks if we're exiting a constructor based on stack depth.
+   * For constructors (especially in inheritance), the stack depth returning to entry level
+   * indicates the end of that constructor's execution.
+   *
+   * @param {InternalCallTree} tree - The call tree instance
+   * @param {string} scopeId - Current scope identifier
+   * @param {number} initialEntryStackDepth - Stack depth at constructor entry
+   * @param {StepDetail} stepDetail - Current step details with stack info
+   * @returns {boolean} True if exiting a constructor scope
+   */
+  function isConstructorExit (tree, scopeId, initialEntryStackDepth, stepDetail) {
+    const scope = tree.scopes[scopeId]
+    if (scope.firstStep === step) {
+      // we are just entering the constructor
+      return false
+    }
+    if (!scope || !scope.functionDefinition || scope.functionDefinition.kind !== 'constructor') {
+      return false
+    }
+    // Check if stack has returned to entry depth (or below, in case of cleanup)
+    if (initialEntryStackDepth !== undefined && stepDetail.stack.length <= initialEntryStackDepth) {
+      console.log('Exiting constructor scope ', scopeId, ' at step ', step)
+      return true
+    }
+    return false
+  }
+
+  /**
    * Checks if one source location is completely included within another.
    *
    * @param {Object} source - Outer source location to check against
@@ -491,6 +522,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
       tree.pendingConstructorExecutionAt = validSourceLocation.start
       tree.pendingConstructorId = functionDefinition.id
       tree.pendingConstructor = functionDefinition
+      tree.pendingConstructorEntryStackDepth = stepDetail.stack.length
       // from now on we'll be waiting for a change in the source location which will mark the beginning of the constructor execution.
       // constructorsStartExecution allows to keep track on which constructor has already been executed.
     }
@@ -520,8 +552,9 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
       } catch (e) {
         return { outStep: step, error: 'InternalCallTree - ' + e.message }
       }
-    } else if (callDepthChange(step, tree.traceManager.trace) || (sourceLocation.jump === 'o' && functionDefinition) || isRevert) {
+    } else if (callDepthChange(step, tree.traceManager.trace) || (sourceLocation.jump === 'o' && functionDefinition) || isRevert || isConstructorExit(tree, scopeId, tree.pendingConstructorEntryStackDepth, stepDetail)) {
       // if not, we might be returning from a CALL or internal function. This is what is checked here.
+      // For constructors in inheritance chains, we also check if stack depth has returned to entry level
       tree.scopes[scopeId].lastStep = step
       if (isRevert) {
         const revertLine = lineColumnPos && lineColumnPos.start ? lineColumnPos.start.line + 1 : undefined
