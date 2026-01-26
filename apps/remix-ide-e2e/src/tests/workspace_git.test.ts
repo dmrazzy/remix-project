@@ -493,6 +493,7 @@ module.exports = {
       .click('*[data-id="contract-wizard-mintable-checkbox"]')
       .click('*[data-id="contract-wizard-burnable-checkbox"]')
       .click('*[data-id="contract-wizard-pausable-checkbox"]')
+      .pause()
       .assert.selected('*[data-id="contract-wizard-access-ownable-radio"]', 'checked')
       .click('*[data-id="contract-wizard-validate-workspace-button"]')
       .clickLaunchIcon('filePanel')

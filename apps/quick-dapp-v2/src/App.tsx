@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer, useState, useMemo } from 'react';
+import React, { useEffect, useReducer, useState, useMemo, useRef } from 'react';
 import { IntlProvider } from 'react-intl'
 import CreateInstance from './components/CreateInstance';
 import EditHtmlTemplate from './components/EditHtmlTemplate';
@@ -22,13 +22,18 @@ function App(): JSX.Element {
   });
 
   const [appState, dispatch] = useReducer(appReducer, appInitialState);
-  
+  const dappsRef = useRef(appState.dapps);
   const [isAppLoading, setIsAppLoading] = useState(true);
-
+  const activeDappRef = useRef(appState.activeDapp);
   const dappManager = useMemo(() => new DappManager(remixClient as any), []);
 
   useEffect(() => {
+    dappsRef.current = appState.dapps;
+  }, [appState.dapps]);
+
+  useEffect(() => {
     updateState(appState);
+    activeDappRef.current = appState.activeDapp;
   }, [appState]);
 
   useEffect(() => {
@@ -39,21 +44,11 @@ function App(): JSX.Element {
       
       try {
         await connectRemix();
-        
         // @ts-ignore
         remixClient.call('locale', 'currentLocale').then((l: any) => setLocale(l));
         // @ts-ignore
         remixClient.on('locale', 'localeChanged', (l: any) => setLocale(l));
-
-        // @ts-ignore
-        remixClient.on('ai-dapp-generator', 'generationProgress', (progress: any) => {
-          if (progress.status === 'started') dispatch({ type: 'SET_AI_LOADING', payload: true });
-        });
-        // @ts-ignore
-        remixClient.on('ai-dapp-generator', 'dappGenerated', () => dispatch({ type: 'SET_AI_LOADING', payload: false }));
-        // @ts-ignore
-        remixClient.on('ai-dapp-generator', 'dappUpdated', () => dispatch({ type: 'SET_AI_LOADING', payload: false }));
-
+        
         const dapps = (await dappManager.getDapps()) || [];
         dispatch({ type: 'SET_DAPPS', payload: dapps });
 
@@ -66,7 +61,7 @@ function App(): JSX.Element {
         }
 
       } catch (e) {
-        console.error("Failed to load app", e);
+        console.error("[DEBUG-APP] Failed to load app", e);
         dispatch({ type: 'SET_DAPPS', payload: [] });
         dispatch({ type: 'SET_VIEW', payload: 'create' });
       } finally {
@@ -76,32 +71,94 @@ function App(): JSX.Element {
     };
 
     initApp();
+  }, [dappManager, dispatch]); 
 
-    const onCreatingStart = () => {
-      dispatch({ type: 'SET_VIEW', payload: 'create' });
-      dispatch({ type: 'SET_AI_LOADING', payload: true });
+  useEffect(() => {
+    const onCreatingStart = async (data: any) => {
+      dispatch({ type: 'SET_AI_LOADING', payload: false });
+
+      if (data.dappConfig) {
+        const newDappsList = [data.dappConfig, ...dappsRef.current];
+        dispatch({ type: 'SET_DAPPS', payload: newDappsList });
+        
+        dispatch({ 
+          type: 'SET_DAPP_PROCESSING', 
+          payload: { slug: data.slug, isProcessing: true } 
+        });
+
+        if (appState.dapps.length === 0) {
+          dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
+        }
+      }
+    };
+
+    const onDappUpdateStart = (data: any) => {
+      if (data && data.slug) {
+        dispatch({ 
+          type: 'SET_DAPP_PROCESSING', 
+          payload: { slug: data.slug, isProcessing: true } 
+        });
+      }
     };
 
     const onDappCreated = async (newDappConfig: any) => {
-      const updatedDapps = await dappManager.getDapps();
-      dispatch({ type: 'SET_DAPPS', payload: updatedDapps });
-      dispatch({ type: 'SET_ACTIVE_DAPP', payload: newDappConfig });
-      dispatch({ type: 'SET_VIEW', payload: 'editor' });
-      setTimeout(() => dispatch({ type: 'SET_AI_LOADING', payload: false }), 100);
+      const updatedDappsList = dappsRef.current.map((d: any) => 
+        d.slug === newDappConfig.slug ? newDappConfig : d
+      );
+
+      const isExist = dappsRef.current.find((d: any) => d.slug === newDappConfig.slug);
+      if (!isExist) {
+        updatedDappsList.unshift(newDappConfig);
+      }
+
+      dispatch({ type: 'SET_DAPPS', payload: updatedDappsList });
+
+      dispatch({ 
+        type: 'SET_DAPP_PROCESSING', 
+        payload: { slug: newDappConfig.slug, isProcessing: false } 
+      });
+      
+      dispatch({ type: 'SET_AI_LOADING', payload: false });
+    };
+    
+    const onCreatingError = (errorData?: any) => {
+      console.error('[DEBUG-APP] Event: creatingDappError', errorData);
+      dispatch({ type: 'SET_AI_LOADING', payload: false });
+      
+      const targetSlug = errorData?.slug || activeDappRef.current?.slug;
+
+      if (targetSlug) {
+        dispatch({ 
+          type: 'SET_DAPP_PROCESSING', 
+          payload: { slug: targetSlug, isProcessing: false } 
+        });
+      } else {
+        console.warn('[DEBUG-APP] Error received without slug. Loading state might be stuck.');
+      }
     };
 
-    const onCreatingError = () => {
+    const onDappUpdated = (data: any) => {
       dispatch({ type: 'SET_AI_LOADING', payload: false });
+
+      if (data.slug) {
+        dispatch({ 
+          type: 'SET_DAPP_PROCESSING', 
+          payload: { slug: data.slug, isProcessing: false } 
+        });
+      }
     };
 
     remixClient.internalEvents.on('creatingDappStart', onCreatingStart);
     remixClient.internalEvents.on('dappCreated', onDappCreated);
     remixClient.internalEvents.on('creatingDappError', onCreatingError);
-
+    remixClient.internalEvents.on('dappUpdated', onDappUpdated);
+    remixClient.internalEvents.on('dappUpdateStart', onDappUpdateStart);
     return () => {
       remixClient.internalEvents.off('creatingDappStart', onCreatingStart);
       remixClient.internalEvents.off('dappCreated', onDappCreated);
       remixClient.internalEvents.off('creatingDappError', onCreatingError);
+      remixClient.internalEvents.off('dappUpdated', onDappUpdated);
+      remixClient.internalEvents.off('dappUpdateStart', onDappUpdateStart);
     };
   }, [dappManager, dispatch]);
 
@@ -152,6 +209,7 @@ function App(): JSX.Element {
         return (
           <Dashboard 
             dapps={appState.dapps} 
+            processingState={appState.dappProcessing}
             onOpen={(dapp) => {
               dispatch({ type: 'SET_ACTIVE_DAPP', payload: dapp });
               dispatch({ type: 'SET_VIEW', payload: 'editor' });

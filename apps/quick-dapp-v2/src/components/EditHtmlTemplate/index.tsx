@@ -61,12 +61,11 @@ function EditHtmlTemplate(): JSX.Element {
   });
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showTips, setShowTips] = useState(false);
 
   useEffect(() => {
     const onDappUpdated = (data: any) => {
       if (activeDapp && data.slug === activeDapp.slug) {
-        console.log('[EditHtmlTemplate] Update received, refreshing preview...');
-        
         dispatch({ 
           type: 'SET_DAPP_PROCESSING', 
           payload: { slug: activeDapp.slug, isProcessing: false } 
@@ -101,13 +100,27 @@ function EditHtmlTemplate(): JSX.Element {
       }
     };
 
-    const onDappError = () => {
+    const onDappError = (errorData: any) => {
+      const errorMessage = errorData?.error || errorData || 'Unknown Error';
       if (activeDapp) {
         dispatch({ 
           type: 'SET_DAPP_PROCESSING', 
           payload: { slug: activeDapp.slug, isProcessing: false } 
         });
       }
+      setNotificationModal({
+        show: true,
+        title: 'Update Failed',
+        message: (
+          <div>
+            <p>An error occurred while generating the code:</p>
+            <div className="alert alert-danger mb-0" style={{maxHeight: '200px', overflowY: 'auto'}}>
+              {errorMessage}
+            </div>
+          </div>
+        ),
+        variant: 'danger'
+      });
     };
 
     remixClient.internalEvents.on('dappUpdated', onDappUpdated);
@@ -175,6 +188,8 @@ function EditHtmlTemplate(): JSX.Element {
     dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
   };
 
+  const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  
   const captureAndSaveThumbnail = async () => {
     if (!activeDapp || !iframeRef.current) return;
     const iframe = iframeRef.current;
@@ -185,14 +200,18 @@ function EditHtmlTemplate(): JSX.Element {
     try {
       setIsCapturing(true);
       const dataUrl = await toPng(doc.body, {
-        quality: 0.8,
-        width: 640,
-        height: 360,
-        backgroundColor: '#ffffff',
-        cacheBust: true,
-        skipAutoScale: true,
-        pixelRatio: 1,
-      });
+      quality: 0.8,
+      width: 640,
+      height: 360,
+      backgroundColor: '#ffffff',
+      cacheBust: true,
+      skipAutoScale: true,
+      pixelRatio: 1,
+      imagePlaceholder: TRANSPARENT_PIXEL,
+      fetchRequestInit: {
+        cache: 'no-cache',
+      }
+    });
 
       const previewPath = `dapps/${activeDapp.slug}/preview.png`;
       await remixClient.call('fileManager', 'writeFile', previewPath, dataUrl);
@@ -207,7 +226,7 @@ function EditHtmlTemplate(): JSX.Element {
     if (!iframeRef.current || !activeDapp) return;
     if (isBuilding) return;
 
-    if (!isBuilderReady || !builderRef.current || !builderRef.current.isReady()) {
+    if (!builderRef.current || !builderRef.current.isReady()) {
       setIframeError('Builder is initializing...');
       return;
     }
@@ -367,19 +386,13 @@ function EditHtmlTemplate(): JSX.Element {
         userPrompt = [ { type: 'text', text: message }, { type: 'image_url', image_url: { url: imageBase64 } } ];
       }
 
-      remixClient.call(
-        // @ts-ignore
-        'ai-dapp-generator',
-        'updateDapp',
+      await remixClient.updateDapp(
+        activeDapp.slug,
         activeDapp.contract.address,
         userPrompt,
-        currentFilesObject,
-        !!imageBase64,
-        activeDapp.slug 
-      ).catch((e: any) => {
-        console.error("Update Trigger Failed:", e);
-        dispatch({ type: 'SET_DAPP_PROCESSING', payload: { slug: activeDapp.slug, isProcessing: false } });
-      });
+        currentFilesObject, 
+        imageBase64 || null
+      );
 
     } catch (error: any) {
       console.error('Update setup failed:', error);
@@ -395,8 +408,8 @@ function EditHtmlTemplate(): JSX.Element {
         const builder = new InBrowserVite();
         await builder.initialize();
         if (mounted) {
-            builderRef.current = builder;
-            setIsBuilderReady(true);
+          builderRef.current = builder;
+          setIsBuilderReady(true);
         }
       } catch (err: any) {
         console.error('Failed to initialize InBrowserVite:', err);
@@ -419,7 +432,7 @@ function EditHtmlTemplate(): JSX.Element {
 
   return (
     <div className="d-flex flex-column h-100">
-      <div className="py-2 px-3 border-bottom d-flex align-items-center bg-light flex-shrink-0">
+      <div className="py-2 px-3 border-bottom d-flex align-items-center flex-shrink-0">
         <button 
           className="btn btn-sm btn-secondary me-3"
           onClick={handleBack}
@@ -427,7 +440,21 @@ function EditHtmlTemplate(): JSX.Element {
         >
           {isCapturing ? <><i className="fas fa-spinner fa-spin me-1"></i> Saving...</> : <><i className="fas fa-arrow-left me-1"></i> Back</>}
         </button>
-        <span className="fw-bold text-body">{activeDapp.name}</span>
+        <div className="d-flex align-items-center flex-wrap gap-2">
+          <span className="fw-bold text-body" style={{fontSize: '1.1rem'}}>
+            {activeDapp.config.title || activeDapp.name}
+          </span>
+          <span className="badge bg-secondary opacity-75">
+            {activeDapp.contract.networkName}
+          </span>
+          <div className="vr mx-1 text-secondary opacity-50" style={{ height: '1.2rem' }}></div>
+          <div className="d-flex align-items-center text-muted" title="Location in File Explorer">
+            <i className="far fa-folder-open me-2 opacity-75"></i>
+            <span className="font-monospace small opacity-75">
+              dapps/{activeDapp.slug}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="flex-grow-1 position-relative" style={{ overflow: 'hidden' }}>
@@ -444,6 +471,14 @@ function EditHtmlTemplate(): JSX.Element {
                   <div className="d-flex justify-content-between align-items-center mb-2 flex-shrink-0">
                     <h5 className="mb-0 text-body">
                       <FormattedMessage id="quickDapp.preview" defaultMessage="Preview" />
+                      <button 
+                        className="btn btn-link text-muted p-0 ms-2 text-decoration-none" 
+                        onClick={() => setShowTips(!showTips)}
+                        style={{ fontSize: '0.85rem' }}
+                      >
+                        <i className="far fa-question-circle me-1"></i>
+                        {showTips ? 'Hide Tips' : 'Help & Tips'}
+                      </button>
                     </h5>
                     <div className="d-flex gap-2">
                       <Button 
@@ -464,6 +499,17 @@ function EditHtmlTemplate(): JSX.Element {
                       </Button>
                     </div>
                   </div>
+
+                  {showTips && (
+                    <div className="alert alert-info py-2 px-3 mb-2 small shadow-sm fade-in border-info bg-opacity-10">
+                      <div className="fw-bold mb-1"><i className="fas fa-robot me-1"></i>AI Code Generation Tips</div>
+                      <ul className="mb-0 ps-3">
+                        <li>AI code might not be perfect. If the preview is broken:</li>
+                        <li><strong>Option 1:</strong> Edit code manually in the <strong>File Explorer</strong> (left panel), then click <strong>Refresh Preview</strong>.</li>
+                        <li><strong>Option 2:</strong> Ask the AI to fix it in the <strong>Chat Box</strong> above.</li>
+                      </ul>
+                    </div>
+                  )}
                   
                   <Card className="border flex-grow-1 d-flex position-relative">
                     <Card.Body className="p-0 d-flex flex-column position-relative" style={{ overflow: 'hidden' }}>
@@ -502,7 +548,6 @@ function EditHtmlTemplate(): JSX.Element {
         </div>
       </div>
       
-      {/* Modals */}
       <Modal show={notificationModal.show} onHide={closeNotificationModal} centered>
         <Modal.Header closeButton>
           <Modal.Title className={notificationModal.variant === 'danger' ? 'text-danger' : notificationModal.variant === 'warning' ? 'text-warning' : 'text-success'}>
