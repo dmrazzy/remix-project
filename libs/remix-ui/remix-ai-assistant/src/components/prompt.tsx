@@ -91,9 +91,6 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   themeTracker
 }) => {
   const { trackMatomoEvent: baseTrackEvent } = useContext(TrackingContext)
-  const trackMatomoEvent = <T extends MatomoEvent = AIEvent>(event: T) => {
-    baseTrackEvent?.<T>(event)
-  }
 
   return (
     <>
@@ -252,21 +249,24 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
                   <span className={showOllamaModelSelector ? "fa fa-caret-up" : "fa fa-caret-down"}></span>
                 </button>
               )}
-            </div>
-            <CustomTooltip
-              placement="top"
-              tooltipText={isRecording ? 'Stop recording' : 'Record audio'}
-              tooltipId="audioPromptTooltip"
-            >
-              <button
-                data-id="remix-ai-record-audio"
-                className={`btn btn-text btn-sm small fw-light mt-2 align-self-end border border-text rounded ${isRecording ? 'btn-danger text-white' : 'text-secondary'}`}
-                onClick={handleRecord}
-              >
-                <i className={`fa ${isRecording ? 'fa-stop' : 'fa-microphone'} me-1`}></i>
-                {isRecording ? 'Stop' : 'Audio Prompt'}
-              </button>
-            </CustomTooltip>
+              test
+            </div> */}
+            <button className="btn d-flex rounded-4 justify-content-between align-items-center gap-2" style={{ backgroundColor: themeTracker && themeTracker.name.toLowerCase() === 'light' ? '#c7e8f1' :'#2b3b4d', color: themeTracker && themeTracker.name.toLowerCase() === 'light' ? '#1ea2aa' :'#2de7f3' }}>
+              <i className="far fa-copy me-1"></i>
+              <span>File</span>
+            </button>
+            {/* <button className={`btn fw-light rounded-4 text-nowrap ${themeTracker && themeTracker.name.toLowerCase() === 'light' ? 'btn-remix-light' : 'btn-remix-dark'}`}>
+              <i className="fas fa-brain me-1"></i>
+              <span>Learn</span>
+            </button>
+            <button className={`btn fw-light rounded-4 text-nowrap ${themeTracker && themeTracker.name.toLowerCase() === 'light' ? 'btn-remix-light' : 'btn-remix-dark'}`}>
+              <i className="fas fa-list me-1"></i>
+              <span className="text-nowrap">Plan a project</span>
+            </button> */}
+            <button className={`btn fw-light rounded-4 text-nowrap ${themeTracker && themeTracker.name.toLowerCase() === 'light' ? 'btn-remix-light' : 'btn-remix-dark'}`}>
+              <i className="fas fa-plus me-1"></i>
+              <span className="text-nowrap">New workspace</span>
+            </button>
             <button
               data-id="remix-ai-workspace-generate"
               className="btn btn-text btn-sm small fw-light text-secondary mt-2 align-self-end border border-text rounded"
