@@ -40,7 +40,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     validationError: '',
     txNumberIsEmpty: true,
     isLocalNodeUsed: false,
-    sourceLocationStatus: ''
+    sourceLocationStatus: '',
+    showOpcodes: true
   })
 
   if (props.onReady) {
@@ -356,6 +357,12 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     return startDebugging(null, txHash, null, web3)
   }
 
+  const handleShowOpcodesChange = (showOpcodes: boolean) => {
+    setState((prevState) => {
+      return { ...prevState, showOpcodes }
+    })
+  }
+
   const stepManager = {
     jumpTo: state.debugger && state.debugger.step_manager ? state.debugger.step_manager.jumpTo.bind(state.debugger.step_manager) : null,
     stepOverBack: state.debugger && state.debugger.step_manager ? state.debugger.step_manager.stepOverBack.bind(state.debugger.step_manager) : null,
@@ -367,7 +374,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     jumpNextBreakpoint: state.debugger && state.debugger.step_manager ? state.debugger.step_manager.jumpNextBreakpoint.bind(state.debugger.step_manager) : null,
     jumpToException: state.debugger && state.debugger.step_manager ? state.debugger.step_manager.jumpToException.bind(state.debugger.step_manager) : null,
     traceLength: state.debugger && state.debugger.step_manager ? state.debugger.step_manager.traceLength : null,
-    registerEvent: state.debugger && state.debugger.step_manager ? state.debugger.step_manager.event.register.bind(state.debugger.step_manager.event) : null
+    registerEvent: state.debugger && state.debugger.step_manager ? state.debugger.step_manager.event.register.bind(state.debugger.step_manager.event) : null,
+    showOpcodes: state.showOpcodes
   }
 
   const vmDebugger = {
@@ -460,7 +468,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
         {state.debugging && <StepManager stepManager={stepManager} />}
       </div>
       <div className="debuggerPanels" ref={panelsRef}>
-        {state.debugging && <VmDebuggerHead debugging={state.debugging} vmDebugger={vmDebugger} stepManager={stepManager} />}
+        {state.debugging && <VmDebuggerHead debugging={state.debugging} vmDebugger={vmDebugger} stepManager={stepManager} onShowOpcodesChange={handleShowOpcodesChange} />}
         {state.debugging && (
           <VmDebugger
             debugging={state.debugging}
