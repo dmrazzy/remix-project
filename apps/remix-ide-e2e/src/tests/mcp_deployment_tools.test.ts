@@ -572,6 +572,13 @@ module.exports = {
           },
           id: 'test-get-accounts-for-simulate'
         }).then(function (accountsResult) {
+          if (accountsResult.error) {
+            done({
+              success: false,
+              error: accountsResult.error.message || JSON.stringify(accountsResult.error)
+            });
+            return;
+          }
           const accountsData = JSON.parse(accountsResult.result?.content?.[0]?.text || '{}');
           const fromAccount = accountsData?.accounts?.[0]?.address;
           const toAccount = accountsData?.accounts?.[1]?.address || fromAccount;
@@ -618,13 +625,11 @@ module.exports = {
             success: false,
             error: error.message,
             // Simulation might not be available in all environments
-            simulationNotSupported: error.message?.includes('not available') ||
-                                    error.message?.includes('not supported')
           });
         });
       }, [], function (result) {
         const data = result.value as any;
-        if (data.error && !data.simulationNotSupported) {
+        if (data.error) {
           console.error('Simulate transaction error:', data.error);
           return;
         }

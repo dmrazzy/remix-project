@@ -58,6 +58,13 @@ module.exports = {
           },
           id: 'test-get-versions'
         }).then(function (result) {
+          if (result.error) {
+            done({
+              success: false,
+              error: result.error.message || JSON.stringify(result.error)
+            });
+            return;
+          }
           const resultData = JSON.parse(result.result?.content?.[0]?.text || '{}');
           done({
             success: !result.error,
@@ -237,7 +244,7 @@ module.exports = {
       }, [testContract], function (result) {
         const data = result.value as any;
         if (data.error) {
-          console.error('Solidity compile error:', data.error);"Input validation failed: Required field 'file' is missing"
+          console.error('Solidity compile error:', data.error);
           return;
         }
         browser.assert.ok(data.success, 'Solidity compile should succeed');
