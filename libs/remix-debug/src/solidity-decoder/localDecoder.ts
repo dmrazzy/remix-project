@@ -16,16 +16,18 @@ export async function solidityLocals (vmtraceIndex, internalTreeCall, stack, mem
     // For complex types (structs, arrays, etc.), we need to wait until initialization is complete
     const isSafeToDecode = !variable.safeToDecodeAtStep || vmtraceIndex >= variable.safeToDecodeAtStep
 
-    if (isSafeToDecode &&
-        variable.stackDepth < stack.length &&
-        (variable.sourceLocation.start <= currentSourceLocation.start || variable.isParameter)) {
+    // Get the current stack position from symbolic stack
+    // This tracks where the variable actually is after DUP, SWAP, etc.
+    const currentStackIndex = findVariableStackPosition(internalTreeCall, vmtraceIndex, variable)
+
+    if (isSafeToDecode) {
       let name = variable.name
       if (name.indexOf('$') !== -1) {
         name = '<' + anonymousIncr + '>'
         anonymousIncr++
       }
       try {
-        locals[name] = await variable.type.decodeFromStack(variable.stackDepth, stack, memory, storageResolver, calldata, cursor, variable)
+        locals[name] = await variable.type.decodeFromStack(currentStackIndex, stack, memory, storageResolver, calldata, cursor, variable)
       } catch (e) {
         console.log(e)
         locals[name] = { error: '<decoding failed - ' + e.message + '>', type: variable && variable.type && variable.type.typeName || 'unknown' }
@@ -35,7 +37,36 @@ export async function solidityLocals (vmtraceIndex, internalTreeCall, stack, mem
   return locals
 }
 
-function formatMemory (memory) {
+/**
+ * Finds the current stack position of a variable at a given VM trace step.
+ * Uses the symbolic stack to track where variables have moved due to stack operations.
+ *
+ * @param internalTreeCall - InternalCallTree instance
+ * @param vmtraceIndex - Current VM trace step
+ * @param variable - Variable metadata
+ * @returns Current stack depth (position) of the variable
+ */
+function findVariableStackPosition(internalTreeCall: any, vmtraceIndex: number, variable: any) {
+  // Try to find the variable in the symbolic stack
+  const variablesOnStack = internalTreeCall.getVariablesOnStackAtStep(vmtraceIndex)
+
+  // Look for our variable by ID (most reliable) or by name
+  const foundVar = variablesOnStack.find((v: any) =>
+    (variable.id && v.slot.variableId === variable.id) ||
+    (v.slot.variableName === variable.name)
+  )
+
+  if (foundVar) {
+    return foundVar.position
+  }
+
+  console.warn(`Variable ${variable.name} (ID: ${variable.id}) not found in symbolic stack at step ${vmtraceIndex}. Falling back to original stackDepth.`);
+  // Fallback to original stackDepth if not found in symbolic stack
+  // This handles cases where symbolic stack might not be fully populated
+  return variable.stackDepth
+}
+
+function formatMemory (memory: any) {
   if (memory instanceof Array) {
     memory = memory.join('').replace(/0x/g, '')
   }

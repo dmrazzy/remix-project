@@ -8,6 +8,8 @@ import { parseType } from './decodeInfo'
 import { isContractCreation, isCallInstruction, isCreateInstruction, isRevertInstruction } from '../trace/traceHelper'
 import { extractLocationFromAstVariable } from './types/util'
 import { findSafeStepForVariable } from './variableInitializationHelper'
+import { SymbolicStackManager } from './symbolicStack'
+import { updateSymbolicStack } from './opcodeStackHandler'
 
 /**
  * Represents detailed information about a single step in the VM execution trace.
@@ -88,6 +90,8 @@ export class InternalCallTree {
   handledPendingConstructorExecution: {
     [Key: number]: any
   }
+  /** Symbolic stack manager for tracking variable bindings and stack state throughout execution */
+  symbolicStackManager: SymbolicStackManager
 
   /**
     * constructor
@@ -106,6 +110,7 @@ export class InternalCallTree {
     this.traceManager = traceManager
     this.offsetToLineColumnConverter = offsetToLineColumnConverter
     this.sourceLocationTracker = new SourceLocationTracker(codeManager, { debugWithGeneratedSources: opts.debugWithGeneratedSources })
+    this.symbolicStackManager = new SymbolicStackManager()
     debuggerEvent.register('newTraceLoaded', async (trace) => {
       const time = Date.now()
       this.reset()
@@ -118,6 +123,7 @@ export class InternalCallTree {
       this.scopes[scopeId] = { firstStep: 0, locals: {}, isCreation, gasCost: 0 }
 
       const compResult = await this.solidityProxy.compilationResult(calledAddress)
+      this.symbolicStackManager.setStackAtStep(0, [])
       if (!compResult) {
         this.event.trigger('noCallTreeAvailable', [])
       } else {
@@ -171,6 +177,7 @@ export class InternalCallTree {
     this.pendingConstructorEntryStackDepth = -1
     this.pendingConstructor = null
     this.variables = {}
+    this.symbolicStackManager.reset()
   }
 
   /**
@@ -332,6 +339,27 @@ export class InternalCallTree {
    */
   getLocalVariableById (id: number) {
     return this.variables[id]
+  }
+
+  /**
+   * Retrieves the symbolic stack state at a specific VM trace step.
+   * The symbolic stack tracks what each stack position represents (variables, parameters, intermediate values).
+   *
+   * @param {number} step - VM trace step index
+   * @returns {Array} Array of symbolic stack slots representing the stack state at that step
+   */
+  getSymbolicStackAtStep (step: number) {
+    return this.symbolicStackManager.getStackAtStep(step)
+  }
+
+  /**
+   * Gets all variables currently on the symbolic stack at a given step.
+   *
+   * @param {number} step - VM trace step index
+   * @returns {Array} Array of variables with their stack positions
+   */
+  getVariablesOnStackAtStep (step: number) {
+    return this.symbolicStackManager.getAllVariablesAtStep(step)
   }
 }
 
@@ -504,8 +532,15 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
     tree.locationAndOpcodePerVMTraceIndex[step] = { sourceLocation, stepDetail, lineColumnPos, contractAddress: address }
     tree.scopes[scopeId].gasCost += stepDetail.gasCost
 
+    // Update symbolic stack based on opcode execution
+    const previousSymbolicStack = tree.symbolicStackManager.getStackAtStep(step)
+    if (stepDetail.stack.length !== previousSymbolicStack.length) {
+      console.warn('STACK SIZE MISMATCH at step ', step, ' opcode ', stepDetail.op, ' symbolic stack size ', previousSymbolicStack.length, ' actual stack size ', stepDetail.stack.length  )
+    }
+    const newSymbolicStack = updateSymbolicStack(previousSymbolicStack, stepDetail.op, step)
+    // step + 1 because the symbolic stack represents the state AFTER the opcode execution
+    tree.symbolicStackManager.setStackAtStep(step + 1, newSymbolicStack)
     
-
     const contractObj = await tree.solidityProxy.contractObjectAtAddress(address)
     const generatedSources = getGeneratedSources(tree, scopeId, contractObj)
     const stackedNodes = await resolveAllNodes(tree, sourceLocation, generatedSources, address)
@@ -655,7 +690,7 @@ async function registerFunctionParameters (tree, functionDefinition, step, scope
  * @param {Array} generatedSources - Compiler-generated sources
  * @param {string} address - Contract address
  */
-async function includeVariableDeclaration (tree, step, sourceLocation, scopeId, contractObj, generatedSources, address) {
+async function includeVariableDeclaration (tree: InternalCallTree, step, sourceLocation, scopeId, contractObj, generatedSources, address) {
   let states = null
   const variableDeclarations = await resolveVariableDeclaration(tree, sourceLocation, generatedSources, address)
   // using the vm trace step, the current source location and the ast,
@@ -690,11 +725,15 @@ async function includeVariableDeclaration (tree, step, sourceLocation, scopeId, 
               stackDepth: stack.length,
               sourceLocation: sourceLocation,
               declarationStep: step,
-              safeToDecodeAtStep: safeStep
+              safeToDecodeAtStep: safeStep,
+              id: variableDeclaration.id
             }
             console.log('New local variable:', newVar)
             tree.scopes[scopeId].locals[variableDeclaration.name] = newVar
             tree.variables[variableDeclaration.id] = newVar
+
+            // Bind variable to symbolic stack
+            tree.symbolicStackManager.bindVariable(step + 1, newVar, stack.length) // step + 1 because the symbolic stack represents the state AFTER the opcode execution
           }
         } catch (error) {
           console.log(error)
@@ -810,7 +849,7 @@ function extractFunctionDefinitions (ast, astWalker) {
  * @param {number} dir - Direction to traverse stack (1 for outputs, -1 for inputs)
  * @returns {Array<string>} Array of parameter names added to the scope
  */
-function addParams (parameterList, tree, scopeId, states, contractObj, sourceLocation, stackLength, stackPosition, dir) {
+function addParams (parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, stackLength, stackPosition, dir) {
   const contractName = contractObj.name
   const params = []
   for (const inputParam in parameterList.parameters) {
@@ -828,11 +867,18 @@ function addParams (parameterList, tree, scopeId, states, contractObj, sourceLoc
         abi: contractObj.contract.abi,
         isParameter: true,
         declarationStep: undefined, // Parameters are set at function entry
-        safeToDecodeAtStep: undefined // Parameters are immediately available
+        safeToDecodeAtStep: undefined, // Parameters are immediately available
+        id: param.id
       }
       tree.scopes[scopeId].locals[attributesName] = newParam
       params.push(attributesName)
       if (!tree.variables[param.id]) tree.variables[param.id] = newParam
+
+      // Bind parameter to symbolic stack at function entry step
+      const entryStep = tree.functionCallStack[tree.functionCallStack.length - 1]
+      if (entryStep !== undefined) {
+        tree.symbolicStackManager.bindVariable(entryStep + 1, newParam, stackDepth)
+      }
     }
     stackPosition += dir
   }
