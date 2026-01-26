@@ -145,7 +145,7 @@ module.exports = {
       .click('*[data-id="contract-wizard-validate-workspace-button"]')
       .perform(function () {
         browser.isVisible('*[data-id="treeViewUltreeViewMenu"]', function (result) {
-            if (!result.value) browser.clickLaunchIcon('filePanel')
+          if (!result.value) browser.clickLaunchIcon('filePanel')
         })
       })
       .isVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]')
@@ -154,7 +154,7 @@ module.exports = {
       .click('*[data-id="treeViewLitreeViewItemcontracts/TestToken.sol"]')
       .pause(1000)
       .getEditorValue((content) => {
-        browser.assert.ok(content.indexOf(`contract TestToken is ERC20, ERC20Burnable, ERC20Pausable, Ownable {`) !== -1,
+        browser.assert.ok(content.indexOf(`contract TestToken is ERC20, ERC20Burnable, ERC20Pausable, Ownable, ERC20Permit {`) !== -1,
           'Correct content')
       })
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemscripts"]')
@@ -162,6 +162,7 @@ module.exports = {
       .waitForElementVisible('#verticalIconsKindsolidity > i.remixui_status.fas.fa-check-circle.text-success.remixui_statusCheck')
       .pause(1000)
       // check js and ts files are not transformed
+      .clickLaunchIcon('filePanel')
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemscripts/deploy_with_ethers.ts"]')
       .click('*[data-id="treeViewLitreeViewItemscripts/deploy_with_ethers.ts"]')
       .waitForElementPresent({

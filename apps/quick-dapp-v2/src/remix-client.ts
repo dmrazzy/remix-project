@@ -28,21 +28,17 @@ export class RemixClient extends PluginClient {
     createClient(this);
     // @ts-ignore
     this.dappManager = new DappManager(this);
-    console.log('[DEBUG-CLIENT] Constructor initialized.');
 
     this.onload(() => {
       // @ts-ignore
       this.on('ai-dapp-generator', 'dappGenerated', async (data: any) => {
-        console.log('[DEBUG-CLIENT] Event received:', data);
 
         if (!data.slug || !data.content) return;
 
         try {
-          console.log(`[DEBUG-CLIENT] Saving files for ${data.slug}...`);
           await this.dappManager.saveGeneratedFiles(data.slug, data.content);
 
           if (data.isUpdate) {
-            console.log('[DEBUG-CLIENT] Update finished. Emitting dappUpdated...');
 
             this.internalEvents.emit('dappUpdated', {
               slug: data.slug,
@@ -53,11 +49,13 @@ export class RemixClient extends PluginClient {
             this.call('notification', 'toast', 'DApp code updated successfully.');
 
           } else {
-            const config = await this.dappManager.getDappConfig(data.slug);
-            if (config) {
-              this.internalEvents.emit('dappCreated', config);
+            const updatedConfig = await this.dappManager.updateDappConfig(data.slug, { status: 'created' });
+
+            if (updatedConfig) {
+              this.internalEvents.emit('dappCreated', updatedConfig);
+
               // @ts-ignore
-              this.call('notification', 'toast', `DApp '${config.name}' created!`);
+              this.call('notification', 'toast', `DApp '${updatedConfig.name}' created!`);
             }
           }
 
@@ -67,6 +65,16 @@ export class RemixClient extends PluginClient {
         } finally {
           this.emit('statusChanged', { key: 'loading', value: false, title: '' });
         }
+      });
+
+      // @ts-ignore
+      this.on('ai-dapp-generator', 'dappGenerationError', (data: any) => {
+        console.error('[DEBUG-CLIENT] Error received from plugin:', data);
+
+        this.internalEvents.emit('creatingDappError', data);
+        // @ts-ignore
+        this.call('notification', 'toast', `Generation Failed: ${data.error}`);
+        this.emit('statusChanged', { key: 'loading', value: false, title: '' });
       });
     });
   }
@@ -95,11 +103,6 @@ export class RemixClient extends PluginClient {
 
   async createDapp(payload: any) {
     try {
-      console.log('[DEBUG-CLIENT] createDapp called with:', payload.contractName);
-
-      this.internalEvents.emit('creatingDappStart');
-      this.emit('statusChanged', { key: 'loading', value: true, title: 'Generating DApp...' });
-
       const networkName = getNetworkName(payload.chainId);
       const contractData = {
         address: payload.address,
@@ -109,14 +112,17 @@ export class RemixClient extends PluginClient {
         networkName
       };
 
-      console.log('[DEBUG-CLIENT] Creating initial Dapp config...');
       const newDappConfig = await this.dappManager.createDapp(
         payload.contractName,
         contractData,
         payload.isBaseMiniApp
       );
 
-      console.log(`[DEBUG-CLIENT] Initial config created. Slug: ${newDappConfig.slug}`);
+      this.internalEvents.emit('creatingDappStart', {
+        slug: newDappConfig.slug,
+        dappConfig: newDappConfig
+      });
+
       // @ts-ignore
       this.call('ai-dapp-generator', 'generateDapp', {
         description: payload.description,
@@ -126,16 +132,14 @@ export class RemixClient extends PluginClient {
         contractName: payload.contractName,
         isBaseMiniApp: payload.isBaseMiniApp,
         image: payload.image,
-        slug: newDappConfig.slug
-      }).then(() => {
-        console.log('[DEBUG-CLIENT] AI Trigger sent successfully (Ack received).');
+        slug: newDappConfig.slug,
+        figmaUrl: payload.figmaUrl,
+        figmaToken: payload.figmaToken
       }).catch((e: any) => {
         console.error('[DEBUG-CLIENT] ❌ AI Trigger Failed:', e);
         this.internalEvents.emit('creatingDappError', "Failed to trigger AI generation");
         this.emit('statusChanged', { key: 'loading', value: false, title: '' });
       });
-
-      console.log('[DEBUG-CLIENT] createDapp finished (waiting for event).');
 
     } catch (e: any) {
       console.error('[DEBUG-CLIENT] ❌ createDapp Exception:', e);
@@ -143,6 +147,31 @@ export class RemixClient extends PluginClient {
       this.emit('statusChanged', { key: 'loading', value: false, title: '' });
     }
   }
+
+  async updateDapp(
+    slug: string,
+    address: string,
+    prompt: string | any[],
+    files: any,
+    image: string | null
+  ) {
+    try {
+      this.internalEvents.emit('dappUpdateStart', { slug });
+
+      // @ts-ignore
+      await this.call('ai-dapp-generator', 'updateDapp',
+        address,
+        prompt,
+        files,
+        image,
+        slug
+      );
+    } catch (e: any) {
+      console.error('[DEBUG-CLIENT] updateDapp failed:', e);
+      this.internalEvents.emit('creatingDappError', { slug, error: e.message });
+    }
+  }
+
 }
 
 const client = new RemixClient();
