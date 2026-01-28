@@ -15,7 +15,7 @@ export function TemplateExplorerBody() {
       <TopCards />
       {
         (dedupedTemplates.length === 0) ? <NotFound /> : (
-          <div className={"body overflow-y-hidden pt-2"}>
+          <div className={"body overflow-y-hidden pt-2 mb-3 border border-success"} style={{ height: 'calc(90vh - 410px)' }}>
             <>
               <div className="d-flex flex-column gap-1">
                 <label
