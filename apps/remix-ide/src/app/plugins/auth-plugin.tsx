@@ -230,9 +230,26 @@ export class AuthPlugin extends Plugin {
 
       if (response.ok && response.data) {
         const newAccessToken = response.data.access_token
+        const newRefreshToken = response.data.refresh_token
+
+        console.log('[AuthPlugin] Refresh response:', {
+          hasNewAccessToken: !!newAccessToken,
+          hasNewRefreshToken: !!newRefreshToken,
+          accessTokenLength: newAccessToken?.length,
+          refreshTokenLength: newRefreshToken?.length
+        })
 
         // Update storage
-        tokenStorage.setTokens(newAccessToken, response.data.refresh_token)
+        tokenStorage.setTokens(newAccessToken, newRefreshToken)
+
+        // Verify storage was updated
+        const storedAccessToken = tokenStorage.getAccessToken()
+        const storedRefreshToken = tokenStorage.getRefreshToken()
+        console.log('[AuthPlugin] Storage after refresh:', {
+          accessTokenStored: storedAccessToken === newAccessToken,
+          refreshTokenStored: newRefreshToken ? storedRefreshToken === newRefreshToken : 'no new refresh token',
+          storedRefreshTokenLength: storedRefreshToken?.length
+        })
 
         // Update API clients
         this.apiClient.setToken(newAccessToken)

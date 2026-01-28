@@ -76,7 +76,7 @@ export function waitForPopupResult(
 export async function performPopupLogin(options: PopupLoginOptions): Promise<AuthResult> {
   const { provider, ssoBaseUrl, origin, timeoutMs } = options
   
-  const loginUrl = `${ssoBaseUrl}/login/${provider}?mode=popup&origin=${encodeURIComponent(origin)}`
+  const loginUrl = `${ssoBaseUrl}/test/login?mode=popup&origin=${encodeURIComponent(origin)}`
   
   const popup = openAuthPopup(loginUrl)
   if (!popup) {
