@@ -19,8 +19,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   onClose,
   position
 }) => {
-  // Group models by category
-  const groupedModels = models.reduce((acc, model) => {
+  // Filter models to only show those the user has access to
+  const accessibleModels = models.filter(model => modelAccess.checkAccess(model.id))
+
+  // Group accessible models by category
+  const groupedModels = accessibleModels.reduce((acc, model) => {
     if (!acc[model.category]) acc[model.category] = []
     acc[model.category].push(model)
     return acc
@@ -45,24 +48,20 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               {category}
             </div>
             {categoryModels.map(model => {
-              const hasAccess = modelAccess.checkAccess(model.id)
               const isSelected = model.id === selectedModelId
 
               return (
                 <div
                   key={model.id}
-                  className={`d-flex align-items-center p-2 ${
-                    hasAccess ? 'cursor-pointer hover-bg-secondary' : 'opacity-50'
-                  } ${isSelected ? 'bg-secondary' : ''}`}
-                  onClick={() => hasAccess && onSelect(model.id)}
-                  style={{ cursor: hasAccess ? 'pointer' : 'not-allowed' }}
+                  className={`d-flex align-items-center p-2 cursor-pointer hover-bg-secondary ${
+                    isSelected ? 'bg-secondary' : ''
+                  }`}
+                  onClick={() => onSelect(model.id)}
+                  style={{ cursor: 'pointer' }}
                 >
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center">
                       <span className="fw-bold">{model.name}</span>
-                      {!hasAccess && (
-                        <i className="fa fa-lock ms-2 text-warning" />
-                      )}
                       {isSelected && (
                         <i className="fa fa-check ms-2 text-success" />
                       )}
@@ -78,13 +77,14 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         ))}
       </div>
 
-      {/* Upgrade prompt for locked models */}
-      <div className="border-top p-2 text-center">
-        <small className="text-secondary">
-          <i className="fa fa-lock me-1" />
-          Premium models require authentication
-        </small>
-      </div>
+      {/* Info footer */}
+      {accessibleModels.length > 0 && (
+        <div className="border-top p-2 text-center">
+          <small className="text-secondary">
+            {accessibleModels.length} model{accessibleModels.length !== 1 ? 's' : ''} available
+          </small>
+        </div>
+      )}
     </div>
   )
 }

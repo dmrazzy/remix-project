@@ -274,13 +274,16 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   useEffect(() => {
     const handleAuthChange = async (authState: { isAuthenticated: boolean; user: any; token: string | null }) => {
       // Refresh model access permissions
+      console.log('calling modelaccess')
       await modelAccess.refreshAccess()
 
       // If user logged out, revert to default model
+      console.log('user is logged in', authState)
       if (!authState.isAuthenticated) {
         const defaultModel = getDefaultModel()
         setSelectedModelId(defaultModel.id)
         setSelectedModel(defaultModel)
+        console.log("Setting default model user not authenticated", defaultModel.id)
         await props.plugin.call('remixAI', 'setModel', defaultModel.id)
       }
     }
@@ -289,7 +292,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     return () => {
       props.plugin.off('auth', 'authStateChanged')
     }
-  }, [props.plugin, modelAccess])
+  }, [props.plugin])
 
   // bubble messages up to parent
   useEffect(() => {
@@ -965,13 +968,26 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               setChoice={handleModelSelection}
               setShowOptions={setShowModelSelector}
               choice={selectedModelId}
-              groupList={AVAILABLE_MODELS.map(model => ({
-                label: model.name,
-                bodyText: model.description,
-                icon: 'fa-solid fa-check',
-                stateValue: model.id,
-                dataId: `ai-model-${model.id.replace(/[^a-zA-Z0-9]/g, '-')}`
-              }))}
+              groupList={AVAILABLE_MODELS
+                .filter(model => {
+                  // Check if user is logged in by checking for token
+                  const isLoggedIn = !!localStorage.getItem('remix_access_token')
+
+                  // If not logged in, only show models that don't require auth
+                  if (!isLoggedIn) {
+                    return !model.requiresAuth
+                  }
+
+                  // If logged in, only show models the user has access to
+                  return modelAccess.checkAccess(model.id)
+                })
+                .map(model => ({
+                  label: model.name,
+                  bodyText: model.description,
+                  icon: 'fa-solid fa-check',
+                  stateValue: model.id,
+                  dataId: `ai-model-${model.id.replace(/[^a-zA-Z0-9]/g, '-')}`
+                }))}
             />
             {mcpEnabled && (
               <div className="border-top mt-2 pt-2">

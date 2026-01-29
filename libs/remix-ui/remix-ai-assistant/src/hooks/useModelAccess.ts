@@ -23,15 +23,53 @@ export function useModelAccess(): ModelAccess {
       const token = localStorage.getItem('remix_access_token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
 
-      const response = await fetch(`${endpointUrls.sso}/accounts`, {
+      const response = await fetch(`${endpointUrls.permissions}`, {
         credentials: 'include',
         headers
       })
       if (response.ok) {
-        // allow users to have access to all models
-        setAllowedModels(AVAILABLE_MODELS.map(m => m.id) || [])
+        const data = await response.json()
+        console.log('Permission response:', data)
+
+        // Parse enabled AI features from backend response
+        const enabledProviders = new Set<string>()
+
+        if (data.features) {
+          // Check each AI feature and map to provider
+          if (data.features['ai:Anthropic']?.is_enabled) {
+            enabledProviders.add('anthropic')
+          }
+          if (data.features['ai:OpenAI']?.is_enabled) {
+            enabledProviders.add('openai')
+          }
+          if (data.features['ai:Mistral']?.is_enabled) {
+            enabledProviders.add('mistralai')
+          }
+        }
+
+        // Start with default model and ollama (always available)
+        const defaultModel = getDefaultModel()
+        const allowedModelIds: string[] = [defaultModel.id, 'ollama']
+
+        // Add models from API-enabled providers
+        AVAILABLE_MODELS.forEach(model => {
+          // Skip if already added (default or ollama)
+          if (allowedModelIds.includes(model.id)) {
+            return
+          }
+
+          // Only add models from enabled providers
+          if (model.requiresAuth && enabledProviders.has(model.provider)) {
+            allowedModelIds.push(model.id)
+          }
+        })
+
+        console.log('Enabled providers:', Array.from(enabledProviders))
+        console.log('Allowed models:', allowedModelIds)
+
+        setAllowedModels(allowedModelIds)
       } else {
-        // Fallback to default model only
+        // Fallback to default model and ollama only
         const defaultModel = getDefaultModel()
         setAllowedModels([defaultModel.id, 'ollama'])
       }
@@ -50,6 +88,8 @@ export function useModelAccess(): ModelAccess {
   }, [])
 
   const checkAccess = (modelId: string) => {
+    console.log('checking  model access', allowedModels)
+
     return allowedModels.includes(modelId)
   }
 
