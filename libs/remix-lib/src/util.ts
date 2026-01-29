@@ -133,7 +133,7 @@ export function findClosestIndex (target, array): number {
   console.log('findClosestIndex', target, array, index)
   if (index < 0) {
     return 0
-  } else if (index >= array.length - 1) {   
+  } else if (index >= array.length - 1) {
     return array.length - 1
   } else {
     const middle = (array[index] + array[index + 1]) / 2
