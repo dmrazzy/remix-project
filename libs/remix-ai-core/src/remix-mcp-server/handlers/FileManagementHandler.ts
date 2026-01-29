@@ -118,14 +118,22 @@ export class FileWriteHandler extends BaseToolHandler {
 
   async execute(args: FileWriteArgs, plugin: Plugin): Promise<IMCPToolResult> {
     try {
-      // Write the file directly to ensure it's persisted
-      await plugin.call('fileManager', 'writeFile', args.path, args.content);
+      const exists = await plugin.call('fileManager', 'exists', args.path)
+      try {
+        if (!exists) {await plugin.call('fileManager', 'writeFile', args.path, "")}
+        await plugin.call('fileManager', 'open', args.path)
+      } catch (openError) {
+        console.warn(`Failed to open file in editor: ${openError.message}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      const cleanContent = typeof args.content === 'string' ? args.content : String(args.content)
+      await plugin.call('editor', 'showCustomDiff', args.path, cleanContent)
 
       const result: FileOperationResult = {
         success: true,
         path: args.path,
         message: 'File written successfully',
-        size: args.content.length,
         lastModified: new Date().toISOString()
       };
 
@@ -196,8 +204,12 @@ export class FileCreateHandler extends BaseToolHandler {
       if (args.type === 'directory') {
         await plugin.call('fileManager', 'mkdir', args.path);
       } else {
-        // Write the file directly with content to ensure it's persisted
-        await plugin.call('fileManager', 'writeFile', args.path, args.content || '');
+        await plugin.call('fileManager', 'writeFile', args.path, '');
+        await plugin.call('fileManager', 'open', args.path)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        const cleanContent = typeof args.content === 'string' ? args.content : String(args.content || '')
+        await plugin.call('editor', 'showCustomDiff', args.path, cleanContent)
       }
 
       const result: FileOperationResult = {

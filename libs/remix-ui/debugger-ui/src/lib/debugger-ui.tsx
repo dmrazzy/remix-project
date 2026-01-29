@@ -187,7 +187,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             return { ...prevState, sourceLocationStatus: '' }
           })
           await debuggerModule.discardHighlight()
-          await debuggerModule.highlight(lineColumnPos, path, rawLocation, stepDetail, lineGasCost, mainContract)
+          const currentStep = debuggerInstance && debuggerInstance.step_manager ? debuggerInstance.step_manager.currentStepIndex : undefined
+          await debuggerModule.highlight(lineColumnPos, path, rawLocation, stepDetail, lineGasCost, mainContract, currentStep)
         }
       }
     })

@@ -7,8 +7,8 @@ import getOpcodes from '../code/opcodes'
  */
 type OpcodeInfo = {
   name: string
-  in: number   // Number of items popped from stack
-  out: number  // Number of items pushed to stack
+  in: number // Number of items popped from stack
+  out: number // Number of items pushed to stack
 }
 
 /**
@@ -89,7 +89,7 @@ export function getOpcodeInfo(opcodeName: string): OpcodeInfo {
 /**
  * Handles DUP operations (DUP1-DUP16)
  * DUPn duplicates the nth stack item from the top
- * 
+ *
  * Note: DUP creates a copy/reference, not a duplicate variable declaration.
  * Only the original slot should maintain variable identity.
  *
@@ -197,8 +197,8 @@ function handleMLoad(
 
     // Push the loaded value, preserving information about what memory address it came from
     const loadedSlot: SymbolicStackSlot = {
-      kind: addressSlot.kind === 'variable' || addressSlot.kind === 'parameter' 
-        ? addressSlot.kind 
+      kind: addressSlot.kind === 'variable' || addressSlot.kind === 'parameter'
+        ? addressSlot.kind
         : 'intermediate',
       originStep: step,
       originOp: 'MLOAD',

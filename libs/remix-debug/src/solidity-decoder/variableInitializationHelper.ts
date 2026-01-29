@@ -95,9 +95,9 @@ export async function findSafeStepForVariable(
 
   try {
     for (let step = declarationStep + 1;
-         step < tree.traceManager.trace.length &&
+      step < tree.traceManager.trace.length &&
          step <= declarationStep + maxLookAhead;
-         step++) {
+      step++) {
       try {
         const nextSourceLocation = await tree.extractSourceLocation(step, address)
 
@@ -133,40 +133,39 @@ export async function findSafeStepForVariable(
  *
  * @param {Object} tree - InternalCallTree instance
  * @param {number} declarationStep - VM trace step where variable was declared
- * @param {number} stackDepth - Stack depth where variable value is stored
+ * @param {number} stackIndex - Stack index where variable value is stored
  * @param {number} maxLookAhead - Maximum steps to look ahead (default 10)
  * @returns {number} VM trace step at which stack value stabilized
  */
 export function findSafeStepByStackStability(
   tree: any,
   declarationStep: number,
-  stackDepth: number,
+  stackIndex: number,
   maxLookAhead: number = 10
 ): number {
   try {
     // Get the initial stack value at the declaration step
     const initialStack = tree.traceManager.getStackAt(declarationStep)
-    if (stackDepth >= initialStack.length) {
-      return declarationStep // Invalid stack depth
+    if (stackIndex >= initialStack.length) {
+      return declarationStep // Invalid stack index
     }
 
     let lastChangedStep = declarationStep
-    let previousValue = initialStack[initialStack.length - 1 - stackDepth]
+    let previousValue = initialStack[stackIndex]
 
     for (let step = declarationStep + 1;
-         step <= declarationStep + maxLookAhead &&
+      step <= declarationStep + maxLookAhead &&
          step < tree.traceManager.trace.length;
-         step++) {
+      step++) {
       try {
         const currentStack = tree.traceManager.getStackAt(step)
 
         // Stack depth might change due to pushes/pops
-        if (stackDepth >= currentStack.length) {
+        if (stackIndex >= currentStack.length) {
           continue
         }
 
-        const currentValue = currentStack[currentStack.length - 1 - stackDepth]
-
+        const currentValue = currentStack[stackIndex]
         if (currentValue !== previousValue) {
           lastChangedStep = step
           previousValue = currentValue

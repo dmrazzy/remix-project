@@ -56,7 +56,7 @@ export class ValueType {
   /**
     * decode the type with the @arg offset location from the memory
     *
-    * @param {Int} stackDepth - position of the type in the stack
+    * @param {Int} stackIndex - position of the type in the stack
     * @return {String} - memory
     * @return {Object} - decoded value
     */
