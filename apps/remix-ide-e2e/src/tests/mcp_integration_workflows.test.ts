@@ -51,6 +51,23 @@ module.exports = {
     init(browser, done, 'http://127.0.0.1:8080/#experimental=true', true, undefined, true, true)
   },
 
+  'Setup: Clear any existing file permissions': function (browser: NightwatchBrowser) {
+    browser
+      .waitForElementVisible('*[data-id="remix-ai-assistant"]')
+      .execute(function () {
+        // Clear config to ensure modal appears on first write
+        localStorage.removeItem('remix.config.json');
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin) {
+          aiPlugin.call('fileManager', 'remove', 'remix.config.json');
+          if (aiPlugin.remixMCPServer) {
+            aiPlugin.remixMCPServer.reloadConfig();
+          }
+        }
+      })
+      .pause(500);
+  },
+
   /**
    * WORKFLOW 1: Complete contract development lifecycle
    * Write → Compile → Deploy → Interact → Debug
@@ -58,7 +75,40 @@ module.exports = {
   'Should complete full contract development workflow': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="remix-ai-assistant"]')
-      .executeAsync(function (workflowContract, done) {
+      // Step 1: Write contract - this will show the permission modal
+      .execute(function (workflowContract) {
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin && aiPlugin.remixMCPServer) {
+          aiPlugin.remixMCPServer.handleMessage({
+            method: 'tools/call',
+            params: {
+              name: 'file_write',
+              arguments: {
+                path: 'workflows/Counter.sol',
+                content: workflowContract
+              }
+            },
+            id: 'workflow-write'
+          });
+        }
+      }, [workflowContract])
+      .pause(500)
+      // Handle permission modal - First modal: Allow/Deny
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 10000)
+      .modalFooterOKClick("mcp_file_write_permission_initial") // Click "Allow"
+      .pause(500)
+      // Second modal: Just This File / All Files in Project
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 10000)
+      .modalFooterCancelClick("mcp_file_write_permission_scope") // Click "All Files in Project"
+      .pause(500)
+      // Third modal: Accept All confirmation
+      .useXpath()
+      .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
+      .click('//button[contains(text(), "Accept All")]')
+      .useCss()
+      .pause(1000)
+      // Now continue with the rest of the workflow
+      .executeAsync(function (done) {
         const aiPlugin = (window as any).getRemixAIPlugin;
         if (!aiPlugin?.remixMCPServer) {
           done({ error: 'RemixMCPServer not available' });
@@ -72,31 +122,16 @@ module.exports = {
           transactionHash: null
         };
 
-        // Step 1: Write contract
+        // Step 2: Compile contract
         aiPlugin.remixMCPServer.handleMessage({
           method: 'tools/call',
           params: {
-            name: 'file_write',
+            name: 'solidity_compile',
             arguments: {
-              path: workflow.contractPath,
-              content: workflowContract
+              files: [workflow.contractPath]
             }
           },
-          id: 'workflow-write'
-        }).then(function (writeResult) {
-          if (writeResult.error) throw new Error('Write failed: ' + writeResult.error.message);
-
-          // Step 2: Compile contract
-          return aiPlugin.remixMCPServer.handleMessage({
-            method: 'tools/call',
-            params: {
-              name: 'solidity_compile',
-              arguments: {
-                files: [workflow.contractPath]
-              }
-            },
-            id: 'workflow-compile'
-          });
+          id: 'workflow-compile'
         }).then(function (compileResult) {
           if (compileResult.error) throw new Error('Compile failed: ' + compileResult.error.message);
 
@@ -175,7 +210,7 @@ module.exports = {
             workflowCompleted: false
           });
         });
-      }, [workflowContract], function (result) {
+      }, [], function (result) {
         const data = result.value as any;
         if (data.error) {
           console.error('Full workflow error:', data.error);
@@ -218,6 +253,7 @@ module.exports = {
           },
           id: 'explore-list'
         }).then(function (listResult) {
+          if (listResult.error) throw new Error('Directory list failed: ' + (listResult.error.message || JSON.stringify(listResult.error)));
           const listData = JSON.parse(listResult.result?.content?.[0]?.text || '{}');
           exploration.files = listData.files || [];
 
@@ -230,6 +266,8 @@ module.exports = {
             id: 'explore-structure'
           });
         }).then(function (structureResult) {
+          if (structureResult.error) throw new Error('Structure read failed: ' + (structureResult.error.message || JSON.stringify(structureResult.error)));
+
           // Step 3: Get compilation results
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'resources/read',
@@ -239,6 +277,8 @@ module.exports = {
             id: 'explore-contracts'
           });
         }).then(function (contractsResult) {
+          if (contractsResult.error) throw new Error('Contracts read failed: ' + (contractsResult.error.message || JSON.stringify(contractsResult.error)));
+
           // Step 4: List all available resources
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'resources/list',
@@ -246,6 +286,7 @@ module.exports = {
             id: 'explore-resources'
           });
         }).then(function (resourcesResult) {
+          if (resourcesResult.error) throw new Error('Resources list failed: ' + (resourcesResult.error.message || JSON.stringify(resourcesResult.error)));
           exploration.resources = resourcesResult.result?.resources || [];
 
           // Step 5: Get compiler config
@@ -258,6 +299,7 @@ module.exports = {
             id: 'explore-compiler-config'
           });
         }).then(function (configResult) {
+          if (configResult.error) throw new Error('Compiler config failed: ' + (configResult.error.message || JSON.stringify(configResult.error)));
           const configData = JSON.parse(configResult.result?.content?.[0]?.text || '{}');
 
           done({
@@ -315,6 +357,8 @@ module.exports = {
           },
           id: 'env-set-environment'
         }).then(function (envResult) {
+          if (envResult.error) throw new Error('Set environment failed: ' + (envResult.error.message || JSON.stringify(envResult.error)));
+
           // Step 2: Get user accounts
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
@@ -325,6 +369,7 @@ module.exports = {
             id: 'env-get-accounts'
           });
         }).then(function (accountsResult) {
+          if (accountsResult.error) throw new Error('Get accounts failed: ' + (accountsResult.error.message || JSON.stringify(accountsResult.error)));
           const accountsData = JSON.parse(accountsResult.result?.content?.[0]?.text || '{}');
           envWorkflow.accounts = accountsData.accounts || [];
           envWorkflow.selectedAccount = envWorkflow.accounts[0];
@@ -341,6 +386,8 @@ module.exports = {
             id: 'env-set-account'
           });
         }).then(function (setAccountResult) {
+          if (setAccountResult.error) throw new Error('Set account failed: ' + (setAccountResult.error.message || JSON.stringify(setAccountResult.error)));
+
           // Step 4: Get account balance
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
@@ -353,6 +400,7 @@ module.exports = {
             id: 'env-get-balance'
           });
         }).then(function (balanceResult) {
+          if (balanceResult.error) throw new Error('Get balance failed: ' + (balanceResult.error.message || JSON.stringify(balanceResult.error)));
           const balanceData = JSON.parse(balanceResult.result?.content?.[0]?.text || '{}');
 
           // Step 5: Get current environment
@@ -365,6 +413,7 @@ module.exports = {
             id: 'env-get-current'
           });
         }).then(function (currentEnvResult) {
+          if (currentEnvResult.error) throw new Error('Get current environment failed: ' + (currentEnvResult.error.message || JSON.stringify(currentEnvResult.error)));
           const currentEnvData = JSON.parse(currentEnvResult.result?.content?.[0]?.text || '{}');
 
           // Step 6: Get deployed contracts
@@ -377,6 +426,7 @@ module.exports = {
             id: 'env-get-deployed'
           });
         }).then(function (deployedResult) {
+          if (deployedResult.error) throw new Error('Get deployed contracts failed: ' + (deployedResult.error.message || JSON.stringify(deployedResult.error)));
           const deployedData = JSON.parse(deployedResult.result?.content?.[0]?.text || '{}');
           envWorkflow.deployedContracts = deployedData.contracts || [];
 
@@ -434,6 +484,7 @@ module.exports = {
           },
           id: 'filemgmt-create'
         }).then(function (createResult) {
+          if (createResult.error) throw new Error('Create file failed: ' + (createResult.error.message || JSON.stringify(createResult.error)));
           steps.push('create');
 
           // Step 2: Copy file
@@ -449,6 +500,7 @@ module.exports = {
             id: 'filemgmt-copy'
           });
         }).then(function (copyResult) {
+          if (copyResult.error) throw new Error('Copy file failed: ' + (copyResult.error.message || JSON.stringify(copyResult.error)));
           steps.push('copy');
 
           // Step 3: Read copied file
@@ -463,6 +515,7 @@ module.exports = {
             id: 'filemgmt-read'
           });
         }).then(function (readResult) {
+          if (readResult.error) throw new Error('Read file failed: ' + (readResult.error.message || JSON.stringify(readResult.error)));
           steps.push('read');
 
           // Step 4: Move file
@@ -478,6 +531,7 @@ module.exports = {
             id: 'filemgmt-move'
           });
         }).then(function (moveResult) {
+          if (moveResult.error) throw new Error('Move file failed: ' + (moveResult.error.message || JSON.stringify(moveResult.error)));
           steps.push('move');
 
           // Step 5: List directory
@@ -492,6 +546,7 @@ module.exports = {
             id: 'filemgmt-list'
           });
         }).then(function (listResult) {
+          if (listResult.error) throw new Error('List directory failed: ' + (listResult.error.message || JSON.stringify(listResult.error)));
           steps.push('list');
           const listData = JSON.parse(listResult.result?.content?.[0]?.text || '{}');
 
@@ -572,6 +627,8 @@ module.exports = {
           },
           id: 'multicomp-config'
         }).then(function (configResult) {
+          if (configResult.error) throw new Error('Set compiler config failed: ' + (configResult.error.message || JSON.stringify(configResult.error)));
+
           // Step 2: Write first contract
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
@@ -584,7 +641,9 @@ module.exports = {
             },
             id: 'multicomp-write1'
           });
-        }).then(function () {
+        }).then(function (write1Result) {
+          if (write1Result.error) throw new Error('Write ContractA failed: ' + (write1Result.error.message || JSON.stringify(write1Result.error)));
+
           // Step 3: Write second contract
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
@@ -597,7 +656,9 @@ module.exports = {
             },
             id: 'multicomp-write2'
           });
-        }).then(function () {
+        }).then(function (write2Result) {
+          if (write2Result.error) throw new Error('Write ContractB failed: ' + (write2Result.error.message || JSON.stringify(write2Result.error)));
+
           // Step 4: Compile both contracts
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
@@ -610,6 +671,7 @@ module.exports = {
             id: 'multicomp-compile'
           });
         }).then(function (compileResult) {
+          if (compileResult.error) throw new Error('Compile failed: ' + (compileResult.error.message || JSON.stringify(compileResult.error)));
           const compileData = JSON.parse(compileResult.result?.content?.[0]?.text || '{}');
 
           // Step 5: Get compilation result
@@ -622,6 +684,7 @@ module.exports = {
             id: 'multicomp-get-result'
           });
         }).then(function (resultData) {
+          if (resultData.error) throw new Error('Get compilation result failed: ' + (resultData.error.message || JSON.stringify(resultData.error)));
           const result = JSON.parse(resultData.result?.content?.[0]?.text || '{}');
 
           // Step 6: Read compilation resources

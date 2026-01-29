@@ -13,12 +13,62 @@ module.exports = {
     init(browser, done, 'http://127.0.0.1:8080/#experimental=true', true, undefined, true, true)
   },
 
+  'Setup: Clear any existing file permissions': function (browser: NightwatchBrowser) {
+    browser
+      .waitForElementVisible('*[data-id="remix-ai-assistant"]')
+      .execute(function () {
+        // Clear config to ensure modal appears on first write
+        localStorage.removeItem('remix.config.json');
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin) {
+          aiPlugin.call('fileManager', 'remove', 'remix.config.json');
+          if (aiPlugin.remixMCPServer) {
+            aiPlugin.remixMCPServer.reloadConfig();
+          }
+        }
+      })
+      .pause(500);
+  },
+
   /**
    * PERMISSION VALIDATION TESTS
    */
   'Should test permission-based access control': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="remix-ai-assistant"]')
+      // First create a test file - this will show the permission modal
+      .execute(function () {
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin && aiPlugin.remixMCPServer) {
+          aiPlugin.remixMCPServer.handleMessage({
+            method: 'tools/call',
+            params: {
+              name: 'file_write',
+              arguments: {
+                path: 'test_permission.txt',
+                content: 'test content for permission check'
+              }
+            },
+            id: 'test-permission-setup'
+          });
+        }
+      })
+      .pause(500)
+      // Handle permission modal - First modal: Allow/Deny
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 10000)
+      .modalFooterOKClick("mcp_file_write_permission_initial") // Click "Allow"
+      .pause(500)
+      // Second modal: Just This File / All Files in Project
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 10000)
+      .modalFooterCancelClick("mcp_file_write_permission_scope") // Click "All Files in Project"
+      .pause(500)
+      // Third modal: Accept All confirmation
+      .useXpath()
+      .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
+      .click('//button[contains(text(), "Accept All")]')
+      .useCss()
+      .pause(1000)
+      // Now test file read permission
       .executeAsync(function (done) {
         const aiPlugin = (window as any).getRemixAIPlugin;
         if (!aiPlugin?.remixMCPServer) {
@@ -26,19 +76,17 @@ module.exports = {
           return;
         }
 
-        // First create a test file
+        // Test file read permission (should succeed with default permissions)
         aiPlugin.remixMCPServer.handleMessage({
           method: 'tools/call',
           params: {
-            name: 'file_write',
+            name: 'file_read',
             arguments: {
-              path: 'test_permission.txt',
-              content: 'test content for permission check'
+              path: 'test_permission.txt'
             }
           },
-          id: 'test-permission-setup'
-        }).then(function () {
-          // Then test file read permission (should succeed with default permissions)
+          id: 'test-permission-read'
+        }).then(function (result) {
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
             params: {

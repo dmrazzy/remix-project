@@ -76,50 +76,83 @@ module.exports = {
     init(browser, done, 'http://127.0.0.1:8080/#experimental=true', true, undefined, true, true)
   },
 
+  'Setup: Clear any existing file permissions': function (browser: NightwatchBrowser) {
+    browser
+      .waitForElementVisible('*[data-id="remix-ai-assistant"]')
+      .execute(function () {
+        // Clear config to ensure modal appears on first write
+        localStorage.removeItem('remix.config.json');
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin) {
+          aiPlugin.call('fileManager', 'remove', 'remix.config.json');
+          if (aiPlugin.remixMCPServer) {
+            aiPlugin.remixMCPServer.reloadConfig();
+          }
+        }
+      })
+      .pause(500);
+  },
+
   'Should prepare debug contract for testing': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="remix-ai-assistant"]')
-      .executeAsync(function (debugContract, done) {
+      // Trigger file write - this will show the permission modal
+      .execute(function (debugContract) {
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin && aiPlugin.remixMCPServer) {
+          aiPlugin.remixMCPServer.handleMessage({
+            method: 'tools/call',
+            params: {
+              name: 'file_write',
+              arguments: {
+                path: 'contracts/DebugTest.sol',
+                content: debugContract
+              }
+            },
+            id: 'test-write-debug-contract'
+          });
+        }
+      }, [debugContract])
+      .pause(500)
+      // Handle permission modal - First modal: Allow/Deny
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 10000)
+      .modalFooterOKClick("mcp_file_write_permission_initial") // Click "Allow"
+      .pause(500)
+      // Second modal: Just This File / All Files in Project
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 10000)
+      .modalFooterCancelClick("mcp_file_write_permission_scope") // Click "All Files in Project"
+      .pause(500)
+      // Third modal: Accept All confirmation
+      .useXpath()
+      .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
+      .click('//button[contains(text(), "Accept All")]')
+      .useCss()
+      .pause(1000)
+      // Now compile and deploy the contract
+      .executeAsync(function (done) {
         const aiPlugin = (window as any).getRemixAIPlugin;
         if (!aiPlugin?.remixMCPServer) {
           done({ error: 'RemixMCPServer not available' });
           return;
         }
-
-        // Write contract
+        console.log('compiling contract')
+        // Compile contract
         aiPlugin.remixMCPServer.handleMessage({
           method: 'tools/call',
           params: {
-            name: 'file_write',
+            name: 'solidity_compile',
             arguments: {
-              path: 'contracts/DebugTest.sol',
-              content: debugContract
+              file: 'contracts/DebugTest.sol'
             }
           },
-          id: 'test-write-debug-contract'
-        }).then(function () {
-          // Wait for UI to process the file write
-          return new Promise(function (resolve) {
-            setTimeout(resolve, 2000);
-          });
-        }).then(function () {
-          // Compile contract
-          return aiPlugin.remixMCPServer.handleMessage({
-            method: 'tools/call',
-            params: {
-              name: 'solidity_compile',
-              arguments: {
-                file: 'contracts/DebugTest.sol'
-              }
-            },
-            id: 'test-compile-debug-contract'
-          });
+          id: 'test-compile-debug-contract'
         }).then(function () {
           // Wait for UI to process the compilation
           return new Promise(function (resolve) {
             setTimeout(resolve, 2000);
           });
         }).then(function () {
+          console.log('deploying contract')
           // Deploy contract
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
@@ -150,7 +183,7 @@ module.exports = {
         }).catch(function (error) {
           done({ error: error.message });
         });
-      }, [debugContract], function (result) {
+      }, [], function (result) {
         const data = result.value as any;
         if (!data || data.error) {
           console.error('Prepare debug contract error:', data?.error || 'No data returned');
@@ -193,7 +226,7 @@ module.exports = {
           return new Promise(function (resolve) {
             setTimeout(function () {
               resolve(debugContract);
-            }, 2000);
+            }, 1000);
           });
         }).then(function (debugContract: any) {
           // Execute transaction to debug
@@ -711,7 +744,7 @@ module.exports = {
           params: {
             name: 'jump_to',
             arguments: {
-              step: 3
+              step: 165
             }
           },
           id: 'test-jump-to'
@@ -761,8 +794,8 @@ module.exports = {
           params: {
             name: 'decode_local_variable',
             arguments: {
-              variableId: 0,
-              stepIndex: 5
+              variableId: 81,
+              stepIndex: 165
             }
           },
           id: 'test-decode-local-var'
@@ -811,8 +844,8 @@ module.exports = {
           params: {
             name: 'decode_state_variable',
             arguments: {
-              variableId: 0,
-              stepIndex: 5
+              variableId: 3,
+              stepIndex: 165
             }
           },
           id: 'test-decode-state-var'

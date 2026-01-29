@@ -12,47 +12,80 @@ module.exports = {
     init(browser, done, 'http://127.0.0.1:8080/#experimental=true', true, undefined, true, true)
   },
 
+  'Setup: Clear any existing file permissions': function (browser: NightwatchBrowser) {
+    browser
+      .waitForElementVisible('*[data-id="remix-ai-assistant"]')
+      .execute(function () {
+        // Clear config to ensure modal appears on first write
+        localStorage.removeItem('remix.config.json');
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin) {
+          aiPlugin.call('fileManager', 'remove', 'remix.config.json');
+          if (aiPlugin.remixMCPServer) {
+            aiPlugin.remixMCPServer.reloadConfig();
+          }
+        }
+      })
+      .pause(500);
+  },
+
   'Should test file_write tool': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="remix-ai-assistant"]')
+      // Trigger file write - this will show the permission modal
+      .execute(function () {
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin && aiPlugin.remixMCPServer) {
+          aiPlugin.remixMCPServer.handleMessage({
+            method: 'tools/call',
+            params: {
+              name: 'file_write',
+              arguments: {
+                path: 'test_mcp/write_test.sol',
+                content: '// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract WriteTest {}'
+              }
+            },
+            id: 'test-file-write'
+          });
+        }
+      })
+      .pause(500)
+      // Handle permission modal - First modal: Allow/Deny
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 10000)
+      .modalFooterOKClick("mcp_file_write_permission_initial") // Click "Allow"
+      .pause(500)
+      // Second modal: Just This File / All Files in Project
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 10000)
+      .modalFooterCancelClick("mcp_file_write_permission_scope") // Click "All Files in Project"
+      .pause(500)
+      // Third modal: Accept All confirmation
+      .useXpath()
+      .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
+      .click('//button[contains(text(), "Accept All")]')
+      .useCss()
+      .pause(1000)
+      // Now verify the file was written
       .executeAsync(function (done) {
         const aiPlugin = (window as any).getRemixAIPlugin;
-        if (!aiPlugin?.remixMCPServer) {
-          done({ error: 'RemixMCPServer not available' });
+        if (!aiPlugin) {
+          done({ error: 'AI Plugin not available' });
           return;
         }
 
-        aiPlugin.remixMCPServer.handleMessage({
-          method: 'tools/call',
-          params: {
-            name: 'file_write',
-            arguments: {
-              path: 'test_mcp/write_test.sol',
-              content: '// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract WriteTest {}'
-            }
-          },
-          id: 'test-file-write'
-        }).then(function (result) {
-          let resultData = null;
-          if (!result.error && result.result?.content?.[0]?.text) {
-            resultData = JSON.parse(result.result.content[0].text);
-          }
-
-          // Wait briefly for file system to process
-          return new Promise(function (resolve) {
-            setTimeout(function () {
-              resolve({
-                success: !result.error,
-                hasResult: !!resultData,
-                writeSuccess: resultData?.success || false,
-                path: resultData?.path || null,
-                errorMessage: result.error?.message || null
+        aiPlugin.call('fileManager', 'exists', 'test_mcp/write_test.sol').then(function (exists: boolean) {
+          if (exists) {
+            return aiPlugin.call('fileManager', 'readFile', 'test_mcp/write_test.sol').then(function (content: string) {
+              done({
+                success: true,
+                writeSuccess: true,
+                path: 'test_mcp/write_test.sol',
+                contentMatches: content.includes('contract WriteTest')
               });
-            }, 500);
-          });
-        }).then(function (data: any) {
-          done(data);
-        }).catch(function (error) {
+            });
+          } else {
+            done({ success: false, error: 'File was not created' });
+          }
+        }).catch(function (error: any) {
           done({ error: error.message });
         });
       }, [], function (result) {

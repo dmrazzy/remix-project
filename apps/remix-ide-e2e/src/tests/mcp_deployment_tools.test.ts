@@ -45,6 +45,23 @@ module.exports = {
     init(browser, done, 'http://127.0.0.1:8080/#experimental=true', true, undefined, true, true)
   },
 
+  'Setup: Clear any existing file permissions': function (browser: NightwatchBrowser) {
+    browser
+      .waitForElementVisible('*[data-id="remix-ai-assistant"]')
+      .execute(function () {
+        // Clear config to ensure modal appears on first write
+        localStorage.removeItem('remix.config.json');
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin) {
+          aiPlugin.call('fileManager', 'remove', 'remix.config.json');
+          if (aiPlugin.remixMCPServer) {
+            aiPlugin.remixMCPServer.reloadConfig();
+          }
+        }
+      })
+      .pause(500);
+  },
+
   'Should test get_current_environment tool': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="remix-ai-assistant"]')
@@ -293,36 +310,57 @@ module.exports = {
 
   'Should test deploy_contract tool': function (browser: NightwatchBrowser) {
     browser
-      .executeAsync(function (deploymentContract, done) {
+      .waitForElementVisible('*[data-id="remix-ai-assistant"]')
+      // Trigger file write - this will show the permission modal
+      .execute(function (deploymentContract) {
+        const aiPlugin = (window as any).getRemixAIPlugin;
+        if (aiPlugin && aiPlugin.remixMCPServer) {
+          aiPlugin.remixMCPServer.handleMessage({
+            method: 'tools/call',
+            params: {
+              name: 'file_write',
+              arguments: {
+                path: 'contracts/DeploymentTest.sol',
+                content: deploymentContract
+              }
+            },
+            id: 'test-write-deploy-contract'
+          });
+        }
+      }, [deploymentContract])
+      .pause(500)
+      // Handle permission modal - First modal: Allow/Deny
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 10000)
+      .modalFooterOKClick("mcp_file_write_permission_initial") // Click "Allow"
+      .pause(500)
+      // Second modal: Just This File / All Files in Project
+      .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 10000)
+      .modalFooterCancelClick("mcp_file_write_permission_scope") // Click "All Files in Project"
+      .pause(500)
+      // Third modal: Accept All confirmation
+      .useXpath()
+      .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
+      .click('//button[contains(text(), "Accept All")]')
+      .useCss()
+      .pause(1000)
+      // Now continue with compile and deploy
+      .executeAsync(function (done) {
         const aiPlugin = (window as any).getRemixAIPlugin;
         if (!aiPlugin?.remixMCPServer) {
           done({ error: 'RemixMCPServer not available' });
           return;
         }
 
-        // Write contract
+        // Compile contract
         aiPlugin.remixMCPServer.handleMessage({
           method: 'tools/call',
           params: {
-            name: 'file_write',
+            name: 'solidity_compile',
             arguments: {
-              path: 'contracts/DeploymentTest.sol',
-              content: deploymentContract
+              file: 'contracts/DeploymentTest.sol'
             }
           },
-          id: 'test-write-deploy-contract'
-        }).then(function () {
-          // Compile contract
-          return aiPlugin.remixMCPServer.handleMessage({
-            method: 'tools/call',
-            params: {
-              name: 'solidity_compile',
-              arguments: {
-                file: 'contracts/DeploymentTest.sol'
-              }
-            },
-            id: 'test-compile-for-deploy'
-          });
+          id: 'test-compile-for-deploy'
         }).then(function () {
           return new Promise(function (resolve) {
             setTimeout(resolve, 2000);
@@ -360,7 +398,7 @@ module.exports = {
         }).catch(function (error) {
           done({ error: error.message });
         });
-      }, [deploymentContract], function (result) {
+      }, [], function (result) {
         const data = result.value as any;
         if (data.error) {
           console.error('Deploy contract error:', data.error);

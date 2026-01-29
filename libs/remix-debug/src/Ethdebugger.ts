@@ -200,7 +200,6 @@ export class Ethdebugger {
       const state = await this.decodeStateAt(step, variable)
       return state[variable[0].name]
     }
-    console.log('returning debug state vars null')
     return null
   }
 
