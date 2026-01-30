@@ -379,10 +379,10 @@ export class RemixAIPlugin extends Plugin {
   }
 
   async setModel(modelId: string) {
-    const model = getModelById(modelId)
+    let model = getModelById(modelId)
     if (!model) {
-      console.error(`Unknown model: ${modelId}`)
-      return
+      model = getDefaultModel()
+      modelId = model.id
     }
 
     // Store previous model for comparison
@@ -412,24 +412,45 @@ export class RemixAIPlugin extends Plugin {
       // Ollama requires sub-model selection, use best available for now
       const isAvailable = await isOllamaAvailable();
       if (!isAvailable) {
-        console.error('Ollama is not available. Please ensure Ollama is running.')
-        return
+        console.error('Ollama is not available. Please ensure Ollama is running. Falling back to default model.')
+        const defaultModel = getDefaultModel()
+        model = defaultModel
+        modelId = defaultModel.id
+        this.selectedModelId = modelId
+        this.selectedModel = model
+        GenerationParams.provider = model.provider
+        GenerationParams.model = modelId
+        CompletionParams.provider = model.provider
+        CompletionParams.model = modelId
+        AssistantParams.provider = model.provider
+        AssistantParams.model = modelId
+      } else {
+        const bestModel = await getBestAvailableModel();
+        if (!bestModel) {
+          console.error('No Ollama models available. Falling back to default model.')
+          // Fall back to default model
+          const defaultModel = getDefaultModel()
+          model = defaultModel
+          modelId = defaultModel.id
+          this.selectedModelId = modelId
+          this.selectedModel = model
+          GenerationParams.provider = model.provider
+          GenerationParams.model = modelId
+          CompletionParams.provider = model.provider
+          CompletionParams.model = modelId
+          AssistantParams.provider = model.provider
+          AssistantParams.model = modelId
+        } else {
+          // Switch to Ollama inferencer
+          this.remoteInferencer = new OllamaInferencer(bestModel);
+          this.remoteInferencer.event.on('onInference', () => {
+            this.isInferencing = true
+          })
+          this.remoteInferencer.event.on('onInferenceDone', () => {
+            this.isInferencing = false
+          })
+        }
       }
-
-      const bestModel = await getBestAvailableModel();
-      if (!bestModel) {
-        console.error('No Ollama models available')
-        return
-      }
-
-      // Switch to Ollama inferencer
-      this.remoteInferencer = new OllamaInferencer(bestModel);
-      this.remoteInferencer.event.on('onInference', () => {
-        this.isInferencing = true
-      })
-      this.remoteInferencer.event.on('onInferenceDone', () => {
-        this.isInferencing = false
-      })
     }
 
     // Update MCP inferencer if enabled
