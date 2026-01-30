@@ -119,7 +119,8 @@ module.exports = {
           contractPath: 'workflows/Counter.sol',
           contractName: 'Counter',
           deployedAddress: null,
-          transactionHash: null
+          transactionHash: null,
+          abi: null
         };
 
         // Step 2: Compile contract
@@ -128,12 +129,20 @@ module.exports = {
           params: {
             name: 'solidity_compile',
             arguments: {
-              files: [workflow.contractPath]
+              file: workflow.contractPath
             }
           },
           id: 'workflow-compile'
         }).then(function (compileResult) {
           if (compileResult.error) throw new Error('Compile failed: ' + compileResult.error.message);
+          const compileData = JSON.parse(compileResult.result?.content?.[0]?.text || '{}');
+          // Extract ABI from compilation result
+          const contractKey = Object.keys(compileData.contracts || {}).find(function(key) {
+            return key.includes(workflow.contractName);
+          });
+          if (contractKey) {
+            workflow.abi = compileData.contracts[contractKey].abi;
+          }
 
           // Step 3: Deploy contract
           return aiPlugin.remixMCPServer.handleMessage({
@@ -141,6 +150,7 @@ module.exports = {
             params: {
               name: 'deploy_contract',
               arguments: {
+                file: workflow.contractPath,
                 contractName: workflow.contractName
               }
             },
@@ -149,16 +159,18 @@ module.exports = {
         }).then(function (deployResult) {
           if (deployResult.error) throw new Error('Deploy failed: ' + deployResult.error.message);
           const deployData = JSON.parse(deployResult.result?.content?.[0]?.text || '{}');
-          workflow.deployedAddress = deployData.address;
+          workflow.deployedAddress = deployData.contractAddress;
 
           // Step 4: Call increment function
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
             params: {
-              name: 'send_transaction',
+              name: 'call_contract',
               arguments: {
-                to: workflow.deployedAddress,
-                functionName: 'increment',
+                address: workflow.deployedAddress,
+                abi: workflow.abi,
+                contractName: workflow.contractName,
+                methodName: 'increment',
                 args: []
               }
             },
@@ -175,8 +187,10 @@ module.exports = {
             params: {
               name: 'call_contract',
               arguments: {
-                contractAddress: workflow.deployedAddress,
-                functionName: 'getCount',
+                address: workflow.deployedAddress,
+                abi: workflow.abi,
+                contractName: workflow.contractName,
+                methodName: 'getCount',
                 args: []
               }
             },
@@ -248,7 +262,7 @@ module.exports = {
           params: {
             name: 'directory_list',
             arguments: {
-              path: '.'
+              path: '/'
             }
           },
           id: 'explore-list'
@@ -343,7 +357,8 @@ module.exports = {
           environment: 'vm-cancun',
           accounts: [],
           selectedAccount: null,
-          deployedContracts: []
+          deployedContracts: [],
+          balance:null
         };
 
         // Step 1: Set execution environment
@@ -372,7 +387,7 @@ module.exports = {
           if (accountsResult.error) throw new Error('Get accounts failed: ' + (accountsResult.error.message || JSON.stringify(accountsResult.error)));
           const accountsData = JSON.parse(accountsResult.result?.content?.[0]?.text || '{}');
           envWorkflow.accounts = accountsData.accounts || [];
-          envWorkflow.selectedAccount = envWorkflow.accounts[0];
+          envWorkflow.selectedAccount = envWorkflow.accounts[4]?.address || envWorkflow.accounts[4];
 
           // Step 3: Set selected account
           return aiPlugin.remixMCPServer.handleMessage({
@@ -380,7 +395,7 @@ module.exports = {
             params: {
               name: 'set_selected_account',
               arguments: {
-                account: envWorkflow.selectedAccount
+                address: envWorkflow.selectedAccount
               }
             },
             id: 'env-set-account'
@@ -402,7 +417,7 @@ module.exports = {
         }).then(function (balanceResult) {
           if (balanceResult.error) throw new Error('Get balance failed: ' + (balanceResult.error.message || JSON.stringify(balanceResult.error)));
           const balanceData = JSON.parse(balanceResult.result?.content?.[0]?.text || '{}');
-
+          envWorkflow.balance = balanceData
           // Step 5: Get current environment
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
@@ -413,7 +428,7 @@ module.exports = {
             id: 'env-get-current'
           });
         }).then(function (currentEnvResult) {
-          if (currentEnvResult.error) throw new Error('Get current environment failed: ' + (currentEnvResult.error.message || JSON.stringify(currentEnvResult.error)));
+          if (currentEnvResult.isError) throw new Error('Get current environment failed: ' + (currentEnvResult.error.message || JSON.stringify(currentEnvResult.error)));
           const currentEnvData = JSON.parse(currentEnvResult.result?.content?.[0]?.text || '{}');
 
           // Step 6: Get deployed contracts
@@ -493,8 +508,8 @@ module.exports = {
             params: {
               name: 'file_copy',
               arguments: {
-                source: basePath + '/original.txt',
-                destination: basePath + '/copy.txt'
+                from: basePath + '/original.txt',
+                to: basePath + '/copy.txt'
               }
             },
             id: 'filemgmt-copy'
@@ -524,8 +539,8 @@ module.exports = {
             params: {
               name: 'file_move',
               arguments: {
-                source: basePath + '/copy.txt',
-                destination: basePath + '/moved.txt'
+                from: basePath + '/copy.txt',
+                to: basePath + '/moved.txt'
               }
             },
             id: 'filemgmt-move'
@@ -659,22 +674,36 @@ module.exports = {
         }).then(function (write2Result) {
           if (write2Result.error) throw new Error('Write ContractB failed: ' + (write2Result.error.message || JSON.stringify(write2Result.error)));
 
-          // Step 4: Compile both contracts
+          // Step 4: Compile first contract
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
             params: {
               name: 'solidity_compile',
               arguments: {
-                files: ['multicomp/ContractA.sol', 'multicomp/ContractB.sol']
+                file: 'multicomp/ContractA.sol'
               }
             },
-            id: 'multicomp-compile'
+            id: 'multicomp-compile-a'
+          });
+        }).then(function (compileResultA) {
+          if (compileResultA.error) throw new Error('Compile ContractA failed: ' + (compileResultA.error.message || JSON.stringify(compileResultA.error)));
+
+          // Step 5: Compile second contract
+          return aiPlugin.remixMCPServer.handleMessage({
+            method: 'tools/call',
+            params: {
+              name: 'solidity_compile',
+              arguments: {
+                file: 'multicomp/ContractB.sol'
+              }
+            },
+            id: 'multicomp-compile-b'
           });
         }).then(function (compileResult) {
-          if (compileResult.error) throw new Error('Compile failed: ' + (compileResult.error.message || JSON.stringify(compileResult.error)));
+          if (compileResult.error) throw new Error('Compile ContractB failed: ' + (compileResult.error.message || JSON.stringify(compileResult.error)));
           const compileData = JSON.parse(compileResult.result?.content?.[0]?.text || '{}');
 
-          // Step 5: Get compilation result
+          // Step 6: Get compilation result
           return aiPlugin.remixMCPServer.handleMessage({
             method: 'tools/call',
             params: {
@@ -687,7 +716,7 @@ module.exports = {
           if (resultData.error) throw new Error('Get compilation result failed: ' + (resultData.error.message || JSON.stringify(resultData.error)));
           const result = JSON.parse(resultData.result?.content?.[0]?.text || '{}');
 
-          // Step 6: Read compilation resources
+          // Step 7: Read compilation resources
           return Promise.all([
             aiPlugin.remixMCPServer.handleMessage({
               method: 'resources/read',
