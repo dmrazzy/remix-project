@@ -44,6 +44,7 @@ import { DeploymentResourceProvider } from './providers/DeploymentResourceProvid
 import { TutorialsResourceProvider } from './providers/TutorialsResourceProvider';
 import { AmpResourceProvider } from './providers/AmpResourceProvider';
 import { DebuggingResourceProvider } from './providers/DebuggingResourceProvider';
+import { ContextResourceProvider } from './providers/ContextResourceProvider';
 
 // Import middleware
 import { SecurityMiddleware } from './middleware/SecurityMiddleware';
@@ -860,6 +861,10 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
   private async initializeDefaultResourceProviders(): Promise<void> {
     if (this._resources.list().length > 0) return
     try {
+      // Register context resource provider (always included, highest priority)
+      const contextProvider = new ContextResourceProvider(this._plugin);
+      this._resources.register(contextProvider);
+
       // Register project resource provider
       const projectProvider = new ProjectResourceProvider(this._plugin);
       this._resources.register(projectProvider);
