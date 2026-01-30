@@ -27,16 +27,6 @@ export const AVAILABLE_MODELS: AIModel[] = [
 
   // Premium models (require auth + access)
   {
-    id: 'gpt-4-turbo',
-    name: 'GPT-4 Turbo',
-    provider: 'openai',
-    description: 'Most capable for complex coding',
-    requiresAuth: true,
-    isDefault: false,
-    category: 'coding',
-    capabilities: ['chat', 'code', 'completion']
-  },
-  {
     id: 'gpt-4o',
     name: 'GPT-4o',
     provider: 'openai',
