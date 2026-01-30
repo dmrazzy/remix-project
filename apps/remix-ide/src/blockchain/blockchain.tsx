@@ -370,7 +370,7 @@ export class Blockchain extends Plugin {
       await this.saveDeployedContractStorageLayout(implementationContractObject, address)
       this.events.emit('newProxyDeployment', address, new Date().toISOString(), implementationContractObject.contractName)
       trackMatomoEvent(this, { category: 'blockchain', action: 'deployWithProxy', name: 'Proxy deployment successful', isClick: false })
-      this.call('udapp', 'addInstance', addressToString(address), implementationContractObject.abi, implementationContractObject.name, implementationContractObject)
+      this.call('udappDeployedContracts', 'addInstance', addressToString(address), implementationContractObject.abi, implementationContractObject.name, implementationContractObject)
     } catch (error) {
       const log = logBuilder(error)
 
@@ -407,7 +407,7 @@ export class Blockchain extends Plugin {
       await this.runTx(args)
       await this.saveDeployedContractStorageLayout(newImplementationContractObject, proxyAddress)
       trackMatomoEvent(this, { category: 'blockchain', action: 'upgradeWithProxy', name: 'Upgrade Successful', isClick: false })
-      this.call('udapp', 'addInstance', addressToString(proxyAddress), newImplementationContractObject.abi, newImplementationContractObject.name, newImplementationContractObject)
+      this.call('udappDeployedContracts', 'addInstance', addressToString(proxyAddress), newImplementationContractObject.abi, newImplementationContractObject.name, newImplementationContractObject)
     } catch (error) {
       const log = logBuilder(error)
       trackMatomoEvent(this, { category: 'blockchain', action: 'upgradeWithProxy', name: 'Upgrade failed', isClick: false })

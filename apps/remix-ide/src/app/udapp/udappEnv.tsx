@@ -8,7 +8,7 @@ const profile = {
   name: 'udappEnv',
   displayName: 'Udapp Environment',
   description: 'Maintains the schema for deployment and execution environment',
-  methods: ['getUI', 'getSelectedAccount', 'isSmartAccount', 'getDefaultProvider', 'getPassphrasePrompt', 'getSelectedProvider'],
+  methods: ['getUI', 'getSelectedAccount', 'isSmartAccount', 'getDefaultProvider', 'getPassphrasePrompt', 'getSelectedProvider', 'getNetwork'],
   events: []
 }
 
@@ -61,17 +61,17 @@ export class EnvironmentPlugin extends Plugin {
     return state?.network
   }
 
-  getUI(engine: Engine, blockchain: Blockchain) {
-    this.engine = engine
-    this.blockchain = blockchain
-    return <EnvironmentWidget plugin={this} />
-  }
-
   getPassphrasePrompt(): React.ReactElement {
     return <PassphraseCreationPrompt udappEnv={this} />
   }
 
   setMatchPassphrase(matchPassphrase: string) {
     this.getDispatch()({ type: 'SET_MATCH_PASSPHRASE', payload: matchPassphrase })
+  }
+
+  getUI(engine: Engine, blockchain: Blockchain) {
+    this.engine = engine
+    this.blockchain = blockchain
+    return <EnvironmentWidget plugin={this} />
   }
 }

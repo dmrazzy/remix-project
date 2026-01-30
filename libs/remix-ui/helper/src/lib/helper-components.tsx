@@ -314,3 +314,18 @@ export const SmartAccountPromptTitle = ({ title }: { title: string }) => {
     </div>
   )
 }
+export const checkSumWarning = () => (
+  <span className="text-start">
+    <FormattedMessage
+      id="udapp.checkSumWarning"
+      values={{
+        br: <br />,
+        a: (
+          <a href="https://eips.ethereum.org/EIPS/eip-55" target="_blank" rel="noreferrer">
+        EIP-55
+          </a>
+        ),
+      }}
+    />
+  </span>
+)

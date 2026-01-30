@@ -138,7 +138,7 @@ export function RunTabUI(props: RunTabProps) {
             count={runTab.recorder.transactionCount}
             currentFile={currentfile}
           />
-          <InstanceContainerUI
+          {/* <InstanceContainerUI
             plugin={plugin}
             getCompilerDetails={getCompilerDetails}
             evmCheckComplete={evmCheckComplete}
@@ -216,7 +216,7 @@ export function RunTabUI(props: RunTabProps) {
                 console.error('[RunTab] Critical Error in editInstance:', error)
               }
             }}
-          />
+          /> */}
         </div>
       </div>
     </Fragment>

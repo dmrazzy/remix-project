@@ -1,0 +1,92 @@
+import { Actions, DeployedContractsWidgetState } from '../types'
+
+export const deployedContractsInitialState: DeployedContractsWidgetState = {
+  deployedContracts: [],
+  isLoading: false,
+  showAddDialog: false,
+  addressInput: '',
+  showClearAllDialog: false,
+  loadType: 'other',
+  currentFile: ''
+}
+
+export const deployedContractsReducer = (state: DeployedContractsWidgetState, action: Actions): DeployedContractsWidgetState => {
+  switch (action.type) {
+  case 'SET_CONTRACTS':
+    return {
+      ...state,
+      deployedContracts: action.payload
+    }
+  case 'ADD_CONTRACT':
+    return {
+      ...state,
+      deployedContracts: [...state.deployedContracts, action.payload],
+      showAddDialog: false,
+      addressInput: ''
+    }
+  case 'REMOVE_CONTRACT':
+    return {
+      ...state,
+      deployedContracts: state.deployedContracts.filter((contract) => contract.address !== action.payload)
+    }
+  case 'CLEAR_ALL_CONTRACTS':
+    return {
+      ...state,
+      deployedContracts: [],
+      showClearAllDialog: false
+    }
+  case 'SET_LOADING':
+    return {
+      ...state,
+      isLoading: action.payload
+    }
+  case 'SHOW_ADD_DIALOG':
+    return {
+      ...state,
+      showAddDialog: action.payload
+    }
+  case 'SET_ADDRESS_INPUT':
+    return {
+      ...state,
+      addressInput: action.payload
+    }
+  case 'PIN_CONTRACT':
+    return {
+      ...state,
+      deployedContracts: state.deployedContracts.map((contract, index) =>
+        index === action.payload.index
+          ? { ...contract, isPinned: true, pinnedAt: action.payload.pinnedAt, filePath: action.payload.filePath }
+          : contract
+      )
+    }
+  case 'UNPIN_CONTRACT':
+    return {
+      ...state,
+      deployedContracts: state.deployedContracts.map((contract, index) =>
+        index === action.payload
+          ? { ...contract, isPinned: false, pinnedAt: undefined, filePath: undefined }
+          : contract
+      )
+    }
+  case 'SHOW_CLEAR_ALL_DIALOG':
+    return {
+      ...state,
+      showClearAllDialog: action.payload
+    }
+
+  case 'SET_LOAD_TYPE':
+    return {
+      ...state,
+      loadType: action.payload
+    }
+
+  case 'SET_CURRENT_FILE':
+    return {
+      ...state,
+      currentFile: action.payload
+    }
+
+  default:
+    return state
+  }
+}

@@ -56,7 +56,7 @@ function getCompiledContracts (compiler: CompilerAbstract) {
   return contracts
 }
 
-function getContractData (contractName: string, compiler: CompilerAbstract): ContractData {
+export function getContractData (contractName: string, compiler: CompilerAbstract): ContractData {
   if (!contractName) return null
   if (!compiler) return null
 
@@ -211,7 +211,7 @@ async function createInstance(selectedContract: ContractData, args, deployMode: 
     })
   }
   const result = await deployOnBlockchain(selectedContract, args, contractMetadata, compilerContracts, plugin)
-  await plugin.call('udapp', 'addInstance', result.address, selectedContract.contract.abi, selectedContract.name, selectedContract)
+  await plugin.call('udappDeployedContracts', 'addInstance', result.address, selectedContract.contract.abi, selectedContract.name, selectedContract)
   const data = await plugin.call('compilerArtefacts', 'getCompilerAbstract', selectedContract.contract.file)
   await plugin.call('compilerArtefacts', 'addResolvedContract', result.address, data)
 

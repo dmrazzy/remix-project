@@ -46,7 +46,6 @@ const profile = {
     'getSettings',
     'setEnvironmentMode',
     'clearAllInstances',
-    'addInstance',
     'resolveContractAndAddInstance',
     'showPluginDetails',
     'getRunTabAPI',
@@ -75,6 +74,7 @@ export class RunTab extends ViewPlugin {
   private dispatch: (state: any) => void = () => {}
   private envUI: React.ReactNode = null
   private deployUI: React.ReactNode = null
+  private deployedContractsUI: React.ReactNode = null
 
   constructor(blockchain: Blockchain, config: any, fileManager: any, editor: any, filePanel: any, compilersArtefacts: CompilerArtefacts, networkModule: any, fileProvider: any, engine: any) {
     super(profile)
@@ -107,7 +107,11 @@ export class RunTab extends ViewPlugin {
         this.renderComponent()
       }
       if (profile.name === 'udappDeploy') {
-        this.deployUI = await this.call('udappDeploy', 'getUI', this.engine, this.blockchain, this.compilersArtefacts, this.editor, this.fileManager)
+        this.deployUI = await this.call('udappDeploy', 'getUI')
+        this.renderComponent()
+      }
+      if (profile.name === 'udappDeployedContracts') {
+        this.deployedContractsUI = await this.call('udappDeployedContracts', 'getUI')
         this.renderComponent()
       }
     })
@@ -174,10 +178,6 @@ export class RunTab extends ViewPlugin {
     this.allTransactionHistory.clear()
   }
 
-  addInstance(address, abi, name, contractData?) {
-    this.emit('addInstanceReducer', address, abi, name, contractData)
-  }
-
   createVMAccount(newAccount) {
     return this.blockchain.createVMAccount(newAccount)
   }
@@ -240,7 +240,8 @@ export class RunTab extends ViewPlugin {
       ...this,
       onReady: this.onReady,
       envUI: this.envUI,
-      deployUI: this.deployUI
+      deployUI: this.deployUI,
+      deployedContractsUI: this.deployedContractsUI
     })
   }
 
@@ -249,14 +250,16 @@ export class RunTab extends ViewPlugin {
       <RunTabUI plugin={state} />
       { this.envUI && createPortal(this.envUI, document.getElementById('udappEnvComponent')) }
       { this.deployUI && createPortal(this.deployUI, document.getElementById('udappDeployComponent')) }
+      { this.deployedContractsUI && createPortal(this.deployedContractsUI, document.getElementById('udappDeployedContractsComponent')) }
     </>)
   }
 
   render() {
     return (
-      <div>
-        <div id="udappEnvComponent"></div>
+      <div style={{ position: 'relative', height: '100%', overflow: 'auto' }}>
+        <div id="udappEnvComponent" style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--body-bg)' }}></div>
         <div id="udappDeployComponent"></div>
+        <div id="udappDeployedContractsComponent"></div>
         <PluginViewWrapper plugin={this} />
       </div>
     )
@@ -272,12 +275,5 @@ export class RunTab extends ViewPlugin {
 
   readFile(fileName) {
     return this.call('fileManager', 'readFile', fileName)
-  }
-
-  async resolveContractAndAddInstance(contractObject, address) {
-    const data = await this.compilersArtefacts.getCompilerAbstract(contractObject.contract.file)
-
-    this.compilersArtefacts.addResolvedContract(addressToString(address), data)
-    this.addInstance(address, contractObject.abi, contractObject.name)
   }
 }

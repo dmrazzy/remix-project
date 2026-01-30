@@ -89,6 +89,7 @@ import { NotificationCenterPlugin } from './app/plugins/notification-center'
 import { FeedbackPlugin } from './app/plugins/feedback'
 import { EnvironmentPlugin } from './app/udapp/udappEnv'
 import { DeployPlugin } from './app/udapp/udappDeploy'
+import { DeployedContractsPlugin } from './app/udapp/udappDeployedContracts'
 
 import { TemplatesSelectionPlugin } from './app/plugins/templates-selection/templates-selection-plugin'
 
@@ -457,6 +458,7 @@ class AppComponent {
 
     const udappEnvPlugin = new EnvironmentPlugin()
     const udappDeployPlugin = new DeployPlugin()
+    const udappDeployedContractsPlugin = new DeployedContractsPlugin()
     const txRunnerPlugin = new TxRunnerPlugin()
 
     this.engine.register([
@@ -528,7 +530,8 @@ class AppComponent {
       chartjs,
       indexedDbCache,
       udappEnvPlugin,
-      udappDeployPlugin
+      udappDeployPlugin,
+      udappDeployedContractsPlugin
     ])
 
     //---- fs plugin
@@ -854,6 +857,7 @@ class AppComponent {
     // await this.appManager.activatePlugin(['compilerArtefacts'])
     await this.appManager.activatePlugin(['udappEnv'])
     await this.appManager.activatePlugin(['udappDeploy'])
+    await this.appManager.activatePlugin(['udappDeployedContracts'])
   }
 }
 

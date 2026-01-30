@@ -2,8 +2,6 @@ import React, { useEffect, useReducer, useState } from 'react'
 import { DeployAppContext } from './contexts'
 import { deployInitialState, deployReducer } from './reducers'
 import DeployPortraitView from './widgets/deployPortraitView'
-import { Plugin, Engine } from '@remixproject/engine'
-import { Actions, DeployWidgetState } from './types'
 import { broadcastCompilationResult } from './actions'
 import "./css/index.css"
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries

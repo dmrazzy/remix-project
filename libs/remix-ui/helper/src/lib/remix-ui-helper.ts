@@ -147,7 +147,8 @@ export const shortenDate = (dateString: string) => {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + ', ' + date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
-export const getTimeAgo = (timestamp: number): string => {
+export const getTimeAgo = (timestamp: number, options?: { truncateTimeAgo?: boolean }): string => {
+  const { truncateTimeAgo = false } = options || {}
   if (!timestamp) return 'recently'
 
   const now = Date.now()
@@ -160,21 +161,21 @@ export const getTimeAgo = (timestamp: number): string => {
   const diffInMonths = Math.floor(diffInDays / 30)
   const diffInYears = Math.floor(diffInDays / 365)
 
-  if (diffInYears > 0) return diffInYears === 1 ? '1 year ago' : `${diffInYears} years ago`
+  if (diffInYears > 0) return diffInYears === 1 ? (truncateTimeAgo ? '1y' : '1 year ago') : truncateTimeAgo ? `${diffInYears}y` : `${diffInYears} years ago`
 
-  if (diffInMonths > 0) return diffInMonths === 1 ? '1 month ago' : `${diffInMonths} months ago`
+  if (diffInMonths > 0) return diffInMonths === 1 ? (truncateTimeAgo ? '1m' : '1 month ago') : truncateTimeAgo ? `${diffInMonths}m` : `${diffInMonths} months ago`
 
-  if (diffInWeeks > 0) return diffInWeeks === 1 ? '1 week ago' : `${diffInWeeks} weeks ago`
+  if (diffInWeeks > 0) return diffInWeeks === 1 ? (truncateTimeAgo ? '1w' : '1 week ago') : truncateTimeAgo ? `${diffInWeeks}w` : `${diffInWeeks} weeks ago`
 
-  if (diffInDays > 0) return diffInDays === 1 ? '1 day ago' : `${diffInDays} days ago`
+  if (diffInDays > 0) return diffInDays === 1 ? (truncateTimeAgo ? '1d' : '1 day ago') : truncateTimeAgo ? `${diffInDays}d` : `${diffInDays} days ago`
 
-  if (diffInHours > 0) return diffInHours === 1 ? '1 hour ago' : `${diffInHours} hours ago`
+  if (diffInHours > 0) return diffInHours === 1 ? (truncateTimeAgo ? '1h' : '1 hour ago') : truncateTimeAgo ? `${diffInHours}h` : `${diffInHours} hours ago`
 
-  if (diffInMinutes > 0) return diffInMinutes === 1 ? '1 minute ago' : `${diffInMinutes} minutes ago`
+  if (diffInMinutes > 0) return diffInMinutes === 1 ? (truncateTimeAgo ? '1m' : '1 minute ago') : truncateTimeAgo ? `${diffInMinutes}m` : `${diffInMinutes} minutes ago`
 
-  if (diffInSeconds > 0) return diffInSeconds === 1 ? '1 second ago' : `${diffInSeconds} seconds ago`
+  if (diffInSeconds > 0) return diffInSeconds === 1 ? (truncateTimeAgo ? '1s' : '1 second ago') : truncateTimeAgo ? `${diffInSeconds}s` : `${diffInSeconds} seconds ago`
 
-  return 'just now'
+  return truncateTimeAgo ? '0s' : 'just now'
 }
 
 /**

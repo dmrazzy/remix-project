@@ -31,7 +31,8 @@ export const widgetInitialState: WidgetState = {
     chainId: '',
     name: ''
   },
-  matchPassphrase: null
+  matchPassphrase: null,
+  deployedContractsCount: 0
 }
 
 export const widgetReducer = (state = widgetInitialState, action: Actions): WidgetState => {
@@ -289,6 +290,13 @@ export const widgetReducer = (state = widgetInitialState, action: Actions): Widg
         ...state.accounts,
         delegations
       }
+    }
+  }
+
+  case 'SET_DEPLOYED_CONTRACTS_COUNT': {
+    return {
+      ...state,
+      deployedContractsCount: action.payload
     }
   }
 

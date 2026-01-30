@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react'
+import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { AddressToggle, CustomMenu, EnvironmentToggle, shortenAddress, SmartAccountPromptTitle } from "@remix-ui/helper"
 import { Dropdown } from "react-bootstrap"
 import { useIntl } from 'react-intl'
@@ -287,7 +287,7 @@ function EnvironmentPortraitView() {
 
   return (
     <>
-      <div className='card ms-2' style={{ backgroundColor: 'var(--custom-onsurface-layer-1)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties}>
+      <div className='card mx-2 mb-2' style={{ backgroundColor: 'var(--custom-onsurface-layer-1)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties}>
         <div className="d-flex align-items-center justify-content-between p-3">
           <div className="d-flex align-items-center">
             <h6 className="my-auto" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>{intl.formatMessage({ id: 'udapp.environment' })}</h6>
@@ -486,7 +486,7 @@ function EnvironmentPortraitView() {
           </div>
         )}
         <div className="mx-auto py-3" style={{ color: 'var(--bs-tertiary-color)' }}>
-          <span className="small me-1">Deployed Contracts</span><span className="small me-2 text-primary">{ 0 }</span>
+          <span className="small me-1">Deployed Contracts</span><span className="small me-2 text-primary">{ widgetState.deployedContractsCount }</span>
           <span className="small me-1">Transactions recorded</span><span className="small text-primary">{ 0 }</span>
         </div>
       </div>

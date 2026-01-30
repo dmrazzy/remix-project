@@ -1,8 +1,6 @@
 import React from 'react'
-import { Engine, Plugin } from '@remixproject/engine'
+import { Plugin } from '@remixproject/engine'
 import { DeployWidget } from '@remix-ui/run-tab-deploy'
-import type { Blockchain } from '../../blockchain/blockchain'
-import type { CompilerArtefacts } from '@remix-project/core-plugin'
 import { DeployWidgetState, Actions, GasEstimationPrompt, MainnetPrompt, DeployUdappTx, DeployUdappNetwork } from '@remix-ui/run-tab-deploy'
 import BN from 'bn.js'
 import { parseUnits } from 'ethers'
@@ -11,12 +9,11 @@ const profile = {
   name: 'udappDeploy',
   displayName: 'Udapp Deploy',
   description: 'Handles contract deployment UI and state',
-  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'getMaxFee', 'getMaxPriorityFee', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue', 'getGasEstimationPrompt', 'getMainnetPrompt', 'getGasPriceStatus', 'setValue', 'setValueUnit'],
+  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'getMaxFee', 'getMaxPriorityFee', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue', 'getGasEstimationPrompt', 'getMainnetPrompt', 'getGasPriceStatus', 'setValue', 'setValueUnit', 'getCompiledContracts'],
   events: []
 }
 
 export class DeployPlugin extends Plugin {
-  engine: Engine
   editor: any
   fileManager: any
   private getWidgetState: (() => DeployWidgetState) | null = null
@@ -77,6 +74,10 @@ export class DeployPlugin extends Plugin {
     return this.getWidgetState()?.gasPriceStatus
   }
 
+  getCompiledContracts() {
+    return this.getWidgetState()?.contracts.contractList
+  }
+
   setGasPriceStatus(status: boolean) {
     this.getDispatch()({ type: 'SET_GAS_PRICE_STATUS', payload: status })
   }
@@ -105,10 +106,7 @@ export class DeployPlugin extends Plugin {
     this.getDispatch()({ type: 'SET_VALUE_UNIT', payload: unit })
   }
 
-  getUI(engine: Engine, editor: any) {
-    this.engine = engine
-    this.editor = editor
-    // this.fileManager = fileManager
+  getUI() {
     return <DeployWidget plugin={this} />
   }
 }
