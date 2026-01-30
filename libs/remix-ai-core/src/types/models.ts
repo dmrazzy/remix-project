@@ -67,7 +67,7 @@ export const AVAILABLE_MODELS: AIModel[] = [
     capabilities: ['chat', 'code', 'completion']
   },
   {
-    id: 'mistral-large-latest',
+    id: 'mistral-medium-latest',
     name: 'Mistral Large',
     provider: 'mistralai',
     description: 'Advanced coding assistance',

@@ -96,7 +96,7 @@ export class RemixAIPlugin extends Plugin {
       if (oldProvider) {
         const migrationMap = {
           'openai': 'gpt-4-turbo',
-          'mistralai': 'mistral-large-latest',
+          'mistralai': 'mistral-medium-latest',
           'anthropic': 'claude-sonnet-4-5',
           'ollama': 'ollama'
         }
@@ -370,7 +370,7 @@ export class RemixAIPlugin extends Plugin {
     // Legacy method - map provider to a default model for backwards compatibility
     const providerToModelMap = {
       'openai': 'gpt-4-turbo',
-      'mistralai': 'mistral-large-latest',
+      'mistralai': 'mistral-medium-latest',
       'anthropic': 'claude-sonnet-4-5',
       'ollama': 'ollama'
     }
