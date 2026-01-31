@@ -30,10 +30,10 @@ export class DeployedContractsPlugin extends Plugin {
     this.getDispatch = getter
   }
 
-  async addInstance(address, abi, name, contractData?, pinnedAt?) {
+  async addInstance(address, abi, name, contractData?, pinnedAt?, timestamp = Date.now()) {
     address = (address.slice(0, 2) === '0x' ? '' : '0x') + address.toString('hex')
     address = ethJSUtil.toChecksumAddress(address)
-    const instance = { address, abi, name, contractData, decodedResponse: {}, isPinned: !!pinnedAt, pinnedAt }
+    const instance = { address, abi, name, contractData, decodedResponse: {}, isPinned: !!pinnedAt, pinnedAt, timestamp }
 
     await new Promise<void>((resolve) => {
       this.getDispatch()?.({ type: 'ADD_CONTRACT', payload: instance })

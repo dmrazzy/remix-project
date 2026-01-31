@@ -3,9 +3,11 @@ import { FormattedMessage } from 'react-intl'
 import { CustomToggle, CustomTooltip, getTimeAgo, shortenAddress } from '@remix-ui/helper'
 import { CopyToClipboard } from '@remix-ui/clipboard'
 import * as remixLib from '@remix-project/remix-lib'
+import { Dropdown } from 'react-bootstrap'
+import { parseUnits } from 'ethers'
 import { DeployedContractsAppContext } from '../contexts'
 import { DeployedContract } from '../types'
-import { Dropdown } from 'react-bootstrap'
+import { runTransactions } from '../actions'
 
 const txHelper = remixLib.execution.txHelper
 
@@ -22,6 +24,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
   const [value, setValue] = useState<number>(0)
   const [valueUnit, setValueUnit] = useState<string>('wei')
   const [gasLimit, setGasLimit] = useState<number>(0) // 0 means auto
+  const [funcInputs, setFuncInputs] = useState<Record<number, string>>({})
 
   useEffect(() => {
     plugin.call('udappEnv', 'getNetwork').then((net) => {
@@ -85,6 +88,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
     const objToSave = {
       name: contract.name,
       address: contract.address,
+      timestamp: contract.timestamp,
       abi: contract.abi || contract.contractData?.abi,
       filePath: contract.filePath || `${workspace.name}/${contract.contractData?.contract?.file}`,
       pinnedAt: Date.now()
@@ -97,6 +101,36 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
 
   const handleContractClick = () => {
     setIsExpanded(!isExpanded)
+  }
+
+  const handleExecuteTransaction = async (funcABI: any, funcIndex: number, lookupOnly: boolean) => {
+    const inputsValues = funcInputs[funcIndex] || ''
+    const sendValue = parseUnits(value.toString() || '0', valueUnit || 'gwei').toString()
+    const gasLimitValue = gasLimit.toString()
+
+    try {
+      await runTransactions(
+        plugin,
+        dispatch,
+        index,
+        lookupOnly,
+        funcABI,
+        inputsValues,
+        contract,
+        funcIndex,
+        { value: sendValue, gasLimit: gasLimitValue }
+      )
+    } catch (error) {
+      console.error('Error executing transaction:', error)
+      await plugin.call('notification', 'toast', `Error: ${error.message}`)
+    }
+  }
+
+  const handleInputChange = (funcIndex: number, value: string) => {
+    setFuncInputs(prev => ({
+      ...prev,
+      [funcIndex]: value
+    }))
   }
 
   return (
@@ -135,7 +169,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
             <div className='d-flex' style={{ color: 'var(--bs-tertiary-color)' }}>
               <div className='d-flex flex-column align-items-end'>
                 <span className='badge text-info' style={{ backgroundColor: '#64C4FF14' }}>{networkName}</span>
-                <span className='small'>{getTimeAgo(Date.now(), { truncateTimeAgo: true })} ago</span>
+                <span className='small'>{getTimeAgo(contract.timestamp, { truncateTimeAgo: true })} ago</span>
               </div>
               <i
                 className="fas fa-ellipsis-v align-self-center ps-3"
@@ -164,7 +198,8 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                               {
                                 funcABI.stateMutability === 'view' || funcABI.stateMutability === 'pure' ?
                                   <span className='badge text-info me-1' style={{ backgroundColor: '#64C4FF14' }}>call</span>
-                                  : <span className='badge text-warning me-1' style={{ backgroundColor: '#FFB96414' }}>store</span>
+                                  : funcABI.stateMutability === 'payable' ? <span className='badge text-danger me-1' style={{ backgroundColor: '#FF777714' }}>payable</span>
+                                    : <span className='badge text-warning me-1' style={{ backgroundColor: '#FFB96414' }}>transact</span>
                               }
                               <label className="mb-0 me-1 text-secondary">
                                 { funcABI.name }
@@ -176,13 +211,20 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                             <div className="position-relative flex-fill">
                               <input
                                 type="text"
-                                placeholder={inputs ? inputs.split(' ')[0] : '0x...'}
+                                placeholder={inputs ? inputs.split(' ')[0] : ''}
                                 className="form-control"
-                                style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '4.5rem', fontSize: '0.75rem' }}
+                                value={funcInputs[funcIndex] || ''}
+                                onChange={(e) => handleInputChange(funcIndex, e.target.value)}
+                                style={{
+                                  backgroundColor: 'var(--bs-body-bg)',
+                                  color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '4.5rem', fontSize: '0.75rem',
+                                  cursor: lookupOnly || !inputs ? 'not-allowed' : 'text'
+                                }}
+                                disabled={lookupOnly || !inputs}
                               />
                               <button
                                 className="btn btn-sm btn-secondary"
-                                // onClick={handleAddContract}
+                                onClick={() => handleExecuteTransaction(funcABI, funcIndex, lookupOnly)}
                                 style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 2, fontSize: '0.65rem', fontWeight: 'bold' }}
                               >
                               Execute

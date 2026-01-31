@@ -5,9 +5,9 @@ import type { DeployedContractsPlugin } from 'apps/remix-ide/src/app/udapp/udapp
 export interface DeployedContract {
   address: string
   name: string
+  timestamp: number
   abi?: any[]
   contractData?: any
-  timestamp?: string
   network?: string
   filePath?: string
   isPinned?: boolean
@@ -45,3 +45,4 @@ export type Actions =
   | { type: 'SHOW_CLEAR_ALL_DIALOG'; payload: boolean }
   | { type: 'SET_LOAD_TYPE'; payload: 'abi' | 'sol' | 'vyper' | 'lexon' | 'contract' | 'other' }
   | { type: 'SET_CURRENT_FILE'; payload: string }
+  | { type: 'SET_DECODED_RESPONSE'; payload: { instanceIndex: number; funcIndex: number; response: any } }

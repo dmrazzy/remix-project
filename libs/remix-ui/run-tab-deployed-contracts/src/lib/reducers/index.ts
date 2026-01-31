@@ -86,6 +86,22 @@ export const deployedContractsReducer = (state: DeployedContractsWidgetState, ac
       currentFile: action.payload
     }
 
+  case 'SET_DECODED_RESPONSE':
+    return {
+      ...state,
+      deployedContracts: state.deployedContracts.map((contract, index) =>
+        index === action.payload.instanceIndex
+          ? {
+            ...contract,
+            decodedResponse: {
+              ...contract.decodedResponse,
+              [action.payload.funcIndex]: action.payload.response
+            }
+          }
+          : contract
+      )
+    }
+
   default:
     return state
   }

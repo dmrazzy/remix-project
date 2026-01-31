@@ -1,8 +1,12 @@
 import React from 'react'
 import { trackMatomoEvent } from '@remix-api'
+import * as remixLib from '@remix-project/remix-lib'
+import { FuncABI } from '@remix-project/core-plugin'
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { DeployedContractsPlugin } from 'apps/remix-ide/src/app/udapp/udappDeployedContracts'
 import { Actions } from '../types'
+
+const txFormat = remixLib.execution.txFormat
 
 export async function loadAddress (plugin: DeployedContractsPlugin, dispatch: React.Dispatch<Actions>, address: string, currentFile: string, loadType: 'abi' | 'sol' | 'vyper' | 'lexon' | 'contract' | 'other') {
   // Show confirmation modal for ABI files
@@ -66,7 +70,7 @@ export async function loadAddress (plugin: DeployedContractsPlugin, dispatch: Re
   }
 }
 
-export async function loadPinnedContracts (plugin: DeployedContractsPlugin, dispatch, dirName) {
+export async function loadPinnedContracts (plugin: DeployedContractsPlugin, dispatch: React.Dispatch<Actions>, dirName: string) {
   dispatch({ type: 'CLEAR_ALL_CONTRACTS', payload: null })
   const isPinnedAvailable = await plugin.call('fileManager', 'exists', `.deploys/pinned-contracts/${dirName}`)
 
@@ -86,15 +90,68 @@ export async function loadPinnedContracts (plugin: DeployedContractsPlugin, disp
 
           await plugin.call('terminal', 'log', { type: 'error', value: msg })
         } else {
-          if (pinnedContractObj) plugin.addInstance(pinnedContractObj.address, pinnedContractObj.abi, null, pinnedContractObj.name, pinnedContractObj.pinnedAt)
+          if (pinnedContractObj) plugin.addInstance(pinnedContractObj.address, pinnedContractObj.abi, pinnedContractObj.name, null, pinnedContractObj.pinnedAt, pinnedContractObj.timestamp)
         }
       }
       if (codeError) {
         const msg = `Some pinned contracts cannot be loaded.\nCotracts deployed to a (Mainnet, Custom, Sepolia) fork are not persisted unless there were already on chain.\nDirectly forking one of these forks will enable you to use the pinned contracts feature.`
+
         await plugin.call('terminal', 'log', { type: 'log', value: msg })
       }
     } catch (err) {
       console.log(err)
     }
+  }
+}
+
+export function setDecodedResponse (instanceIndex: number, response: any, funcIndex?: number): Actions {
+  return {
+    type: 'SET_DECODED_RESPONSE',
+    payload: {
+      instanceIndex,
+      funcIndex,
+      response
+    }
+  }
+}
+
+export async function runTransactions (
+  plugin: DeployedContractsPlugin,
+  dispatch: React.Dispatch<Actions>,
+  instanceIndex: number,
+  lookupOnly: boolean,
+  funcABI: FuncABI,
+  inputsValues: string,
+  contract: any,
+  funcIndex: number,
+  sendParams?: { value: string, gasLimit: string }
+) {
+  // Destructure contract properties
+  const { name: contractName, abi, contractData, address } = contract
+  const contractABI = abi || contractData?.abi
+
+  let eventAction: 'call' | 'lowLevelinteractions' | 'transact'
+  if (lookupOnly) {
+    eventAction = 'call'
+  } else if (funcABI.type === 'fallback' || funcABI.type === 'receive') {
+    eventAction = 'lowLevelinteractions'
+  } else {
+    eventAction = 'transact'
+  }
+
+  // Get network name for tracking
+  const network = await plugin.call('udappEnv', 'getNetwork')
+  const networkName = network?.name || 'unknown'
+
+  trackMatomoEvent(plugin, { category: 'udapp', action: eventAction, name: networkName, isClick: true })
+
+  const params = funcABI.type !== 'fallback' ? inputsValues : ''
+  const result = await plugin.call('blockchain', 'runOrCallContractMethod', contractName, contractABI, funcABI, contractData, inputsValues, address, params, sendParams)
+
+  console.log('result: ', result)
+  if (lookupOnly) {
+    const response = txFormat.decodeResponse(result.returnValue, funcABI)
+
+    dispatch(setDecodedResponse(instanceIndex, response, funcIndex))
   }
 }

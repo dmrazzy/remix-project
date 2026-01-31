@@ -668,7 +668,7 @@ export class Blockchain extends Plugin {
     return txlistener
   }
 
-  async runOrCallContractMethod(contractName, contractAbi, funABI, contract, value, address, callType, lookupOnly) {
+  async runOrCallContractMethod(contractName, contractAbi, funABI, contract, value, address, callType, sendParams?: { value: string, gasLimit: string }) {
     // contractsDetails is used to resolve libraries
     try {
       const data = await txFormat.buildData(
@@ -688,11 +688,6 @@ export class Blockchain extends Plugin {
           }
         }
       )
-      if (!lookupOnly) {
-      // logCallback(`${logMsg} pending ... `)
-      } else {
-      // logCallback(`${logMsg}`)
-      }
       if (funABI.type === 'fallback') data.dataHex = value
 
       if (data) {
@@ -701,6 +696,14 @@ export class Blockchain extends Plugin {
         data.contractABI = contractAbi
         // @ts-ignore
         data.contract = contract
+
+        // Apply send parameters if provided
+        if (sendParams) {
+          // @ts-ignore
+          data.value = sendParams.value
+          // @ts-ignore
+          data.gasLimit = sendParams.gasLimit
+        }
       }
       const useCall = funABI.stateMutability === 'view' || funABI.stateMutability === 'pure'
       const result = await this.runTx({ to: address, data, useCall })
@@ -1003,8 +1006,8 @@ export class Blockchain extends Plugin {
   }
 
   async runTransaction(args) {
-    const gasLimit = await this.call('udappDeploy', 'getGasLimit')
-    const value = await this.call('udappDeploy', 'getValue')
+    const gasLimit = args.data?.gasLimit || await this.call('udappDeploy', 'getGasLimit')
+    const value = args.data?.value || await this.call('udappDeploy', 'getValue')
     const queryValue = !args.useCall ? value : '0x0'
     let fromAddress
     let fromSmartAccount

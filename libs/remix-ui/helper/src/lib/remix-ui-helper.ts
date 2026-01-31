@@ -165,13 +165,13 @@ export const getTimeAgo = (timestamp: number, options?: { truncateTimeAgo?: bool
 
   if (diffInMonths > 0) return diffInMonths === 1 ? (truncateTimeAgo ? '1m' : '1 month ago') : truncateTimeAgo ? `${diffInMonths}m` : `${diffInMonths} months ago`
 
-  if (diffInWeeks > 0) return diffInWeeks === 1 ? (truncateTimeAgo ? '1w' : '1 week ago') : truncateTimeAgo ? `${diffInWeeks}w` : `${diffInWeeks} weeks ago`
+  if (diffInWeeks > 0) return diffInWeeks === 1 ? (truncateTimeAgo ? '1wk' : '1 week ago') : truncateTimeAgo ? `${diffInWeeks}w` : `${diffInWeeks} weeks ago`
 
   if (diffInDays > 0) return diffInDays === 1 ? (truncateTimeAgo ? '1d' : '1 day ago') : truncateTimeAgo ? `${diffInDays}d` : `${diffInDays} days ago`
 
   if (diffInHours > 0) return diffInHours === 1 ? (truncateTimeAgo ? '1h' : '1 hour ago') : truncateTimeAgo ? `${diffInHours}h` : `${diffInHours} hours ago`
 
-  if (diffInMinutes > 0) return diffInMinutes === 1 ? (truncateTimeAgo ? '1m' : '1 minute ago') : truncateTimeAgo ? `${diffInMinutes}m` : `${diffInMinutes} minutes ago`
+  if (diffInMinutes > 0) return diffInMinutes === 1 ? (truncateTimeAgo ? '1min' : '1 minute ago') : truncateTimeAgo ? `${diffInMinutes}min` : `${diffInMinutes} minutes ago`
 
   if (diffInSeconds > 0) return diffInSeconds === 1 ? (truncateTimeAgo ? '1s' : '1 second ago') : truncateTimeAgo ? `${diffInSeconds}s` : `${diffInSeconds} seconds ago`
 
