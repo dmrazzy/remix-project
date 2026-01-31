@@ -1,4 +1,5 @@
 import { bytesToHex, toChecksumAddress } from '@ethereumjs/util'
+import { BN } from 'bn.js'
 import { ProcessLoadingParams } from '../types/remix-helper'
 
 export const extractNameFromKey = (key: string): string => {
@@ -336,3 +337,33 @@ export const getMultiValsString = (values: string[]) => {
   }
 }
 
+export const extractDataDefault = (item, parent?) => {
+  const ret: any = {}
+
+  if (BN.isBN(item)) {
+    ret.self = item.toString(10)
+    ret.children = []
+  } else {
+    if (item instanceof Array) {
+      ret.children = item.map((item, index) => {
+        return { key: index, value: item }
+      })
+      ret.self = 'Array'
+      ret.isNode = true
+      ret.isLeaf = false
+    } else if (item instanceof Object) {
+      ret.children = Object.keys(item).map((key) => {
+        return { key: key, value: item[key] }
+      })
+      ret.self = 'Object'
+      ret.isNode = true
+      ret.isLeaf = false
+    } else {
+      ret.self = item
+      ret.children = null
+      ret.isNode = false
+      ret.isLeaf = true
+    }
+  }
+  return ret
+}

@@ -102,6 +102,16 @@ export const deployedContractsReducer = (state: DeployedContractsWidgetState, ac
       )
     }
 
+  case 'UPDATE_CONTRACT_BALANCE':
+    return {
+      ...state,
+      deployedContracts: state.deployedContracts.map((contract) =>
+        contract.address === action.payload.address
+          ? { ...contract, balance: action.payload.balance }
+          : contract
+      )
+    }
+
   default:
     return state
   }

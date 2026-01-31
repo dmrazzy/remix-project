@@ -18,9 +18,11 @@ export default function DeployedContractsPortraitView() {
 
   const handleClearAllClick = async () => {
     const network = await plugin.call('udappEnv', 'getNetwork')
-    const isPinnedAvailable = await plugin.call('fileManager', 'exists', `.deploys/pinned-contracts/${network.chainId}`)
+    const chainId = network?.chainId
+    const providerName = network?.name === 'VM' ? await plugin.call('udappEnv', 'getSelectedProvider') : chainId
+    const isPinnedAvailable = await plugin.call('fileManager', 'exists', `.deploys/pinned-contracts/${providerName}`)
 
-    if (isPinnedAvailable) await plugin.call('fileManager', 'remove', `.deploys/pinned-contracts/${network.chainId}`)
+    if (isPinnedAvailable) await plugin.call('fileManager', 'remove', `.deploys/pinned-contracts/${providerName}`)
     dispatch({ type: 'SHOW_CLEAR_ALL_DIALOG', payload: true })
     dispatch({ type: 'SHOW_ADD_DIALOG', payload: false })
   }
@@ -174,7 +176,7 @@ export default function DeployedContractsPortraitView() {
 
       {/* Clear All Confirmation Dialog */}
       {showClearAllDialog && (
-        <div className="add-contract-dialog border-top bg-light">
+        <div className="m-3 mt-0 p-3 rounded" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
           <div className="d-flex justify-content-between align-items-center mb-2">
             <p className="mb-0 text-danger" style={{ color: themeQuality === 'dark' ? 'white' : 'black', fontSize: '0.9rem' }}>
             Clear all deployed contracts

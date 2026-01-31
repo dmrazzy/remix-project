@@ -104,17 +104,6 @@ export async function loadPinnedContracts (plugin: DeployedContractsPlugin, disp
   }
 }
 
-export function setDecodedResponse (instanceIndex: number, response: any, funcIndex?: number): Actions {
-  return {
-    type: 'SET_DECODED_RESPONSE',
-    payload: {
-      instanceIndex,
-      funcIndex,
-      response
-    }
-  }
-}
-
 export async function runTransactions (
   plugin: DeployedContractsPlugin,
   dispatch: React.Dispatch<Actions>,
@@ -148,10 +137,15 @@ export async function runTransactions (
   const params = funcABI.type !== 'fallback' ? inputsValues : ''
   const result = await plugin.call('blockchain', 'runOrCallContractMethod', contractName, contractABI, funcABI, contractData, inputsValues, address, params, sendParams)
 
-  console.log('result: ', result)
   if (lookupOnly) {
     const response = txFormat.decodeResponse(result.returnValue, funcABI)
 
-    dispatch(setDecodedResponse(instanceIndex, response, funcIndex))
+    dispatch({ type: 'SET_DECODED_RESPONSE',
+      payload: {
+        instanceIndex,
+        funcIndex,
+        response
+      }
+    })
   }
 }

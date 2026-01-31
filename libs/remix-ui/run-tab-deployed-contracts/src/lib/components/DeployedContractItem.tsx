@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { FormattedMessage } from 'react-intl'
-import { CustomToggle, CustomTooltip, getTimeAgo, shortenAddress } from '@remix-ui/helper'
+import { CustomToggle, CustomTooltip, extractDataDefault, getTimeAgo, shortenAddress } from '@remix-ui/helper'
 import { CopyToClipboard } from '@remix-ui/clipboard'
 import * as remixLib from '@remix-project/remix-lib'
 import { Dropdown } from 'react-bootstrap'
@@ -8,6 +8,7 @@ import { parseUnits } from 'ethers'
 import { DeployedContractsAppContext } from '../contexts'
 import { DeployedContract } from '../types'
 import { runTransactions } from '../actions'
+import { TreeView, TreeViewItem } from '@remix-ui/tree-view'
 
 const txHelper = remixLib.execution.txHelper
 
@@ -25,6 +26,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
   const [valueUnit, setValueUnit] = useState<string>('wei')
   const [gasLimit, setGasLimit] = useState<number>(0) // 0 means auto
   const [funcInputs, setFuncInputs] = useState<Record<number, string>>({})
+  const [expandPath, setExpandPath] = useState<string[]>([])
 
   useEffect(() => {
     plugin.call('udappEnv', 'getNetwork').then((net) => {
@@ -133,6 +135,44 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
     }))
   }
 
+  const handleExpand = (path: string) => {
+    if (expandPath.includes(path)) {
+      const filteredPath = expandPath.filter((value) => value !== path)
+
+      setExpandPath(filteredPath)
+    } else {
+      setExpandPath([...expandPath, path])
+    }
+  }
+
+  const label = (key: string | number, value: string) => {
+    return (
+      <div className="d-flex mt-2 flex-row label_item align-items-baseline">
+        <label className="small fw-bold mb-0 pe-1 label_key">{key}:</label>
+        <label className="m-0 label_value">{value}</label>
+      </div>
+    )
+  }
+
+  const renderData = (item, parent, key: string | number, keyPath: string) => {
+    const data = extractDataDefault(item, parent)
+    const children = (data.children || []).map((child, index) => {
+      return renderData(child.value, data, child.key, keyPath + '/' + child.key)
+    })
+
+    if (children && children.length > 0) {
+      return (
+        <TreeViewItem id={`treeViewItem${key}`} key={keyPath} label={label(key, data.self)} onClick={() => handleExpand(keyPath)} expand={expandPath.includes(keyPath)}>
+          <TreeView id={`treeView${key}`} key={keyPath}>
+            {children}
+          </TreeView>
+        </TreeViewItem>
+      )
+    } else {
+      return <TreeViewItem id={key.toString()} key={keyPath} label={label(key, data.self)} onClick={() => handleExpand(keyPath)} expand={expandPath.includes(keyPath)} />
+    }
+  }
+
   return (
     <div className="mb-3">
       <div
@@ -230,6 +270,21 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                               Execute
                               </button>
                             </div>
+                            {lookupOnly && (
+                              <div className="udapp_value" data-id="udapp_value">
+                                <TreeView id="treeView">
+                                  {Object.keys(contract.decodedResponse || {}).map((key) => {
+                                    const response = contract.decodedResponse[key]
+
+                                    return parseInt(key) === funcIndex
+                                      ? Object.keys(response || {}).map((innerkey, index) => {
+                                        return renderData(contract.decodedResponse[key][innerkey], response, innerkey, innerkey)
+                                      })
+                                      : null
+                                  })}
+                                </TreeView>
+                              </div>
+                            )}
                           </div>
                         )})}
                     {/* Value and Gas Limit */}
@@ -321,7 +376,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                   </div>
                   <div className='d-flex justify-content-between pt-3 border-top'>
                     <div>Balance</div>
-                    <div>0 ETH</div>
+                    <div>{contract.balance || 0} ETH</div>
                   </div>
                 </>
               ) : (

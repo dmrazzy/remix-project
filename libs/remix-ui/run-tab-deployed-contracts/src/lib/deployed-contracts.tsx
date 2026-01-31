@@ -60,6 +60,15 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
         await loadPinnedContracts(plugin, dispatch, chainId)
       }
     })
+
+    plugin.on('blockchain', 'transactionExecuted', async (error, _, to) => {
+      if (error) return
+      if (to) {
+        const balance = await plugin.call('blockchain', 'getBalanceInEther', to)
+
+        if (balance) dispatch({ type: 'UPDATE_CONTRACT_BALANCE', payload: { address: to, balance } })
+      }
+    })
   }, [])
 
   return (

@@ -13,6 +13,7 @@ export interface DeployedContract {
   isPinned?: boolean
   pinnedAt?: number
   decodedResponse?: Record<number, any>
+  balance?: string
 }
 
 export interface DeployedContractsWidgetState {
@@ -46,3 +47,4 @@ export type Actions =
   | { type: 'SET_LOAD_TYPE'; payload: 'abi' | 'sol' | 'vyper' | 'lexon' | 'contract' | 'other' }
   | { type: 'SET_CURRENT_FILE'; payload: string }
   | { type: 'SET_DECODED_RESPONSE'; payload: { instanceIndex: number; funcIndex: number; response: any } }
+  | { type: 'UPDATE_CONTRACT_BALANCE'; payload: { address: string; balance: string } }
