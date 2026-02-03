@@ -94,7 +94,7 @@ function EnvironmentWidget({ plugin }: { plugin: EnvironmentPlugin }) {
       dispatch({ type: 'SET_NETWORK_STATUS', payload: { chainId: networkStatus.network.id, name: networkStatus.network.name } })
     })
 
-    plugin.on('udappDeployedContracts', 'deployedInstanceAdded', async () => {
+    plugin.on('udappDeployedContracts', 'deployedInstanceUpdated', async () => {
       const deployedContractsCount = await plugin.call('udappDeployedContracts', 'getDeployedInstanceCount')
 
       dispatch({ type: 'SET_DEPLOYED_CONTRACTS_COUNT', payload: deployedContractsCount })

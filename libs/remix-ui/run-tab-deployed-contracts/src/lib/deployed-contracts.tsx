@@ -53,7 +53,7 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
     plugin.on('blockchain', 'networkStatus', async ({ error, network }) => {
       if (error) return
       if (network?.name === 'VM') return
-      const chainId = network?.chainId
+      const chainId = network?.id
 
       if (chainId && lastLoadedChainIdRef.current !== chainId) {
         lastLoadedChainIdRef.current = chainId
@@ -70,6 +70,10 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
       }
     })
   }, [])
+
+  useEffect(() => {
+    plugin.emit('deployedInstanceUpdated', widgetState.deployedContracts)
+  }, [widgetState.deployedContracts])
 
   return (
     <DeployedContractsAppContext.Provider value={{ widgetState, dispatch, plugin, themeQuality }}>

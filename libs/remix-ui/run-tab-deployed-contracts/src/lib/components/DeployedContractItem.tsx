@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useEffect, useState, useRef } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { CustomToggle, CustomTooltip, extractDataDefault, getTimeAgo, shortenAddress, isNumeric, is0XPrefixed, isHexadecimal } from '@remix-ui/helper'
 import { CopyToClipboard } from '@remix-ui/clipboard'
@@ -9,6 +9,7 @@ import { DeployedContractsAppContext } from '../contexts'
 import { DeployedContract } from '../types'
 import { runTransactions } from '../actions'
 import { TreeView, TreeViewItem } from '@remix-ui/tree-view'
+import { ContractKebabMenu } from './ContractKebabMenu'
 
 const txHelper = remixLib.execution.txHelper
 
@@ -30,6 +31,8 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
   const [expandPath, setExpandPath] = useState<string[]>([])
   const [calldataValue, setCalldataValue] = useState<string>('')
   const [llIError, setLlIError] = useState<string>('')
+  const [showKebabMenu, setShowKebabMenu] = useState<boolean>(false)
+  const kebabIconRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     plugin.call('udappEnv', 'getNetwork').then((net) => {
@@ -58,7 +61,9 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
     if (contract.isPinned) {
       const network = await plugin.call('udappEnv', 'getNetwork')
       const chainId = network?.chainId
-      await plugin.call('fileManager', 'remove', `.deploys/pinned-contracts/${chainId}/${contract.address}.json`)
+      const providerName = network?.name === 'VM' ? await plugin.call('udappEnv', 'getSelectedProvider') : chainId
+
+      await plugin.call('fileManager', 'remove', `.deploys/pinned-contracts/${providerName}/${contract.address}.json`)
     }
 
     dispatch({ type: 'REMOVE_CONTRACT', payload: contract.address })
@@ -212,6 +217,107 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
     }
   }
 
+  const handleKebabClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setShowKebabMenu(prev => !prev)
+  }
+
+  const handleCreateDapp = async (contract: DeployedContract) => {
+    setShowKebabMenu(false)
+
+    const network = await plugin.call('udappEnv', 'getNetwork')
+    const payload = {
+      address: '',
+      abi: null,
+      name: '',
+      network: network?.name,
+      devdoc: null,
+      methodIdentifiers: null,
+      solcVersion: '',
+      htmlTemplate: null
+    }
+
+    const targetPlugin = 'quick-dapp'
+
+    try {
+      // We always have a contract instance with contractData
+      const { metadata: metaFromInst, abi: abiFromInst, object } = contract.contractData || {}
+
+      payload.address = contract.address
+      payload.abi = contract.abi || abiFromInst
+      payload.name = contract.name
+
+      if (object) {
+        payload.devdoc = object.devdoc
+        payload.methodIdentifiers = object.evm?.methodIdentifiers
+      }
+
+      if (metaFromInst) {
+        try {
+          payload.solcVersion = JSON.parse(metaFromInst).compiler.version
+        } catch (e) {
+          console.warn('[DeployedContractItem] Failed to parse solcVersion from metadata', e)
+        }
+      }
+
+      await plugin.call(targetPlugin, 'edit', payload)
+
+    } catch (error) {
+      console.error('[DeployedContractItem] Error creating dapp:', error)
+      await plugin.call('notification', 'toast', `Error creating dapp: ${error.message}`)
+    }
+  }
+
+  const handleCopyABI = async (contract: DeployedContract) => {
+    setShowKebabMenu(false)
+    const abi = contract.abi || contract.contractData?.abi
+    if (abi) {
+      navigator.clipboard.writeText(JSON.stringify(abi, null, 2))
+      await plugin.call('notification', 'toast', 'ABI copied to clipboard')
+    }
+  }
+
+  const handleCopyBytecode = async (contract: DeployedContract) => {
+    setShowKebabMenu(false)
+    const bytecode = contract.contractData?.bytecode || contract.contractData?.object
+    if (bytecode) {
+      navigator.clipboard.writeText(bytecode)
+      await plugin.call('notification', 'toast', 'Bytecode copied to clipboard')
+    }
+  }
+
+  const handleOpenInExplorer = async (contract: DeployedContract) => {
+    setShowKebabMenu(false)
+    const network = await plugin.call('udappEnv', 'getNetwork')
+    let explorerUrl = ''
+
+    // Determine explorer URL based on network
+    if (network?.name) {
+      switch (network.name.toLowerCase()) {
+      case 'mainnet':
+      case 'ethereum':
+        explorerUrl = `https://etherscan.io/address/${contract.address}`
+        break
+      case 'sepolia':
+        explorerUrl = `https://sepolia.etherscan.io/address/${contract.address}`
+        break
+      case 'goerli':
+        explorerUrl = `https://goerli.etherscan.io/address/${contract.address}`
+        break
+      default:
+        await plugin.call('notification', 'toast', 'Block explorer not available for this network')
+        return
+      }
+      window.open(explorerUrl, '_blank')
+    }
+  }
+
+  const handleClear = async (contract: DeployedContract) => {
+    setShowKebabMenu(false)
+    handleRemove({ stopPropagation: () => {} } as React.MouseEvent)
+  }
+
   const label = (key: string | number, value: string) => {
     return (
       <div className="d-flex mt-2 flex-row label_item align-items-baseline">
@@ -279,12 +385,24 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                 <span className='small'>{getTimeAgo(contract.timestamp, { truncateTimeAgo: true })} ago</span>
               </div>
               <i
-                className="fas fa-ellipsis-v align-self-center ps-3"
+                ref={kebabIconRef as any}
+                className="fas fa-ellipsis-v align-self-center p-2 mx-1"
                 style={{ cursor: 'pointer' }}
-                onClick={(e) => e.stopPropagation()}
+                onClick={handleKebabClick}
               ></i>
             </div>
           </div>
+          <ContractKebabMenu
+            show={showKebabMenu}
+            target={kebabIconRef.current}
+            onHide={() => setShowKebabMenu(false)}
+            contract={contract}
+            onCreateDapp={handleCreateDapp}
+            onCopyABI={handleCopyABI}
+            onCopyBytecode={handleCopyBytecode}
+            onOpenInExplorer={handleOpenInExplorer}
+            onClear={handleClear}
+          />
           {/* Expanded Contract Interface */}
           {isExpanded && (
             <div className="border-top p-3 pt-0" onClick={(e) => e.stopPropagation()}>
@@ -456,7 +574,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                       <div className="position-relative flex-fill">
                         <input
                           type="text"
-                          placeholder="call data"
+                          placeholder="0x..."
                           className="form-control"
                           value={calldataValue}
                           onChange={(e) => setCalldataValue(e.target.value)}

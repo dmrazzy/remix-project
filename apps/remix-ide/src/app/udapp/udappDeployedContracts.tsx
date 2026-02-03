@@ -39,7 +39,6 @@ export class DeployedContractsPlugin extends Plugin {
       this.getDispatch()?.({ type: 'ADD_CONTRACT', payload: instance })
       setTimeout(resolve, 10)
     })
-    this.emit('deployedInstanceAdded', instance)
   }
 
   getDeployedInstanceCount() {
