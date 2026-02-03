@@ -5,6 +5,7 @@ import VmDebugger from './vm-debugger/vm-debugger' // eslint-disable-line
 import VmDebuggerHead from './vm-debugger/vm-debugger-head' // eslint-disable-line
 import SearchBar from './search-bar/search-bar' // eslint-disable-line
 import TransactionRecorder from './transaction-recorder/transaction-recorder' // eslint-disable-line
+import DebugLayout from './debug-layout/debug-layout' // eslint-disable-line
 import {TransactionDebugger as Debugger} from '@remix-project/remix-debug' // eslint-disable-line
 import {DebuggerUIProps} from './idebugger-api' // eslint-disable-line
 import {Toaster} from '@remix-ui/toaster' // eslint-disable-line
@@ -49,6 +50,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
 
   const [deployments, setDeployments] = useState<ContractDeployment[]>([])
   const [transactions, setTransactions] = useState<Map<string, ContractInteraction[]>>(new Map())
+  const [traceData, setTraceData] = useState<{ currentStep: number; traceLength: number } | null>(null)
 
   if (props.onReady) {
     props.onReady({
@@ -229,6 +231,19 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     }
 
     providerChanged()
+  }, [state.debugger])
+
+  useEffect(() => {
+    if (state.debugger && state.debugger.step_manager) {
+      const updateTraceData = (step) => {
+        setTraceData({
+          currentStep: step,
+          traceLength: state.debugger.step_manager.traceLength || 0
+        })
+      }
+
+      state.debugger.step_manager.event.register('stepChanged', updateTraceData)
+    }
   }, [state.debugger])
 
   const listenToEvents = (debuggerInstance, currentReceipt) => {
@@ -525,17 +540,17 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   return (
     <div>
       <Toaster message={state.toastMessage} />
-      <div className="px-2 pb-3 pt-3" ref={debuggerTopRef}>
-        {/* Search Bar */}
-        <SearchBar
-          onSearch={handleSearch}
-          debugging={state.debugging}
-          currentTxHash={state.txNumber}
-          onStopDebugging={unLoad}
-        />
+      {!state.debugging && (
+        <div className="px-2 pb-3 pt-3" ref={debuggerTopRef}>
+          {/* Search Bar */}
+          <SearchBar
+            onSearch={handleSearch}
+            debugging={state.debugging}
+            currentTxHash={state.txNumber}
+            onStopDebugging={unLoad}
+          />
 
-        {/* Informational Text */}
-        {!state.debugging && (
+          {/* Informational Text */}
           <div className="debugger-info mb-2">
             <h6 className="search-bar-title mt-3">
               <FormattedMessage id="debugger.startDebugging" defaultMessage="Start debugging a transaction" />
@@ -546,44 +561,42 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
               </span>
             </div>
           </div>
-        )}
 
-        {/* Validation Error */}
-        {state.validationError && <span className="w-100 py-1 text-danger validationError d-block mb-3">{state.validationError}</span>}
+          {/* Validation Error */}
+          {state.validationError && <span className="w-100 py-1 text-danger validationError d-block mb-3">{state.validationError}</span>}
 
-        {/* Configuration Options */}
-        <div>
-          <div className="mb-2 debuggerConfig form-check">
-            <CustomTooltip tooltipId="debuggerGenSourceCheckbox" tooltipText={<FormattedMessage id="debugger.debugWithGeneratedSources" />} placement="bottom-start">
-              {customJSX}
-            </CustomTooltip>
-          </div>
-          {state.isLocalNodeUsed && (
+          {/* Configuration Options */}
+          <div>
             <div className="mb-2 debuggerConfig form-check">
-              <CustomTooltip tooltipId="debuggerGenSourceInput" tooltipText={<FormattedMessage id="debugger.forceToUseCurrentLocalNode" />} placement="right">
-                <input
-                  className="form-check-input"
-                  id="debugWithLocalNodeInput"
-                  onChange={({ target: { checked } }) => {
-                    setState((prevState) => {
-                      return {
-                        ...prevState,
-                        opt: { ...prevState.opt, debugWithLocalNode: checked }
-                      }
-                    })
-                  }}
-                  type="checkbox"
-                />
+              <CustomTooltip tooltipId="debuggerGenSourceCheckbox" tooltipText={<FormattedMessage id="debugger.debugWithGeneratedSources" />} placement="bottom-start">
+                {customJSX}
               </CustomTooltip>
-              <label data-id="debugLocaNodeLabel" className="form-check-label" htmlFor="debugWithLocalNodeInput">
-                <FormattedMessage id="debugger.debugLocaNodeLabel" />
-              </label>
             </div>
-          )}
-        </div>
+            {state.isLocalNodeUsed && (
+              <div className="mb-2 debuggerConfig form-check">
+                <CustomTooltip tooltipId="debuggerGenSourceInput" tooltipText={<FormattedMessage id="debugger.forceToUseCurrentLocalNode" />} placement="right">
+                  <input
+                    className="form-check-input"
+                    id="debugWithLocalNodeInput"
+                    onChange={({ target: { checked } }) => {
+                      setState((prevState) => {
+                        return {
+                          ...prevState,
+                          opt: { ...prevState.opt, debugWithLocalNode: checked }
+                        }
+                      })
+                    }}
+                    type="checkbox"
+                  />
+                </CustomTooltip>
+                <label data-id="debugLocaNodeLabel" className="form-check-label" htmlFor="debugWithLocalNodeInput">
+                  <FormattedMessage id="debugger.debugLocaNodeLabel" />
+                </label>
+              </div>
+            )}
+          </div>
 
-        {/* Transaction Recorder Section */}
-        {!state.debugging && (
+          {/* Transaction Recorder Section */}
           <TransactionRecorder
             requestDebug={requestDebug}
             unloadRequested={unloadRequested}
@@ -594,19 +607,33 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             transactions={transactions}
             onDebugTransaction={(txHash) => debug(txHash)}
           />
-        )}
+        </div>
+      )}
 
-        {state.debugging && state.sourceLocationStatus && (
-          <div className="text-warning mt-3">
-            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {state.sourceLocationStatus}
-          </div>
-        )}
+      {state.debugging && (
+        <div className="px-2 pb-3 pt-3" ref={debuggerTopRef} style={{ height: '100%' }}>
+          <DebugLayout
+            onSearch={handleSearch}
+            debugging={state.debugging}
+            currentTxHash={state.txNumber}
+            onStopDebugging={unLoad}
+            currentBlock={state.currentBlock}
+            currentReceipt={state.currentReceipt}
+            currentTransaction={state.currentTransaction}
+            traceData={traceData}
+          />
+        </div>
+      )}
 
-        {state.debugging && <StepManager stepManager={stepManager} />}
-      </div>
-      <div className="debuggerPanels" ref={panelsRef}>
-        {state.debugging && <VmDebuggerHead debugging={state.debugging} vmDebugger={vmDebugger} stepManager={stepManager} onShowOpcodesChange={handleShowOpcodesChange} />}
-        {state.debugging && (
+      {state.debugging && (
+        <div className="debuggerPanels" ref={panelsRef}>
+          {state.sourceLocationStatus && (
+            <div className="text-warning px-2 py-2">
+              <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {state.sourceLocationStatus}
+            </div>
+          )}
+          <StepManager stepManager={stepManager} />
+          <VmDebuggerHead debugging={state.debugging} vmDebugger={vmDebugger} stepManager={stepManager} onShowOpcodesChange={handleShowOpcodesChange} />
           <VmDebugger
             debugging={state.debugging}
             vmDebugger={vmDebugger}
@@ -614,9 +641,9 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             currentReceipt={state.currentReceipt}
             currentTransaction={state.currentTransaction}
           />
-        )}
-        <div id="bottomSpacer" className="p-1 mt-3"></div>
-      </div>
+          <div id="bottomSpacer" className="p-1 mt-3"></div>
+        </div>
+      )}
     </div>
   )
 }
