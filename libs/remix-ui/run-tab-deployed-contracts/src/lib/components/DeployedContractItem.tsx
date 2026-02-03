@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { FormattedMessage } from 'react-intl'
-import { CustomToggle, CustomTooltip, extractDataDefault, getTimeAgo, shortenAddress } from '@remix-ui/helper'
+import { FormattedMessage, useIntl } from 'react-intl'
+import { CustomToggle, CustomTooltip, extractDataDefault, getTimeAgo, shortenAddress, isNumeric, is0XPrefixed, isHexadecimal } from '@remix-ui/helper'
 import { CopyToClipboard } from '@remix-ui/clipboard'
 import * as remixLib from '@remix-project/remix-lib'
 import { Dropdown } from 'react-bootstrap'
@@ -19,6 +19,7 @@ interface DeployedContractItemProps {
 
 export function DeployedContractItem({ contract, index }: DeployedContractItemProps) {
   const { dispatch, plugin, themeQuality } = useContext(DeployedContractsAppContext)
+  const intl = useIntl()
   const [networkName, setNetworkName] = useState<string>('')
   const [isExpanded, setIsExpanded] = useState<boolean>(false)
   const [contractABI, setContractABI] = useState(null)
@@ -27,6 +28,8 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
   const [gasLimit, setGasLimit] = useState<number>(0) // 0 means auto
   const [funcInputs, setFuncInputs] = useState<Record<number, string>>({})
   const [expandPath, setExpandPath] = useState<string[]>([])
+  const [calldataValue, setCalldataValue] = useState<string>('')
+  const [llIError, setLlIError] = useState<string>('')
 
   useEffect(() => {
     plugin.call('udappEnv', 'getNetwork').then((net) => {
@@ -145,6 +148,70 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
     }
   }
 
+  const sendData = async () => {
+    setLlIError('')
+    const fallback = txHelper.getFallbackInterface(contractABI)
+    const receive = txHelper.getReceiveInterface(contractABI)
+    const amount = parseUnits(value.toString() || '0', valueUnit || 'wei').toString()
+
+    if (amount !== '0') {
+      // check for numeric and receive/fallback
+      if (!isNumeric(value.toString())) {
+        return setLlIError(intl.formatMessage({ id: 'udapp.llIError1' }))
+      } else if (!receive && !(fallback && fallback.stateMutability === 'payable')) {
+        return setLlIError(intl.formatMessage({ id: 'udapp.llIError2' }))
+      }
+    }
+    let calldata = calldataValue
+
+    if (calldata) {
+      if (calldata.length < 4 && is0XPrefixed(calldata)) {
+        return setLlIError(intl.formatMessage({ id: 'udapp.llIError3' }))
+      } else {
+        if (is0XPrefixed(calldata)) {
+          calldata = calldata.substr(2, calldata.length)
+        }
+        if (!isHexadecimal(calldata)) {
+          return setLlIError(intl.formatMessage({ id: 'udapp.llIError4' }))
+        }
+      }
+      if (!fallback) {
+        return setLlIError(intl.formatMessage({ id: 'udapp.llIError5' }))
+      }
+    }
+
+    if (!receive && !fallback) return setLlIError(intl.formatMessage({ id: 'udapp.llIError6' }))
+
+    // we have to put the right function ABI:
+    // if receive is defined and that there is no calldata => receive function is called
+    // if fallback is defined => fallback function is called
+    let funcABI = null
+    if (receive && !calldata) funcABI = receive
+    else if (fallback) funcABI = fallback
+
+    if (!funcABI) return setLlIError(intl.formatMessage({ id: 'udapp.llIError7' }))
+
+    try {
+      const sendValue = parseUnits(value.toString() || '0', valueUnit || 'wei').toString()
+      const gasLimitValue = gasLimit.toString()
+
+      await runTransactions(
+        plugin,
+        dispatch,
+        index,
+        false,
+        funcABI,
+        '',
+        contract,
+        -1, // Use -1 for low level interactions
+        { value: sendValue, gasLimit: gasLimitValue }
+      )
+    } catch (error) {
+      console.error('Error executing low level transaction:', error)
+      await plugin.call('notification', 'toast', `Error: ${error.message}`)
+    }
+  }
+
   const label = (key: string | number, value: string) => {
     return (
       <div className="d-flex mt-2 flex-row label_item align-items-baseline">
@@ -176,11 +243,11 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
   return (
     <div className="mb-3">
       <div
-        className="d-flex align-items-center p-3 rounded"
+        className="d-flex align-items-center rounded"
         style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', cursor: 'pointer' }}
       >
-        <div className="me-auto text-nowrap text-truncate overflow-hidden w-100">
-          <div className="d-flex align-items-center justify-content-between w-100" onClick={handleContractClick}>
+        <div className="me-auto w-100">
+          <div className="d-flex align-items-center justify-content-between w-100 p-3 text-nowrap text-truncate overflow-hidden" onClick={handleContractClick}>
             <div className='d-flex'>
               <CustomTooltip
                 placement="top"
@@ -220,10 +287,11 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
           </div>
           {/* Expanded Contract Interface */}
           {isExpanded && (
-            <div className="mt-3 border-top" onClick={(e) => e.stopPropagation()}>
+            <div className="border-top p-3 pt-0" onClick={(e) => e.stopPropagation()}>
               {contractABI && contractABI.length > 0 ? (
                 <>
                   <div className="py-3 pb-2">
+                    <p className='mb-1'>High level interaction</p>
                     {contractABI
                       .filter((item: any) => item.type === 'function')
                       .map((funcABI: any, funcIndex: number) => {
@@ -233,7 +301,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                         const inputs = funcABI.inputs ? txHelper.inputParametersDeclarationToString(funcABI.inputs) : ''
 
                         return (
-                          <div key={funcIndex} className="mb-1 p-2 rounded">
+                          <div key={funcIndex} className="mb-1 px-0 py-2 rounded">
                             <div className="d-flex align-items-center mb-2" key={funcIndex}>
                               {
                                 funcABI.stateMutability === 'view' || funcABI.stateMutability === 'pure' ?
@@ -288,7 +356,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                           </div>
                         )})}
                     {/* Value and Gas Limit */}
-                    <div className='border-top pt-3'>
+                    <div className='pt-3'>
                       {/* Value */}
                       <div className="d-flex align-items-center gap-3 mb-3">
                         <label className="mb-2" style={{ fontSize: '0.9rem', minWidth: '75px', color: themeQuality === 'dark' ? 'white' : 'black' }}>
@@ -372,6 +440,44 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                           />
                         </div>
                       </div>
+                    </div>
+                  </div>
+                  <div className='pt-3 border-top'>
+                    <p className='mb-1'>Low level interaction</p>
+                    <div className="mb-1 px-0 py-2 rounded">
+                      <div className="d-flex align-items-center mb-2">
+                        <label className="mb-0 me-1 text-secondary">
+                          Call data
+                        </label>
+                        <span style={{ fontWeight: 'lighter' }}>
+                          call data
+                        </span>
+                      </div>
+                      <div className="position-relative flex-fill">
+                        <input
+                          type="text"
+                          placeholder="call data"
+                          className="form-control"
+                          value={calldataValue}
+                          onChange={(e) => setCalldataValue(e.target.value)}
+                          style={{
+                            backgroundColor: 'var(--bs-body-bg)',
+                            color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '4.5rem', fontSize: '0.75rem',
+                          }}
+                        />
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={sendData}
+                          style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 2, fontSize: '0.65rem', fontWeight: 'bold' }}
+                        >
+                              Execute
+                        </button>
+                      </div>
+                      {llIError && (
+                        <div className="alert alert-danger mt-2 p-2" role="alert" style={{ fontSize: '0.75rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                          {llIError}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className='d-flex justify-content-between pt-3 border-top'>
