@@ -13,6 +13,7 @@ interface DebugLayoutProps {
   currentReceipt: any
   currentTransaction: any
   traceData?: any
+  currentFunction?: string
 }
 
 export const DebugLayout = ({
@@ -23,7 +24,8 @@ export const DebugLayout = ({
   currentBlock,
   currentReceipt,
   currentTransaction,
-  traceData
+  traceData,
+  currentFunction
 }: DebugLayoutProps) => {
   const [activeObjectTab, setActiveObjectTab] = useState<'json' | 'raw'>('json')
   const [copyTooltips, setCopyTooltips] = useState<{ [key: string]: string }>({
@@ -51,19 +53,26 @@ export const DebugLayout = ({
     const tx = currentTransaction
     const block = currentBlock
     const receipt = currentReceipt
-    console.log('receipt-->', receipt)
+
+    // Get input data (can be either 'data' or 'input' property)
+    const inputData = tx?.data || tx?.input
+
     // Determine status
     const status = receipt?.status === 1 || receipt?.status === '0x1' || receipt?.status === 'true' || receipt?.status === true || receipt?.status === 'success' ? 'success' : 'failed'
 
     // Extract function name from input data if available
     let functionName = 'N/A'
-    if (tx && tx.input) {
-      if (tx.input === '0x' || tx.input === '') {
+
+    // Use currentFunction prop if available (decoded function name from debugger)
+    if (currentFunction) {
+      functionName = currentFunction
+    } else if (tx && inputData) {
+      if (inputData === '0x' || inputData === '') {
         // Empty input means it's a simple transfer
         functionName = !tx.to ? 'Contract Creation' : 'Transfer'
-      } else if (tx.input.length >= 10) {
+      } else if (inputData.length >= 10) {
         // Has input data, show the method signature
-        const methodId = tx.input.substring(0, 10)
+        const methodId = inputData.substring(0, 10)
         functionName = methodId
       }
     } else if (receipt?.contractAddress) {
@@ -188,10 +197,55 @@ export const DebugLayout = ({
   }
 
   const renderObjectContent = () => {
+    const tx = currentTransaction
+    const receipt = currentReceipt
+
+    // Get input data (can be either 'data' or 'input' property)
+    const inputData = tx?.data || tx?.input
+
+    // Extract function name
+    let functionName = 'N/A'
+
+    // Use currentFunction prop if available (decoded function name from debugger)
+    if (currentFunction) {
+      functionName = currentFunction
+    } else if (tx && inputData) {
+      if (inputData === '0x' || inputData === '') {
+        functionName = !tx.to ? 'Contract Creation' : 'Transfer'
+      } else if (inputData.length >= 10) {
+        const methodId = inputData.substring(0, 10)
+        functionName = methodId
+      }
+    } else if (receipt?.contractAddress) {
+      functionName = 'Contract Creation'
+    }
+
+    // msg.sender is the transaction sender
+    const msgSender = tx?.from || 'N/A'
+
+    // Extract parameters from transaction input (strip function selector)
+    let parameters = 'N/A'
+    if (tx && inputData) {
+      if (inputData === '0x' || inputData === '') {
+        parameters = !tx.to ? 'Contract Bytecode' : 'None (ETH Transfer)'
+      } else if (inputData.length > 10) {
+        // Strip the function selector (first 10 chars including '0x')
+        parameters = '0x' + inputData.substring(10)
+      } else {
+        parameters = inputData
+      }
+    }
+
+    // Extract return values from receipt logs if available
+    const returnValues = receipt?.logs && receipt.logs.length > 0
+      ? receipt.logs
+      : 'No events emitted'
+
     const objectData = {
-      block: currentBlock,
-      receipt: currentReceipt,
-      transaction: currentTransaction
+      'msg.sender': msgSender,
+      function: functionName,
+      parameters: parameters,
+      returnValues: returnValues
     }
 
     if (activeObjectTab === 'json') {
@@ -255,11 +309,11 @@ export const DebugLayout = ({
         </div>
       </div>
 
-      {/* Section 3: Object with Tabs */}
+      {/* Section 3: Parameters & Return Values */}
       <div className="debug-section debug-section-object">
         <div className="debug-section-header">
           <h6 className="debug-section-title">
-            <FormattedMessage id="debugger.object" defaultMessage="Object" />
+            <FormattedMessage id="debugger.parametersAndReturnValues" defaultMessage="Parameters & Return Values" />
           </h6>
           <div className="debug-tabs">
             <button

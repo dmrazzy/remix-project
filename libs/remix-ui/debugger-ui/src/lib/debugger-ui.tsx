@@ -51,6 +51,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   const [deployments, setDeployments] = useState<ContractDeployment[]>([])
   const [transactions, setTransactions] = useState<Map<string, ContractInteraction[]>>(new Map())
   const [traceData, setTraceData] = useState<{ currentStep: number; traceLength: number } | null>(null)
+  const [currentFunction, setCurrentFunction] = useState<string>('')
 
   if (props.onReady) {
     props.onReady({
@@ -243,6 +244,22 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
       }
 
       state.debugger.step_manager.event.register('stepChanged', updateTraceData)
+    }
+
+    // Listen for function stack updates to get the current function name
+    if (state.debugger && state.debugger.vmDebuggerLogic) {
+      const updateFunctionName = (stack) => {
+        if (stack && stack.length > 0) {
+          // Get the top-level function from the stack
+          const topFunction = stack[0]
+          const funcName = topFunction.functionDefinition?.name || topFunction.functionDefinition?.kind || ''
+          setCurrentFunction(funcName)
+        } else {
+          setCurrentFunction('')
+        }
+      }
+
+      state.debugger.vmDebuggerLogic.event.register('functionsStackUpdate', updateFunctionName)
     }
   }, [state.debugger])
 
@@ -621,11 +638,13 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             currentReceipt={state.currentReceipt}
             currentTransaction={state.currentTransaction}
             traceData={traceData}
+            currentFunction={currentFunction}
           />
         </div>
       )}
 
-      {state.debugging && (
+      {/* OLD DEBUGGER UI - COMMENTED OUT */}
+      {/* {state.debugging && (
         <div className="debuggerPanels" ref={panelsRef}>
           {state.sourceLocationStatus && (
             <div className="text-warning px-2 py-2">
@@ -643,7 +662,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
           />
           <div id="bottomSpacer" className="p-1 mt-3"></div>
         </div>
-      )}
+      )} */}
     </div>
   )
 }
