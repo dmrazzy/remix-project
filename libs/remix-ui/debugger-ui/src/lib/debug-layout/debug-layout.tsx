@@ -63,21 +63,21 @@ export const DebugLayout = ({
     // Extract function name from input data if available
     let functionName = 'N/A'
 
-    // Use currentFunction prop if available (decoded function name from debugger)
-    if (currentFunction) {
+    // Check if it's a contract creation first (no 'to' address or has contractAddress)
+    if (!tx?.to || receipt?.contractAddress) {
+      functionName = 'Contract Creation'
+    } else if (currentFunction) {
+      // Use currentFunction prop if available (decoded function name from debugger)
       functionName = currentFunction
     } else if (tx && inputData) {
       if (inputData === '0x' || inputData === '') {
         // Empty input means it's a simple transfer
-        functionName = !tx.to ? 'Contract Creation' : 'Transfer'
+        functionName = 'Transfer'
       } else if (inputData.length >= 10) {
         // Has input data, show the method signature
         const methodId = inputData.substring(0, 10)
         functionName = methodId
       }
-    } else if (receipt?.contractAddress) {
-      // Contract creation
-      functionName = 'Contract Creation'
     }
 
     // Format timestamp
@@ -206,18 +206,19 @@ export const DebugLayout = ({
     // Extract function name
     let functionName = 'N/A'
 
-    // Use currentFunction prop if available (decoded function name from debugger)
-    if (currentFunction) {
+    // Check if it's a contract creation first (no 'to' address or has contractAddress)
+    if (!tx?.to || receipt?.contractAddress) {
+      functionName = 'Contract Creation'
+    } else if (currentFunction) {
+      // Use currentFunction prop if available (decoded function name from debugger)
       functionName = currentFunction
     } else if (tx && inputData) {
       if (inputData === '0x' || inputData === '') {
-        functionName = !tx.to ? 'Contract Creation' : 'Transfer'
+        functionName = 'Transfer'
       } else if (inputData.length >= 10) {
         const methodId = inputData.substring(0, 10)
         functionName = methodId
       }
-    } else if (receipt?.contractAddress) {
-      functionName = 'Contract Creation'
     }
 
     // msg.sender is the transaction sender

@@ -13,6 +13,10 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
   const [aiSwitch, setAiSwitch] = useState(true)
   const [currentExt, setCurrentExt] = useState('')
   const [currentFilePath, setCurrentFilePath] = useState('')
+  const [isDebugging, setIsDebugging] = useState(false)
+  const [isDebuggerActive, setIsDebuggerActive] = useState(false)
+  const [stepManager, setStepManager] = useState<any>(null)
+  const [stepState, setStepState] = useState<'initial' | 'middle' | 'end'>('initial')
 
   useEffect(() => {
     const getAI = async () => {
@@ -50,10 +54,76 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
       handleExtChange('')
     })
 
+    // Check if debugger is currently active
+    const checkDebuggerActive = async () => {
+      try {
+        const active = await plugin.call('sidePanel', 'currentFocus')
+        setIsDebuggerActive(active === 'debugger')
+      } catch (err) {
+        console.error('Failed to check debugger active state', err)
+      }
+    }
+
+    checkDebuggerActive()
+
+    // Listen for plugin activation/deactivation
+    const onPluginActivated = (name: string) => {
+      if (name === 'debugger') {
+        setIsDebuggerActive(true)
+      } else {
+        setIsDebuggerActive(false)
+      }
+    }
+
+    // Listen for debugger events
+    const onDebuggingStarted = (data: any) => {
+      console.log('Debugging started', data)
+      setIsDebugging(true)
+      setStepManager(data.stepManager)
+
+      // When debugging starts, always start from 'initial' state (step 0)
+      // The stepChanged event will update the state if needed
+      setStepState('initial')
+
+      // Register for step changes if available
+      if (data.stepManager?.registerEvent) {
+        data.stepManager.registerEvent('stepChanged', (step: number) => {
+          // Get the latest traceLength
+          const length = data.stepManager.traceLength || 0
+
+          console.log('Step changed:', step, 'Trace length:', length)
+
+          if (step === 0) {
+            setStepState('initial')
+          } else if (length > 0 && step >= length - 1) {
+            setStepState('end')
+          } else {
+            setStepState('middle')
+          }
+        })
+      }
+    }
+
+    const onDebuggingStopped = () => {
+      console.log('Debugging stopped')
+      setIsDebugging(false)
+      setStepManager(null)
+      setStepState('initial')
+    }
+
+    plugin.on('sidePanel', 'pluginDisabled', onPluginActivated)
+    plugin.on('sidePanel', 'focusChanged', onPluginActivated)
+    plugin.on('debugger', 'debuggingStarted', onDebuggingStarted)
+    plugin.on('debugger', 'debuggingStopped', onDebuggingStopped)
+
     return () => {
       plugin.off('tabs', 'extChanged')
       plugin.off('fileManager', 'currentFileChanged')
       plugin.off('settings', 'copilotChoiceUpdated')
+      plugin.off('sidePanel', 'pluginDisabled')
+      plugin.off('sidePanel', 'focusChanged')
+      plugin.off('debugger', 'debuggingStarted')
+      plugin.off('debugger', 'debuggingStopped')
     }
   }, [plugin])
 
@@ -95,6 +165,78 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
     return ''
   }
 
+  // Show debugger controls when debugging AND debugger plugin is active
+  if (isDebugging && isDebuggerActive) {
+    return (
+      <div className="bottom-bar border-top border-bottom" data-id="bottomBarPanel">
+        <span className="debug-bar-label">Debugger Controls:</span>
+        <div className="debug-controls">
+          <button
+            className="btn btn-sm btn-secondary debug-btn"
+            onClick={() => stepManager?.jumpPreviousBreakpoint && stepManager.jumpPreviousBreakpoint()}
+            disabled={stepState === 'initial'}
+            data-id="btnJumpPreviousBreakpoint"
+            title="Jump to Previous Breakpoint"
+          >
+            <i className="fas fa-step-backward"></i>
+            <span className="btn-label">Previous Breakpoint</span>
+          </button>
+          <button
+            className="btn btn-sm btn-secondary debug-btn"
+            onClick={() => stepManager?.stepOverBack && stepManager.stepOverBack(true)}
+            disabled={stepState === 'initial'}
+            data-id="btnStepBackward"
+            title="Step Backward"
+          >
+            <i className="fas fa-reply"></i>
+            <span className="btn-label">Step Backward</span>
+          </button>
+          <button
+            className="btn btn-sm btn-primary debug-btn"
+            onClick={() => stepManager?.stepIntoBack && stepManager.stepIntoBack(true)}
+            disabled={stepState === 'initial'}
+            data-id="btnStepBack"
+            title="Step Back"
+          >
+            <i className="fas fa-level-up-alt"></i>
+            <span className="btn-label">Step Back</span>
+          </button>
+          <button
+            className="btn btn-sm btn-primary debug-btn"
+            onClick={() => stepManager?.stepIntoForward && stepManager.stepIntoForward(true)}
+            disabled={stepState === 'end'}
+            data-id="btnStepInto"
+            title="Step Into"
+          >
+            <i className="fas fa-level-down-alt"></i>
+            <span className="btn-label">Step Into</span>
+          </button>
+          <button
+            className="btn btn-sm btn-secondary debug-btn"
+            onClick={() => stepManager?.stepOverForward && stepManager.stepOverForward()}
+            disabled={stepState === 'end'}
+            data-id="btnStepForward"
+            title="Step Forward"
+          >
+            <i className="fas fa-share"></i>
+            <span className="btn-label">Step Forward</span>
+          </button>
+          <button
+            className="btn btn-sm btn-secondary debug-btn"
+            onClick={() => stepManager?.jumpNextBreakpoint && stepManager.jumpNextBreakpoint()}
+            disabled={stepState === 'end'}
+            data-id="btnJumpNextBreakpoint"
+            title="Jump to Next Breakpoint"
+          >
+            <i className="fas fa-step-forward"></i>
+            <span className="btn-label">Next Breakpoint</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Show explain contract button when not debugging
   if (!SUPPORTED_EXTENSIONS.includes(currentExt)) {
     return null
   }

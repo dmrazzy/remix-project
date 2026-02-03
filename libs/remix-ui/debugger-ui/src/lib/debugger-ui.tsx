@@ -384,6 +384,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
         debugging: false
       }
     })
+    // Emit debugging stopped event
+    debuggerModule.emit('debuggingStopped')
   }
   const startDebugging = async (blockNumber, txNumber, tx, optWeb3?) => {
     if (state.debugger) {
@@ -468,6 +470,25 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
               debugger: debuggerInstance,
               toastMessage: `debugging ${txNumber}`,
               validationError: ''
+            }
+          })
+          // Activate the debugger plugin when debugging starts
+          debuggerModule.call('menuicons', 'select', 'debugger').catch(err => {
+            console.error('Failed to activate debugger:', err)
+          })
+          // Emit debugging started event
+          debuggerModule.emit('debuggingStarted', {
+            txHash: txNumber,
+            stepManager: {
+              stepOverBack: debuggerInstance.step_manager?.stepOverBack.bind(debuggerInstance.step_manager),
+              stepIntoBack: debuggerInstance.step_manager?.stepIntoBack.bind(debuggerInstance.step_manager),
+              stepIntoForward: debuggerInstance.step_manager?.stepIntoForward.bind(debuggerInstance.step_manager),
+              stepOverForward: debuggerInstance.step_manager?.stepOverForward.bind(debuggerInstance.step_manager),
+              jumpPreviousBreakpoint: debuggerInstance.step_manager?.jumpPreviousBreakpoint.bind(debuggerInstance.step_manager),
+              jumpNextBreakpoint: debuggerInstance.step_manager?.jumpNextBreakpoint.bind(debuggerInstance.step_manager),
+              traceLength: debuggerInstance.step_manager?.traceLength,
+              currentStepIndex: debuggerInstance.step_manager?.currentStepIndex,
+              registerEvent: debuggerInstance.step_manager?.event.register.bind(debuggerInstance.step_manager?.event)
             }
           })
         })
