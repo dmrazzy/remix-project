@@ -422,7 +422,6 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
     this.trackMatomoEvent?.({ category: 'ai', action: 'code_completion', name: metadata.task + '_partial_accept', isClick: true })
   }
 
-  // This is called when the completion is dismissed/freed
   freeInlineCompletions(
     completions: monacoTypes.languages.InlineCompletions<monacoTypes.languages.InlineCompletion>
   ): void {
