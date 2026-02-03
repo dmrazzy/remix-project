@@ -355,6 +355,17 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   }, [props.queuedMessage])
 
+  // Stop ongoing request
+  const stopRequest = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      setIsStreaming(false)
+
+      trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'StopRequest', isClick: true })
+    }
+  }, [])
+
   // reusable sender (used by both UI button and imperative ref)
   const sendPrompt = useCallback(
     async (prompt: string) => {
@@ -396,6 +407,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       }
 
       try {
+        // Create new AbortController for this request
+        abortControllerRef.current = new AbortController()
         setIsStreaming(true)
 
         // Add temporary assistant message for parsing status
@@ -519,16 +532,17 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           }
         }
 
-        // Attach the callback to the response if it's an object
+        // Attach the callback and abort signal to the response if it's an object
         if (response && typeof response === 'object') {
           response.uiToolCallback = uiToolCallback
+          response.abortSignal = abortControllerRef.current?.signal
         }
 
         // Use the selected model's provider to determine handler
         const provider = selectedModel.provider
         switch (provider) {
         case 'openai':
-          HandleOpenAIResponse(
+          await HandleOpenAIResponse(
             response,
             (chunk: string) => {
               if (abortControllerRef.current?.signal.aborted) return
@@ -543,7 +557,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           )
           break;
         case 'mistralai':
-          HandleMistralAIResponse(
+          await HandleMistralAIResponse(
             response,
             (chunk: string) => {
               if (abortControllerRef.current?.signal.aborted) return
@@ -558,7 +572,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           )
           break;
         case 'anthropic':
-          HandleAnthropicResponse(
+          await HandleAnthropicResponse(
             response,
             (chunk: string) => {
               if (abortControllerRef.current?.signal.aborted) return
@@ -582,7 +596,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             )
           }
 
-          HandleOllamaResponse(
+          await HandleOllamaResponse(
             response,
             (chunk: string) => {
               if (abortControllerRef.current?.signal.aborted) return
@@ -598,7 +612,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           break;
         }
         default:
-          HandleStreamResponse(
+          await HandleStreamResponse(
             response,
             (chunk: string) => {
               if (abortControllerRef.current?.signal.aborted) return
@@ -617,6 +631,13 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       catch (error) {
         console.error('Error sending prompt:', error)
         setIsStreaming(false)
+        abortControllerRef.current = null
+
+        // Don't show error message if request was aborted by user
+        if (error.name === 'AbortError') {
+          return
+        }
+
         // Add error message to chat history
         setMessages(prev => [
           ...prev,
@@ -1037,6 +1058,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           setInput={setInput}
           isStreaming={isStreaming}
           handleSend={handleSend}
+          handleStop={stopRequest}
           showContextOptions={showContextOptions}
           setShowContextOptions={setShowContextOptions}
           showModelSelector={showModelSelector}
