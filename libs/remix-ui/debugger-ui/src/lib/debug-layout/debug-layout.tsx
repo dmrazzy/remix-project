@@ -14,6 +14,7 @@ interface DebugLayoutProps {
   currentTransaction: any
   traceData?: any
   currentFunction?: string
+  functionStack?: any[]
 }
 
 export const DebugLayout = ({
@@ -25,7 +26,8 @@ export const DebugLayout = ({
   currentReceipt,
   currentTransaction,
   traceData,
-  currentFunction
+  currentFunction,
+  functionStack
 }: DebugLayoutProps) => {
   const [activeObjectTab, setActiveObjectTab] = useState<'json' | 'raw'>('json')
   const [copyTooltips, setCopyTooltips] = useState<{ [key: string]: string }>({
@@ -196,6 +198,55 @@ export const DebugLayout = ({
     )
   }
 
+  const renderCallTrace = () => {
+    if (!functionStack || functionStack.length === 0) {
+      return (
+        <p className="text-muted">
+          <FormattedMessage id="debugger.noCallTrace" defaultMessage="No call trace available" />
+        </p>
+      )
+    }
+
+    return (
+      <div className="call-trace-list">
+        {functionStack.map((func, index) => {
+          const functionName = func.functionDefinition?.name || func.functionDefinition?.kind || 'Unknown'
+          const callType = func.callType || func.functionDefinition?.visibility || ''
+          const inputs = func.inputs || []
+          const gasCost = func.gasCost || 0
+          const step = func.firstStep !== undefined ? func.firstStep : '-'
+
+          // Determine call type icon and label
+          let callTypeLabel = ''
+          if (callType.includes('delegate') || func.isDelegateCall) {
+            callTypeLabel = 'DELEGATECALL'
+          } else if (callType.includes('static') || func.isStaticCall) {
+            callTypeLabel = 'STATICCALL'
+          } else if (functionName === 'constructor' || func.functionDefinition?.kind === 'constructor') {
+            callTypeLabel = 'CREATE'
+          } else {
+            callTypeLabel = 'CALL'
+          }
+
+          return (
+            <div key={index} className="call-trace-item" style={{ paddingLeft: `${index * 12}px` }}>
+              <div className="call-trace-line">
+                <span className="call-trace-step">{step}</span>
+                <span className={`call-trace-type ${callTypeLabel.toLowerCase()}`}>
+                  {callTypeLabel}
+                </span>
+                <span className="call-trace-function">
+                  {functionName}({inputs.join(', ')})
+                </span>
+                <span className="call-trace-gas">{gasCost} gas</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   const renderObjectContent = () => {
     const tx = currentTransaction
     const receipt = currentReceipt
@@ -283,30 +334,11 @@ export const DebugLayout = ({
       <div className="debug-section debug-section-trace">
         <div className="debug-section-header">
           <h6 className="debug-section-title">
-            <FormattedMessage id="debugger.callTrace" defaultMessage="Call Trace" />
+            Call Trace (Trace Length: {(traceData && traceData.traceLength) || 0})
           </h6>
         </div>
-        <div className="debug-section-content">
-          {traceData ? (
-            <div className="trace-info">
-              <div className="trace-item">
-                <span className="trace-label">
-                  <FormattedMessage id="debugger.vmTraceStep" defaultMessage="VM Trace Step:" />
-                </span>
-                <span className="trace-value">{traceData.currentStep || 0}</span>
-              </div>
-              <div className="trace-item">
-                <span className="trace-label">
-                  <FormattedMessage id="debugger.traceLength" defaultMessage="Trace Length:" />
-                </span>
-                <span className="trace-value">{traceData.traceLength || 0}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-muted">
-              <FormattedMessage id="debugger.noTraceData" defaultMessage="No trace data available" />
-            </p>
-          )}
+        <div className="debug-section-content debug-section-scrollable">
+          {renderCallTrace()}
         </div>
       </div>
 

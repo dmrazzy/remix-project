@@ -52,6 +52,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   const [transactions, setTransactions] = useState<Map<string, ContractInteraction[]>>(new Map())
   const [traceData, setTraceData] = useState<{ currentStep: number; traceLength: number } | null>(null)
   const [currentFunction, setCurrentFunction] = useState<string>('')
+  const [functionStack, setFunctionStack] = useState<any[]>([])
 
   if (props.onReady) {
     props.onReady({
@@ -248,18 +249,21 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
 
     // Listen for function stack updates to get the current function name
     if (state.debugger && state.debugger.vmDebuggerLogic) {
-      const updateFunctionName = (stack) => {
+      const updateFunctionStack = (stack) => {
         if (stack && stack.length > 0) {
           // Get the top-level function from the stack
           const topFunction = stack[0]
           const funcName = topFunction.functionDefinition?.name || topFunction.functionDefinition?.kind || ''
           setCurrentFunction(funcName)
+          // Store the full stack for the trace view
+          setFunctionStack(stack)
         } else {
           setCurrentFunction('')
+          setFunctionStack([])
         }
       }
 
-      state.debugger.vmDebuggerLogic.event.register('functionsStackUpdate', updateFunctionName)
+      state.debugger.vmDebuggerLogic.event.register('functionsStackUpdate', updateFunctionStack)
     }
   }, [state.debugger])
 
@@ -660,6 +664,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             currentTransaction={state.currentTransaction}
             traceData={traceData}
             currentFunction={currentFunction}
+            functionStack={functionStack}
           />
         </div>
       )}
