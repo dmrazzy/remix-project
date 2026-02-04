@@ -1,0 +1,91 @@
+.debugger-call-stack {
+  height: 100%;
+  overflow-y: auto;
+  background-color: var(--body-bg);
+}
+
+.call-stack-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.call-stack-item {
+  font-family: monospace;
+  font-size: 13px;
+  border-left: 2px solid var(--secondary);
+  transition: all 0.2s ease;
+}
+
+.call-stack-item:hover {
+  background-color: var(--secondary);
+  border-left-color: var(--primary);
+}
+
+.call-stack-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  flex-wrap: wrap;
+}
+
+.call-stack-step {
+  color: var(--secondary);
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+}
+
+.call-stack-type {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.call-stack-type.call {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.call-stack-type.create {
+  background-color: #28a745;
+  color: white;
+}
+
+.call-stack-type.internal {
+  background-color: #6c757d;
+  color: white;
+}
+
+.call-stack-type.external {
+  background-color: #007bff;
+  color: white;
+}
+
+.call-stack-type.delegatecall {
+  background-color: #ffc107;
+  color: black;
+}
+
+.call-stack-type.staticcall {
+  background-color: #dc3545;
+  color: white;
+}
+
+.call-stack-function {
+  color: var(--text);
+  font-weight: 500;
+  flex: 1;
+  min-width: 150px;
+}
+
+.call-stack-gas {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-left: auto;
+}

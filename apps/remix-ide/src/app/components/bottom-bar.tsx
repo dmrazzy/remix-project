@@ -58,7 +58,8 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
     const checkDebuggerActive = async () => {
       try {
         const active = await plugin.call('sidePanel', 'currentFocus')
-        setIsDebuggerActive(active === 'debugger')
+        const isDebugger = active === 'debugger'
+        setIsDebuggerActive(isDebugger)
       } catch (err) {
         console.error('Failed to check debugger active state', err)
       }
@@ -68,18 +69,24 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
 
     // Listen for plugin activation/deactivation
     const onPluginActivated = (name: string) => {
-      if (name === 'debugger') {
-        setIsDebuggerActive(true)
-      } else {
-        setIsDebuggerActive(false)
-      }
+      const isDebugger = name === 'debugger'
+      setIsDebuggerActive(isDebugger)
     }
 
     // Listen for debugger events
-    const onDebuggingStarted = (data: any) => {
-      console.log('Debugging started', data)
+    const onDebuggingStarted = async (data: any) => {
       setIsDebugging(true)
       setStepManager(data.stepManager)
+
+      // Re-check if debugger is active when debugging starts
+      try {
+        // Add a small delay to allow the debugger to activate
+        await new Promise(resolve => setTimeout(resolve, 100))
+        const active = await plugin.call('sidePanel', 'currentFocus')
+        setIsDebuggerActive(active === 'debugger')
+      } catch (err) {
+        console.error('Failed to check debugger active state on debugging start', err)
+      }
 
       // When debugging starts, always start from 'initial' state (step 0)
       // The stepChanged event will update the state if needed
@@ -90,8 +97,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
         data.stepManager.registerEvent('stepChanged', (step: number) => {
           // Get the latest traceLength
           const length = data.stepManager.traceLength || 0
-
-          console.log('Step changed:', step, 'Trace length:', length)
 
           if (step === 0) {
             setStepState('initial')
@@ -105,7 +110,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
     }
 
     const onDebuggingStopped = () => {
-      console.log('Debugging stopped')
       setIsDebugging(false)
       setStepManager(null)
       setStepState('initial')
