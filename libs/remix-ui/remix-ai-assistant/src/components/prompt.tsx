@@ -13,6 +13,7 @@ export interface PromptAreaProps {
   setInput: React.Dispatch<React.SetStateAction<string>>
   isStreaming: boolean
   handleSend: () => void
+  handleStop: () => void
   showContextOptions: boolean
   setShowContextOptions: React.Dispatch<React.SetStateAction<boolean>>
   showAssistantOptions: boolean
@@ -53,6 +54,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   setInput,
   isStreaming,
   handleSend,
+  handleStop,
   showContextOptions,
   setShowContextOptions,
   showAssistantOptions,
@@ -168,10 +170,13 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
             </span>
           </div>
         </div>
-        <div className="ai-chat-input d-flex flex-column">
+        <div className="ai-chat-input d-flex flex-column position-relative">
           <textarea
             ref={textareaRef}
-            style={{ flexGrow: 1 }}
+            style={{
+              flexGrow: 1,
+              paddingRight: isStreaming ? '50px' : '10px'
+            }}
             rows={2}
             className="form-control bg-light"
             value={input}
@@ -193,6 +198,34 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
                 : "Edit my codebase, generate new contracts ..."
             }
           />
+          {isStreaming && (
+            <CustomTooltip
+              placement="top"
+              tooltipText="Stop"
+              tooltipId="stopRequestTooltip"
+            >
+              <button
+                data-id="remix-ai-stop-request"
+                className="position-absolute prompt-stop-button"
+                onClick={handleStop}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#5a5a5a'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bs-danger)'
+                }}
+              >
+                <div
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '2px'
+                  }}
+                />
+              </button>
+            </CustomTooltip>
+          )}
 
           <div className="d-flex justify-content-between">
 

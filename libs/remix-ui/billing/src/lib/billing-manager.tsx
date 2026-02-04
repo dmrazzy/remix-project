@@ -134,7 +134,7 @@ export const BillingManager: React.FC<BillingManagerProps> = ({
       try {
         const user = await plugin?.call('auth', 'getUser')
         setIsAuthenticated(!!user)
-        
+
         // Set token for billing API
         const token = localStorage.getItem('remix_access_token')
         if (token) {
