@@ -1,7 +1,7 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { FormattedMessage } from 'react-intl'
 import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
-import { RemoteWorkspacesList, CurrentWorkspaceSection } from './components'
+import { RemoteWorkspacesList, CurrentWorkspaceSection, CurrentCloudWorkspaceFiles } from './components'
 import { LoginButton } from '@remix-ui/login'
 import { CloudWorkspacesProvider, CurrentWorkspaceCloudStatus, CloudWorkspacesContextValue } from './context'
 import { WorkspaceBackupData } from './types'
@@ -100,15 +100,37 @@ export const RemixUICloudWorkspaces: React.FC<CloudWorkspacesProps> = ({
     )
   }
 
+  // Get current workspace's backup data (if connected to cloud)
+  const currentRemoteId = currentWorkspaceStatus.remoteId
+  const currentWorkspaceBackupData = currentRemoteId ? workspaceBackups[currentRemoteId] : null
+
+  // Filter out current workspace from remote workspaces list
+  const otherWorkspaces = useMemo(() => {
+    if (!currentRemoteId) return workspaces
+    return workspaces.filter(ws => ws.id !== currentRemoteId)
+  }, [workspaces, currentRemoteId])
+
   return (
     <CloudWorkspacesProvider value={contextValue}>
       <div className="cloud-workspaces-container h-100 d-flex flex-column" style={{ fontSize: '0.85rem' }}>
-        {/* Current Workspace Section */}
+        {/* Current Workspace Section - shows local/cloud names, save/backup/restore buttons */}
         <CurrentWorkspaceSection plugin={plugin} />
 
-        {/* Remote Workspaces Section */}
+        {/* Current Cloud Workspace Files - shows saves/backups of the connected cloud workspace */}
+        {currentRemoteId && (
+          <CurrentCloudWorkspaceFiles
+            backups={currentWorkspaceBackupData?.backups || []}
+            autosave={currentWorkspaceBackupData?.autosave || null}
+            loading={currentWorkspaceBackupData?.loading || false}
+            onRestore={onRestoreBackup}
+            onDelete={onDeleteBackup}
+            onDownload={onDownloadBackup}
+          />
+        )}
+
+        {/* Remote Workspaces Section - shows OTHER remote workspaces for browsing/restoring */}
         <RemoteWorkspacesList
-          workspaces={workspaces}
+          workspaces={otherWorkspaces}
           selectedWorkspace={selectedWorkspace}
           workspaceBackups={workspaceBackups}
           expandedWorkspaces={expandedWorkspaces}

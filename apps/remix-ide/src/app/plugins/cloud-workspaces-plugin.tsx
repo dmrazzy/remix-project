@@ -447,6 +447,13 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       
       console.log('[CloudWorkspaces] Current workspace status loaded:', this.state.currentWorkspaceStatus)
       console.log('[CloudWorkspaces] canSave:', this.state.currentWorkspaceStatus.canSave)
+      
+      // Load backups for current workspace if it's connected to cloud
+      if (remoteId) {
+        // Fire and forget - don't block on this
+        this.loadBackups(remoteId)
+      }
+      
       this.renderComponent()
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Failed to load workspace status:', e)
