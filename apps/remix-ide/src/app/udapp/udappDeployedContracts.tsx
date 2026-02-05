@@ -2,15 +2,14 @@ import React from 'react'
 import { Plugin } from '@remixproject/engine'
 import { DeployedContractsWidget } from '@remix-ui/run-tab-deployed-contracts'
 import { DeployedContractsWidgetState, Actions } from '@remix-ui/run-tab-deployed-contracts'
-import { addressToString } from '@remix-ui/helper'
 import * as ethJSUtil from '@ethereumjs/util'
 
 const profile = {
   name: 'udappDeployedContracts',
   displayName: 'Udapp Deployed Contracts',
   description: 'Manages the UI and state for deployed contracts',
-  methods: ['getUI', 'addInstance', 'getDeployedInstanceCount'],
-  events: []
+  methods: ['getUI', 'addInstance', 'getDeployedInstanceCount', 'getDeployedContracts'],
+  events: ['deployedInstanceUpdated']
 }
 
 export class DeployedContractsPlugin extends Plugin {
@@ -45,11 +44,8 @@ export class DeployedContractsPlugin extends Plugin {
     return this.getWidgetState()?.deployedContracts.length || 0
   }
 
-  async resolveContractAndAddInstance(contractObject, address) {
-    const data = await this.call('compilerArtefacts', 'getCompilerAbstract', contractObject.contract.file)
-    await this.call('compilerArtefacts', 'addResolvedContract', addressToString(address), data)
-
-    this.addInstance(address, contractObject.abi, contractObject.name)
+  getDeployedContracts() {
+    return this.getWidgetState()?.deployedContracts || []
   }
 
   getUI() {

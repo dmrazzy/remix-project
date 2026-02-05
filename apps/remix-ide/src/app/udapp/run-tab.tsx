@@ -11,22 +11,6 @@ import type { Blockchain } from '../../blockchain/blockchain'
 import type { CompilerArtefacts } from '@remix-project/core-plugin'
 import { Recorder } from '../tabs/runTab/model/recorder'
 
-export const providerLogos = {
-  'injected-metamask-optimism': ['assets/img/optimism-ethereum-op-logo.png', 'assets/img/metamask.png'],
-  'injected-metamask-arbitrum': ['assets/img/arbitrum-arb-logo.png', 'assets/img/metamask.png'],
-  'injected-metamask-gnosis': ['assets/img/gnosis_chain.png', 'assets/img/metamask.png'],
-  'injected-metamask-chiado': ['assets/img/gnosis_chain.png', 'assets/img/metamask.png'],
-  'injected-metamask-linea': ['assets/img/linea_chain.png', 'assets/img/metamask.png'],
-  'injected-metamask-sepolia': ['assets/img/metamask.png'],
-  'injected-metamask-ephemery': ['assets/img/metamask.png'],
-  'injected-MetaMask': ['assets/img/metamask.png'],
-  'injected-Brave Wallet': ['assets/img/brave.png'],
-  'injected-Trust Wallet': ['assets/img/trust-wallet.png'],
-  'hardhat-provider': ['assets/img/hardhat.png'],
-  'walletconnect': ['assets/img/Walletconnect-logo.png'],
-  'foundry-provider': ['assets/img/foundry.png']
-}
-
 const profile = {
   name: 'udapp',
   displayName: 'Deploy & run transactions',
@@ -46,7 +30,6 @@ const profile = {
     'getSettings',
     'setEnvironmentMode',
     'clearAllInstances',
-    'resolveContractAndAddInstance',
     'showPluginDetails',
     'getRunTabAPI',
     'getDeployedContracts',
@@ -75,6 +58,7 @@ export class RunTab extends ViewPlugin {
   private envUI: React.ReactNode = null
   private deployUI: React.ReactNode = null
   private deployedContractsUI: React.ReactNode = null
+  private transactionsUI: React.ReactNode = null
 
   constructor(blockchain: Blockchain, config: any, fileManager: any, editor: any, filePanel: any, compilersArtefacts: CompilerArtefacts, networkModule: any, fileProvider: any, engine: any) {
     super(profile)
@@ -112,6 +96,10 @@ export class RunTab extends ViewPlugin {
       }
       if (profile.name === 'udappDeployedContracts') {
         this.deployedContractsUI = await this.call('udappDeployedContracts', 'getUI')
+        this.renderComponent()
+      }
+      if (profile.name === 'udappTransactions') {
+        this.transactionsUI = await this.call('udappTransactions', 'getUI')
         this.renderComponent()
       }
     })
@@ -165,69 +153,9 @@ export class RunTab extends ViewPlugin {
     }
   }
 
-  setAccount(address: string) {
-    this.emit('setAccountReducer', address)
-  }
-
-  getAllDeployedInstances() {
-    return this.REACT_API.instances?.instanceList
-  }
-
   clearAllInstances() {
     this.emit('clearAllInstancesReducer')
     this.allTransactionHistory.clear()
-  }
-
-  createVMAccount(newAccount) {
-    return this.blockchain.createVMAccount(newAccount)
-  }
-
-  sendTransaction(tx) {
-    trackMatomoEvent(this, { category: 'udapp', action: 'sendTx', name: 'udappTransaction', isClick: true })
-    return this.blockchain.sendTransaction(tx)
-  }
-
-  getRunTabAPI(){
-    return this.REACT_API;
-  }
-
-  getDeployedContracts() {
-    if (!this.REACT_API || !this.REACT_API.instances) {
-      return {};
-    }
-    const instances = this.REACT_API.instances.instanceList || [];
-    const deployedContracts = {};
-    const currentProvider = this.REACT_API.selectExEnv || 'vm-london';
-
-    deployedContracts[currentProvider] = {};
-
-    instances.forEach((instance, index) => {
-      if (instance && instance.address) {
-        const txData = this.allTransactionHistory.get(instance.address)
-
-        const contractInstance = {
-          name: instance.name || txData?.contractName || 'Unknown',
-          address: instance.address,
-          abi: instance.contractData?.abi || instance.abi || [],
-          timestamp: txData?.timestamp ? new Date(txData.timestamp).toISOString() : new Date().toISOString(),
-          from: txData?.from || this.REACT_API.accounts?.selectedAccount || 'unknown',
-          transactionHash: txData?.transactionHash || 'unknown',
-          blockHash: txData?.blockHash,
-          blockNumber: Number(txData?.blockNumber) || 0,
-          gasUsed: Number(txData?.gasUsed)|| 0,
-          gasPrice: txData?.gasPrice || '0',
-          value: txData?.value || '0',
-          status: txData?.status || 'unknown',
-          constructorArgs: txData?.constructorArgs || [],
-          verified: false,
-          index: index
-        }
-
-        deployedContracts[currentProvider][instance.address] = contractInstance
-      }
-    });
-
-    return deployedContracts;
   }
 
   setDispatch(dispatch: (state: any) => void) {
@@ -238,19 +166,19 @@ export class RunTab extends ViewPlugin {
   renderComponent() {
     this.dispatch && this.dispatch({
       ...this,
-      onReady: this.onReady,
       envUI: this.envUI,
       deployUI: this.deployUI,
-      deployedContractsUI: this.deployedContractsUI
+      deployedContractsUI: this.deployedContractsUI,
+      transactionsUI: this.transactionsUI
     })
   }
 
-  updateComponent(state: any) {
+  updateComponent() {
     return (<>
-      <RunTabUI plugin={state} />
       { this.envUI && createPortal(this.envUI, document.getElementById('udappEnvComponent')) }
       { this.deployUI && createPortal(this.deployUI, document.getElementById('udappDeployComponent')) }
       { this.deployedContractsUI && createPortal(this.deployedContractsUI, document.getElementById('udappDeployedContractsComponent')) }
+      { this.transactionsUI && createPortal(this.transactionsUI, document.getElementById('udappTransactionsComponent')) }
     </>)
   }
 
@@ -260,20 +188,9 @@ export class RunTab extends ViewPlugin {
         <div id="udappEnvComponent" style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--body-bg)' }}></div>
         <div id="udappDeployComponent"></div>
         <div id="udappDeployedContractsComponent"></div>
+        <div id="udappTransactionsComponent"></div>
         <PluginViewWrapper plugin={this} />
       </div>
     )
-  }
-
-  onReady(api) {
-    this.REACT_API = api
-  }
-
-  writeFile(fileName, content) {
-    return this.call('fileManager', 'writeFile', fileName, content)
-  }
-
-  readFile(fileName) {
-    return this.call('fileManager', 'readFile', fileName)
   }
 }

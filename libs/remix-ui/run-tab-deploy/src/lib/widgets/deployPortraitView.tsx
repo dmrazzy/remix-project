@@ -276,9 +276,11 @@ function DeployPortraitView() {
                             </div>
                           </div>
                           {selectedContract && !selectedContract?.isCompiled && !selectedContract?.isCompiling && (
-                            <button
+                            <div
                               className="btn btn-primary d-flex align-items-center justify-content-center"
                               data-id="compile-action"
+                              role="button"
+                              tabIndex={0}
                               style={{
                                 padding: "4px 8px",
                                 height: "28px",
@@ -286,7 +288,8 @@ function DeployPortraitView() {
                                 fontSize: "11px",
                                 fontWeight: 700,
                                 lineHeight: "14px",
-                                whiteSpace: "nowrap"
+                                whiteSpace: "nowrap",
+                                cursor: "pointer"
                               }}
                               onClick={async (e) => {
                                 e.stopPropagation()
@@ -300,26 +303,43 @@ function DeployPortraitView() {
                                   }
                                 }
                               }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  e.currentTarget.click()
+                                }
+                              }}
                             >
                               <i className="fas fa-play"></i>
                               <span className="ms-2" style={{ lineHeight: "12px", position: "relative", top: "1px" }}>
                               Compile
                               </span>
-                            </button>
+                            </div>
                           )}
                           {selectedContract?.isCompiled && (
-                            <div onClick={async (e) => {
-                              e.stopPropagation()
-                              if (selectedContract?.filePath) {
-                                dispatch({ type: 'SET_COMPILING', payload: selectedContract.filePath })
-                                try {
-                                  await plugin.call('solidity', 'compile', selectedContract.filePath)
-                                } catch (error) {
-                                  console.error('Compilation error: ', error)
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              style={{ cursor: "pointer" }}
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                if (selectedContract?.filePath) {
                                   dispatch({ type: 'SET_COMPILING', payload: selectedContract.filePath })
+                                  try {
+                                    await plugin.call('solidity', 'compile', selectedContract.filePath)
+                                  } catch (error) {
+                                    console.error('Compilation error: ', error)
+                                    dispatch({ type: 'SET_COMPILING', payload: selectedContract.filePath })
+                                  }
                                 }
-                              }
-                            }}>
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  e.currentTarget.click()
+                                }
+                              }}
+                            >
                               <span className={`badge border p-2 text-success`} style={{ fontWeight: 'light', backgroundColor: 'var(--custom-onsurface-layer-3)' }}>
                                 <i className="fas fa-check"></i> Compiled
                               </span>

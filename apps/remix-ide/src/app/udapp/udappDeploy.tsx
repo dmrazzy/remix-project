@@ -31,11 +31,11 @@ export class DeployPlugin extends Plugin {
   }
 
   getGasLimit(): string {
-    return '0x' + new BN( this.getWidgetState()?.gasLimit, 10).toString(16)
+    return '0x' + new BN(this.getWidgetState()?.gasLimit, 10).toString(16)
   }
 
-  getValue(): string {
-    return (parseUnits(this.getWidgetState()?.value.toString() || '0', this.getValueUnit() || 'gwei')).toString()
+  getValue(): bigint {
+    return parseUnits(this.getWidgetState()?.value.toString() || '0', this.getValueUnit() || 'gwei')
   }
 
   getValueUnit(): 'wei' | 'gwei' | 'finney' | 'ether' {

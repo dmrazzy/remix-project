@@ -85,7 +85,8 @@ export class TxRunnerWeb3 {
           return await this.broadcastTx(tx, txHash, isCreation, true, contractAddress)
         } else {
           const web3 = tx.web3 || await this._api.call('blockchain', 'getWeb3')
-          const res = await (await web3.getSigner(tx.from)).sendTransaction(tx)
+          const signer = await web3.getSigner(tx.from)
+          const res = await signer.sendTransaction(tx)
 
           return await this.broadcastTx(tx, res.hash, isCreation, false, null)
         }
@@ -219,22 +220,18 @@ export class TxRunnerWeb3 {
         // callback(new Error('Gas estimation failed because of an unknown internal error. This may indicated that the transaction will fail.'))
         return
       }
+      const defaultGasLimit = 3000000
+
+      tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
       if (network.name === 'VM') {
         return await this._executeTx(tx, network, null)
       } else {
-        const defaultGasLimit = 3000000
-
-        tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
         if (tx.fromSmartAccount && tx.value === "0" &&
               err && err.message && err.message.includes('missing revert data')
         ) {
           // Do not show dialog for 'missing revert data'
           // tx fees can be managed by paymaster in case of smart account tx
           // @todo If paymaster is used, check if balance/credits are available
-
-          const defaultGasLimit = 3000000
-          tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
-
           if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
             return await this._executeTx(tx, network, null)
           }

@@ -4,7 +4,7 @@ import StepManager from './step-manager/step-manager' // eslint-disable-line
 import VmDebugger from './vm-debugger/vm-debugger' // eslint-disable-line
 import VmDebuggerHead from './vm-debugger/vm-debugger-head' // eslint-disable-line
 import SearchBar from './search-bar/search-bar' // eslint-disable-line
-import TransactionRecorder from './transaction-recorder/transaction-recorder' // eslint-disable-line
+// import TransactionRecorder from './transaction-recorder/transaction-recorder' // eslint-disable-line
 import {TransactionDebugger as Debugger} from '@remix-project/remix-debug' // eslint-disable-line
 import {DebuggerUIProps} from './idebugger-api' // eslint-disable-line
 import {Toaster} from '@remix-ui/toaster' // eslint-disable-line
@@ -583,7 +583,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
         </div>
 
         {/* Transaction Recorder Section */}
-        {!state.debugging && (
+        {/* {!state.debugging && (
           <TransactionRecorder
             requestDebug={requestDebug}
             unloadRequested={unloadRequested}
@@ -594,7 +594,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             transactions={transactions}
             onDebugTransaction={(txHash) => debug(txHash)}
           />
-        )}
+        )} */}
 
         {state.debugging && state.sourceLocationStatus && (
           <div className="text-warning mt-3">

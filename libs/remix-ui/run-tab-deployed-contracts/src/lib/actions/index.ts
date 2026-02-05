@@ -113,7 +113,7 @@ export async function runTransactions (
   inputsValues: string,
   contract: any,
   funcIndex: number,
-  sendParams?: { value: string, gasLimit: string }
+  sendParams?: { value: bigint, gasLimit: string }
 ) {
   // Destructure contract properties
   const { name: contractName, abi, contractData, address } = contract

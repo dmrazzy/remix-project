@@ -44,16 +44,17 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
       dispatch({ type: 'SET_CURRENT_FILE', payload: currentFile })
     })
 
-    plugin.on('blockchain', 'contextChanged', async () => {
-      const context = await plugin.call('udappEnv', 'getSelectedProvider')
-
-      if (context.startsWith('vm')) await loadPinnedContracts(plugin, dispatch, context)
-    })
-
     plugin.on('blockchain', 'networkStatus', async ({ error, network }) => {
       if (error) return
-      if (network?.name === 'VM') return
-      const chainId = network?.id
+      let chainId: string
+
+      if (network?.name === 'VM') {
+        const context = await plugin.call('udappEnv', 'getSelectedProvider')
+
+        chainId = context
+      } else {
+        chainId = network?.id
+      }
 
       if (chainId && lastLoadedChainIdRef.current !== chainId) {
         lastLoadedChainIdRef.current = chainId

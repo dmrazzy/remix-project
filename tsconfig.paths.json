@@ -244,6 +244,9 @@
             ],
             "@remix-project/import-resolver": [
               "libs/remix-import-resolver/src/index.ts"
+            ],
+            "@remix-ui/run-tab-transactions": [
+              "libs/remix-ui/run-tab-transactions/src/index.ts"
             ]
         }
     }

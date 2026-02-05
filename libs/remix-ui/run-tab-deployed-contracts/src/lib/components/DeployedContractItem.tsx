@@ -10,6 +10,7 @@ import { DeployedContract } from '../types'
 import { runTransactions } from '../actions'
 import { TreeView, TreeViewItem } from '@remix-ui/tree-view'
 import { ContractKebabMenu } from './ContractKebabMenu'
+import BN from 'bn.js'
 
 const txHelper = remixLib.execution.txHelper
 
@@ -115,8 +116,8 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
 
   const handleExecuteTransaction = async (funcABI: any, funcIndex: number, lookupOnly: boolean) => {
     const inputsValues = funcInputs[funcIndex] || ''
-    const sendValue = parseUnits(value.toString() || '0', valueUnit || 'gwei').toString()
-    const gasLimitValue = gasLimit.toString()
+    const sendValue = parseUnits(value.toString() || '0', valueUnit || 'wei')
+    const gasLimitValue = '0x' + new BN(gasLimit, 10).toString(16)
 
     try {
       await runTransactions(
@@ -197,8 +198,8 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
     if (!funcABI) return setLlIError(intl.formatMessage({ id: 'udapp.llIError7' }))
 
     try {
-      const sendValue = parseUnits(value.toString() || '0', valueUnit || 'wei').toString()
-      const gasLimitValue = gasLimit.toString()
+      const sendValue = parseUnits(value.toString() || '0', valueUnit || 'wei')
+      const gasLimitValue = '0x' + new BN(gasLimit, 10).toString(16)
 
       await runTransactions(
         plugin,
@@ -444,9 +445,9 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                                 style={{
                                   backgroundColor: 'var(--bs-body-bg)',
                                   color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '4.5rem', fontSize: '0.75rem',
-                                  cursor: lookupOnly || !inputs ? 'not-allowed' : 'text'
+                                  cursor: !inputs ? 'not-allowed' : 'text'
                                 }}
-                                disabled={lookupOnly || !inputs}
+                                disabled={!inputs}
                               />
                               <button
                                 className="btn btn-sm btn-secondary"

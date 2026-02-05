@@ -48,7 +48,7 @@ export const ContractKebabMenu: React.FC<ContractKebabMenuProps> = ({
     onCreateDapp && {
       id: 'createDapp',
       label: 'Create a dapp',
-      icon: 'fas fa-sparkles',
+      icon: 'fa-kit fa-remixai',
       color: 'var(--bs-body-color)',
       onClick: () => onCreateDapp(contract)
     },
