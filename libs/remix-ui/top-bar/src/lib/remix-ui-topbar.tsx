@@ -43,12 +43,9 @@ export function RemixUiTopbar() {
   const [latestReleaseNotesUrl, setLatestReleaseNotesUrl] = useState<string>('')
   const [currentReleaseVersion, setCurrentReleaseVersion] = useState<string>('')
   const [menuItems, setMenuItems] = useState<any[]>([])
-  const [showTheme, setShowTheme] = useState<boolean>(false)
   const subMenuIconRef = useRef<any>(null)
-  const themeIconRef = useRef<any>(null)
   const [showSubMenuFlyOut, setShowSubMenuFlyOut] = useState<boolean>(false)
-  useOnClickOutside([subMenuIconRef, themeIconRef], () => setShowSubMenuFlyOut(false))
-  useOnClickOutside([themeIconRef], () => setShowTheme(false))
+  useOnClickOutside([subMenuIconRef], () => setShowSubMenuFlyOut(false))
   const workspaceRenameInput = useRef()
   const [leftPanelHidden, setLeftPanelHidden] = useState<boolean>(false)
   const [bottomPanelHidden, setBottomPanelHidden] = useState<boolean>(false)
@@ -201,6 +198,7 @@ export function RemixUiTopbar() {
         switchWorkspace(NO_WORKSPACE)
       }
     }
+    updateMenuItems()
   }, [global.fs.browser.workspaces, global.fs.browser.workspaces.length])
 
   useEffect(() => {
@@ -281,6 +279,7 @@ export function RemixUiTopbar() {
   const onFinishDeleteWorkspace = async (workspaceName?: string) => {
     try {
       await deleteWorkspace(workspaceName)
+      await updateMenuItems()
     } catch (e) {
       global.modal(
         intl.formatMessage({ id: 'filePanel.workspace.delete' }),
@@ -296,7 +295,7 @@ export function RemixUiTopbar() {
   const deleteCurrentWorkspace = (workspaceName?: string) => {
     global.modal(
       intl.formatMessage({ id: 'filePanel.workspace.delete' }),
-      intl.formatMessage({ id: 'filePanel.workspace.deleteConfirm' }),
+      intl.formatMessage({ id: 'filePanel.workspace.deleteConfirm' }, { currentWorkspace: workspaceName }),
       intl.formatMessage({ id: 'filePanel.ok' }),
       () => onFinishDeleteWorkspace(workspaceName),
       intl.formatMessage({ id: 'filePanel.cancel' })
@@ -620,65 +619,13 @@ export function RemixUiTopbar() {
                 plugin={plugin}
                 variant="compact"
                 showCredits={true}
-                className="ms-2"
+                className="ms-3"
               />
             )}
           </>
-          <Dropdown className="ms-3" data-id="topbar-themeIcon" show={showTheme} ref={themeIconRef}>
-            <Dropdown.Toggle
-              as={Button}
-              variant="outline-secondary"
-              className="btn-topbar btn-sm me-3"
-              data-id="topbar-themeIcon-toggle"
-              style={{
-                padding: '0.35rem 0.5rem',
-                fontSize: '0.8rem',
-              }}
-              onClick={async () => {
-                setShowTheme(!showTheme)
-              }}
-            >
-              <i
-                className={
-                  `fas ${currentTheme && currentTheme.name.includes('Dark') ? 'fa-moon' : 'fa-sun-bright text-white'} me-2`
-                }
-                onClick={() => {
-                  setShowTheme(!showTheme)
-                }}
-              ></i>
-              Theme
-            </Dropdown.Toggle>
-            <Dropdown.Menu
-              as={CustomTopbarMenu}
-              className="custom-dropdown-items text-decoration-none bg-light"
-              data-id="topbar-thememenu-body"
-              style={{
-                minWidth: '95px'
-              }}
-            >
-              <Dropdown.Item
-                onClick={() => {
-                  plugin.call('theme', 'switchTheme', 'Light')
-                }}
-                data-id="topbar-themeIcon-light"
-              >
-                <i className="fas fa-sun-bright me-2"></i>
-                Light
-              </Dropdown.Item>
-              <Dropdown.Item
-                onClick={() => {
-                  plugin.call('theme', 'switchTheme', 'Dark')
-                }}
-                data-id="topbar-themeIcon-dark"
-              >
-                <i className="fas fa-moon me-2"></i>
-                Dark
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
           <span
             style={{ fontSize: '1.5rem', cursor: 'pointer' }}
-            className=""
+            className="ms-3"
             onClick={async () => {
               const isActive = await plugin.call('manager', 'isActive', 'settings')
               if (!isActive) await plugin.call('manager', 'activatePlugin', 'settings')

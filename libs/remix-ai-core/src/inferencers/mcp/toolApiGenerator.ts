@@ -10,7 +10,6 @@ export interface IMCPToolResult {
   content: Array<{
     type: 'text' | 'image' | 'resource';
     text?: string;
-    data?: string;
     mimeType?: string;
   }>;
   isError?: boolean;
@@ -52,12 +51,7 @@ for (const file of files) {
         })
         .join(', ');
 
-      // Truncate description to max 50 characters
-      const description = tool.description.length > 50
-        ? tool.description.substring(0, 50) + '...'
-        : tool.description;
-
-      list += `- ${tool.name}({${paramsList}}) - ${description}\n\n`;
+      list += `- ${tool.name}({${paramsList}}) - ${tool.description}\n\n`;
     }
 
     return list;

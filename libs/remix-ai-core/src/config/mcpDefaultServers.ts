@@ -58,19 +58,46 @@ export const mcpDefaultServersConfig: MCPDefaultServersConfig = {
       name: 'Alchemy',
       description: 'Alchemy blockchain data query',
       transport: 'http',
-      url: endpointUrls.mcpCorsProxy + '/alchemy',
+      url: endpointUrls.mcpCorsProxy8443 + '/alchemy',
+      autoStart: true,
+      enabled: true,
+      timeout: 30000
+    },
+    {
+      name: 'Web Search',
+      description: 'Web search capabilities',
+      transport: 'http',
+      url: endpointUrls.mcpCorsProxy8443 + '/web-search',
+      autoStart: true,
+      enabled: true,
+      timeout: 30000
+    },
+    {
+      name: 'Etherscan',
+      description: 'Etherscan block explorer',
+      transport: 'http',
+      url: endpointUrls.mcpCorsProxy8443 + '/etherscan/mcp',
+      autoStart: true,
+      enabled: true,
+      timeout: 30000
+    },
+    {
+      name: 'Thegraph API',
+      description: 'Thegraph API (subgraph and token API',
+      transport: 'http',
+      url: endpointUrls.mcpCorsProxy8443 + '/thegraph/mcp',
+      autoStart: true,
+      enabled: true,
+      timeout: 30000
+    },
+    {
+      name: 'Sourcify',
+      description: 'Sourcify smart contract verification',
+      transport: 'http',
+      url: endpointUrls.mcpCorsProxy8443 + '/sourcify/mcp',
       autoStart: true,
       enabled: true,
       timeout: 30000
     }
-    // {
-    //   name: 'Etherscan',
-    //   description: 'Etherscan block explorer',
-    //   transport: 'http',
-    //   url: endpointUrls.mcpCorsProxy + '/etherscan',
-    //   autoStart: true,
-    //   enabled: true,
-    //   timeout: 30000
-    // }
   ]
 };

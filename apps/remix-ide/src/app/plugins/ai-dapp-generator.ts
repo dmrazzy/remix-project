@@ -1,5 +1,5 @@
 import { Plugin } from '@remixproject/engine'
-import { INITIAL_SYSTEM_PROMPT, FOLLOW_UP_SYSTEM_PROMPT, UPDATE_PAGE_START, UPDATE_PAGE_END, SEARCH_START, DIVIDER, REPLACE_END, NEW_PAGE_END, NEW_PAGE_START } from './prompt'
+import { INITIAL_SYSTEM_PROMPT, FOLLOW_UP_SYSTEM_PROMPT, BASE_MINI_APP_SYSTEM_PROMPT, } from './prompt'
 
 const profile = {
   name: 'ai-dapp-generator',
@@ -16,6 +16,12 @@ interface GenerateDappOptions {
   abi: any[]
   chainId: string | number
   contractName: string
+  hasImage?: boolean
+  isBaseMiniApp?: boolean
+  image?: string
+  slug?: string
+  figmaUrl?: string
+  figmaToken?: string
 }
 
 interface DappGenerationContext {
@@ -37,21 +43,153 @@ export class AIDappGenerator extends Plugin {
   /**
    * Generate a new DApp or update an existing one
    */
-  async generateDapp(options: GenerateDappOptions): Promise<Pages> {
+  async generateDapp(options: GenerateDappOptions & { slug: string }): Promise<void> {
+
+    if (options.figmaUrl && options.figmaToken) {
+      this.processFigmaGeneration(options).catch(err => {
+        console.error("[DEBUG-AI] Figma process crashed:", err);
+        this.call('terminal', 'log', { type: 'error', value: err.message });
+      });
+    } else {
+      this.processGeneration(options).catch(err => {
+        console.error("[DEBUG-AI] Background process crashed:", err);
+        this.call('terminal', 'log', { type: 'error', value: err.message });
+      });
+    }
+
+    return;
+  }
+
+  private async processFigmaGeneration(options: GenerateDappOptions & { slug: string }) {
+
+    await this.call('notification', 'toast', 'Analyzing Figma Design... (This may take time)')
+    this.emit('generationProgress', { status: 'started', address: options.address })
+
+    const context = this.getOrCreateContext(options.address)
+
+    const contractInfo = {
+      address: options.address,
+      abi: options.abi,
+      chainId: options.chainId,
+      name: options.contractName
+    };
+
     try {
-      await this.call('notification', 'toast', 'Generating the DApp, please wait... it can take up to 2 minutes depending on the contract complexity.')
+      const startTime = Date.now();
+
+      // const FIGMA_BACKEND_URL = "http://localhost:4000/figma/generate";
+      const FIGMA_BACKEND_URL = "https://quickdapp-figma.api.remix.live/generate";
+
+      const htmlContent = await this.callFigmaAPI(FIGMA_BACKEND_URL, {
+        figmaToken: options.figmaToken,
+        figmaUrl: options.figmaUrl,
+        userPrompt: options.description,
+        contractInfo: contractInfo,
+        isBaseMiniApp: options.isBaseMiniApp
+      });
+
+      const duration = (Date.now() - startTime) / 1000;
+
+      const pages = parsePages(htmlContent);
+
+      const pageKeys = Object.keys(pages);
+
+      if (pageKeys.length === 0) {
+        console.error('[DEBUG-AI] ❌ CRITICAL: No files parsed!');
+
+        if (!htmlContent) console.error('[DEBUG-AI] htmlContent is EMPTY.');
+
+        throw new Error("AI failed to return valid file structure from Figma design.");
+      }
+
+      if (Object.keys(pages).length === 0) {
+        throw new Error("AI failed to return valid file structure from Figma design.");
+      }
+
+      context.messages.push({
+        role: 'user',
+        content: `Generated from Figma: ${options.figmaUrl}\nInstructions: ${options.description}`
+      });
+      context.messages.push({ role: 'assistant', content: htmlContent });
+      this.saveContext(options.address, context);
+
+      this.emit('dappGenerated', {
+        address: options.address,
+        slug: options.slug,
+        content: pages,
+        isUpdate: false
+      });
+
+      await this.call('notification', 'toast', 'Figma Design Imported Successfully!');
+
+    } catch (error: any) {
+      console.error('[DEBUG-AI] Figma Generation Failed:', error);
+      this.call('terminal', 'log', { type: 'error', value: error.message });
+      this.emit('dappGenerationError', {
+        address: options.address,
+        slug: options.slug,
+        error: error.message
+      });
+    }
+  }
+
+  private async callFigmaAPI(url: string, payload: any): Promise<string> {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text()
+        throw new Error(`Figma Backend Error: ${errText}`)
+      }
+
+      const json = await response.json();
+      return json.content;
+
+    } catch (error) {
+      console.error('[AI-DAPP] Figma API Call Failed:', error);
+      throw error;
+    }
+  }
+
+  private async processGeneration(options: GenerateDappOptions & { slug: string }) {
+
+    try {
+      const hasImage = !!options.image;
+
+      await this.call('notification', 'toast', 'Generating... (Logs in console)')
       this.emit('generationProgress', { status: 'started', address: options.address })
 
       const context = this.getOrCreateContext(options.address)
-
       const message = this.createInitialMessage(options)
-      const messagesToSend = [
-        { role: 'user', content: message }
-      ]
+      const messagesToSend = [{ role: 'user', content: message }]
 
-      const htmlContent = await this.callLLMAPI(messagesToSend, INITIAL_SYSTEM_PROMPT)
+      let selectedSystemPrompt = INITIAL_SYSTEM_PROMPT
+      if (options.isBaseMiniApp) {
+        selectedSystemPrompt = BASE_MINI_APP_SYSTEM_PROMPT
+      }
 
-      const pages = parsePages(htmlContent)
+      const startTime = Date.now();
+
+      const htmlContent = await this.callLLMAPI(messagesToSend, selectedSystemPrompt, hasImage);
+
+      const duration = (Date.now() - startTime) / 1000;
+
+      const pages = parsePages(htmlContent);
+      const pageKeys = Object.keys(pages);
+
+      if (pageKeys.length === 0) {
+        console.error('[DEBUG-AI] ❌ CRITICAL: parsePages returned empty object!');
+
+        throw new Error("AI generated empty content. Please try again.");
+      }
+
       context.messages = [
         { role: 'user', content: message },
         { role: 'assistant', content: htmlContent }
@@ -60,52 +198,78 @@ export class AIDappGenerator extends Plugin {
 
       this.emit('dappGenerated', {
         address: options.address,
-        content: null,
+        slug: options.slug,
+        content: pages,
         isUpdate: false
-      })
+      });
 
-      await this.call('notification', 'toast', 'The DApp has been generated successfully!')
+      await this.call('notification', 'toast', 'Generation Complete!');
 
-      return pages
+    } catch (error: any) {
+      console.error('[DEBUG-AI] Generation Failed:', error);
+      this.call('terminal', 'log', { type: 'error', value: error.message });
 
-    } catch (error) {
-      await this.call('terminal', 'log', { type: 'error', value: error.message })
-      throw error
+      this.emit('dappGenerationError', {
+        address: options.address,
+        slug: options.slug,
+        error: error.message
+      });
     }
   }
 
   /**
    * Update an existing DApp with new description
    */
-  async updateDapp(address: string, description: string, currentFiles: Pages): Promise<Pages> {
-    const context = this.getOrCreateContext(address)
+  async updateDapp(address: string, description: string | any[], currentFiles: any, hasImage: boolean, slug: string): Promise<void> {
+
+    this.processUpdate(address, description, currentFiles, hasImage, slug).catch(err => {
+      console.error("[DEBUG-AI] ❌ Background update crashed:", err);
+      this.call('terminal', 'log', { type: 'error', value: err.message });
+    });
+
+    return;
+  }
+
+  private async processUpdate(address: string, description: string | any[], currentFiles: any, hasImage: boolean, slug: string) {
+    const context = this.getOrCreateContext(address);
 
     if (context.messages.length === 0) {
-      throw new Error('No existing DApp found for this address. Please generate one first.')
+      await this.call('terminal', 'log', { type: 'error', value: 'No context found for this dapp.' });
+      return;
     }
 
-    const message = this.createUpdateMessage(description, currentFiles)
-    context.messages.push({ role: 'user', content: message })
+    const message = this.createUpdateMessage(description, currentFiles);
+    context.messages.push({ role: 'user', content: message });
 
     try {
-      const htmlContent = await this.callLLMAPI(context.messages, FOLLOW_UP_SYSTEM_PROMPT)
+      const htmlContent = await this.callLLMAPI(context.messages, FOLLOW_UP_SYSTEM_PROMPT, hasImage);
 
-      const pages = parsePages(htmlContent)
+      const pages = parsePages(htmlContent);
 
       if (Object.keys(pages).length === 0) {
-        throw new Error("AI failed to return valid file structure. Check logs.");
+        throw new Error("AI failed to return valid file structure.");
       }
 
-      context.messages.push({ role: 'assistant', content: htmlContent })
-      this.saveContext(address, context)
+      context.messages.push({ role: 'assistant', content: htmlContent });
+      this.saveContext(address, context);
 
-      this.emit('dappUpdated', { address, content: pages })
-      return pages
+      this.emit('dappGenerated', {
+        address,
+        slug,
+        content: pages,
+        isUpdate: true
+      });
 
-    } catch (error) {
-      // Remove the failed message from context
-      context.messages.pop()
-      throw error
+    } catch (error: any) {
+      context.messages.pop();
+      console.error('[DEBUG-AI] Update failed:', error);
+      this.call('terminal', 'log', { type: 'error', value: `Update failed: ${error.message}` });
+
+      this.emit('dappGenerationError', {
+        address,
+        slug,
+        error: error.message || "Unknown error during generation"
+      });
     }
   }
 
@@ -168,200 +332,355 @@ export class AIDappGenerator extends Plugin {
   private saveContext(address: string, context: DappGenerationContext): void {
     this.contexts.set(address, context)
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('ai-dapp-' + address, JSON.stringify(context.messages))
+      try {
+        const messagesToSave = context.messages.map(msg => {
+          const newMsg = { ...msg };
+
+          if (Array.isArray(newMsg.content)) {
+            newMsg.content = newMsg.content.map((part: any) => {
+              if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
+                return {
+                  type: 'image_url',
+                  image_url: { url: '[IMAGE_DATA_REMOVED_TO_SAVE_SPACE]' }
+                };
+              }
+              return part;
+            });
+          }
+          return newMsg;
+        });
+
+        localStorage.setItem('ai-dapp-' + address, JSON.stringify(messagesToSave))
+      } catch (e) {
+        console.warn('[AIDappGenerator] Failed to save context to localStorage (Quota Exceeded). History might be lost on reload.');
+      }
     }
   }
 
-  private createInitialMessage(options: GenerateDappOptions): string {
+  private createInitialMessage(options: GenerateDappOptions): string | any[] {
     const providerCode = this.getProviderCode()
 
-    return `
-      You MUST generate a new DApp based on the following requirements.
+    const userDescription = Array.isArray(options.description)
+      ? options.description.map(p => p.type === 'text' ? p.text : '').join('\n')
+      : options.description;
+
+    const functionNames = options.abi
+      .filter((item: any) => item.type === 'function')
+      .map((item: any) => `- ${item.name} (${item.stateMutability})`)
+      .join('\n');
+
+    const contractMandate = `
+      **🚨 MANDATORY SMART CONTRACT INTEGRATION 🚨**
       
-      **MOST IMPORTANT RULE:** You MUST follow the file structure and code templates
-      defined in the system prompt. Specifically, you MUST use the
-      \`window.__QUICK_DAPP_CONFIG__\` object in \`index.html\` and \`src/App.jsx\`
-      to handle the DApp's title, details, and logo.
-      
+      You MUST integrate the provided Smart Contract into the UI.
+      A DApp with only UI and no logic is a FAILURE.
+
       **Contract Details:**
+      - **Address:** \`${options.address}\`
+      - **Chain ID:** ${options.chainId}
+      - **ABI Functions to Implement:**
+      ${functionNames}
+
+      **Integration Rules:**
+      1. **Connect Wallet:** Must include a button to connect MetaMask/Wallet.
+      2. **Read Functions:** Display data from 'view'/'pure' functions on the screen.
+      3. **Write Functions:** Create Forms/Buttons to trigger 'payable'/'nonpayable' functions.
+      4. **Feedback:** Show loading states and success/error toasts for transactions.
+    `;
+
+    const dynamicContentRules = `
+      **🚨 DYNAMIC CONTENT RULES (CRITICAL) 🚨**
+      The DApp creates a shell that passes configuration via \`window.__QUICK_DAPP_CONFIG__\`.
+      
+      1. **NO HARDCODED TEXT/LOGOS:**
+         - Even if the user asks for "Binance Style", **DO NOT** write "Binance" as the main title.
+         - **DO NOT** hardcode an <img> tag with a random URL unless it's a background or icon.
+      
+      2. **USE CONFIG VARIABLES:**
+         - In \`App.jsx\`, read config: \`const config = window.__QUICK_DAPP_CONFIG__ || {};\`
+         - **Title:** Use \`{config.title}\` for the main header (Navbar/Hero).
+         - **Logo:** Use \`{config.logo}\`. Render it ONLY if it exists: \`{config.logo && <img src={config.logo} ... />}\`.
+         - **Description:** Use \`{config.details}\` for the sub-header or about section.
+         
+      3. **FALLBACK:**
+         - Only if \`config.title\` is missing, fall back to "My DApp".
+         - BUT ALWAYS prioritize the \`config\` object variables.
+    `;
+
+    const architectureInstructions = `
+      **ARCHITECTURE INSTRUCTIONS :**
+
+      1. **Analyze the Request:** - Split complex UIs into \`src/pages/Home.jsx\`, \`src/pages/Dashboard.jsx\`, etc.
+      
+      2. **Routing (ZERO DEPENDENCY MODE):**
+         - **STOP! Do NOT use \`react-router-dom\`.** It causes version conflicts.
+         - **Implement a simple Hash Router manually** in \`src/App.jsx\`.
+         - Use \`useState\` and \`window.location.hash\` to switch pages.
+         - Example Pattern for App.jsx:
+           \`\`\`javascript
+           const [route, setRoute] = useState(window.location.hash || '#/');
+           useEffect(() => {
+             const onHashChange = () => setRoute(window.location.hash || '#/');
+             window.addEventListener('hashchange', onHashChange);
+             return () => window.removeEventListener('hashchange', onHashChange);
+           }, []);
+           
+           // Navigation Function
+           const navigate = (path) => window.location.hash = path;
+           
+           // Render
+           return (
+             <div>
+               <Navbar navigate={navigate} />
+               {route === '#/' && <Home />}
+               {route === '#/dashboard' && <Dashboard />}
+             </div>
+           );
+           \`\`\`
+
+      3. **File Structure Target:**
+         - \`index.html\` (Simple Import Map)
+         - \`src/main.jsx\`
+         - \`src/App.jsx\` (Manual Router Logic)
+         - \`src/index.css\` (Tailwind)
+         - \`src/pages/*.jsx\`
+    `;
+
+    const technicalConstraints = `
+      **TECHNICAL CONSTRAINTS (STRICTLY FOLLOW THESE):**
+      
+      1. **DEPENDENCY MANAGEMENT (SIMPLE IMPORT MAP):**
+         - Use this SIMPLIFIED Import Map in \`index.html\` <head>.
+         - **Do NOT** include react-router-dom.
+           \`\`\`html
+           <script type="importmap">
+           {
+             "imports": {
+               "react": "https://esm.sh/react@18.2.0",
+               "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+               "ethers": "https://esm.sh/ethers@6.11.1"
+             }
+           }
+           </script>
+           \`\`\`
+         - In JSX files, use: \`import React, { useState, useEffect } from "react";\`
+
+      2. **STYLING (Tailwind CSS ONLY):**
+          - Do NOT use custom CSS classes like "card", "btn", "navbar". 
+          - USE ONLY Tailwind utility classes directly in JSX (e.g., \`className="bg-white p-4 rounded shadow"\`).
+          - Ensure the UI looks exactly like the image provided.
+
+      3. **Ethers.js v6 RULES (CRITICAL):**
+          - **Read-Only:** For 'view'/'pure' functions, use \`new ethers.Contract(addr, abi, provider)\`.
+          - **Write (Transaction):** For 'nonpayable'/'payable' functions, YOU MUST USE A SIGNER.
+            \`\`\`javascript
+            // Inside the button click handler:
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner(); // <--- CRITICAL
+            const contractWithSigner = new ethers.Contract(address, abi, signer); 
+            const tx = await contractWithSigner.functionName(args);
+            await tx.wait();
+            \`\`\`
+          - **NEVER** try to send a transaction with a Provider-only contract instance. It will throw "UNSUPPORTED_OPERATION".
+
+      4. **Files & Structure:**
+          - At a minimum, the following files must be returned. \`index.html\`, \`src/main.jsx\`, \`src/App.jsx\`, \`src/index.css\`.
+          - Inject provider script in \`index.html\` <head>.
+          - Use \`window.__QUICK_DAPP_CONFIG__\` for titles/logos.
+
+      5. **Functionality:**
+          - Connect Wallet button must be visible.
+          - Handle "User rejected request" errors gracefully.
+
+      6. **Output Format:**
+         - Return ALL files using \`<<<<<<< START_TITLE filename >>>>>>> END_TITLE\` format.
+         - **Do NOT** omit any file. output full content.
+         - **Minimal Comments:** To save token space, avoid verbose comments.
+    `;
+
+    const basePrompt = `
+      You are generating a new DApp.
+      
+      **CRITICAL INSTRUCTION - USER PRIORITY:**
+      The user has provided specific design or functional requirements below.
+      You MUST prioritize the user's request (theme, language, features) over
+      any default templates or examples provided in the system prompt.
+      
+      >>> USER REQUEST START >>>
+      "${userDescription}"
+      <<< USER REQUEST END <<<
+
+      ${contractMandate}
+      ${dynamicContentRules}
+      ${architectureInstructions}
+      ${technicalConstraints}
+
+      If the user asked for a specific language (e.g. Korean), use it for all UI text.
+      If the user asked for a specific theme (e.g. Dark), implement it using Tailwind classes.
+
+      ---------------------------------------------------------
+      **TECHNICAL CONSTRAINTS (DO NOT BREAK THESE):**
+      
+      **1. File Structure:** Follow the \`window.__QUICK_DAPP_CONFIG__\` pattern.
+      
+      **2. Contract Details:**
       - Address: ${options.address}
       - Chain ID: ${options.chainId} (Decimal), 0x${Number(options.chainId).toString(16)} (Hex)
       - ABI: ${JSON.stringify(options.abi)}
 
-      **UI/UX REQUIREMENTS (RainbowKit Style):**
-      1. **No Default Alerts:** Do NOT use \`window.alert\`. Use modern UI elements (e.g., error text below buttons).
-      2. **Connection State:** - Before connection: Show a centered "Connect Wallet" button.
-         - After connection: Show the **Connected Address** (e.g., 0x12...34) and a **"Disconnect"** button clearly.
-      3. **Network Check:** If on the wrong network, show a "Wrong Network" warning and a **"Switch Network"** button.
-      4. **Feedback:** Show loading spinners or "Loading..." text during async actions.
+      **3. Code Patterns (React + Ethers v6):**
+      - Use \`useState\` and \`useEffect\`.
+      - Implement \`connectWallet\` and \`switchNetwork\` (Error 4902 handling).
+      - Check \`window.ethereum\` existence.
+      - Use \`ethers.BrowserProvider\`.
 
-      **CODE PATTERN REQUIREMENTS (React + Ethers v6):**
-      
-      In \`src/App.jsx\`, you MUST implement the following robust patterns.
-      
-      **1. Constants & State:**
-      Define the target chain ID in Hex format for MetaMask.
-      \`\`\`javascript
-      const TARGET_CHAIN_HEX = "0x${Number(options.chainId).toString(16)}";
-      const TARGET_CHAIN_DECIMAL = ${options.chainId};
-      
-      const [walletState, setWalletState] = useState({
-        isConnected: false,
-        chainId: null,
-        address: '',
-        isConnecting: false,
-        error: ''
-      });
-      \`\`\`
+      **4. UI/UX Requirements:**
+      - Show "Connect Wallet" button when disconnected.
+      - Show "Wrong Network" warning if chain ID mismatches.
+      - Use loading spinners for async actions.
 
-      **2. Robust Network Switching (CRITICAL):**
-      You MUST handle the case where the network is not added to the user's wallet (Error 4902).
-      \`\`\`javascript
-      const switchNetwork = async () => {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: TARGET_CHAIN_HEX }],
-          });
-          // Success: The page will likely reload or the chainChanged event will fire
-          return true;
-        } catch (error) {
-          // Error Code 4902 means the chain has not been added to MetaMask.
-          if (error.code === 4902) {
-             try {
-               await window.ethereum.request({
-                 method: 'wallet_addEthereumChain',
-                 params: [{
-                   chainId: TARGET_CHAIN_HEX,
-                   // You can add generic placeholders for rpcUrls if not known, 
-                   // or rely on the user to add it manually if this fails.
-                 }]
-               });
-               return true;
-             } catch (addError) {
-               console.error("Failed to add chain:", addError);
-               setWalletState(prev => ({ ...prev, error: "Failed to add network to wallet." }));
-               return false;
-             }
-          }
-          console.error("Failed to switch network:", error);
-          setWalletState(prev => ({ ...prev, error: "Failed to switch network: " + error.message }));
-          return false;
-        }
-      };
-      \`\`\`
-
-      **3. Disconnect Logic:**
-      Always reset state completely.
-      \`\`\`javascript
-      const disconnectWallet = () => {
-        setWalletState({
-          isConnected: false,
-          chainId: null,
-          address: '',
-          isConnecting: false,
-          error: ''
-        });
-        setContract(null);
-      };
-      \`\`\`
-
-      **4. Connection Logic:**
-      Check the network immediately after connecting.
-      \`\`\`javascript
-      const connectWallet = async () => {
-        if (!window.ethereum) {
-          setWalletState(prev => ({ ...prev, error: "MetaMask not found" }));
-          return;
-        }
-        setWalletState(prev => ({ ...prev, isConnecting: true, error: '' }));
-        
-        try {
-          const provider = new ethers.BrowserProvider(window.ethereum);
-          const accounts = await provider.send("eth_requestAccounts", []);
-          const network = await provider.getNetwork();
-          const currentChainId = Number(network.chainId); // Convert bigint to number
-          
-          const isCorrectChain = currentChainId === TARGET_CHAIN_DECIMAL;
-          
-          setWalletState({
-            isConnected: true,
-            chainId: currentChainId,
-            address: accounts[0],
-            isConnecting: false,
-            error: isCorrectChain ? '' : 'Wrong Network. Please switch.'
-          });
-          
-          // Optional: Auto-switch if wrong network
-          if (!isCorrectChain) {
-             await switchNetwork(); 
-          }
-
-        } catch (err) {
-          setWalletState(prev => ({ ...prev, isConnecting: false, error: err.message }));
-        }
-      };
-      \`\`\`
-
-      **5. UI Rendering Logic:**
-      \`\`\`jsx
-      <nav>
-        {walletState.isConnected ? (
-          <div className="flex items-center gap-4">
-            <span className="badge">
-               {walletState.chainId === TARGET_CHAIN_DECIMAL ? "Connected" : "Wrong Network"}
-            </span>
-            <span className="address">{walletState.address.slice(0,6)}...</span>
-            <button onClick={disconnectWallet} className="btn-disconnect">
-              Disconnect
-            </button>
-          </div>
-        ) : (
-          <button onClick={connectWallet}>Connect Wallet</button>
-        )}
-      </nav>
-      {/* Show explicit switch button if connected but wrong network */}
-      {walletState.isConnected && walletState.chainId !== TARGET_CHAIN_DECIMAL && (
-        <div className="alert-warning">
-           <p>You are on the wrong network.</p>
-           <button onClick={switchNetwork}>Switch to Correct Network</button>
-        </div>
-      )}
-      \`\`\`
-
-      **User's Design Request:**
-      Please build the DApp based on this description:
-      "${options.description}"
-      
-      **Provider Code:**
-      Also, ensure the following provider injection script is in the \`<head>\`
-      of \`index.html\`:
+      **5. Provider Injection:**
+      Ensure this script is in \`<head>\` of \`index.html\`:
       ${providerCode}
 
-      Remember: Return ALL project files in the 'START_TITLE' format as
-      instructed in the system prompt.
+      Remember: Return ALL project files in the 'START_TITLE' format.
     `
+    if (options.image) {
+
+      const visionPrompt = `
+      # VISION-DRIVEN DAPP GENERATION: PIXEL-PERFECT CLONE MODE
+      
+      The user provided an **IMAGE**. Your goal is to **CLONE** this interface into React code.
+
+      **VISUAL INSTRUCTIONS (PRIORITY #1 - THE "LOOK"):**
+
+      1. **IGNORE DEFAULT TEMPLATES:** Do not use generic styles. If the image looks unique, your code must look unique.
+      2. **EXACT COLORS:** Do not strictly rely on default Tailwind colors (like \`bg-blue-500\`). **Extract the HEX CODES** from the image and use Tailwind arbitrary values (e.g., \`bg-[#1a2b3c]\`, \`text-[#f0f0f0]\`).
+      3. **LAYOUT & SPACING:** Observe the exact padding, border-radius, and shadows. Replicate the "density" of the UI.
+      4. **FONTS & VIBE:** Match the font weight (Bold/Light) and style (Modern/Retro) exactly.
+
+      **TASK: MERGE VISUALS WITH LOGIC (STRICT COMPLIANCE)**
+
+      You are provided with an **IMAGE**. This image is the SINGLE SOURCE OF TRUTH for the target **Visual Style, Mood, and Layout**.
+      You are also provided with **MANDATORY LOGIC REQUIREMENTS**.
+
+      **PRIORITY RULES:**
+      1. **LOGIC & STRUCTURE (HIGHEST PRIORITY - DO NOT BREAK):**
+         - Implement React + Ethers.js structure defined in "TECHNICAL CONSTRAINTS".
+         - Use \`window.__QUICK_DAPP_CONFIG__\` for Title/Logo/Details.
+         - Integrate the Smart Contract (ABI, Address).
+         - Use \`.jsx\` extensions.
+
+      2. **VISUALS & MOOD (CRITICAL DESIGN GOAL):**
+         - **ANALYZE THE VIBE:** Look at the image's atmosphere. Is it dark & futuristic? Playful & colorful? Minimalist & clean?
+         - **COLOR PALETTE:** Extract the primary colors, background colors, and accent colors from the image and apply them using Tailwind CSS (e.g., arbitrary values like \`bg-[#1a1b1e]\` if needed to match precisely).
+         - **TYPOGRAPHY & COMPOSITION:** Observe font weights, spacing, and rounded corners in the image and replicate them.
+         - **REPLICATE, DON'T JUST MAP:** Do not just place buttons in the same spots. Make them *look* exactly like the buttons in the image.
+
+      **CONTRACT TO INTEGRATE:**
+      - **Address:** \`${options.address}\`
+      - **Chain ID:** ${options.chainId}
+      - **ABI Functions:**
+      ${functionNames}
+
+      **USER INSTRUCTIONS:**
+      "${userDescription}"
+
+      ${architectureInstructions}
+      ${technicalConstraints}
+      
+      **REMINDER:** The Image is for *CSS/Layout*. The System Prompt is for *Code Structure/Logic*. DO NOT FAIL THE LOGIC.
+      
+      **PROVIDER SCRIPT TO INJECT:**
+      ${providerCode}
+      `;
+
+      return [
+        {
+          type: 'image_url',
+          image_url: { url: options.image }
+        },
+        {
+          type: 'text',
+          text: visionPrompt
+        }
+      ];
+    }
+
+    return basePrompt;
   }
 
-  private createUpdateMessage(description: string, currentFiles: Pages): string {
-    const filesString = JSON.stringify(currentFiles, null, 2);
-    return `
-      IMPORTANT: The user has provided context in this message (like new Title or Details).
-      You MUST prioritize the information in this message over the
-      file contents I am providing below.
+  private createUpdateMessage(description: string | any[], currentFiles: Pages): string | any[] {
+
+    const filteredFiles: Pages = {};
+    for (const [fileName, content] of Object.entries(currentFiles)) {
+      if (fileName === 'index.html' || fileName.startsWith('src/')) {
+        filteredFiles[fileName] = content;
+      }
+    }
+
+    const filesString = JSON.stringify(filteredFiles, null, 2);
+
+    const textOnlyInstruction = `
+      IMPORTANT: The user has provided context in this message.
+      Prioritize the user's request over the file contents below.
       
-      User's request and context:
-      ${description}
+      User's request:
+      ${Array.isArray(description) ? description.map(p => p.text).join('\n') : description}
 
       ---
-      
-      Here is the full code of my current project (which might be outdated):
+      Current Project Code (Partial View):
       ${filesString}
 
-      Please apply the update. Remember to return ALL project files 
-      in the 'START_TITLE' format and follow the
-      window.__QUICK_DAPP_CONFIG__ template.
+      Please apply the update. 
+      **CRITICAL REQUIREMENT:** 1. Return ALL project files (index.html, src/App.jsx, etc).
+      2. You MUST use the format: <<<<<<< START_TITLE filename >>>>>>> END_TITLE
+      3. Do NOT provide explanations, only the code blocks.
     `
+
+    if (Array.isArray(description)) {
+
+      return description.map(part => {
+        if (part.type === 'text') {
+          const visionInstruction = `
+          # UI RECONSTRUCTION TASK 🚨
+          
+          The user has provided an **IMAGE** as a visual reference.
+          
+          **YOUR GOAL:**
+          Refactor the **visuals (CSS/Layout)** of the current code to match the attached image, BUT **preserve the existing blockchain logic**.
+
+          **STRICT RULES:**
+          1. **PRESERVE LOGIC:** Do NOT remove the existing \`ethers.js\` integration, \`useEffect\`, \`useState\`, or ABI calls found in the Reference Code.
+          2. **APPLY DESIGN:** Change the HTML structure and Tailwind classes to match the image.
+          3. **CONFIG:** Keep using \`window.__QUICK_DAPP_CONFIG__\` variable.
+          4. **FILES:** Return ALL necessary files (index.html, src/App.jsx, etc).
+
+          ---
+          **YOUR MISSION:**
+          1. **DISCARD** the current CSS/Layout styles of the reference code.
+          2. **REBUILD** the visual layer (\`return (...)\` in JSX) to match the **IMAGE** exactly.
+          3. **USE ARBITRARY VALUES:** Use exact hex codes from the image (e.g. \`bg-[#123]\`) instead of generic Tailwind classes.
+          4. **KEEP LOGIC:** You MUST preserve the existing variables, states, \`useEffect\`, and \`ethers.js\` logic from the reference code. Just wrap them in the new design.
+          
+          **USER REQUEST:**
+          "${part.text}"
+          
+          ---
+          **REFERENCE LOGIC (PRESERVE THIS LOGIC):**
+          ${filesString}
+          `;
+
+          return {
+            type: 'text',
+            text: visionInstruction
+          };
+        }
+        return part;
+      })
+    }
+
+    return textOnlyInstruction;
   }
 
   private getProviderCode(): string {
@@ -375,9 +694,9 @@ export class AIDappGenerator extends Plugin {
 </script>`
   }
 
-  private async callLLMAPI(messages: any[], systemPrompt: string): Promise<string> {
-    const BACKEND_URL = "https://quickdapp-ai.api.remix.live/generate";
-    // const BACKEND_URL = "http://localhost:4000/dapp-generator/generate";
+  private async callLLMAPI(messages: any[], systemPrompt: string, hasImage: boolean = false): Promise<string> {
+    const BACKEND_URL = "https://quickdapp-ai.api.remix.live/generate"
+    // const BACKEND_URL = "http://localhost:4000/dapp-generator/generate"
 
     try {
       const response = await fetch(BACKEND_URL, {
@@ -388,13 +707,14 @@ export class AIDappGenerator extends Plugin {
         },
         body: JSON.stringify({
           messages,
-          systemPrompt
+          systemPrompt,
+          hasImage
         })
       });
 
       if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Backend Error: ${errText}`);
+        const errText = await response.text()
+        throw new Error(`Backend Error: ${errText}`)
       }
 
       const json = await response.json();
@@ -411,10 +731,17 @@ export class AIDappGenerator extends Plugin {
 const cleanFileContent = (content: string, filename: string): string => {
   let cleaned = content.trim()
 
-  cleaned = cleaned.replace(/^```[\w-]*\n?/gm, '')
-  cleaned = cleaned.replace(/```$/gm, '')
+  const codeBlockRegex = /```[\w-]*\n([\s\S]*?)\n?```/;
+  const match = cleaned.match(codeBlockRegex);
 
-  const strayTags = ['javascript', 'typescript', 'html', 'css', 'jsx', 'tsx', 'json']
+  if (match && match[1]) {
+    cleaned = match[1].trim();
+  } else {
+    cleaned = cleaned.replace(/^```[\w-]*\n?/gm, '')
+    cleaned = cleaned.replace(/```$/gm, '')
+  }
+
+  const strayTags = ['javascript', 'typescript', 'html', 'css', 'jsx', 'tsx', 'json', 'bash']
   for (const tag of strayTags) {
     if (cleaned.toLowerCase().startsWith(tag)) {
       const regex = new RegExp(`^${tag}\\s*\\n?`, 'i')
@@ -452,12 +779,8 @@ const ensureCompleteHtml = (html: string): string => {
 };
 
 const parsePages = (content: string) => {
-  const pages = {}
-  const markerRegex = /<<<<<<< START_TITLE (.*?) >>>>>>> END_TITLE/g
-
-  if (!content.match(markerRegex)) {
-    return pages
-  }
+  const pages: Record<string, string> = {}
+  const markerRegex = /<{3,}\s*START_TITLE\s+(.*?)\s+>{3,}\s*END_TITLE/g
 
   const parts = content.split(markerRegex)
 

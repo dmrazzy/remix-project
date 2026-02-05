@@ -89,6 +89,7 @@ let requiredModules = [
   'matomo',
   'walletconnect',
   'popupPanel',
+  'overlay',
   'remixAI',
   'remixAID',
   'remixaiassistant',
@@ -97,6 +98,7 @@ let requiredModules = [
   'githubAuthHandler',
   'desktopClient',
   'auth',
+  'account',
   'transactionSimulator',
   'amp',
   's3Storage',
@@ -173,7 +175,8 @@ export function isNative(name) {
     'templateexplorermodal',
     'amp',
     'vega',
-    'chartjs'
+    'chartjs',
+    'quick-dapp-v2'
   ]
   return nativePlugins.includes(name) || requiredModules.includes(name) || isInjectedProvider(name) || isVM(name) || isScriptRunner(name)
 }

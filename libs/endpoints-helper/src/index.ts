@@ -1,6 +1,7 @@
 type EndpointUrls = {
     corsProxy: string;
     mcpCorsProxy: string;
+    mcpCorsProxy8443: string;
     solidityScan: string;
     ipfsGateway: string;
     commonCorsProxy: string;
@@ -19,11 +20,13 @@ type EndpointUrls = {
     credits: string;
     audio: string;
     storage: string;
+    permissions: string;
 };
 
 const defaultUrls: EndpointUrls = {
   corsProxy: 'https://gitproxy.api.remix.live',
   mcpCorsProxy: "https://mcp.api.remix.live",
+  mcpCorsProxy8443: "https://mcp.api.remix.live:8443",
   solidityScan: 'https://solidityscan.api.remix.live',
   ipfsGateway: 'https://jqgt.api.remix.live',
   commonCorsProxy: 'https://common-corsproxy.api.remix.live',
@@ -38,15 +41,17 @@ const defaultUrls: EndpointUrls = {
   solidityScanWebSocket: 'wss://solidityscan.api.remix.live',
   gitHubLoginProxy: 'https://github-login-proxy.api.remix.live',
   sso: 'https://auth.api.remix.live:8443/sso',
-  billing: 'https://auth.api.remix.live:8443//billing',
+  billing: 'https://auth.api.remix.live:8443/billing',
   credits: 'https://auth.api.remix.live:8443/credits',
   audio: 'https://audio.api.remix.live',
   storage: 'https://auth.api.remix.live:8443/storage',
+  permissions: 'https://auth.api.remix.live:8443/permissions',
 };
 
 const endpointPathMap: Record<keyof EndpointUrls, string> = {
   corsProxy: 'corsproxy',
   mcpCorsProxy: 'mcp',
+  mcpCorsProxy8443: 'mcp',
   solidityScan: 'solidityscan',
   ipfsGateway: 'jqgt',
   commonCorsProxy: 'common-corsproxy',
@@ -65,6 +70,7 @@ const endpointPathMap: Record<keyof EndpointUrls, string> = {
   credits: 'credits',
   audio: 'audio',
   storage: 'storage',
+  permissions: 'permissions',
 };
 
 const prefix = process.env.NX_ENDPOINTS_URL;
@@ -74,6 +80,7 @@ const localhostUrls: EndpointUrls = {
   // PROXY service (port 3005)
   corsProxy: 'http://localhost:3005/corsproxy',
   mcpCorsProxy: 'http://localhost:3005/mcp',
+  mcpCorsProxy8443: 'http://localhost:8443/mcp',
   commonCorsProxy: 'http://localhost:3005/common-corsproxy',
   github: 'http://localhost:3005/github',
   ghfolderpull: 'http://localhost:3005/ghfolderpull',
@@ -89,21 +96,25 @@ const localhostUrls: EndpointUrls = {
   vyper2: 'http://localhost:3006/vyper2',
   
   // AI service (port 3003)
-  solcoder: 'http://localhost:3003/solcoder',
+  solcoder: 'http://localhost:4000/solcoder',
   completion: 'http://localhost:3003/completion',
   gptChat: 'http://localhost:3003/gpt-chat',
   rag: 'http://localhost:3003/rag',
   
   // AUTH service (port 3001)
-  sso: 'http://localhost:3001/sso',
+  sso: 'https://auth.api.remix.live:8443/sso',
   
   // BILLING service (port 3002)
-  billing: 'http://localhost:3002/billing',
-  credits: 'http://localhost:3002/credits',
+  billing: 'https://auth.api.remix.live:8443/billing',
+  credits: 'https://auth.api.remix.live:8443/credits',
+  
+  // AUDIO service (port 3004)
   audio: 'http://localhost:3004/audio',
   
   // STORAGE service (port 3002 - same as billing)
   storage: 'http://localhost:3002/storage',
+  // PERMISSIONS service
+  permissions: 'https://auth.api.remix.live:8443/permissions',
 };
 
 const resolvedUrls: EndpointUrls = prefix

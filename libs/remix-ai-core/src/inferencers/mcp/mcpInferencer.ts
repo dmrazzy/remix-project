@@ -18,6 +18,7 @@ import { ResourceScoring } from "../../services/resourceScoring";
 import { CodeExecutor } from "./codeExecutor";
 import { ToolApiGenerator } from "./toolApiGenerator";
 import { MCPClient } from "./mcpClient";
+import { SimpleToolSelector } from "../../services/simpleToolSelector";
 
 // Helper function to track events using MatomoManager instance
 function trackMatomoEvent(category: string, action: string, name?: string) {
@@ -47,6 +48,7 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
   private remixMCPServer?: any; // Internal RemixMCPServer instance
   private MAX_TOOL_EXECUTIONS = 10;
   private baseInferencer: RemoteInferencer; // The actual inferencer to use (could be Ollama or Remote)
+  private toolSelector: SimpleToolSelector = new SimpleToolSelector();
 
   constructor(servers: IMCPServer[] = [], apiUrl?: string, completionUrl?: string, remixMCPServer?: any, baseInferencer?: RemoteInferencer) {
     super(apiUrl, completionUrl);
@@ -268,10 +270,10 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
         }))
       });
 
-      const workspaceResource: IMCPResource = {
-        uri: 'project://structure',
-        name: 'Project Structure',
-        description: 'Hierarchical view of project files and folders',
+      const contextResource: IMCPResource = {
+        uri: 'context://workspace',
+        name: 'Workspace Context',
+        description: 'Complete IDE context including files, editor state, git status, and diagnostics',
         mimeType: 'application/json',
       };
 
@@ -279,14 +281,14 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
       const hasInternalServer = this.mcpClients.has('Remix IDE Server')
 
       if (hasInternalServer) {
-        const existingProjectStructure = selectedResources.find(r => r.resource.uri === 'project://structure');
+        const existingProjectStructure = selectedResources.find(r => r.resource.uri === 'context://workspace');
         if (existingProjectStructure === undefined) {
           selectedResources.push({
-            resource: workspaceResource,
+            resource: contextResource,
             serverName: 'Remix IDE Server',
             score: 1.0, // High score to ensure it's included
             components: { keywordMatch: 1.0, domainRelevance: 1.0, typeRelevance:1, priority:1, freshness:1 },
-            reasoning: 'Project structure always included for internal remix MCP server'
+            reasoning: 'IDE context always included for internal remix MCP server'
           });
         }
       }
@@ -371,8 +373,8 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
     const mcpContext = await this.enrichContextWithMCPResources(options, prompt);
     const enrichedPrompt = mcpContext ? `${mcpContext}\n\n${prompt}` : prompt;
 
-    // Add available tools to the request in LLM format
-    const llmFormattedTools = await this.getToolsForLLMRequest(options.provider);
+    // Add available tools to the request in LLM format (with prompt for tool selection)
+    const llmFormattedTools = await this.getToolsForLLMRequest(options.provider, prompt);
     const enhancedOptions = {
       ...options,
       tools: llmFormattedTools.length > 0 ? llmFormattedTools : undefined,
@@ -504,20 +506,23 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
 
             const followUpOptions = {
               ...enhancedOptions,
-              toolsMessages: toolsMessagesArray
+              toolsMessages: toolsMessagesArray,
+              chatHistory: options.provider === 'anthropic'
+                ? [...(enhancedOptions.chatHistory || []), { role: 'user', content: prompt }]
+                : enhancedOptions.chatHistory
             };
 
-            // Send empty prompt - the tool results are in toolsMessages
-            // Don't add extra prompts as they cause Anthropic to summarize instead of using full tool results
             if (options.provider === 'openai' || options.provider === 'mistralai') {
               return {
                 streamResponse: await this.baseInferencer.answer(prompt, followUpOptions),
-                callback: toolExecutionStatusCallback
+                callback: toolExecutionStatusCallback,
+                uiToolCallback: uiCallback
               } as IAIStreamResponse;
             } else {
               return {
                 streamResponse: await this.baseInferencer.answer("", followUpOptions),
-                callback: toolExecutionStatusCallback
+                callback: toolExecutionStatusCallback,
+                uiToolCallback: uiCallback
               } as IAIStreamResponse;
             }
           }
@@ -537,8 +542,8 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
     const mcpContext = await this.enrichContextWithMCPResources(options, prompt);
     const enrichedContext = mcpContext ? `${mcpContext}\n\n${context}` : context;
 
-    // Add available tools to the request in LLM format
-    const llmFormattedTools = await this.getToolsForLLMRequest(options.provider);
+    // Add available tools to the request in LLM format (with prompt for tool selection)
+    const llmFormattedTools = await this.getToolsForLLMRequest(options.provider, prompt);
     options.stream_result = false
     const enhancedOptions = {
       ...options,
@@ -672,7 +677,23 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
   }
 
   /**
-   * Get available tools for LLM integration
+   * Infer tool category from tool name (simple heuristic)
+   */
+  private inferToolCategory(toolName: string): string {
+    const name = toolName.toLowerCase()
+    if (name.includes('compile')) return 'compilation'
+    if (name.includes('deploy') || name.includes('transaction') || name.includes('balance') || name.includes('account')) return 'deployment'
+    if (name.includes('debug') || name.includes('breakpoint')) return 'debugging'
+    if (name.includes('file') || name.includes('directory')) return 'file_management'
+    if (name.includes('test')) return 'testing'
+    if (name.includes('git') || name.includes('commit')) return 'git'
+    if (name.includes('scan') || name.includes('analyze') || name.includes('audit')) return 'analysis'
+    if (name.includes('wei') || name.includes('ether') || name.includes('hex') || name.includes('decimal')) return 'deployment'
+    return 'workspace'
+  }
+
+  /**
+   * Get available tools for LLM integration with category metadata
    */
   async getAvailableToolsForLLM(): Promise<IMCPTool[]> {
     const allTools: IMCPTool[] = [];
@@ -680,28 +701,51 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
 
     for (const [serverName, tools] of Object.entries(toolsFromServers)) {
       for (const tool of tools) {
-        // Add server context to tool for execution routing
-        const enhancedTool: IMCPTool & { _mcpServer?: string } = {
+        // Add server context AND category metadata for filtering
+        const enhancedTool: IMCPTool & { _mcpServer?: string; _mcpCategory?: string } = {
           ...tool,
-          _mcpServer: serverName
+          _mcpServer: serverName,
+          _mcpCategory: this.inferToolCategory(tool.name)
         };
         allTools.push(enhancedTool);
       }
     }
+
     return allTools;
   }
 
-  async getToolsForLLMRequest(provider?: string): Promise<any[]> {
+  async getToolsForLLMRequest(provider?: string, prompt?: string): Promise<any[]> {
     const mcpTools = await this.getAvailableToolsForLLM();
+    console.log('[MCPInferencer] Total available tools:', mcpTools.length)
 
-    if (mcpTools.length === 0) {
-      return [];
+    if (mcpTools.length === 0) return [];
+
+    // Use keyword-based tool selection if prompt provided and more than 15 tools
+    let selectedTools = mcpTools;
+    if (prompt && mcpTools.length > 15) {
+      try {
+        selectedTools = this.toolSelector.selectTools(mcpTools, prompt, 15);
+
+        // Emit selection event for debugging/analytics
+        this.event.emit('mcpToolSelection', {
+          totalTools: mcpTools.length,
+          selectedTools: selectedTools.map(t => t.name),
+          categories: this.toolSelector.detectCategories(prompt),
+          method: 'keyword'
+        });
+
+        console.log(`[MCPInferencer] Tool selection: ${mcpTools.length} → ${selectedTools.length} tools (${Math.round((1 - selectedTools.length / mcpTools.length) * 100)}% reduction)`)
+        console.log('[MCPInferencer] Selected tools:', selectedTools.map(t => t.name).join(', '))
+      } catch (error) {
+        console.warn('[MCPInferencer] Tool selection failed, using all tools:', error)
+        selectedTools = mcpTools
+      }
     }
 
     // Generate compact tool descriptions
     const apiGenerator = new ToolApiGenerator();
     const apiDescription = apiGenerator.generateAPIDescription();
-    const toolsList = apiGenerator.generateToolsList(mcpTools);
+    const toolsList = apiGenerator.generateToolsList(selectedTools);
 
     // Create single execute_tool with TypeScript API definitions
     const executeToolDef = {
@@ -791,7 +835,6 @@ ${toolsList}`,
           }
 
           if (uiCallback){
-            console.log('on UI tool callback', innerToolCall.name, innerToolCall.arguments)
             uiCallback(true, innerToolCall.name, innerToolCall.arguments);
           }
           const result = await this.executeTool(targetServer, innerToolCall);
@@ -809,6 +852,7 @@ ${toolsList}`,
       // Convert code execution result to MCP tool result format
       if (result.success) {
         const content = [];
+        let isError = false
 
         // Add all tool call results with their full payloads
         if (result.toolCallRecords && result.toolCallRecords.length > 0) {
@@ -821,6 +865,7 @@ ${toolsList}`,
             const toolResult = record.result.content
               .map((c: any) => c.text || JSON.stringify(c))
               .join('\n');
+            isError = record.result?.isError
 
             content.push({
               type: 'text' as const,
@@ -850,7 +895,7 @@ ${toolsList}`,
 
         return {
           content: content.length > 0 ? content : [{ type: 'text', text: 'Code executed successfully with no output' }],
-          isError: false
+          isError: isError
         };
       } else {
         const content = [];
