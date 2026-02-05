@@ -28,7 +28,7 @@ import {
   StorageFile,
   StorageFilesResponse,
   StorageListOptions,
-  WorkspacesResponse
+  WorkspacesResponse,
   PermissionsResponse,
   FeatureCheckResponse,
   MultiFeatureCheckResponse,
