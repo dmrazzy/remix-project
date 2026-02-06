@@ -51,8 +51,6 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
     this.cache = new CompletionCache();
     this.completionMetadata = new WeakMap();
     this.sessionMetadata = new Map();
-
-    console.log('[Constructor] InlineCompletionProvider initialized');
   }
 
   // Called from external code (editor.tsx) when full completion is detected via text change
