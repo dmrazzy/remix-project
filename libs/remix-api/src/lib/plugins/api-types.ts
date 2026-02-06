@@ -436,3 +436,108 @@ export interface FeatureAccessCheckResponse {
   featureGroup: string
   hasAccess: boolean
 }
+
+// ==================== Invite Tokens ====================
+
+/**
+ * Action that will be performed when a token is redeemed
+ */
+export interface InviteTokenAction {
+  type: 'add_to_feature_group' | 'grant_credits' | 'grant_product' | 'add_tag'
+  description: string
+  config?: Record<string, unknown>
+}
+
+/**
+ * Token info returned from validation
+ */
+export interface InviteTokenInfo {
+  name: string
+  description: string
+  expires_at: string | null
+  remaining_uses: number | null
+}
+
+/**
+ * Response from validate token endpoint
+ */
+export interface InviteValidateResponse {
+  valid: boolean
+  name?: string
+  description?: string
+  expires_at?: string | null
+  uses_remaining?: number | null
+  already_redeemed?: boolean
+  redeemed_at?: string | null
+  actions?: InviteTokenAction[]
+  error?: string
+  error_code?: 'NOT_FOUND' | 'INACTIVE' | 'EXPIRED' | 'NOT_STARTED' | 'EXHAUSTED' | 'MAX_USES_REACHED'
+}
+
+/**
+ * Request to redeem a token
+ */
+export interface InviteRedeemRequest {
+  token: string
+}
+
+/**
+ * Action result after redemption
+ */
+export interface InviteActionResult {
+  type: string
+  success: boolean
+  details?: Record<string, unknown>
+  error?: string
+}
+
+/**
+ * Response from redeem token endpoint
+ */
+export interface InviteRedeemResponse {
+  success: boolean
+  message?: string
+  error?: string
+  error_code?: 'NOT_FOUND' | 'INACTIVE' | 'EXPIRED' | 'NOT_STARTED' | 'EXHAUSTED' | 'ALREADY_REDEEMED'
+  redeemed_at?: string
+  actions_applied?: InviteActionResult[]
+  redemption?: {
+    id: number
+    redeemed_at: string
+  }
+}
+
+/**
+ * A redemption record
+ */
+export interface InviteRedemption {
+  id: number
+  token_name: string
+  token_description: string
+  redeemed_at: string
+  actions: InviteTokenAction[]
+}
+
+/**
+ * Response from my-redemptions endpoint
+ */
+export interface InviteRedemptionsResponse {
+  redemptions: InviteRedemption[]
+}
+
+/**
+ * A user tag
+ */
+export interface UserTag {
+  tag: string
+  source: 'invite_token' | 'admin' | 'system'
+  created_at: string
+}
+
+/**
+ * Response from my-tags endpoint
+ */
+export interface UserTagsResponse {
+  tags: UserTag[]
+}
+

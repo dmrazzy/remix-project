@@ -1,5 +1,5 @@
 import { Plugin } from '@remixproject/engine'
-import { AuthUser, AuthProvider as AuthProviderType, ApiClient, SSOApiService, CreditsApiService, PermissionsApiService, BillingApiService, Credits } from '@remix-api'
+import { AuthUser, AuthProvider as AuthProviderType, ApiClient, SSOApiService, CreditsApiService, PermissionsApiService, BillingApiService, InviteApiService, Credits, InviteValidateResponse, InviteRedeemResponse } from '@remix-api'
 import { endpointUrls } from '@remix-endpoints-helper'
 import { getAddress } from 'ethers'
 
@@ -7,8 +7,8 @@ const profile = {
   name: 'auth',
   displayName: 'Authentication',
   description: 'Handles SSO authentication and credits',
-  methods: ['login', 'logout', 'getUser', 'getCredits', 'refreshCredits', 'linkAccount', 'getLinkedAccounts', 'unlinkAccount', 'getApiClient', 'getSSOApi', 'getCreditsApi', 'getPermissionsApi', 'getBillingApi', 'checkPermission', 'hasPermission', 'getAllPermissions', 'checkPermissions', 'getFeaturesByCategory', 'getFeatureLimit', 'getPaddleConfig'],
-  events: ['authStateChanged', 'creditsUpdated', 'accountLinked']
+  methods: ['login', 'logout', 'getUser', 'getCredits', 'refreshCredits', 'linkAccount', 'getLinkedAccounts', 'unlinkAccount', 'getApiClient', 'getSSOApi', 'getCreditsApi', 'getPermissionsApi', 'getBillingApi', 'checkPermission', 'hasPermission', 'getAllPermissions', 'checkPermissions', 'getFeaturesByCategory', 'getFeatureLimit', 'getPaddleConfig', 'getInviteApi', 'validateInviteToken', 'redeemInviteToken', 'getPendingInviteToken', 'setPendingInviteToken', 'setPendingInviteValidation', 'clearPendingInviteToken', 'getPendingInviteValidation', 'isAuthenticated', 'getToken'],
+  events: ['authStateChanged', 'creditsUpdated', 'accountLinked', 'inviteTokenDetected', 'inviteTokenRedeemed']
 }
 
 export class AuthPlugin extends Plugin {
@@ -17,7 +17,9 @@ export class AuthPlugin extends Plugin {
   private creditsApi: CreditsApiService
   private permissionsApi: PermissionsApiService
   private billingApi: BillingApiService
+  private inviteApi: InviteApiService
   private refreshTimer: number | null = null
+  private pendingInviteToken: string | null = null
 
   constructor() {
     super(profile)
@@ -38,11 +40,16 @@ export class AuthPlugin extends Plugin {
     const billingClient = new ApiClient(endpointUrls.billing)
     this.billingApi = new BillingApiService(billingClient)
 
+    // Invite API (no auth required for validation, but needed for redemption)
+    const inviteClient = new ApiClient(endpointUrls.invite)
+    this.inviteApi = new InviteApiService(inviteClient)
+
     // Set up token refresh callback for auto-renewal
     this.apiClient.setTokenRefreshCallback(() => this.refreshAccessToken())
     creditsClient.setTokenRefreshCallback(() => this.refreshAccessToken())
     permissionsClient.setTokenRefreshCallback(() => this.refreshAccessToken())
     billingClient.setTokenRefreshCallback(() => this.refreshAccessToken())
+    inviteClient.setTokenRefreshCallback(() => this.refreshAccessToken())
   }
 
   private clearRefreshTimer() {
@@ -499,6 +506,7 @@ export class AuthPlugin extends Plugin {
       // Update other API services too
       this.creditsApi.setToken(token)
       this.permissionsApi.setToken(token)
+      this.inviteApi.setToken(token)
     }
 
     return token
@@ -535,6 +543,7 @@ export class AuthPlugin extends Plugin {
         this.apiClient.setToken(newAccessToken)
         this.creditsApi.setToken(newAccessToken)
         this.permissionsApi.setToken(newAccessToken)
+        this.inviteApi.setToken(newAccessToken)
 
         console.log('[AuthPlugin] Access token refreshed successfully')
         // Reschedule next proactive refresh
@@ -637,6 +646,8 @@ export class AuthPlugin extends Plugin {
 
     // Validate existing token with the API on load
     this.validateAndRestoreSession()
+
+    // Note: Invite token URL checking is handled by invitationManager plugin
   }
 
   /**
@@ -970,5 +981,108 @@ Issued At: ${new Date().toISOString()}`
       console.error('[SIWE] Login failed:', error)
       throw error
     }
+  }
+
+  // ==================== Invite Token Methods ====================
+
+  /**
+   * Get the Invite API service
+   */
+  getInviteApi(): InviteApiService {
+    return this.inviteApi
+  }
+
+  /**
+   * Validate an invite token (no auth required)
+   * @param token - The invite token string
+   */
+  async validateInviteToken(token: string): Promise<InviteValidateResponse> {
+    const response = await this.inviteApi.validateToken(token)
+    if (!response.ok) {
+      return {
+        valid: false,
+        error: response.error || 'Failed to validate token',
+        error_code: 'NOT_FOUND'
+      }
+    }
+    return response.data!
+  }
+
+  /**
+   * Redeem an invite token (auth required)
+   * @param token - The invite token string
+   */
+  async redeemInviteToken(token: string): Promise<InviteRedeemResponse> {
+    const response = await this.inviteApi.redeemToken(token)
+    if (!response.ok) {
+      return {
+        success: false,
+        error: response.error || 'Failed to redeem token',
+        error_code: 'NOT_FOUND'
+      }
+    }
+    
+    const result = response.data!
+    
+    // If redemption was successful, emit event and refresh relevant data
+    if (result.success) {
+      this.emit('inviteTokenRedeemed', {
+        token,
+        actions: result.actions_applied
+      })
+      
+      // Refresh credits and permissions as they may have changed
+      this.refreshCredits().catch(console.error)
+    }
+    
+    return result
+  }
+
+  /**
+   * Get the pending invite token (if any)
+   */
+  getPendingInviteToken(): string | null {
+    // Check session storage first, then instance variable
+    const sessionToken = sessionStorage.getItem('remix_pending_invite')
+    return sessionToken || this.pendingInviteToken
+  }
+
+  /**
+   * Get the pending invite validation result (if any)
+   */
+  getPendingInviteValidation(): { token: string; validation: InviteValidateResponse } | null {
+    const stored = sessionStorage.getItem('remix_pending_invite_validation')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+
+  /**
+   * Set a pending invite token
+   */
+  setPendingInviteToken(token: string): void {
+    this.pendingInviteToken = token
+    sessionStorage.setItem('remix_pending_invite', token)
+  }
+
+  /**
+   * Store the pending invite validation for retrieval by UI
+   */
+  setPendingInviteValidation(token: string, validation: InviteValidateResponse): void {
+    sessionStorage.setItem('remix_pending_invite_validation', JSON.stringify({ token, validation }))
+  }
+
+  /**
+   * Clear the pending invite token
+   */
+  clearPendingInviteToken(): void {
+    this.pendingInviteToken = null
+    sessionStorage.removeItem('remix_pending_invite')
+    sessionStorage.removeItem('remix_pending_invite_validation')
   }
 }
