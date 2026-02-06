@@ -58,16 +58,11 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
   private handleExternalAcceptance(sessionId: number): void {
     const metadata = this.sessionMetadata.get(sessionId);
     if (!metadata) {
-      console.log('[handleExternalAcceptance] No metadata for session', { sessionId });
       return;
     }
 
     // Prevent duplicate tracking (in case handlePartialAccept was already called)
     if (metadata.accepted) {
-      console.log('[handleExternalAcceptance] DUPLICATE acceptance detected - ignoring', {
-        sessionId,
-        previousAcceptanceType: metadata.acceptanceType
-      });
       return;
     }
 
