@@ -733,14 +733,59 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     }
   }
 
+  /**
+   * Scan all local workspaces' remix.config.json to build a map of remoteId -> local workspace names.
+   * Uses the raw filesystem to read across workspaces without switching the active one.
+   */
+  private async scanLocalRemoteIds(): Promise<Map<string, string[]>> {
+    const remoteIdToLocal = new Map<string, string[]>()
+    try {
+      const fs = (window as any).remixFileSystem
+      if (!fs || !await fs.exists('/.workspaces')) {
+        return remoteIdToLocal
+      }
+
+      const workspaceNames = await fs.readdir('/.workspaces')
+      for (const wsName of workspaceNames) {
+        const configPath = `/.workspaces/${wsName}/remix.config.json`
+        try {
+          if (!await fs.exists(configPath)) continue
+          const raw = await fs.readFile(configPath, 'utf8')
+          const config = JSON.parse(raw)
+          const remoteId = config?.['remote-workspace']?.remoteId
+          if (remoteId) {
+            const existing = remoteIdToLocal.get(remoteId) || []
+            existing.push(wsName)
+            remoteIdToLocal.set(remoteId, existing)
+          }
+        } catch (e) {
+          // Skip workspaces with unreadable configs
+        }
+      }
+    } catch (e) {
+      console.warn('[CloudWorkspacesPlugin] Failed to scan local remote IDs:', e)
+    }
+    return remoteIdToLocal
+  }
+
   private async loadWorkspaces(): Promise<void> {
     this.state.loading = true
     this.state.error = null
     this.renderComponent()
 
     try {
-      const result = await this.call('s3Storage', 'listWorkspaces')
-      this.state.workspaces = result.workspaces || []
+      const [result, localRemoteIds] = await Promise.all([
+        this.call('s3Storage', 'listWorkspaces'),
+        this.scanLocalRemoteIds()
+      ])
+      
+      // Enrich each remote workspace with local presence info
+      const workspaces = (result.workspaces || []).map(ws => ({
+        ...ws,
+        localWorkspaceNames: localRemoteIds.get(ws.id) || []
+      }))
+      
+      this.state.workspaces = workspaces
       this.emit('workspacesLoaded', this.state.workspaces)
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Failed to load workspaces:', e)
@@ -858,15 +903,19 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       const currentRemoteId = await this.call('s3Storage', 'getWorkspaceRemoteId')
       const canRestoreToCurrent = currentRemoteId && currentRemoteId === backupRemoteId
       
+      // Scan all local workspaces to find any already linked to this remote ID
+      const localRemoteIds = await this.scanLocalRemoteIds()
+      const localWorkspacesWithSameId = localRemoteIds.get(backupRemoteId) || []
+      
       if (canRestoreToCurrent) {
-        // Show modal with both options: restore to current or new workspace
+        // Current workspace owns this remote — offer restore to current or create a separate copy
         const restoreModal = {
           id: 'restoreBackupModal',
           title: 'Restore Backup',
           message: 'How would you like to restore this backup?',
           modalType: 'modal',
           okLabel: 'Restore to Current Workspace',
-          cancelLabel: 'Create New Workspace',
+          cancelLabel: 'Create Separate Copy',
           okFn: async () => {
             try {
               await this.call('s3Storage', 'restoreWorkspace', backupPath)
@@ -880,14 +929,48 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
             }
           },
           cancelFn: async () => {
-            await this.restoreToNewWorkspaceWithNameCheck(backupPath)
+            // Separate copy = fresh remoteId, no link to the original cloud
+            await this.restoreToNewWorkspaceWithNameCheck(backupPath, { keepRemoteId: false })
+          },
+          hideFn: () => null
+        }
+        await this.call('notification', 'modal', restoreModal)
+      } else if (localWorkspacesWithSameId.length > 0) {
+        // Another local workspace already syncs to this remote — warn the user
+        const existingNames = localWorkspacesWithSameId.join(', ')
+        const restoreModal = {
+          id: 'restoreBackupConflictModal',
+          title: 'Remote Already on This Device',
+          message: `The workspace "${existingNames}" on this device is already syncing to this cloud workspace. ` +
+            `You can restore into that existing workspace or create a separate copy with its own cloud identity.`,
+          modalType: 'modal',
+          okLabel: `Restore to "${localWorkspacesWithSameId[0]}"`,
+          cancelLabel: 'Create Separate Copy',
+          okFn: async () => {
+            try {
+              // Switch to that workspace and restore into it
+              await this.call('filePanel', 'setWorkspace', { name: localWorkspacesWithSameId[0] })
+              await this.call('s3Storage', 'restoreWorkspace', backupPath)
+            } catch (e) {
+              console.error('[CloudWorkspacesPlugin] Restore to existing local failed:', e)
+              await this.call('notification', 'alert', {
+                id: 'restoreError',
+                title: 'Restore Failed',
+                message: e.message || 'Failed to restore backup'
+              })
+            }
+          },
+          cancelFn: async () => {
+            // Separate copy = fresh remoteId
+            await this.restoreToNewWorkspaceWithNameCheck(backupPath, { keepRemoteId: false })
           },
           hideFn: () => null
         }
         await this.call('notification', 'modal', restoreModal)
       } else {
-        // Only option is to restore to a new workspace
-        await this.restoreToNewWorkspaceWithNameCheck(backupPath)
+        // Remote is NOT on this device — this is the "moved to another computer" case
+        // Keep the remoteId so the user continues syncing to the same cloud
+        await this.restoreToNewWorkspaceWithNameCheck(backupPath, { keepRemoteId: true })
       }
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Restore failed:', e)
@@ -897,8 +980,12 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
 
   /**
    * Smart restore to new workspace - checks if workspace name exists and prompts user
+   * @param keepRemoteId - If true, keep the original remoteId (continuity). If false, assign a fresh one (separate copy).
    */
-  private async restoreToNewWorkspaceWithNameCheck(backupPath: string): Promise<void> {
+  private async restoreToNewWorkspaceWithNameCheck(
+    backupPath: string, 
+    options: { keepRemoteId: boolean } = { keepRemoteId: true }
+  ): Promise<void> {
     try {
       // Get backup metadata to find the original workspace name
       const backupInfo = await this.call('s3Storage', 'getBackupInfo', backupPath)
@@ -910,7 +997,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       if (!workspaceExists) {
         // Workspace doesn't exist - restore directly to original name
         await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
-          targetWorkspaceName: originalName
+          targetWorkspaceName: originalName,
+          keepRemoteId: options.keepRemoteId
         })
       } else {
         // Workspace exists - ask user what to do
@@ -925,7 +1013,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
             try {
               await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
                 targetWorkspaceName: originalName,
-                overwriteIfExists: true
+                overwriteIfExists: true,
+                keepRemoteId: options.keepRemoteId
               })
             } catch (e) {
               console.error('[CloudWorkspacesPlugin] Restore with overwrite failed:', e)
@@ -939,7 +1028,9 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
           cancelFn: async () => {
             try {
               // Let the plugin auto-generate a unique name
-              await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath)
+              await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
+                keepRemoteId: options.keepRemoteId
+              })
             } catch (e) {
               console.error('[CloudWorkspacesPlugin] Restore with new name failed:', e)
               await this.call('notification', 'alert', {

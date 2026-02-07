@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
 import { BackupItem } from './BackupItem'
 import { AutosaveItem } from './AutosaveItem'
 import { useCloudWorkspaces } from '../context'
+import { getDayLabel } from '../types'
 
 export interface CurrentCloudWorkspaceFilesProps {
   backups: StorageFile[]
@@ -12,6 +13,79 @@ export interface CurrentCloudWorkspaceFilesProps {
   onRestore: (folder: string, filename: string) => void
   onDelete: (folder: string, filename: string) => void
   onDownload: (folder: string, filename: string) => void
+}
+
+/**
+ * Collapsible backup history for the current workspace panel
+ */
+const CurrentBackupHistory: React.FC<{
+  backups: StorageFile[]
+  onRestore: (folder: string, filename: string) => void
+  onDelete: (folder: string, filename: string) => void
+  onDownload: (folder: string, filename: string) => void
+}> = ({ backups, onRestore, onDelete, onDownload }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const sorted = [...backups].reverse()
+
+  // Group by day
+  const grouped: { label: string; items: StorageFile[] }[] = []
+  let currentLabel = ''
+  for (const b of sorted) {
+    const label = getDayLabel(b.lastModified)
+    if (label !== currentLabel) {
+      currentLabel = label
+      grouped.push({ label, items: [b] })
+    } else {
+      grouped[grouped.length - 1].items.push(b)
+    }
+  }
+
+  return (
+    <>
+      <div
+        className="d-flex align-items-center px-2 pt-2 pb-1"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ cursor: 'pointer' }}
+      >
+        <i
+          className={`fas fa-chevron-${isOpen ? 'down' : 'right'} me-1 text-muted`}
+          style={{ fontSize: '0.55rem', width: '8px' }}
+        ></i>
+        <i className="fas fa-history me-1 text-muted" style={{ fontSize: '0.65rem' }}></i>
+        <span className="text-muted" style={{ fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <FormattedMessage id="cloudWorkspaces.backupHistory" defaultMessage="Backup History" />
+        </span>
+        <span
+          className="badge bg-secondary ms-1"
+          style={{ fontSize: '0.55rem', padding: '1px 5px', borderRadius: '8px' }}
+        >
+          {backups.length}
+        </span>
+      </div>
+      {isOpen && (
+        <div>
+          {grouped.map((group, gi) => (
+            <React.Fragment key={gi}>
+              {grouped.length > 1 && (
+                <div className="px-2 pt-1" style={{ fontSize: '0.6rem', fontWeight: 600, color: 'var(--secondary)', opacity: 0.6 }}>
+                  {group.label}
+                </div>
+              )}
+              {group.items.map((backup, index) => (
+                <BackupItem
+                  key={backup.key || `${gi}-${index}`}
+                  backup={backup}
+                  onRestore={onRestore}
+                  onDelete={onDelete}
+                  onDownload={onDownload}
+                />
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+    </>
+  )
 }
 
 export const CurrentCloudWorkspaceFiles: React.FC<CurrentCloudWorkspaceFilesProps> = ({
@@ -35,7 +109,7 @@ export const CurrentCloudWorkspaceFiles: React.FC<CurrentCloudWorkspaceFilesProp
       {/* Section Header */}
       <div className="d-flex justify-content-between align-items-center px-2 py-1 border-bottom bg-light">
         <span className="text-muted small fw-bold">
-          <i className="fas fa-history me-1"></i>
+          <i className="fas fa-cloud me-1"></i>
           <FormattedMessage id="cloudWorkspaces.savedVersions" defaultMessage="Saved Versions" />
         </span>
       </div>
@@ -55,6 +129,7 @@ export const CurrentCloudWorkspaceFiles: React.FC<CurrentCloudWorkspaceFilesProp
           </div>
         ) : (
           <div style={{ paddingLeft: '8px' }}>
+            {/* Last Save — the current autosave state */}
             {autosave && (
               <AutosaveItem 
                 autosave={autosave} 
@@ -62,15 +137,15 @@ export const CurrentCloudWorkspaceFiles: React.FC<CurrentCloudWorkspaceFilesProp
                 onDownload={onDownload} 
               />
             )}
-            {[...backups].reverse().map((backup, index) => (
-              <BackupItem 
-                key={backup.key || index}
-                backup={backup} 
-                onRestore={onRestore} 
+            {/* Backup History — collapsible previous snapshots */}
+            {backups.length > 0 && (
+              <CurrentBackupHistory
+                backups={backups}
+                onRestore={onRestore}
                 onDelete={onDelete}
                 onDownload={onDownload}
               />
-            ))}
+            )}
           </div>
         )}
       </div>

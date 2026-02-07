@@ -1,7 +1,7 @@
 import React from 'react'
 import { useIntl } from 'react-intl'
 import { CustomTooltip } from '@remix-ui/helper'
-import { BackupItemProps, formatSize, formatDate } from '../types'
+import { BackupItemProps, formatSize, formatDate, formatRelativeDate } from '../types'
 
 /**
  * Parse workspace name and timestamp from backup filename
@@ -45,6 +45,7 @@ export const BackupItem: React.FC<BackupItemProps> = ({
   const intl = useIntl()
   const { workspaceName, isEncrypted } = parseBackupFilename(backup.filename)
   const backupDate = formatDate(backup.lastModified)
+  const relativeDate = formatRelativeDate(backup.lastModified)
 
   return (
     <div className="d-flex align-items-center py-1 px-2 border-bottom">
@@ -59,14 +60,17 @@ export const BackupItem: React.FC<BackupItemProps> = ({
       )}
       <CustomTooltip
         placement="top"
-        tooltipText={`${workspaceName} • ${backupDate}${isEncrypted ? ' 🔐' : ''}`}
+        tooltipText={`${workspaceName} • ${backupDate} • ${formatSize(backup.size)}${isEncrypted ? ' 🔐' : ''}`}
       >
         <div className="flex-grow-1 text-truncate" style={{ minWidth: 0, cursor: 'default' }}>
           <span className="small">
-            {workspaceName}
+            {relativeDate}
           </span>
           <span className="text-muted ms-1" style={{ fontSize: '0.7rem' }}>
-            {formatSize(backup.size)} · {backupDate}
+            {formatSize(backup.size)}
+          </span>
+          <span className="text-muted ms-1" style={{ fontSize: '0.65rem', opacity: 0.7 }}>
+            {workspaceName}
           </span>
         </div>
       </CustomTooltip>

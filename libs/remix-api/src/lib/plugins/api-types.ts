@@ -225,6 +225,8 @@ export interface WorkspaceSummary {
   workspaceName?: string
   /** User ID who owns this remote workspace */
   userId?: string
+  /** Names of local workspaces on this device that are linked to this remote ID */
+  localWorkspaceNames?: string[]
 }
 
 /**

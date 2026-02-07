@@ -1,7 +1,7 @@
 import React from 'react'
-import { useIntl } from 'react-intl'
+import { useIntl, FormattedMessage } from 'react-intl'
 import { CustomTooltip } from '@remix-ui/helper'
-import { AutosaveItemProps, formatSize, formatDate } from '../types'
+import { AutosaveItemProps, formatSize, formatDate, formatRelativeDate } from '../types'
 
 /**
  * Parse workspace name from autosave filename
@@ -36,29 +36,31 @@ export const AutosaveItem: React.FC<AutosaveItemProps> = ({
   const { workspaceName, isEncrypted } = parseAutosaveFilename(autosave.filename)
 
   return (
-    <div className="d-flex align-items-center py-1 px-2 border-bottom">
-      <i className="fas fa-clock me-1 text-info" style={{ fontSize: '0.75rem' }}></i>
+    <div className="d-flex align-items-center py-1 px-2 border-bottom" style={{ background: 'var(--remix-bg-opacity, transparent)' }}>
+      <i className="fas fa-save me-1 text-success" style={{ fontSize: '0.75rem' }}></i>
       {isEncrypted && (
         <CustomTooltip
           placement="top"
-          tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.encryptedAutosave', defaultMessage: 'Encrypted autosave' })}
+          tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.encryptedAutosave', defaultMessage: 'Encrypted save' })}
         >
           <i className="fas fa-lock me-1 text-warning" style={{ fontSize: '0.65rem' }}></i>
         </CustomTooltip>
       )}
       <CustomTooltip
         placement="top"
-        tooltipText={`${workspaceName || 'Autosave'} • ${formatDate(autosave.lastModified)}${isEncrypted ? ' 🔐' : ''}`}
+        tooltipText={`${workspaceName ? workspaceName + ' • ' : ''}${formatDate(autosave.lastModified)}${isEncrypted ? ' 🔐' : ''}`}
       >
         <div className="flex-grow-1 text-truncate" style={{ minWidth: 0, cursor: 'default' }}>
-          <span className="small text-info">autosave</span>
+          <span className="small fw-bold">
+            <FormattedMessage id="cloudWorkspaces.lastSave" defaultMessage="Last Save" />
+          </span>
           {workspaceName && (
             <span className="text-muted ms-1" style={{ fontSize: '0.7rem' }}>
               ({workspaceName})
             </span>
           )}
           <span className="text-muted ms-1" style={{ fontSize: '0.7rem' }}>
-            {formatSize(autosave.size)} · {formatDate(autosave.lastModified)}
+            {formatSize(autosave.size)} · {formatRelativeDate(autosave.lastModified)}
           </span>
         </div>
       </CustomTooltip>
@@ -79,7 +81,7 @@ export const AutosaveItem: React.FC<AutosaveItemProps> = ({
       </CustomTooltip>
       <CustomTooltip
         placement="top"
-        tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosaveTip', defaultMessage: 'Restore from this autosave' })}
+        tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosaveTip', defaultMessage: 'Restore from this save' })}
       >
         <button
           className="btn btn-sm p-0 ms-1 text-success"

@@ -2053,7 +2053,7 @@ export class S3StoragePlugin extends Plugin {
    */
   async restoreBackupToNewWorkspace(
     backupPath: string,
-    options?: { targetWorkspaceName?: string; overwriteIfExists?: boolean }
+    options?: { targetWorkspaceName?: string; overwriteIfExists?: boolean; keepRemoteId?: boolean }
   ): Promise<void> {
     const provider = this.ensureProvider()
     
@@ -2184,18 +2184,24 @@ export class S3StoragePlugin extends Plugin {
     
     await Promise.all(filePromises)
     
-    // Link the restored workspace to the same remote ID for testing conflict detection
-    // This allows testing multi-browser/tab scenarios where both point to same cloud
+    // Decide whether to keep the original remoteId or assign a fresh one
+    const keepRemoteId = options?.keepRemoteId !== false // Default to true for backward compatibility
+    const assignedRemoteId = keepRemoteId ? remoteWorkspaceId : generateWorkspaceId()
+    
     const remixConfig: RemixConfig = {
       'remote-workspace': {
-        remoteId: remoteWorkspaceId,
+        remoteId: assignedRemoteId,
         userId: user?.sub,
         createdAt: new Date().toISOString()
       }
     }
     await this.call('fileManager', 'writeFile', REMIX_CONFIG_FILE, JSON.stringify(remixConfig, null, 2))
     
-    console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (linked to ${remoteWorkspaceId})`)
+    if (keepRemoteId) {
+      console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (linked to ${remoteWorkspaceId})`)
+    } else {
+      console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (fresh ID: ${assignedRemoteId}, original was ${remoteWorkspaceId})`)  
+    }
     
     // Notify user about git repo info if present
     if (gitBackupInfo?.isGitRepo) {
@@ -2216,12 +2222,15 @@ export class S3StoragePlugin extends Plugin {
     this.emit('restoreCompleted', { 
       backupPath, 
       fileCount: restoredCount,
-      workspaceRemoteId: remoteWorkspaceId,
+      workspaceRemoteId: assignedRemoteId,
+      originalRemoteId: remoteWorkspaceId,
+      keepRemoteId,
       newWorkspaceName,
       gitBackupInfo
     })
     
-    await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files)`)
+    const idNote = keepRemoteId ? '' : ' (separate copy)'
+    await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files)${idNote}`)
   }
   
   /**

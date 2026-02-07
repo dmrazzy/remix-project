@@ -239,6 +239,7 @@ export function RemixUiTopbar() {
       branches: workspace.branches,
       currentBranch: workspace.currentBranch,
       hasGitSubmodules: workspace.hasGitSubmodules,
+      remoteId: workspace.remoteId,
       submenu: subItems
     }))
     setMenuItems(menuItems)
