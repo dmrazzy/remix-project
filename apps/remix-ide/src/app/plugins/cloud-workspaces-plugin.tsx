@@ -786,9 +786,15 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       ])
       
       const backups = backupsResult.files || []
-      const autosaveFiles = autosaveResult.files || []
+      const allAutosaveFiles = autosaveResult.files || []
       
-      // Find the latest autosave (could be .zip or .zip.enc)
+      // Filter to only actual backup files (.zip or .zip.enc)
+      // The autosave folder also contains content-hash.json and session.lock which are not backups
+      const autosaveFiles = allAutosaveFiles.filter(f => 
+        f.filename.endsWith('.zip') || f.filename.endsWith('.zip.enc')
+      )
+      
+      // Find the latest autosave
       // Sort by lastModified descending and take the first one
       let autosave = null
       if (autosaveFiles.length > 0) {

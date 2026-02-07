@@ -51,6 +51,7 @@ import {
 const REMIX_CONFIG_FILE = 'remix.config.json'
 const LOCK_FILE_NAME = 'session.lock'
 const CONTENT_HASH_FILE_NAME = 'content-hash.json'
+const GIT_BACKUP_INFO_FILE = '_git_backup_info.json'
 const LOCK_EXPIRY_MS = 2 * 60 * 1000 // 2 minutes - lock expires if not refreshed
 const SESSION_STORAGE_KEY = 'remix-cloud-session-id'
 
@@ -619,6 +620,56 @@ export class S3StoragePlugin extends Plugin {
   }
   
   /**
+   * Collect git metadata (remotes, branch, commit hash) if workspace is a git repo.
+   * Returns null if the workspace is not a git repo.
+   */
+  private async collectGitMetadata(): Promise<{
+    isGitRepo: boolean;
+    remotes: Array<{ name: string; url: string }>;
+    branch: string | null;
+    commitHash: string | null;
+  } | null> {
+    try {
+      // Check if .git exists in the workspace
+      const hasGit = await this.call('fileManager', 'exists', '.git')
+      if (!hasGit) return null
+
+      let remotes: Array<{ name: string; url: string }> = []
+      let branch: string | null = null
+      let commitHash: string | null = null
+
+      try {
+        const remotesList = await this.call('dgitApi', 'remotes')
+        if (remotesList && Array.isArray(remotesList)) {
+          remotes = remotesList.map((r: any) => ({ name: r.name, url: r.url }))
+        }
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not get git remotes:', e)
+      }
+
+      try {
+        const branchInfo = await this.call('dgitApi', 'currentbranch', { checkout: true })
+        if (branchInfo) {
+          branch = branchInfo.name || null
+        }
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not get current branch:', e)
+      }
+
+      try {
+        commitHash = await this.call('dgitApi', 'resolveref', { ref: 'HEAD' })
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not get HEAD commit hash:', e)
+      }
+
+      return { isGitRepo: true, remotes, branch, commitHash }
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Error checking git status:', e)
+      return null
+    }
+  }
+
+  /**
    * Create a backup from pre-collected files
    * Used when files are already collected (e.g., for hash checking before upload)
    */
@@ -643,13 +694,17 @@ export class S3StoragePlugin extends Plugin {
     
     const workspaceRemoteId = await this.getWorkspaceRemoteId()
     
+    // Collect git metadata if this is a git repo
+    const gitInfo = await this.collectGitMetadata()
+    
     // Add metadata inside the zip (for when zip is downloaded/inspected)
     const zipMetadata = {
       createdAt: new Date().toISOString(),
       fileCount: files.length,
       workspaceRemoteId,
       workspaceName,
-      isAutosave: folder.includes('autosave')
+      isAutosave: folder.includes('autosave'),
+      isGitRepo: !!gitInfo
     }
     
     // Add all files to zip
@@ -661,6 +716,26 @@ export class S3StoragePlugin extends Plugin {
     
     // Add metadata file inside zip
     zip.file('_backup_metadata.json', JSON.stringify(zipMetadata, null, 2))
+    
+    // Add git metadata if this is a git repo
+    if (gitInfo) {
+      const gitBackupInfo = {
+        ...gitInfo,
+        capturedAt: new Date().toISOString(),
+        note: 'This workspace was a git repository. The .git folder is not included in cloud backups. Use the remote URL to re-clone or re-initialize git after restoring.'
+      }
+      zip.file(GIT_BACKUP_INFO_FILE, JSON.stringify(gitBackupInfo, null, 2))
+      console.log('[S3StoragePlugin] 📋 Git metadata captured:', gitBackupInfo)
+      
+      // Show warning toast (only for manual backups, not autosaves)
+      if (!folder.includes('autosave')) {
+        const remoteUrl = gitInfo.remotes.find(r => r.name === 'origin')?.url
+        const message = remoteUrl
+          ? `⚠️ This workspace is a git repo (${remoteUrl}). Git history is not included in cloud backups. Push your changes to preserve git history.`
+          : '⚠️ This workspace is a git repo. Git history is not included in cloud backups. Push your changes to preserve git history.'
+        await this.call('notification', 'toast', message)
+      }
+    }
     
     // Generate compressed zip
     let zipContent = await zip.generateAsync({
@@ -1798,13 +1873,26 @@ export class S3StoragePlugin extends Plugin {
       console.log('[S3StoragePlugin] Backup metadata:', metadata)
     }
     
+    // Check for git metadata
+    let gitBackupInfo: any = null
+    const gitInfoFile = zip.file(GIT_BACKUP_INFO_FILE)
+    if (gitInfoFile) {
+      try {
+        const gitInfoStr = await gitInfoFile.async('string')
+        gitBackupInfo = JSON.parse(gitInfoStr)
+        console.log('[S3StoragePlugin] 📋 Backup contains git metadata:', gitBackupInfo)
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not parse git backup info:', e)
+      }
+    }
+    
     // Extract and write files
     let restoredCount = 0
     const filePromises: Promise<void>[] = []
     
     zip.forEach((relativePath, zipEntry) => {
-      // Skip metadata, directories, and remix.config.json (preserve local cloud settings)
-      if (relativePath === '_backup_metadata.json' || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
+      // Skip metadata, directories, git backup info, and remix.config.json (preserve local cloud settings)
+      if (relativePath === '_backup_metadata.json' || relativePath === GIT_BACKUP_INFO_FILE || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
         return
       }
       
@@ -1823,10 +1911,27 @@ export class S3StoragePlugin extends Plugin {
     
     console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files`)
     
+    // Notify user about git repo info if present
+    if (gitBackupInfo?.isGitRepo) {
+      const remoteUrl = gitBackupInfo.remotes?.find((r: any) => r.name === 'origin')?.url
+      if (remoteUrl) {
+        await this.call('notification', 'toast', 
+          `ℹ️ This workspace was a git repo cloned from ${remoteUrl} (branch: ${gitBackupInfo.branch || 'unknown'}). ` +
+          `Git history was not included in the backup. You can re-clone from the git plugin to restore git functionality.`
+        )
+      } else {
+        await this.call('notification', 'toast', 
+          'ℹ️ This workspace was a git repo. Git history was not included in the backup. ' +
+          'You can re-initialize git from the git plugin.'
+        )
+      }
+    }
+    
     this.emit('restoreCompleted', { 
       backupPath: `${backupFolder}/${backupFilename}`, 
       fileCount: restoredCount,
-      workspaceRemoteId 
+      workspaceRemoteId,
+      gitBackupInfo
     })
     
     await this.call('notification', 'toast', `☁️ Workspace restored (${restoredCount} files)`)
@@ -1844,6 +1949,8 @@ export class S3StoragePlugin extends Plugin {
     fileCount: number;
     isEncrypted: boolean;
     remoteWorkspaceId: string;
+    isGitRepo: boolean;
+    gitInfo: { remotes: Array<{ name: string; url: string }>; branch: string | null; commitHash: string | null } | null;
   }> {
     const provider = this.ensureProvider()
     
@@ -1867,7 +1974,9 @@ export class S3StoragePlugin extends Plugin {
           createdAt: s3Metadata.lastModified || null,
           fileCount: parseInt(s3Metadata.metadata['file-count'] || '0', 10),
           isEncrypted,
-          remoteWorkspaceId
+          remoteWorkspaceId,
+          isGitRepo: false, // Not available from S3 metadata, need full download to check
+          gitInfo: null
         }
       }
     } catch (e) {
@@ -1904,12 +2013,33 @@ export class S3StoragePlugin extends Plugin {
       }
     }
     
+    // Check for git backup info
+    let isGitRepo = false
+    let gitInfo: { remotes: Array<{ name: string; url: string }>; branch: string | null; commitHash: string | null } | null = null
+    const gitInfoFile = zip.file(GIT_BACKUP_INFO_FILE)
+    if (gitInfoFile) {
+      try {
+        const gitInfoStr = await gitInfoFile.async('string')
+        const parsedGitInfo = JSON.parse(gitInfoStr)
+        isGitRepo = parsedGitInfo.isGitRepo || false
+        gitInfo = {
+          remotes: parsedGitInfo.remotes || [],
+          branch: parsedGitInfo.branch || null,
+          commitHash: parsedGitInfo.commitHash || null
+        }
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not parse git backup info:', e)
+      }
+    }
+    
     return {
       workspaceName,
       createdAt,
       fileCount,
       isEncrypted,
-      remoteWorkspaceId
+      remoteWorkspaceId,
+      isGitRepo,
+      gitInfo
     }
   }
 
@@ -2018,13 +2148,26 @@ export class S3StoragePlugin extends Plugin {
     
     console.log(`[S3StoragePlugin] Created new workspace: ${newWorkspaceName}`)
     
+    // Check for git metadata
+    let gitBackupInfo: any = null
+    const gitInfoFile = zip.file(GIT_BACKUP_INFO_FILE)
+    if (gitInfoFile) {
+      try {
+        const gitInfoStr = await gitInfoFile.async('string')
+        gitBackupInfo = JSON.parse(gitInfoStr)
+        console.log('[S3StoragePlugin] 📋 Backup contains git metadata:', gitBackupInfo)
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not parse git backup info:', e)
+      }
+    }
+    
     // Extract and write files to the new workspace
     let restoredCount = 0
     const filePromises: Promise<void>[] = []
     
     zip.forEach((relativePath, zipEntry) => {
-      // Skip metadata, directories, and remix.config.json (to avoid inheriting remoteId)
-      if (relativePath === '_backup_metadata.json' || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
+      // Skip metadata, directories, git backup info, and remix.config.json (to avoid inheriting remoteId)
+      if (relativePath === '_backup_metadata.json' || relativePath === GIT_BACKUP_INFO_FILE || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
         return
       }
       
@@ -2054,11 +2197,28 @@ export class S3StoragePlugin extends Plugin {
     
     console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (linked to ${remoteWorkspaceId})`)
     
+    // Notify user about git repo info if present
+    if (gitBackupInfo?.isGitRepo) {
+      const remoteUrl = gitBackupInfo.remotes?.find((r: any) => r.name === 'origin')?.url
+      if (remoteUrl) {
+        await this.call('notification', 'toast', 
+          `ℹ️ This workspace was a git repo cloned from ${remoteUrl} (branch: ${gitBackupInfo.branch || 'unknown'}). ` +
+          `Git history was not included in the backup. You can re-clone from the git plugin to restore git functionality.`
+        )
+      } else {
+        await this.call('notification', 'toast', 
+          'ℹ️ This workspace was a git repo. Git history was not included in the backup. ' +
+          'You can re-initialize git from the git plugin.'
+        )
+      }
+    }
+    
     this.emit('restoreCompleted', { 
       backupPath, 
       fileCount: restoredCount,
       workspaceRemoteId: remoteWorkspaceId,
-      newWorkspaceName 
+      newWorkspaceName,
+      gitBackupInfo
     })
     
     await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files)`)
