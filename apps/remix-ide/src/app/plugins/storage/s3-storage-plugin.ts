@@ -153,10 +153,13 @@ interface LockCheckResult {
 const EXCLUDED_PATTERNS = [
   '.deps',           // npm dependencies cached by Remix
   'artifacts',       // compiled contract artifacts
-  '.git',            // git folder
   'node_modules',    // node modules (shouldn't exist but just in case)
   '.cache',          // cache folders
 ]
+
+// .git is handled separately with a size cap rather than blanket exclusion
+// Shallow single-branch clones (the dgit default) are typically small and should be preserved
+const MAX_GIT_FOLDER_SIZE = 5 * 1024 // 5KB - tiny limit for testing
 
 const profile = {
   name: 's3Storage',
@@ -618,6 +621,47 @@ export class S3StoragePlugin extends Plugin {
     const files = await this.collectWorkspaceFiles()
     return this.createBackupFromFiles(files, filename, folder)
   }
+
+  /**
+   * Check if .git was excluded from collected files and prompt the user with a modal dialog.
+   * Returns true if the user wants to proceed, false if they cancelled.
+   * For autosave, this is skipped (returns true silently).
+   */
+  private async promptIfGitExcluded(
+    files: Array<{ path: string; content: string }> & { gitIncluded?: boolean; gitExcludedReason?: string }
+  ): Promise<boolean> {
+    if (files.gitIncluded !== false || !files.gitExcludedReason) {
+      // .git was included or doesn't exist — no prompt needed
+      return true
+    }
+
+    // Collect git info for the dialog
+    const gitInfo = await this.collectGitMetadata()
+    const remoteUrl = gitInfo?.remotes?.find(r => r.name === 'origin')?.url
+    const branch = gitInfo?.branch || 'unknown'
+
+    const sizeParts = files.gitExcludedReason.match(/([\d.]+\s*[KMGT]?B)/gi)
+    const sizeText = sizeParts?.[0] || 'too large'
+
+    let message = `The .git folder in this workspace is ${sizeText} and exceeds the cloud backup size limit.\n\n`
+    message += `Git history will NOT be included in this backup. Your source files will still be saved.\n\n`
+    if (remoteUrl) {
+      message += `Remote: ${remoteUrl}\nBranch: ${branch}\n\n`
+      message += `To preserve git history, push your changes to the remote before backing up.`
+    } else {
+      message += `This workspace has no git remote configured. Add a remote and push to preserve git history.`
+    }
+
+    const result = await this.call('notification', 'modal', {
+      id: 'gitExcludedFromBackup',
+      title: '⚠️ Git History Too Large for Cloud Backup',
+      message,
+      okLabel: 'Continue without git history',
+      cancelLabel: 'Cancel backup'
+    })
+
+    return result // true if OK, false/undefined if cancelled
+  }
   
   /**
    * Collect git metadata (remotes, branch, commit hash) if workspace is a git repo.
@@ -632,6 +676,7 @@ export class S3StoragePlugin extends Plugin {
     try {
       // Check if .git exists in the workspace
       const hasGit = await this.call('fileManager', 'exists', '.git')
+      console.log('[S3StoragePlugin] 🔍 collectGitMetadata: .git exists =', hasGit)
       if (!hasGit) return null
 
       let remotes: Array<{ name: string; url: string }> = []
@@ -662,6 +707,7 @@ export class S3StoragePlugin extends Plugin {
         console.warn('[S3StoragePlugin] Could not get HEAD commit hash:', e)
       }
 
+      console.log('[S3StoragePlugin] 🔍 collectGitMetadata result:', { isGitRepo: true, remotes, branch, commitHash })
       return { isGitRepo: true, remotes, branch, commitHash }
     } catch (e) {
       console.warn('[S3StoragePlugin] Error checking git status:', e)
@@ -696,6 +742,13 @@ export class S3StoragePlugin extends Plugin {
     
     // Collect git metadata if this is a git repo
     const gitInfo = await this.collectGitMetadata()
+    console.log('[S3StoragePlugin] 🔍 createBackupFromFiles: gitInfo =', gitInfo)
+    
+    // Check if .git was included in the files (collected by collectWorkspaceFiles)
+    const filesWithGitInfo = files as Array<{ path: string; content: string }> & { gitIncluded?: boolean; gitExcludedReason?: string }
+    const gitIncluded = filesWithGitInfo.gitIncluded === true
+    const gitExcludedReason = filesWithGitInfo.gitExcludedReason
+    console.log('[S3StoragePlugin] 🔍 createBackupFromFiles: gitIncluded =', gitIncluded, ', gitExcludedReason =', gitExcludedReason, ', filesWithGitInfo.gitIncluded =', filesWithGitInfo.gitIncluded)
     
     // Add metadata inside the zip (for when zip is downloaded/inspected)
     const zipMetadata = {
@@ -704,7 +757,8 @@ export class S3StoragePlugin extends Plugin {
       workspaceRemoteId,
       workspaceName,
       isAutosave: folder.includes('autosave'),
-      isGitRepo: !!gitInfo
+      isGitRepo: !!gitInfo,
+      gitIncluded
     }
     
     // Add all files to zip
@@ -717,24 +771,21 @@ export class S3StoragePlugin extends Plugin {
     // Add metadata file inside zip
     zip.file('_backup_metadata.json', JSON.stringify(zipMetadata, null, 2))
     
-    // Add git metadata if this is a git repo
-    if (gitInfo) {
+    // Add git metadata file only if .git was NOT included (as fallback info for restore)
+    if (gitInfo && !gitIncluded) {
       const gitBackupInfo = {
         ...gitInfo,
         capturedAt: new Date().toISOString(),
-        note: 'This workspace was a git repository. The .git folder is not included in cloud backups. Use the remote URL to re-clone or re-initialize git after restoring.'
+        gitExcludedReason,
+        note: 'The .git folder was too large to include in this backup. Use the remote URL to re-clone or re-initialize git after restoring.'
       }
       zip.file(GIT_BACKUP_INFO_FILE, JSON.stringify(gitBackupInfo, null, 2))
-      console.log('[S3StoragePlugin] 📋 Git metadata captured:', gitBackupInfo)
+      console.log('[S3StoragePlugin] 📋 Git metadata captured (git folder excluded due to size):', gitBackupInfo)
       
-      // Show warning toast (only for manual backups, not autosaves)
-      if (!folder.includes('autosave')) {
-        const remoteUrl = gitInfo.remotes.find(r => r.name === 'origin')?.url
-        const message = remoteUrl
-          ? `⚠️ This workspace is a git repo (${remoteUrl}). Git history is not included in cloud backups. Push your changes to preserve git history.`
-          : '⚠️ This workspace is a git repo. Git history is not included in cloud backups. Push your changes to preserve git history.'
-        await this.call('notification', 'toast', message)
-      }
+      // Note: for manual saves/backups, the user was already prompted via promptIfGitExcluded()
+      // For autosaves, we silently continue — the git metadata file preserves the info for restore
+    } else if (gitInfo && gitIncluded) {
+      console.log('[S3StoragePlugin] ✅ Git folder included in backup — no metadata fallback needed')
     }
     
     // Generate compressed zip
@@ -1169,10 +1220,18 @@ export class S3StoragePlugin extends Plugin {
       console.warn('[S3StoragePlugin] Could not get workspace name:', e)
     }
 
-    await this.call('notification', 'toast', '☁️ Saving to cloud...')
-    
     // Collect files for backup and hash
     const files = await this.collectWorkspaceFiles()
+    
+    // Prompt user if .git was excluded due to size
+    const proceed = await this.promptIfGitExcluded(files)
+    if (!proceed) {
+      console.log('[S3StoragePlugin] Save cancelled by user (git exclusion dialog)')
+      return
+    }
+    
+    await this.call('notification', 'toast', '☁️ Saving to cloud...')
+    
     const currentHash = await computeWorkspaceHash(files)
     
     // Acquire lock and save
@@ -1214,10 +1273,18 @@ export class S3StoragePlugin extends Plugin {
       console.warn('[S3StoragePlugin] Could not get workspace name:', e)
     }
 
-    await this.call('notification', 'toast', '☁️ Saving to cloud...')
-    
     // Collect files for backup and hash
     const files = await this.collectWorkspaceFiles()
+    
+    // Prompt user if .git was excluded due to size
+    const proceed = await this.promptIfGitExcluded(files)
+    if (!proceed) {
+      console.log('[S3StoragePlugin] Force save cancelled by user (git exclusion dialog)')
+      return
+    }
+    
+    await this.call('notification', 'toast', '☁️ Saving to cloud...')
+    
     const currentHash = await computeWorkspaceHash(files)
     
     // Force acquire lock (takes over from other session)
@@ -1682,34 +1749,59 @@ export class S3StoragePlugin extends Plugin {
   }
   
   /**
-   * Recursively collect all files in the workspace
+   * Recursively collect all files in the workspace.
+   * .git folder is included if its total size is under MAX_GIT_FOLDER_SIZE,
+   * otherwise it's excluded and gitExcludedReason is set.
    */
   private async collectWorkspaceFiles(
-    basePath: string = ''
-  ): Promise<Array<{ path: string; content: string }>> {
+    basePath: string = '',
+    _context?: { gitFiles: Array<{ path: string; content: string }>; gitSize: number }
+  ): Promise<Array<{ path: string; content: string }> & { gitIncluded?: boolean; gitExcludedReason?: string }> {
+    const isRoot = basePath === '' || basePath === '/'
+    const context = _context || { gitFiles: [], gitSize: 0 }
     const files: Array<{ path: string; content: string }> = []
     
     try {
       const entries = await this.call('fileManager', 'readdir', basePath || '/')
+      if (isRoot) {
+        console.log('[S3StoragePlugin] 🔍 collectWorkspaceFiles: root entries =', Object.keys(entries))
+      }
       
       for (const [entryPath, info] of Object.entries(entries)) {
-        // Skip excluded patterns
+        // Skip standard excluded patterns (not .git — that's handled separately)
         if (this.shouldExclude(entryPath)) {
           console.log(`[S3StoragePlugin] Skipping excluded path: ${entryPath}`)
           continue
         }
+
+        const normalizedPath = entryPath.replace(/^\//, '').toLowerCase()
+        const isGitPath = normalizedPath === '.git' || normalizedPath.startsWith('.git/')
         
         const entryInfo = info as { isDirectory: boolean }
         
         if (entryInfo.isDirectory) {
           // Recursively collect files from subdirectory
-          const subFiles = await this.collectWorkspaceFiles(entryPath)
-          files.push(...subFiles)
+          const subFiles = await this.collectWorkspaceFiles(entryPath, context)
+          // Separate git files from non-git files
+          for (const f of subFiles) {
+            const fNorm = f.path.replace(/^\//, '').toLowerCase()
+            if (fNorm === '.git' || fNorm.startsWith('.git/')) {
+              context.gitFiles.push(f)
+            } else {
+              files.push(f)
+            }
+          }
         } else {
           // Read file content
           try {
             const content = await this.call('fileManager', 'readFile', entryPath)
-            files.push({ path: entryPath, content })
+            if (isGitPath) {
+              const size = new TextEncoder().encode(content).length
+              context.gitSize += size
+              context.gitFiles.push({ path: entryPath, content })
+            } else {
+              files.push({ path: entryPath, content })
+            }
           } catch (err) {
             console.warn(`[S3StoragePlugin] Could not read file: ${entryPath}`, err)
           }
@@ -1717,6 +1809,29 @@ export class S3StoragePlugin extends Plugin {
       }
     } catch (err) {
       console.error(`[S3StoragePlugin] Error reading directory: ${basePath}`, err)
+    }
+    
+    // At the root level, decide whether to include .git
+    if (isRoot) {
+      console.log('[S3StoragePlugin] 🔍 collectWorkspaceFiles root decision: gitFiles.length =', context.gitFiles.length, ', gitSize =', context.gitSize, 'bytes, MAX_GIT_FOLDER_SIZE =', MAX_GIT_FOLDER_SIZE, 'bytes')
+      const result = files as Array<{ path: string; content: string }> & { gitIncluded?: boolean; gitExcludedReason?: string }
+      if (context.gitFiles.length > 0) {
+        if (context.gitSize <= MAX_GIT_FOLDER_SIZE) {
+          // .git is small enough — include it
+          result.push(...context.gitFiles)
+          result.gitIncluded = true
+          const sizeMB = (context.gitSize / (1024 * 1024)).toFixed(1)
+          console.log(`[S3StoragePlugin] ✅ Including .git folder (${sizeMB} MB, ${context.gitFiles.length} files)`)
+        } else {
+          // .git is too large — skip it
+          result.gitIncluded = false
+          const sizeMB = (context.gitSize / (1024 * 1024)).toFixed(1)
+          const limitMB = (MAX_GIT_FOLDER_SIZE / (1024 * 1024)).toFixed(0)
+          result.gitExcludedReason = `Git folder is ${sizeMB} MB (limit: ${limitMB} MB). Push to GitHub to preserve git history.`
+          console.log(`[S3StoragePlugin] ⚠️ Excluding .git folder: ${sizeMB} MB exceeds ${limitMB} MB limit`)
+        }
+      }
+      return result
     }
     
     return files
@@ -1758,21 +1873,28 @@ export class S3StoragePlugin extends Plugin {
     
     console.log(`[S3StoragePlugin] 📦 Starting workspace backup for: ${workspaceRemoteId}`)
     
+    // Collect files first so we can check git exclusion before uploading
+    const files = await this.collectWorkspaceFiles()
+    
+    // Prompt user if .git was excluded due to size
+    const proceed = await this.promptIfGitExcluded(files)
+    if (!proceed) {
+      console.log('[S3StoragePlugin] Backup cancelled by user (git exclusion dialog)')
+      throw new Error('Backup cancelled')
+    }
+    
     // Use the createBackup helper which handles encryption
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const backupFilename = `${sanitizedName}-${timestamp}.zip`
     const folder = `${workspaceRemoteId}/backups`
     
-    const key = await this.createBackup(backupFilename, folder)
+    const key = await this.createBackupFromFiles(files, backupFilename, folder)
     
     console.log(`[S3StoragePlugin] ✅ Backup complete: ${key}`)
     
     // Update the last backup time in config
     await this.updateLastBackupTime()
-    
-    // Get file count for notification
-    const files = await this.collectWorkspaceFiles()
     
     this.emit('backupCompleted', { 
       key, 
@@ -1890,6 +2012,22 @@ export class S3StoragePlugin extends Plugin {
     let restoredCount = 0
     const filePromises: Promise<void>[] = []
     
+    // Check if backup contains .git files
+    const backupHasGit = zip.file(/^\.git[\/]/).length > 0 || zip.file('.git') !== null
+    
+    // If backup contains .git, wipe local .git first to prevent corruption
+    if (backupHasGit) {
+      try {
+        const localGitExists = await this.call('fileManager', 'exists', '.git')
+        if (localGitExists) {
+          console.log('[S3StoragePlugin] 🗑️ Wiping local .git folder before restoring backup .git')
+          await this.call('fileManager', 'remove', '.git')
+        }
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not wipe local .git folder:', e)
+      }
+    }
+    
     zip.forEach((relativePath, zipEntry) => {
       // Skip metadata, directories, git backup info, and remix.config.json (preserve local cloud settings)
       if (relativePath === '_backup_metadata.json' || relativePath === GIT_BACKUP_INFO_FILE || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
@@ -1915,15 +2053,20 @@ export class S3StoragePlugin extends Plugin {
     if (gitBackupInfo?.isGitRepo) {
       const remoteUrl = gitBackupInfo.remotes?.find((r: any) => r.name === 'origin')?.url
       if (remoteUrl) {
-        await this.call('notification', 'toast', 
-          `ℹ️ This workspace was a git repo cloned from ${remoteUrl} (branch: ${gitBackupInfo.branch || 'unknown'}). ` +
-          `Git history was not included in the backup. You can re-clone from the git plugin to restore git functionality.`
-        )
+        await this.call('notification', 'alert', {
+          id: 'gitBackupInfoAlert',
+          title: 'Git Repository Info',
+          message: `This workspace was a git repo cloned from ${remoteUrl} (branch: ${gitBackupInfo.branch || 'unknown'}, commit: ${gitBackupInfo.commitHash?.substring(0, 8) || 'unknown'}). ` +
+            `Git history was not included in this backup because it exceeded the size limit. ` +
+            `You can re-clone from the git plugin to restore git functionality.`
+        })
       } else {
-        await this.call('notification', 'toast', 
-          'ℹ️ This workspace was a git repo. Git history was not included in the backup. ' +
-          'You can re-initialize git from the git plugin.'
-        )
+        await this.call('notification', 'alert', {
+          id: 'gitBackupInfoAlert',
+          title: 'Git Repository Info',
+          message: 'This workspace was a git repo. Git history was not included in this backup because it exceeded the size limit. ' +
+            'You can re-initialize git from the git plugin.'
+        })
       }
     }
     
@@ -2013,7 +2156,7 @@ export class S3StoragePlugin extends Plugin {
       }
     }
     
-    // Check for git backup info
+    // Check for git backup info (only exists when .git was excluded due to size)
     let isGitRepo = false
     let gitInfo: { remotes: Array<{ name: string; url: string }>; branch: string | null; commitHash: string | null } | null = null
     const gitInfoFile = zip.file(GIT_BACKUP_INFO_FILE)
@@ -2029,6 +2172,14 @@ export class S3StoragePlugin extends Plugin {
         }
       } catch (e) {
         console.warn('[S3StoragePlugin] Could not parse git backup info:', e)
+      }
+    }
+    
+    // Also check if .git folder is directly in the zip (included because it was under size limit)
+    if (!isGitRepo) {
+      const gitFilesInZip = zip.file(/^\\.git[\\/]/)
+      if (gitFilesInZip.length > 0) {
+        isGitRepo = true
       }
     }
     
@@ -2165,6 +2316,23 @@ export class S3StoragePlugin extends Plugin {
     let restoredCount = 0
     const filePromises: Promise<void>[] = []
     
+    // Check if backup contains .git files
+    const backupHasGit = zip.file(/^\.git[\/]/).length > 0 || zip.file('.git') !== null
+    
+    // If backup contains .git, wipe local .git first to prevent corruption
+    // (even in a new workspace, createWorkspace with 'blank' might init .git)
+    if (backupHasGit) {
+      try {
+        const localGitExists = await this.call('fileManager', 'exists', '.git')
+        if (localGitExists) {
+          console.log('[S3StoragePlugin] 🗑️ Wiping local .git folder in new workspace before restoring backup .git')
+          await this.call('fileManager', 'remove', '.git')
+        }
+      } catch (e) {
+        console.warn('[S3StoragePlugin] Could not wipe local .git folder:', e)
+      }
+    }
+    
     zip.forEach((relativePath, zipEntry) => {
       // Skip metadata, directories, git backup info, and remix.config.json (to avoid inheriting remoteId)
       if (relativePath === '_backup_metadata.json' || relativePath === GIT_BACKUP_INFO_FILE || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
@@ -2207,15 +2375,20 @@ export class S3StoragePlugin extends Plugin {
     if (gitBackupInfo?.isGitRepo) {
       const remoteUrl = gitBackupInfo.remotes?.find((r: any) => r.name === 'origin')?.url
       if (remoteUrl) {
-        await this.call('notification', 'toast', 
-          `ℹ️ This workspace was a git repo cloned from ${remoteUrl} (branch: ${gitBackupInfo.branch || 'unknown'}). ` +
-          `Git history was not included in the backup. You can re-clone from the git plugin to restore git functionality.`
-        )
+        await this.call('notification', 'alert', {
+          id: 'gitBackupInfoAlert',
+          title: 'Git Repository Info',
+          message: `This workspace was a git repo cloned from ${remoteUrl} (branch: ${gitBackupInfo.branch || 'unknown'}, commit: ${gitBackupInfo.commitHash?.substring(0, 8) || 'unknown'}). ` +
+            `Git history was not included in this backup because it exceeded the size limit. ` +
+            `You can re-clone from the git plugin to restore git functionality.`
+        })
       } else {
-        await this.call('notification', 'toast', 
-          'ℹ️ This workspace was a git repo. Git history was not included in the backup. ' +
-          'You can re-initialize git from the git plugin.'
-        )
+        await this.call('notification', 'alert', {
+          id: 'gitBackupInfoAlert',
+          title: 'Git Repository Info',
+          message: 'This workspace was a git repo. Git history was not included in this backup because it exceeded the size limit. ' +
+            'You can re-initialize git from the git plugin.'
+        })
       }
     }
     
