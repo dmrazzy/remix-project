@@ -12,6 +12,7 @@ import {
   LinkAccountResponse,
   GitHubLinkRequest,
   GitHubLinkResponse,
+  GitHubTokenResponse,
   SiweVerifyRequest,
   SiweVerifyResponse,
   VerifyResponse,
@@ -129,6 +130,13 @@ export class SSOApiService {
    */
   async linkGitHub(request: GitHubLinkRequest): Promise<ApiResponse<GitHubLinkResponse>> {
     return this.apiClient.post<GitHubLinkResponse>('/github/link', request)
+  }
+  
+  /**
+   * Get stored GitHub OAuth token for authenticated user
+   */
+  async getGitHubToken(): Promise<ApiResponse<GitHubTokenResponse>> {
+    return this.apiClient.get<GitHubTokenResponse>('/accounts/github/token')
   }
   
   /**

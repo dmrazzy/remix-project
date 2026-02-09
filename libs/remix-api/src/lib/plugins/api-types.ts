@@ -72,6 +72,13 @@ export interface GitHubLinkResponse {
   }
 }
 
+export interface GitHubTokenResponse {
+  access_token: string
+  login?: string
+  avatar_url?: string
+  scopes?: string[]
+}
+
 // ==================== SIWE ====================
 
 export interface SiweVerifyRequest {

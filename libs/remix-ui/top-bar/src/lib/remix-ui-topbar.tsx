@@ -612,18 +612,22 @@ export function RemixUiTopbar() {
           style={{ minWidth: '33%' }}
         >
           <>
-            <GitHubLogin
-              cloneGitRepository={showCloneModal}
-              logOutOfGithub={logOutOfGithub}
-              publishToGist={publishToGist}
-              loginWithGitHub={loginWithGitHub}
-            />
+            {!enableLogin && (
+              <GitHubLogin
+                cloneGitRepository={showCloneModal}
+                logOutOfGithub={logOutOfGithub}
+                publishToGist={publishToGist}
+                loginWithGitHub={loginWithGitHub}
+              />
+            )}
             {enableLogin && (
               <LoginButton
                 plugin={plugin}
                 variant="compact"
                 showCredits={true}
                 className="ms-3"
+                cloneGitRepository={showCloneModal}
+                publishToGist={publishToGist}
               />
             )}
           </>

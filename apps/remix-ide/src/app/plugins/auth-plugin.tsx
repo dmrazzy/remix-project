@@ -7,8 +7,8 @@ const profile = {
   name: 'auth',
   displayName: 'Authentication',
   description: 'Handles SSO authentication and credits',
-  methods: ['login', 'logout', 'getUser', 'getCredits', 'refreshCredits', 'linkAccount', 'getLinkedAccounts', 'unlinkAccount', 'getApiClient', 'getSSOApi', 'getCreditsApi', 'getPermissionsApi', 'getBillingApi', 'checkPermission', 'hasPermission', 'getAllPermissions', 'checkPermissions', 'getFeaturesByCategory', 'getFeatureLimit', 'getPaddleConfig'],
-  events: ['authStateChanged', 'creditsUpdated', 'accountLinked']
+  methods: ['login', 'logout', 'getUser', 'getCredits', 'refreshCredits', 'linkAccount', 'getLinkedAccounts', 'unlinkAccount', 'getApiClient', 'getSSOApi', 'getCreditsApi', 'getPermissionsApi', 'getBillingApi', 'checkPermission', 'hasPermission', 'getAllPermissions', 'checkPermissions', 'getFeaturesByCategory', 'getFeatureLimit', 'getPaddleConfig', 'fetchGitHubToken', 'disconnectGitHub'],
+  events: ['authStateChanged', 'creditsUpdated', 'accountLinked', 'gitHubTokenReady']
 }
 
 export class AuthPlugin extends Plugin {
@@ -269,7 +269,7 @@ export class AuthPlugin extends Plugin {
       }
 
       // Wait for message from popup
-      const result = await new Promise<{ user: AuthUser; accessToken: string; refreshToken: string }>((resolve, reject) => {
+      const result = await new Promise<{ user: AuthUser; accessToken: string; refreshToken: string; providerToken?: string }>((resolve, reject) => {
         const timeout = setTimeout(() => {
           cleanup()
           reject(new Error('Login timeout'))
@@ -284,6 +284,7 @@ export class AuthPlugin extends Plugin {
         }, 500) // Check every 500ms
 
         const handleMessage = (event: MessageEvent) => {
+          console.log('[AuthPlugin] Received message event:', event)
           // Verify origin
           if (event.origin !== new URL(endpointUrls.sso).origin) {
             return
@@ -291,13 +292,14 @@ export class AuthPlugin extends Plugin {
 
           if (event.data.type === 'sso-auth-success') {
             console.log('[AuthPlugin] Received auth success from popup')
-            console.log('[AuthPlugin] User data from popup:', event.data.user)
+            console.log('[AuthPlugin] User data from popup:', event.data)
             console.log('[AuthPlugin] User provider field:', event.data.user?.provider)
             cleanup()
             resolve({
               user: event.data.user,
               accessToken: event.data.accessToken,
-              refreshToken: event.data.refreshToken
+              refreshToken: event.data.refreshToken,
+              providerToken: event.data.providerToken
             })
           } else if (event.data.type === 'sso-auth-error') {
             cleanup()
@@ -318,6 +320,7 @@ export class AuthPlugin extends Plugin {
       })
 
       // Store tokens in localStorage
+      console.log(result)
       console.log('[AuthPlugin] Storing user in localStorage:', result.user)
       console.log('[AuthPlugin] User has provider field:', result.user.provider)
       localStorage.setItem('remix_access_token', result.accessToken)
@@ -334,6 +337,12 @@ export class AuthPlugin extends Plugin {
         user: result.user,
         token: result.accessToken
       })
+
+      // If logged in via GitHub, bridge the provider token to dgit config
+      if (result.user.provider === 'github' && result.providerToken) {
+        console.log('[AuthPlugin] GitHub provider detected, bridging token to dgit')
+        await this.bridgeGitHubToken(result.providerToken)
+      }
 
       // Fetch credits after successful login
       this.refreshCredits().catch(console.error)
@@ -402,7 +411,7 @@ export class AuthPlugin extends Plugin {
       }
 
       // Wait for message from popup
-      const result = await new Promise<{ user: AuthUser; accessToken: string }>((resolve, reject) => {
+      const result = await new Promise<{ user: AuthUser; accessToken: string; providerToken?: string }>((resolve, reject) => {
         const timeout = setTimeout(() => {
           cleanup()
           reject(new Error('Account linking timeout'))
@@ -470,9 +479,78 @@ export class AuthPlugin extends Plugin {
       localStorage.setItem('remix_access_token', currentToken)
       localStorage.setItem('remix_user', JSON.stringify(currentUser))
 
+      // If linking GitHub, bridge the provider token to dgit config
+      if (provider === 'github' && result.providerToken) {
+        console.log('[AuthPlugin] GitHub linked, bridging token to dgit')
+        await this.bridgeGitHubToken(result.providerToken)
+      }
+
     } catch (error: any) {
       console.error('[AuthPlugin] Account linking failed:', error)
       throw error
+    }
+  }
+
+  /**
+   * Bridge a GitHub OAuth token to the dgit plugin config.
+   * Saves the token and emits an event so git listeners can update state.
+   */
+  private async bridgeGitHubToken(token: string): Promise<void> {
+    try {
+      await this.call('config' as any, 'setAppParameter', 'settings/gist-access-token', token)
+      this.emit('gitHubTokenReady' as any, { token })
+      console.log('[AuthPlugin] GitHub token bridged to dgit config')
+    } catch (error) {
+      console.error('[AuthPlugin] Failed to bridge GitHub token:', error)
+    }
+  }
+
+  /**
+   * Fetch the stored GitHub OAuth token from the SSO backend.
+   * Use this when a non-GitHub SSO user links GitHub later,
+   * or to re-fetch after session restore.
+   */
+  async fetchGitHubToken(): Promise<string | null> {
+    try {
+      const token = await this.getToken()
+      if (!token) return null
+
+      const response = await fetch(`${endpointUrls.sso}/accounts/github/token`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        console.log('[AuthPlugin] No GitHub token available from backend:', response.status)
+        return null
+      }
+
+      const data = await response.json()
+      if (data.access_token) {
+        await this.bridgeGitHubToken(data.access_token)
+        return data.access_token
+      }
+      return null
+    } catch (error) {
+      console.error('[AuthPlugin] Failed to fetch GitHub token:', error)
+      return null
+    }
+  }
+
+  /**
+   * Disconnect GitHub from dgit. Clears the stored GitHub token
+   * but does NOT affect SSO login state.
+   */
+  async disconnectGitHub(): Promise<void> {
+    try {
+      await this.call('config' as any, 'setAppParameter', 'settings/gist-access-token', '')
+      this.emit('gitHubTokenReady' as any, { token: null })
+      console.log('[AuthPlugin] GitHub disconnected from dgit')
+    } catch (error) {
+      console.error('[AuthPlugin] Failed to disconnect GitHub:', error)
     }
   }
 

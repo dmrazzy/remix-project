@@ -45,6 +45,7 @@ export interface ICustomRemixApi extends IRemixApi {
   desktopClient: IDesktopClient
   githubAuthHandler: IGitHubAuthHandlerApi
   sso: ISSOApi
+  auth: ISSOApi
 }
 
 export declare type CustomRemixApi = Readonly<ICustomRemixApi>
