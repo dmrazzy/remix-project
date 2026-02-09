@@ -98,6 +98,11 @@ function EnvironmentWidget({ plugin }: { plugin: EnvironmentPlugin }) {
 
       dispatch({ type: 'SET_DEPLOYED_CONTRACTS_COUNT', payload: deployedInstances.length })
     })
+
+    plugin.on('udappTransactions', 'transactionRecorderUpdated', async (transactions: any[]) => {
+
+      dispatch({ type: 'SET_TRANSACTION_RECORDER_COUNT', payload: transactions.length })
+    })
   }, [])
 
   return (

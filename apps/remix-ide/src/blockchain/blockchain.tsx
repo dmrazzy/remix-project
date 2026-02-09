@@ -303,7 +303,7 @@ export class Blockchain extends Plugin {
     const data = await txFormat.buildData(
       selectedContract.name,
       selectedContract.object,
-      compilerContracts,
+      compilerContracts?.data?.contracts,
       true,
       constructor,
       args,
@@ -1044,7 +1044,6 @@ export class Blockchain extends Plugin {
 
     if (!tx.timestamp) tx.timestamp = Date.now()
     const timestamp = tx.timestamp
-    this._triggerEvent('initiatingTransaction', [timestamp, tx, payLoad])
     if (fromSmartAccount) trackMatomoEvent(this, { category: 'udapp', action: 'safeSmartAccount', name: 'txInitiatedFromSmartAccount', isClick: false })
     try {
       const result = await this.call('txRunner', 'rawRun', tx)

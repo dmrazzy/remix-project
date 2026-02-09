@@ -11,17 +11,36 @@ function TransactionsWidget({ plugin }: { plugin: TransactionsPlugin }) {
   const [themeQuality, setThemeQuality] = useState<string>('dark')
 
   useEffect(() => {
+    if (plugin.setStateGetter) {
+      plugin.setStateGetter(() => widgetState)
+    }
   }, [widgetState])
 
   useEffect(() => {
-    plugin.on('udappDeployedContracts', 'deployedInstanceUpdated', (deployments: any[]) => {
-      dispatch({ type: 'SET_DEPLOYMENTS', payload: deployments })
+    plugin.on('blockchain', 'transactionExecuted', async (error, from, to, _data, _call, txResult, timestamp, payLoad) => {
+      if (error) return
+      if (_call) return
+      const accounts = await plugin.call('blockchain', 'getAccounts')
+
+      dispatch({
+        type: 'RECORD_TRANSACTION_EXECUTED',
+        payload: { error, from, to, txResult, timestamp, payLoad, accounts }
+      })
+    })
+
+    plugin.on('blockchain', 'contextChanged', () => {
+      dispatch({ type: 'CLEAR_RECORDER_DATA' })
     })
 
     return () => {
-      plugin.off('udappDeployedContracts', 'deployedInstanceUpdated')
+      plugin.off('blockchain', 'transactionExecuted')
+      plugin.off('blockchain', 'contextChanged')
     }
-  }, [plugin])
+  }, [])
+
+  useEffect(() => {
+    plugin.emit('transactionRecorderUpdated', widgetState.recorderData.journal)
+  }, [widgetState.recorderData.journal])
 
   return (
     <TransactionsAppContext.Provider value={{ widgetState, dispatch, plugin, themeQuality }}>

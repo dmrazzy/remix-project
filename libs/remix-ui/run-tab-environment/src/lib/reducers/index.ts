@@ -32,7 +32,8 @@ export const widgetInitialState: WidgetState = {
     name: ''
   },
   matchPassphrase: null,
-  deployedContractsCount: 0
+  deployedContractsCount: 0,
+  transactionRecorderCount: 0
 }
 
 export const widgetReducer = (state = widgetInitialState, action: Actions): WidgetState => {
@@ -297,6 +298,13 @@ export const widgetReducer = (state = widgetInitialState, action: Actions): Widg
     return {
       ...state,
       deployedContractsCount: action.payload
+    }
+  }
+
+  case 'SET_TRANSACTION_RECORDER_COUNT': {
+    return {
+      ...state,
+      transactionRecorderCount: action.payload
     }
   }
 

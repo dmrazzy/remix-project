@@ -487,7 +487,7 @@ function EnvironmentPortraitView() {
         )}
         <div className="mx-auto py-3" style={{ color: 'var(--bs-tertiary-color)' }}>
           <span className="small me-1">Deployed Contracts</span><span className="small me-2 text-primary">{ widgetState.deployedContractsCount }</span>
-          <span className="small me-1">Transactions recorded</span><span className="small text-primary">{ 0 }</span>
+          <span className="small me-1">Transactions recorded</span><span className="small text-primary">{ widgetState.transactionRecorderCount }</span>
         </div>
       </div>
     </>

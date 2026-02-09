@@ -50,7 +50,8 @@ export interface WidgetState {
   },
   network: NetworkStatus,
   matchPassphrase: string,
-  deployedContractsCount: number
+  deployedContractsCount: number,
+  transactionRecorderCount: number
 }
 
 export interface ActionPayloadTypes {
@@ -76,6 +77,7 @@ export interface ActionPayloadTypes {
   SET_DELEGATION: { account: string, address: string },
   REMOVE_DELEGATION: string,
   SET_DEPLOYED_CONTRACTS_COUNT: number
+  SET_TRANSACTION_RECORDER_COUNT: number
 }
 export interface Action<T extends keyof ActionPayloadTypes> {
   type: T

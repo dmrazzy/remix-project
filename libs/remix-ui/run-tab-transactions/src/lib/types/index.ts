@@ -1,41 +1,39 @@
 import React from 'react'
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import type { TransactionsPlugin } from 'apps/remix-ide/src/app/udapp/udappTransactions'
+import { FuncABI } from '@remix-project/core-plugin'
 
-export type TabType = 'Active' | 'Saved'
+export type TabType = 'ContractCall' | 'TransactionList'
 export type SortOrder = 'newest' | 'oldest'
 
 export interface Transaction {
-  hash: string
   timestamp: number
-  status?: string
-  from?: string
-  to?: string
-  value?: string
-  gasUsed?: string
-  blockNumber?: number
-  contractAddress?: string
-  functionName?: string
-  parameters?: any[]
-  logs?: any[]
-  decodedOutput?: any
-}
-
-export interface Deployment {
-  address: string
-  name: string
-  timestamp: number
-  abi?: any[]
-  bytecode?: string
-  network?: string
+  record: {
+    abi: string
+    bytecode: string
+    contractName: string
+    from: string
+    to: string
+    inputs: string
+    linkReferences: Record<string, any>
+    name: string,
+    parameters: any[]
+    type: 'constructor' | 'function' | 'fallback' | 'receive'
+    value: string
+    timestamp: number,
+    targetAddress: string,
+    status: string | number | boolean,
+    txHash: string
+  }
 }
 
 export interface TransactionsWidgetState {
   activeTab: TabType
   sortOrder: SortOrder
-  transactions: Map<string, Transaction[]>
-  isRecording: boolean
-  deployments: Deployment[]
+  recorderData: RecorderData
+  showClearAllDialog: boolean
+  showSaveDialog: boolean
+  scenarioInput: string
 }
 
 export interface TransactionsAppContextType {
@@ -53,4 +51,19 @@ export type Actions =
   | { type: 'REMOVE_TRANSACTION'; payload: string }
   | { type: 'CLEAR_TRANSACTIONS'; payload: null }
   | { type: 'SET_RECORDING'; payload: boolean }
-  | { type: 'SET_DEPLOYMENTS'; payload: Deployment[] }
+  | { type: 'RECORD_TRANSACTION_EXECUTED'; payload: { error: any; from: string; to: string; txResult: any; timestamp: number; payLoad: any; accounts: any[] } }
+  | { type: 'SET_CREATED_CONTRACT'; payload: { address: string; timestamp: string | number } }
+  | { type: 'CLEAR_RECORDER_DATA' }
+  | { type: 'SHOW_CLEAR_ALL_DIALOG'; payload: boolean }
+  | { type: 'SHOW_SAVE_DIALOG'; payload: boolean }
+  | { type: 'SET_SCENARIO_INPUT'; payload: string }
+
+export interface RecorderData {
+    journal: Transaction[];
+    _createdContracts: { [key: string]: any };
+    _createdContractsReverse: { [key: string]: any };
+    _usedAccounts: { [key: string]: any };
+    _abis: Record<string, FuncABI[]>;
+    _contractABIReferences: { [key: string]: any };
+    _linkReferences: { [key: string]: any };
+  }

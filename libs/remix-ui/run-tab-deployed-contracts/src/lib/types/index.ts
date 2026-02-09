@@ -1,12 +1,13 @@
 import React from 'react'
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import type { DeployedContractsPlugin } from 'apps/remix-ide/src/app/udapp/udappDeployedContracts'
+import { FuncABI } from '@remix-project/core-plugin'
 
 export interface DeployedContract {
   address: string
   name: string
   timestamp: number
-  abi?: any[]
+  abi?: FuncABI[]
   contractData?: any
   network?: string
   filePath?: string

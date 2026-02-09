@@ -367,3 +367,11 @@ export const extractDataDefault = (item, parent?) => {
   }
   return ret
 }
+
+export const extractRecorderTimestamp = (value: any): string | null => {
+  const stamp = /created{(.*)}/g.exec(value)
+  if (stamp) {
+    return stamp[1]
+  }
+  return null
+}
