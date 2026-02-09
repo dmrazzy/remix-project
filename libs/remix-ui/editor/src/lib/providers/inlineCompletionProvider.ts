@@ -51,8 +51,6 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
     this.cache = new CompletionCache();
     this.completionMetadata = new WeakMap();
     this.sessionMetadata = new Map();
-
-    console.log('[Constructor] InlineCompletionProvider initialized');
   }
 
   // Called from external code (editor.tsx) when full completion is detected via text change
@@ -60,16 +58,11 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
   private handleExternalAcceptance(sessionId: number): void {
     const metadata = this.sessionMetadata.get(sessionId);
     if (!metadata) {
-      console.log('[handleExternalAcceptance] No metadata for session', { sessionId });
       return;
     }
 
     // Prevent duplicate tracking (in case handlePartialAccept was already called)
     if (metadata.accepted) {
-      console.log('[handleExternalAcceptance] DUPLICATE acceptance detected - ignoring', {
-        sessionId,
-        previousAcceptanceType: metadata.acceptanceType
-      });
       return;
     }
 
