@@ -280,7 +280,7 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
     })
 
     const data = await this.props.plugin.call('remixAI', 'code_insertion', word, word_after)
-    this.trackMatomoEvent?.({ category: 'ai', action: 'remixAI', name: 'code_generation', isClick: false })
+    this.trackMatomoEvent?.({ category: 'ai', action: 'completion', name: 'code_generation', isClick: false })
     this.task = 'code_generation'
 
     const parsedData = data.trimStart()
@@ -303,7 +303,7 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
     try {
       CompletionParams.stop = ['\n\n', '```']
       const output = await this.props.plugin.call('remixAI', 'code_insertion', word, word_after, CompletionParams)
-      this.trackMatomoEvent?.({ category: 'ai', action: 'remixAI', name: 'code_insertion', isClick: false })
+      this.trackMatomoEvent?.({ category: 'ai', action: 'completion', name: 'code_insertion', isClick: false })
       const generatedText = output
 
       this.task = 'code_insertion'
@@ -330,7 +330,7 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
       CompletionParams.stop = ['\n', '```']
       this.task = 'code_completion'
       const output = await this.props.plugin.call('remixAI', 'code_insertion', word, word_after, CompletionParams)
-      this.trackMatomoEvent?.({ category: 'ai', action: 'remixAI', name: 'code_completion', isClick: false })
+      this.trackMatomoEvent?.({ category: 'ai', action: 'completion', name: 'code_completion', isClick: false })
       const generatedText = output
       let clean = generatedText
 
@@ -384,7 +384,7 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
     });
 
     this.rateLimiter.trackCompletionShown()
-    this.trackMatomoEvent?.({ category: 'ai', action: 'remixAI', name: 'code_completion_did_show', isClick: true })
+    this.trackMatomoEvent?.({ category: 'ai', action: 'completion', name: 'code_completion_did_show', isClick: true })
   }
 
   // This is called when user accepts part of the completion (Ctrl+RightArrow)
@@ -419,7 +419,7 @@ export class RemixInLineCompletionProvider implements monacoTypes.languages.Inli
     });
 
     this.rateLimiter.trackCompletionAccepted()
-    this.trackMatomoEvent?.({ category: 'ai', action: 'code_completion', name: metadata.task + '_partial_accept', isClick: true })
+    this.trackMatomoEvent?.({ category: 'ai', action: 'completion', name: metadata.task + '_partial_accept', isClick: true })
   }
 
   freeInlineCompletions(

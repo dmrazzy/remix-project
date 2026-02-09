@@ -191,7 +191,7 @@ export class RemixAIPlugin extends Plugin {
     params.threadId = newThreadID
     params.provider = 'anthropic' // enforce all generation to be only on anthropic
     useRag = false
-    trackMatomoEvent(this, { category: 'ai', action: 'GenerateNewAIWorkspace', name: 'GenerateNewAIWorkspace', isClick: false })
+    trackMatomoEvent(this, { category: 'ai', action: 'remixAI', name: 'GenerateNewAIWorkspace', isClick: false })
     let userPrompt = ''
 
     if (useRag) {
@@ -235,7 +235,7 @@ export class RemixAIPlugin extends Plugin {
     params.threadId = newThreadID
     params.provider = this.assistantProvider
     useRag = false
-    trackMatomoEvent(this, { category: 'ai', action: 'GenerateNewAIWorkspace', name: 'WorkspaceAgentEdit', isClick: false })
+    trackMatomoEvent(this, { category: 'ai', action: 'remixAI', name: 'WorkspaceAgentEdit', isClick: false })
 
     await statusCallback?.('Performing workspace request...')
     if (useRag) {
@@ -302,7 +302,7 @@ export class RemixAIPlugin extends Plugin {
     else {
       console.log("chatRequestBuffer is not empty. First process the last request.", this.chatRequestBuffer)
     }
-    trackMatomoEvent(this, { category: 'ai', action: 'chatting', name: 'remixAI_chat', isClick: false })
+    trackMatomoEvent(this, { category: 'ai', action: 'remixAI', name: 'remixAI_chat', isClick: false })
   }
 
   async ProcessChatRequestBuffer(params:IParams=GenerationParams){

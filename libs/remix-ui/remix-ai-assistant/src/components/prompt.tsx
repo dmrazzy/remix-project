@@ -140,7 +140,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
                   className={`btn btn-sm ${aiMode === 'ask' ? 'btn-primary' : 'btn-outline-secondary'} px-2`}
                   onClick={() => {
                     setAiMode('ask')
-                    trackMatomoEvent({ category: 'ai', action: 'ModeSwitch', name: 'ask', isClick: true })
+                    trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ModeSwitch_ask', isClick: true })
                   }}
                 >
                   Ask
@@ -156,7 +156,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
                   className={`btn btn-sm ${aiMode === 'edit' ? 'btn-primary' : 'btn-outline-secondary'} px-2`}
                   onClick={() => {
                     setAiMode('edit')
-                    trackMatomoEvent({ category: 'ai', action: 'ModeSwitch', name: 'edit', isClick: true })
+                    trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ModeSwitch_edit', isClick: true })
                   }}
                 >
                   Edit
