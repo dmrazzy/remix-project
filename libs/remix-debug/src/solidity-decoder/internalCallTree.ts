@@ -328,7 +328,7 @@ export class InternalCallTree {
     * @returns {Object|null} Scope object containing firstStep, lastStep, locals, isCreation, and gasCost, or null if not found
     */
   findScope (vmtraceIndex) {
-    console.log(this.scopes)
+    console.log(this.scopes, this.scopeStarts)
     let scopeId = this.findScopeId(vmtraceIndex)
     if (scopeId !== '' && !scopeId) return null
     let scope = this.scopes[scopeId]
@@ -620,7 +620,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
   let subScope = 1
   const address = tree.traceManager.getCurrentCalledAddressAt(step)
   tree.scopes[scopeId].address = address
-  
+
   let currentSourceLocation = sourceLocation || { start: -1, length: -1, file: -1, jump: '-' }
   let previousSourceLocation = currentSourceLocation
   let previousValidSourceLocation = validSourceLocation || currentSourceLocation
@@ -705,6 +705,19 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
     const isInternalTxInstrn = isCallInstruction(stepDetail)
     const isCreateInstrn = isCreateInstruction(stepDetail)
 
+    // check if there is a function at destination - but only for AST node resolution
+    const contractObj = await tree.solidityProxy.contractObjectAtAddress(address)
+    const generatedSources = getGeneratedSources(tree, scopeId, contractObj)
+    const { nodes, blocksDefinition } = await resolveNodesAtSourceLocation(tree, sourceLocation, generatedSources, address)
+
+    functionDefinition = await resolveFunctionDefinition(tree, sourceLocation, generatedSources, address)
+
+    if (!tree.scopes[scopeId].functionDefinition && stepDetail.op === 'JUMPDEST' && functionDefinition && tree.scopes[scopeId].firstStep === step) {
+      tree.scopes[scopeId].functionDefinition = functionDefinition
+      tree.scopes[scopeId].lowLevelScope = false
+      await registerFunctionParameters(tree, functionDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
+    }
+
     // Update symbolic stack based on opcode execution
     const previousSymbolicStack = tree.symbolicStackManager.getStackAtStep(step)
     if (stepDetail.stack.length !== previousSymbolicStack.length) {
@@ -718,37 +731,11 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
     const zeroTheStack = (isInternalTxInstrn || isCreateInstrn) && !isStaticCallInstruction(stepDetail)
     tree.symbolicStackManager.setStackAtStep(step + 1, zeroTheStack ? [] : newSymbolicStack)
 
-    // check if there is a function at destination - but only for AST node resolution
-    const contractObj = await tree.solidityProxy.contractObjectAtAddress(address)
-    const generatedSources = getGeneratedSources(tree, scopeId, contractObj)
-    const { nodes, blocksDefinition } = await resolveNodesAtSourceLocation(tree, sourceLocation, generatedSources, address)
-
     tree.locationAndOpcodePerVMTraceIndex[step].blocksDefinition = blocksDefinition
-    functionDefinition = await resolveFunctionDefinition(tree, sourceLocation, generatedSources, address)
-    if (functionDefinition && !tree.scopes[scopeId].functionDefinition) {
-      tree.scopes[scopeId].functionDefinition = functionDefinition
-      tree.scopes[scopeId].lowLevelScope = false
-      await registerFunctionParameters(tree, functionDefinition, step, scopeId, contractObj, validSourceLocation, address)
-    }
 
     const isRevert = isRevertInstruction(stepDetail)
-    const constructorExecutionStarts = tree.pendingConstructorExecutionAt > -1 && tree.pendingConstructorExecutionAt < validSourceLocation.start
-    if (functionDefinition && functionDefinition.kind === 'constructor' && tree.pendingConstructorExecutionAt === -1 && !tree.constructorsStartExecution[functionDefinition.id]) {
-      tree.pendingConstructorExecutionAt = validSourceLocation.start
-      tree.pendingConstructorId = functionDefinition.id
-      tree.pendingConstructor = functionDefinition
-      tree.pendingConstructorEntryStackIndex = stepDetail.stack.length
-      // from now on we'll be waiting for a change in the source location which will mark the beginning of the constructor execution.
-      // constructorsStartExecution allows to keep track on which constructor has already been executed.
-      console.log('Pending constructor execution at ', tree.pendingConstructorExecutionAt, ' for constructor id ', tree.pendingConstructorId)
-    }
-    let fnTargetSourceLocation
-    if (previousSourceLocation && previousSourceLocation.jump === 'i') {
-      fnTargetSourceLocation = previousSourceLocation
-    } else if (sourceLocation && sourceLocation.jump === 'i') {
-      fnTargetSourceLocation = sourceLocation
-    }
-    const internalfunctionCall = /*functionDefinition &&*/ (fnTargetSourceLocation && fnTargetSourceLocation.jump === 'i') /*&& functionDefinition.kind !== 'constructor'*/
+
+    const internalfunctionCall = /*functionDefinition &&*/ (sourceLocation && sourceLocation.jump === 'i') /*&& functionDefinition.kind !== 'constructor'*/
     const isJumpOutOfFunction = /*functionDefinition &&*/ (sourceLocation && sourceLocation.jump === 'o') /*&& functionDefinition.kind !== 'constructor'*/
 
     let lowLevelScope = sourceLocation && sourceLocation.jump === 'i'
@@ -760,18 +747,19 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
       try {
         previousSourceLocation = null
         const newScopeId = scopeId === '' ? subScope.toString() : scopeId + '.' + subScope
-        console.log('Entering new scope at step ', step, newScopeId, constructorExecutionStarts, isInternalTxInstrn, internalfunctionCall)
-        tree.scopeStarts[step] = newScopeId
+        console.log('Entering new scope at step ', step, newScopeId, isInternalTxInstrn, internalfunctionCall)
+        tree.scopeStarts[step + 1] = newScopeId
         const startExecutionLine = lineColumnPos && lineColumnPos.start ? lineColumnPos.start.line + 1 : undefined
-        tree.scopes[newScopeId] = { firstStep: step, locals: {}, isCreation, gasCost: 0, startExecutionLine, functionDefinition, opcodeInfo: stepDetail, stackBeforeJumping: newSymbolicStack, lowLevelScope: true }
+        tree.scopes[newScopeId] = { firstStep: step + 1, locals: {}, isCreation, gasCost: 0, startExecutionLine, functionDefinition, opcodeInfo: stepDetail, stackBeforeJumping: newSymbolicStack, lowLevelScope: true }
         addReducedTrace(tree, step)
         // for the ctor we are at the start of its trace, we have to replay this step in order to catch all the locals:
         const nextStep = step + 1
         let isConstructor = false
         if (!lowLevelScope && functionDefinition) {
           isConstructor = functionDefinition && functionDefinition.kind === 'constructor'
+          tree.scopes[newScopeId].lowLevelScope = false
           // Register function parameters when entering new function scope (internal calls or external calls)
-          await registerFunctionParameters(tree, functionDefinition, step, newScopeId, contractObj, fnTargetSourceLocation, address)
+          await registerFunctionParameters(tree, functionDefinition, step, newScopeId, contractObj, sourceLocation, address)
         }
         let externalCallResult
         try {

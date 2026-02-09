@@ -11,14 +11,14 @@ import type { InternalCallTree, StepDetail } from "../internalCallTree"
    * @param {Array} trace - The VM trace array
    * @returns {boolean} True if depth changes between current and next step
    */
-  export function callDepthChange (step, trace) {
-    if (step + 1 < trace.length) {
-      return trace[step].depth !== trace[step + 1].depth
-    }
-    return false
+export function callDepthChange (step, trace) {
+  if (step + 1 < trace.length) {
+    return trace[step].depth !== trace[step + 1].depth
   }
+  return false
+}
 
-  /**
+/**
    * Checks if we're exiting a constructor based on stack depth.
    * For constructors (especially in inheritance), the stack depth returning to entry level
    * indicates the end of that constructor's execution.
@@ -29,54 +29,53 @@ import type { InternalCallTree, StepDetail } from "../internalCallTree"
    * @param {StepDetail} stepDetail - Current step details with stack info
    * @returns {boolean} True if exiting a constructor scope
    */
-  export function isConstructorExit (tree, step, scopeId, initialEntrystackIndex, stepDetail, isConstructor) {
-    if (!isConstructor) return false // we are not in a constructor anyway
-    const scope = tree.scopes[scopeId]
-    if (scope.firstStep === step) {
-      // we are just entering the constructor
-      return false
-    }
-    if (!scope || !scope.functionDefinition || scope.functionDefinition.kind !== 'constructor') {
-      return false
-    }
-    // Check if stack has returned to entry depth (or below, in case of cleanup)
-    if (initialEntrystackIndex !== undefined && stepDetail.stack.length <= initialEntrystackIndex) {
-      console.log('Exiting constructor scope ', scopeId, ' at step ', step)
-      return true
-    }
+export function isConstructorExit (tree, step, scopeId, initialEntrystackIndex, stepDetail, isConstructor) {
+  if (!isConstructor) return false // we are not in a constructor anyway
+  const scope = tree.scopes[scopeId]
+  if (scope.firstStep === step) {
+    // we are just entering the constructor
     return false
   }
+  if (!scope || !scope.functionDefinition || scope.functionDefinition.kind !== 'constructor') {
+    return false
+  }
+  // Check if stack has returned to entry depth (or below, in case of cleanup)
+  if (initialEntrystackIndex !== undefined && stepDetail.stack.length <= initialEntrystackIndex) {
+    console.log('Exiting constructor scope ', scopeId, ' at step ', step)
+    return true
+  }
+  return false
+}
 
-  /**
+/**
    * Checks if one source location is completely included within another.
    *
    * @param {Object} source - Outer source location to check against
    * @param {Object} included - Inner source location to check
    * @returns {boolean} True if included is completely within source
    */
-  export function includedSource (source, included) {
-    return (included.start !== -1 &&
+export function includedSource (source, included) {
+  return (included.start !== -1 &&
       included.length !== -1 &&
       included.file !== -1 &&
       included.start >= source.start &&
       included.start + included.length <= source.start + source.length &&
       included.file === source.file)
-  }
+}
 
-  /**
+/**
    * Compare 2 source locations
    *
    * @param {Object} source - Outer source location to check against
    * @param {Object} included - Inner source location to check
    * @returns {boolean} True if included is completely within source
    */
-  export function compareSource (source, included) {
-    return (included.start === source.start &&
+export function compareSource (source, included) {
+  return (included.start === source.start &&
       included.length === source.length &&
       included.file === source.file &&
       included.start === source.start)
-  }
-
+}
 
 /**
  * Adds a VM trace index to the reduced trace.
@@ -697,5 +696,4 @@ export async function resolveNodesAtSourceLocation (tree, sourceLocation, genera
     return { nodes: [], functionDefinition: null, blocksDefinition: []}
   }
 }
-
 
