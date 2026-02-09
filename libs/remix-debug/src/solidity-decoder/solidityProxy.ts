@@ -2,7 +2,7 @@
 import { util } from '@remix-project/remix-lib'
 import { isContractCreation } from '../trace/traceHelper'
 import { extractStateVariables } from './stateDecoder'
-import { extractContractDefinitions, extractStatesDefinitions } from './astHelper'
+import { extractContractDefinitions, extractStatesDefinitions } from './helpers/astHelper'
 
 export class SolidityProxy {
   cache
