@@ -53,6 +53,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   const [traceData, setTraceData] = useState<{ currentStep: number; traceLength: number } | null>(null)
   const [currentFunction, setCurrentFunction] = useState<string>('')
   const [functionStack, setFunctionStack] = useState<any[]>([])
+  const [nestedScopes, setNestedScopes] = useState<any[]>([])
 
   if (props.onReady) {
     props.onReady({
@@ -340,6 +341,18 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     })
 
     debuggerInstance.event.register('debuggerUnloaded', () => unLoad())
+
+    // Listen for callTreeReady event to get nested scopes
+    if (debuggerInstance && debuggerInstance.debugger && debuggerInstance.debugger.callTree) {
+      debuggerInstance.debugger.callTree.event.register('callTreeReady', () => {
+        try {
+          const scopes = debuggerInstance.debugger.callTree.getScopesAsNestedJSON(true)
+          setNestedScopes(scopes)
+        } catch (error) {
+          console.error('Error loading nested scopes:', error)
+        }
+      })
+    }
   }
 
   const requestDebug = (blockNumber, txNumber, tx) => {
@@ -665,6 +678,13 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             traceData={traceData}
             currentFunction={currentFunction}
             functionStack={functionStack}
+            nestedScopes={nestedScopes}
+            deployments={deployments}
+            onScopeSelected={(scope) => {
+              if (debuggerModule.emit) {
+                debuggerModule.emit('scopeSelected', scope, deployments)
+              }
+            }}
           />
         </div>
       )}

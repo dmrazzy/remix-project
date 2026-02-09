@@ -89,3 +89,8 @@
   font-size: 11px;
   margin-left: auto;
 }
+
+.call-stack-children {
+  border-left: 1px solid var(--secondary);
+  margin-left: 8px;
+}

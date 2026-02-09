@@ -15,6 +15,9 @@ interface DebugLayoutProps {
   traceData?: any
   currentFunction?: string
   functionStack?: any[]
+  nestedScopes?: any[]
+  deployments?: any[]
+  onScopeSelected?: (scope: any) => void
 }
 
 export const DebugLayout = ({
@@ -27,13 +30,18 @@ export const DebugLayout = ({
   currentTransaction,
   traceData,
   currentFunction,
-  functionStack
+  functionStack,
+  nestedScopes,
+  deployments,
+  onScopeSelected
 }: DebugLayoutProps) => {
   const [activeObjectTab, setActiveObjectTab] = useState<'json' | 'raw'>('json')
   const [copyTooltips, setCopyTooltips] = useState<{ [key: string]: string }>({
     from: 'Copy address',
     to: 'Copy address'
   })
+  const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
+  const [selectedScope, setSelectedScope] = useState<any>(null)
 
   const formatAddress = (address: string | undefined) => {
     if (!address) return ''
@@ -198,7 +206,145 @@ export const DebugLayout = ({
     )
   }
 
+  const toggleScope = (scopeId: string) => {
+    setExpandedScopes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(scopeId)) {
+        newSet.delete(scopeId)
+      } else {
+        newSet.add(scopeId)
+      }
+      return newSet
+    })
+  }
+
+  const getContractName = (address: string): string => {
+    if (!address || !deployments) return ''
+
+    // Find contract by address
+    const contract = deployments.find(d =>
+      d.address && d.address.toLowerCase() === address.toLowerCase()
+    )
+
+    return contract?.name || ''
+  }
+
+  const isExternalCall = (opcode: string): boolean => {
+    return ['CALL', 'DELEGATECALL', 'STATICCALL', 'CREATE', 'CREATE2'].includes(opcode)
+  }
+
+  const collectExternalCalls = (scope: any): any[] => {
+    const items: any[] = []
+    const opcode = scope.opcodeInfo?.op || ''
+
+    // Check if this scope itself is an external call
+    if (isExternalCall(opcode) || scope.isCreation) {
+      items.push(scope)
+    }
+
+    // Recursively collect from children
+    if (scope.children && scope.children.length > 0) {
+      scope.children.forEach((child: any) => {
+        items.push(...collectExternalCalls(child))
+      })
+    }
+
+    return items
+  }
+
+  const renderScopeItem = (scope: any, depth: number = 0): JSX.Element => {
+    const opcode = scope.opcodeInfo?.op || ''
+    let callTypeLabel = ''
+
+    if (opcode === 'DELEGATECALL') {
+      callTypeLabel = 'DELEGATECALL'
+    } else if (opcode === 'STATICCALL') {
+      callTypeLabel = 'STATICCALL'
+    } else if (opcode === 'CALL') {
+      callTypeLabel = 'CALL'
+    } else if (opcode === 'CREATE' || opcode === 'CREATE2' || scope.isCreation) {
+      callTypeLabel = 'CREATE'
+    } else {
+      callTypeLabel = 'TRANSACTION'
+    }
+
+    // Collect external calls from all descendants (including deeply nested)
+    let externalChildren: any[] = []
+    if (scope.children && scope.children.length > 0) {
+      scope.children.forEach((child: any) => {
+        externalChildren.push(...collectExternalCalls(child))
+      })
+    }
+    const hasChildren = externalChildren.length > 0
+    const isExpanded = expandedScopes.has(scope.scopeId)
+    const isSelected = selectedScope?.scopeId === scope.scopeId
+
+    // Get function/method name
+    const itemName = scope.functionDefinition?.name || scope.functionDefinition?.kind || (scope.isCreation ? 'constructor' : 'fallback')
+
+    // Get contract name from address
+    const contractName = getContractName(scope.address)
+    const contractIdentifier = contractName || (scope.address ? `${scope.address.substring(0, 6)}...${scope.address.substring(scope.address.length - 4)}` : '')
+
+    // Format as contractName.methodName or contractName.EventName
+    const displayName = contractIdentifier ? `${contractIdentifier}.${itemName}` : itemName
+
+    return (
+      <div key={scope.scopeId}>
+        <div
+          className={`call-trace-item ${isSelected ? 'selected' : ''}`}
+          style={{ paddingLeft: `${depth * 20}px` }}
+          onClick={() => {
+            setSelectedScope(scope)
+            if (onScopeSelected) {
+              onScopeSelected(scope)
+            }
+          }}
+        >
+          <div className="call-trace-line">
+            {hasChildren && (
+              <span
+                className="call-trace-expand-icon"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleScope(scope.scopeId)
+                }}
+                style={{ cursor: 'pointer', marginRight: '8px', userSelect: 'none' }}
+              >
+                {isExpanded ? '−' : '+'}
+              </span>
+            )}
+            {!hasChildren && <span style={{ marginRight: '20px' }}></span>}
+            <span className="call-trace-step">{scope.firstStep}</span>
+            <span className={`call-trace-type ${callTypeLabel.toLowerCase()}`}>
+              {callTypeLabel}
+            </span>
+            <span className="call-trace-function">
+              {displayName}
+            </span>
+            <span className="call-trace-gas">{scope.gasCost} gas</span>
+          </div>
+        </div>
+        {hasChildren && isExpanded && (
+          <div className="call-trace-children">
+            {externalChildren.map((child: any) => renderScopeItem(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const renderCallTrace = () => {
+    // Use nested scopes if available
+    if (nestedScopes && nestedScopes.length > 0) {
+      return (
+        <div className="call-trace-list">
+          {nestedScopes.map((scope) => renderScopeItem(scope, 0))}
+        </div>
+      )
+    }
+
+    // Fallback to old implementation
     if (!functionStack || functionStack.length === 0) {
       return (
         <p className="text-muted">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react' // eslint-disable-line
 import './DebuggerCallStack.css'
 
 interface DebuggerCallStackProps {
@@ -6,77 +6,88 @@ interface DebuggerCallStackProps {
 }
 
 export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
-  const [callStack, setCallStack] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [selectedScope, setSelectedScope] = useState<any>(null)
+  const [deployments, setDeployments] = useState<any[]>([])
 
   useEffect(() => {
-    const fetchCallStack = async () => {
-      try {
-        // Get call tree scopes from debugger
-        const scopes = await plugin.call('debugger', 'getCallTreeScopes')
-
-        if (scopes && scopes.functionDefinitionsByScope) {
-          // Convert scopes to an array for display
-          const stackItems: any[] = []
-          const scopeMap = scopes.scopes
-          const functionDefs = scopes.functionDefinitionsByScope
-
-          // Build the call stack from scopes
-          for (const [scopeId, scope] of Object.entries(scopeMap as Record<string, any>)) {
-            const funcDef = functionDefs[scopeId]
-            if (funcDef) {
-              stackItems.push({
-                scopeId,
-                functionName: funcDef.name || funcDef.kind || 'Unknown',
-                visibility: funcDef.visibility || '',
-                firstStep: scope.firstStep,
-                lastStep: scope.lastStep,
-                gasCost: scope.gasCost || 0,
-                isCreation: scope.isCreation || false
-              })
-            }
-          }
-
-          // Sort by firstStep to show execution order
-          stackItems.sort((a, b) => a.firstStep - b.firstStep)
-          setCallStack(stackItems)
-        } else {
-          setCallStack([])
-        }
-        setIsLoading(false)
-      } catch (error) {
-        console.error('Error fetching call stack:', error)
-        setCallStack([])
-        setIsLoading(false)
-      }
+    // Listen for scope selection from debugger UI
+    const handleScopeSelected = (scope: any, deps: any[]) => {
+      setSelectedScope(scope)
+      setDeployments(deps || [])
     }
 
-    fetchCallStack()
-
-    // Listen for debugger step changes
-    const handleStepChange = () => {
-      fetchCallStack()
-    }
-
-    plugin.on('debugger', 'debuggingStepChanged', handleStepChange)
+    plugin.on('debugger', 'scopeSelected', handleScopeSelected)
 
     return () => {
-      plugin.off('debugger', 'debuggingStepChanged', handleStepChange)
+      plugin.off('debugger', 'scopeSelected', handleScopeSelected)
     }
   }, [plugin])
 
-  if (isLoading) {
+  const getContractName = (address: string): string => {
+    if (!address || !deployments) return ''
+
+    // Find contract by address
+    const contract = deployments.find((d: any) =>
+      d.address && d.address.toLowerCase() === address.toLowerCase()
+    )
+
+    return contract?.name || ''
+  }
+
+  const renderExecutionItem = (scope: any, depth: number = 0): JSX.Element => {
+    const opcode = scope.opcodeInfo?.op || ''
+    const itemName = scope.functionDefinition?.name || scope.functionDefinition?.kind || (scope.isCreation ? 'constructor' : 'low-level')
+
+    // Determine call type
+    let callTypeLabel = 'INTERNAL'
+    let callTypeClass = 'internal'
+
+    if (opcode === 'DELEGATECALL') {
+      callTypeLabel = 'DELEGATECALL'
+      callTypeClass = 'delegatecall'
+    } else if (opcode === 'STATICCALL') {
+      callTypeLabel = 'STATICCALL'
+      callTypeClass = 'staticcall'
+    } else if (opcode === 'CALL') {
+      callTypeLabel = 'CALL'
+      callTypeClass = 'call'
+    } else if (opcode === 'CREATE' || opcode === 'CREATE2' || scope.isCreation) {
+      callTypeLabel = 'CREATE'
+      callTypeClass = 'create'
+    }
+
+    // Get contract name and format as contractName.methodName or contractName.EventName
+    const contractName = getContractName(scope.address)
+    const contractIdentifier = contractName || (scope.address ? `${scope.address.substring(0, 6)}...${scope.address.substring(scope.address.length - 4)}` : '')
+    const displayName = contractIdentifier ? `${contractIdentifier}.${itemName}` : itemName
+
     return (
-      <div className="debugger-call-stack p-3">
-        <div className="text-muted">Loading call stack...</div>
+      <div key={scope.scopeId}>
+        <div className="call-stack-item" style={{ paddingLeft: `${depth * 16}px` }}>
+          <div className="call-stack-line">
+            <span className="call-stack-step">{scope.firstStep}</span>
+            <span className={`call-stack-type ${callTypeClass}`}>
+              {callTypeLabel}
+            </span>
+            <span className="call-stack-function">
+              {displayName}
+            </span>
+            <span className="call-stack-gas">{scope.gasCost} gas</span>
+          </div>
+        </div>
+        {scope.children && scope.children.length > 0 && (
+          <div className="call-stack-children">
+            {scope.children.map((child: any) => renderExecutionItem(child, depth + 1))}
+          </div>
+        )}
       </div>
     )
   }
 
-  if (callStack.length === 0) {
+  if (!selectedScope) {
     return (
       <div className="debugger-call-stack p-3">
-        <div className="text-muted">No call stack available</div>
+        <div className="text-muted">Select a call from Call Trace to view execution details</div>
       </div>
     )
   }
@@ -84,37 +95,7 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
   return (
     <div className="debugger-call-stack p-3">
       <div className="call-stack-list">
-        {callStack.map((item, index) => {
-          // Determine call type
-          let callTypeLabel = 'CALL'
-          let callTypeClass = 'call'
-
-          if (item.isCreation) {
-            callTypeLabel = 'CREATE'
-            callTypeClass = 'create'
-          } else if (item.visibility === 'internal') {
-            callTypeLabel = 'INTERNAL'
-            callTypeClass = 'internal'
-          } else if (item.visibility === 'external' || item.visibility === 'public') {
-            callTypeLabel = 'EXTERNAL'
-            callTypeClass = 'external'
-          }
-
-          return (
-            <div key={index} className="call-stack-item" style={{ paddingLeft: `${Math.min(index * 12, 60)}px` }}>
-              <div className="call-stack-line">
-                <span className="call-stack-step">{item.firstStep}</span>
-                <span className={`call-stack-type ${callTypeClass}`}>
-                  {callTypeLabel}
-                </span>
-                <span className="call-stack-function">
-                  {item.functionName}()
-                </span>
-                <span className="call-stack-gas">{item.gasCost} gas</span>
-              </div>
-            </div>
-          )
-        })}
+        {renderExecutionItem(selectedScope, 0)}
       </div>
     </div>
   )

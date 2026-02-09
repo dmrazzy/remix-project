@@ -181,11 +181,18 @@
 .call-trace-item {
   border-left: 2px solid var(--bs-border-color);
   transition: all 0.2s;
+  cursor: pointer;
 }
 
 .call-trace-item:hover {
   background-color: var(--custom-onsurface-layer-1);
   border-left-color: var(--bs-primary);
+}
+
+.call-trace-item.selected {
+  background-color: var(--custom-onsurface-layer-2);
+  border-left-color: var(--bs-primary);
+  border-left-width: 3px;
 }
 
 .call-trace-line {
@@ -254,4 +261,30 @@
   font-size: 0.7rem;
   font-weight: 400;
   white-space: nowrap;
+}
+
+.call-trace-expand-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  font-weight: bold;
+  color: var(--bs-body-color);
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.call-trace-expand-icon:hover {
+  background-color: var(--custom-onsurface-layer-1);
+}
+
+.call-trace-children {
+  border-left: 1px solid var(--bs-border-color);
+  margin-left: 10px;
+}
+
+.call-trace-type.transaction {
+  background-color: rgba(0, 123, 255, 0.1);
+  color: #007bff;
 }
