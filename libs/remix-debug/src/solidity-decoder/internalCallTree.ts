@@ -524,9 +524,10 @@ export class InternalCallTree {
    * Transforms scopeIds like "1", "1.1", "1.2", "1.1.1" into a hierarchical tree.
    *
    * @param {ScopeFilterMode} filterMode - Filtering mode: 'all' (no filtering), 'call' (only keep CALLs), 'nojump' (merge low-level scopes)
+   * @param {string} rootScopeId - Optional scope ID to use as root. If specified, builds tree from this scope instead of actual roots
    * @returns {NestedScope[]} Array of nested scopes with children as arrays
    */
-  getScopesAsNestedJSON (filterMode: ScopeFilterMode = 'all'): NestedScope[] {
+  getScopesAsNestedJSON (filterMode: ScopeFilterMode = 'all', rootScopeId?: string): NestedScope[] {
     const scopeMap = new Map<string, NestedScope>()
 
     // Helper function to check if a scope or its children contain external calls
@@ -548,8 +549,13 @@ export class InternalCallTree {
       return false
     }
 
-    // Create NestedScope objects for all scopes, filtering based on mode
+    // Create NestedScope objects for scopes, filtering based on mode and rootScopeId
     for (const [scopeId, scope] of Object.entries(this.scopes)) {
+      // If rootScopeId is specified, only include that scope and its descendants
+      if (rootScopeId && scopeId !== rootScopeId && !scopeId.startsWith(rootScopeId + '.')) {
+        continue
+      }
+      
       // Filter scopes based on filterMode
       if (filterMode === 'call') {
         // For 'call' mode: include external CALLs OR internal functions that contain external calls
@@ -573,8 +579,10 @@ export class InternalCallTree {
     // Build the tree structure
     for (const [scopeId, nestedScope] of scopeMap) {
       const parentScopeId = this.parentScope(scopeId)
-      if (parentScopeId === '') {
-        // This is a root scope
+      const isRootLevel = rootScopeId ? scopeId === rootScopeId : parentScopeId === ''
+      
+      if (isRootLevel) {
+        // This is a root scope (either actual root or specified rootScopeId)
         rootScopes.push(nestedScope)
       } else {
         // Check if this scope should be merged with its parent
