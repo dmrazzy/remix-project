@@ -96,7 +96,7 @@ export class RemixAIPlugin extends Plugin {
       if (oldProvider) {
         const migrationMap = {
           'openai': 'gpt-4-turbo',
-          'mistralai': 'mistral-medium-latest',
+          'mistralai': 'mistral-small-latest',
           'anthropic': 'claude-sonnet-4-5',
           'ollama': 'ollama'
         }
@@ -215,6 +215,7 @@ export class RemixAIPlugin extends Plugin {
     params.stream_result = false // enforce no stream result
     params.threadId = newThreadID
     params.provider = 'anthropic' // enforce all generation to be only on anthropic
+    params.model = 'claude-haiku-4-5'
     useRag = false
     trackMatomoEvent(this, { category: 'ai', action: 'GenerateNewAIWorkspace', name: 'GenerateNewAIWorkspace', isClick: false })
     let userPrompt = ''
@@ -368,9 +369,9 @@ export class RemixAIPlugin extends Plugin {
 
   async setAssistantProvider(provider: string) {
     // Legacy method - map provider to a default model for backwards compatibility
-    const providerToModelMap = {
+    const providerToModelMap: Record<string, string> = {
       'openai': 'gpt-4-turbo',
-      'mistralai': 'mistral-medium-latest',
+      'mistralai': 'mistral-small-latest',
       'anthropic': 'claude-sonnet-4-5',
       'ollama': 'ollama'
     }

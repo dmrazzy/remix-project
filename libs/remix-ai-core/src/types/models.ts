@@ -58,7 +58,7 @@ export const AVAILABLE_MODELS: AIModel[] = [
   },
   {
     id: 'mistral-medium-latest',
-    name: 'Mistral Large',
+    name: 'Mistral medium',
     provider: 'mistralai',
     description: 'Advanced coding assistance',
     requiresAuth: true,
