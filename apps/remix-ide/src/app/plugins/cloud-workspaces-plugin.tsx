@@ -929,8 +929,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
             }
           },
           cancelFn: async () => {
-            // Separate copy = fresh remoteId, no link to the original cloud
-            await this.restoreToNewWorkspaceWithNameCheck(backupPath, { keepRemoteId: false })
+            // Separate copy — prompt for workspace name
+            await this.promptAndRestoreToNewWorkspace(backupPath, { keepRemoteId: false })
           },
           hideFn: () => null
         }
@@ -961,8 +961,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
             }
           },
           cancelFn: async () => {
-            // Separate copy = fresh remoteId
-            await this.restoreToNewWorkspaceWithNameCheck(backupPath, { keepRemoteId: false })
+            // Separate copy — prompt for workspace name
+            await this.promptAndRestoreToNewWorkspace(backupPath, { keepRemoteId: false })
           },
           hideFn: () => null
         }
@@ -970,7 +970,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       } else {
         // Remote is NOT on this device — this is the "moved to another computer" case
         // Keep the remoteId so the user continues syncing to the same cloud
-        await this.restoreToNewWorkspaceWithNameCheck(backupPath, { keepRemoteId: true })
+        await this.promptAndRestoreToNewWorkspace(backupPath, { keepRemoteId: true })
       }
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Restore failed:', e)
@@ -979,71 +979,94 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   }
 
   /**
-   * Smart restore to new workspace - checks if workspace name exists and prompts user
-   * @param keepRemoteId - If true, keep the original remoteId (continuity). If false, assign a fresh one (separate copy).
+   * Prompt the user for a workspace name and then restore the backup.
+   * Pre-fills the input with the original workspace name from the backup metadata.
+   * If a workspace with the chosen name already exists, offers to overwrite or try a different name.
    */
-  private async restoreToNewWorkspaceWithNameCheck(
-    backupPath: string, 
-    options: { keepRemoteId: boolean } = { keepRemoteId: true }
+  private async promptAndRestoreToNewWorkspace(
+    backupPath: string,
+    options: { keepRemoteId: boolean }
   ): Promise<void> {
     try {
       // Get backup metadata to find the original workspace name
       const backupInfo = await this.call('s3Storage', 'getBackupInfo', backupPath)
-      const originalName = backupInfo.workspaceName
-      
-      // Check if a workspace with this name already exists
-      const workspaceExists = await this.call('filePanel', 'workspaceExists', originalName)
-      
-      if (!workspaceExists) {
-        // Workspace doesn't exist - restore directly to original name
-        await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
-          targetWorkspaceName: originalName,
-          keepRemoteId: options.keepRemoteId
-        })
-      } else {
-        // Workspace exists - ask user what to do
-        const conflictModal = {
-          id: 'restoreWorkspaceConflictModal',
-          title: 'Workspace Already Exists',
-          message: `A workspace named "${originalName}" already exists. What would you like to do?`,
-          modalType: 'modal',
-          okLabel: 'Overwrite Existing',
-          cancelLabel: 'Create with New Name',
-          okFn: async () => {
+      const suggestedName = backupInfo.workspaceName || 'restored-workspace'
+
+      // Show prompt modal asking for workspace name
+      const nameModal = {
+        id: 'restoreWorkspaceNameModal',
+        title: 'Choose Workspace Name',
+        message: 'Enter a name for the restored workspace:',
+        modalType: 'prompt' as any,
+        okLabel: 'Restore',
+        cancelLabel: 'Cancel',
+        defaultValue: suggestedName,
+        okFn: async (workspaceName: string) => {
+          if (!workspaceName || !workspaceName.trim()) {
+            await this.call('notification', 'alert', {
+              id: 'restoreError',
+              title: 'Invalid Name',
+              message: 'Workspace name cannot be empty.'
+            })
+            return
+          }
+          const trimmedName = workspaceName.trim()
+          
+          // Check if workspace already exists
+          const workspaceExists = await this.call('filePanel', 'workspaceExists', trimmedName)
+
+          if (!workspaceExists) {
+            // Doesn't exist — restore directly
             try {
               await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
-                targetWorkspaceName: originalName,
-                overwriteIfExists: true,
+                targetWorkspaceName: trimmedName,
                 keepRemoteId: options.keepRemoteId
               })
             } catch (e) {
-              console.error('[CloudWorkspacesPlugin] Restore with overwrite failed:', e)
+              console.error('[CloudWorkspacesPlugin] Restore failed:', e)
               await this.call('notification', 'alert', {
                 id: 'restoreError',
                 title: 'Restore Failed',
                 message: e.message || 'Failed to restore backup'
               })
             }
-          },
-          cancelFn: async () => {
-            try {
-              // Let the plugin auto-generate a unique name
-              await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
-                keepRemoteId: options.keepRemoteId
-              })
-            } catch (e) {
-              console.error('[CloudWorkspacesPlugin] Restore with new name failed:', e)
-              await this.call('notification', 'alert', {
-                id: 'restoreError',
-                title: 'Restore Failed',
-                message: e.message || 'Failed to restore backup to new workspace'
-              })
+          } else {
+            // Already exists — ask to overwrite or pick another name
+            const overwriteModal = {
+              id: 'restoreWorkspaceOverwriteModal',
+              title: 'Workspace Already Exists',
+              message: `A workspace named "${trimmedName}" already exists. Overwrite it?`,
+              modalType: 'modal',
+              okLabel: 'Overwrite',
+              cancelLabel: 'Cancel',
+              okFn: async () => {
+                try {
+                  await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
+                    targetWorkspaceName: trimmedName,
+                    overwriteIfExists: true,
+                    keepRemoteId: options.keepRemoteId
+                  })
+                } catch (e) {
+                  console.error('[CloudWorkspacesPlugin] Restore with overwrite failed:', e)
+                  await this.call('notification', 'alert', {
+                    id: 'restoreError',
+                    title: 'Restore Failed',
+                    message: e.message || 'Failed to restore backup'
+                  })
+                }
+              },
+              cancelFn: () => {
+                // User cancelled overwrite — re-prompt with a different name
+                this.promptAndRestoreToNewWorkspace(backupPath, options)
+              },
+              hideFn: () => null
             }
-          },
-          hideFn: () => null
-        }
-        await this.call('notification', 'modal', conflictModal)
+            await this.call('notification', 'modal', overwriteModal)
+          }
+        },
+        hideFn: () => null
       }
+      await this.call('notification', 'modal', nameModal)
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Restore to new workspace failed:', e)
       await this.call('notification', 'alert', {
