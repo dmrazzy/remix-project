@@ -485,10 +485,14 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                           <input
                             id='value'
                             type="number"
+                            min="0"
                             className="form-control form-control-sm border-0"
-                            placeholder="000000000000000000000000000000000"
-                            value={value}
-                            onChange={(e) => setValue(parseInt(e.target.value) || 0)}
+                            placeholder="0"
+                            value={value || ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10)
+                              setValue(isNaN(val) ? 0 : Math.max(0, val))
+                            }}
                             style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, paddingRight: '4rem' }}
                           />
                           <Dropdown style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}>
