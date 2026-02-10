@@ -536,7 +536,7 @@ export class InternalCallTree {
       for (const [checkScopeId, checkScope] of Object.entries(this.scopes)) {
         // Check if this scope is a descendant of the given scopeId
         const isDescendant = checkScopeId.startsWith(scopeId + '.') || checkScopeId === scopeId
-        
+
         if (isDescendant) {
           // Check if this descendant scope is an external call
           // External calls have CALL instruction and lowLevelScope = false
@@ -545,7 +545,7 @@ export class InternalCallTree {
           }
         }
       }
-      
+
       return false
     }
 
@@ -555,18 +555,18 @@ export class InternalCallTree {
       if (rootScopeId && scopeId !== rootScopeId && !scopeId.startsWith(rootScopeId + '.')) {
         continue
       }
-      
+
       // Filter scopes based on filterMode
       if (filterMode === 'call') {
         // For 'call' mode: include external CALLs OR internal functions that contain external calls
         const isExternalCall = isCallInstruction(scope.opcodeInfo) && !scope.lowLevelScope
         const hasExternalCallsInside = !isExternalCall && containsExternalCall(scopeId)
-        
+
         if (!isExternalCall && !hasExternalCallsInside) {
           continue
         }
       }
-      
+
       scopeMap.set(scopeId, {
         ...scope,
         scopeId,
@@ -580,7 +580,7 @@ export class InternalCallTree {
     for (const [scopeId, nestedScope] of scopeMap) {
       const parentScopeId = this.parentScope(scopeId)
       const isRootLevel = rootScopeId ? scopeId === rootScopeId : parentScopeId === ''
-      
+
       if (isRootLevel) {
         // This is a root scope (either actual root or specified rootScopeId)
         rootScopes.push(nestedScope)
@@ -688,7 +688,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
         const contract = compilationResult.getContract(contractName)
         if (contract) {
           tree.sourceLocationTracker.sourceMapByAddress[currentAddress] = isCreation ? contract.object.evm.bytecode.sourceMap : contract.object.evm.deployedBytecode.sourceMap
-        }        
+        }
       }
       const amountOfSources = tree.sourceLocationTracker.getTotalAmountOfSources(address, compilationResult.data.contracts)
       if (tree.sourceLocationTracker.isInvalidSourceLocation(currentSourceLocation, amountOfSources)) { // file is -1 or greater than amount of sources
@@ -795,7 +795,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
 
     const origin = tree.scopes[scopeId].opcodeInfo
     const originIsCall = (isCallInstruction(origin) || isCreateInstruction(origin))
-    
+
     if (isInternalTxInstrn || (internalfunctionCall && functionDefinition) || lowLevelScope) {
       try {
         previousSourceLocation = null

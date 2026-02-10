@@ -412,7 +412,7 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
     console.log(`[addInputParams] Adding ${paramCount} input parameters for function ${functionDefinition.name}`)
     console.log(`  - scopeId: ${scopeId}`)
     console.log(`  - stackLength: ${stackLength}, paramCount: ${paramCount}`)
-  }  
+  }
 
   const stackLengthAtStart = functionDefinition.kind === 'constructor' ? 0 : stackLength
   for (let i = 0; i < paramCount; i++) {

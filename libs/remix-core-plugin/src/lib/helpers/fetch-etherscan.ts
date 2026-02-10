@@ -100,7 +100,7 @@ export const fetchContractFromEtherscan = async (plugin, endpoint: string | Netw
   if (data.result[0].ContractName) {
     plugin.call('IndexedDBCache', 'set', `nameof-${contractAddress}`, data.result[0].ContractName)
   }*/
-  
+
   let settings: CompilerSettings
   if (data.result[0].SourceCode?.settings) {
     settings = data.result[0].SourceCode?.settings
@@ -114,7 +114,7 @@ export const fetchContractFromEtherscan = async (plugin, endpoint: string | Netw
         evmVersion: data.result[0].EVMVersion,
         optimizer: { enabled: data.result[0].OptimizationUsed, runs: parseInt(data.result[0].Runs) }
       }
-    } catch (e) { }   
+    } catch (e) { }
   }
   const config = {
     language: 'Solidity',
