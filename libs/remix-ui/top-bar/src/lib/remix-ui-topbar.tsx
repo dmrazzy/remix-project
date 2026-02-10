@@ -20,6 +20,7 @@ import { TrackingContext } from '@remix-ide/tracking'
 import { MatomoEvent, TopbarEvent, WorkspaceEvent } from '@remix-api'
 import { LoginButton } from '@remix-ui/login'
 import { appActionTypes } from 'libs/remix-ui/app/src/lib/remix-app/actions/app'
+import { NotificationBell } from '../components/NotificationBell'
 
 export function RemixUiTopbar() {
   const intl = useIntl()
@@ -627,6 +628,7 @@ export function RemixUiTopbar() {
               />
             )}
           </>
+          <NotificationBell className="ms-3" />
           <span
             style={{ fontSize: '1.5rem', cursor: 'pointer' }}
             className="ms-3"
