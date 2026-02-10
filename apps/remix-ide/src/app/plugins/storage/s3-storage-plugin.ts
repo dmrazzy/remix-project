@@ -252,8 +252,12 @@ export class S3StoragePlugin extends Plugin {
     await this.initializeProvider()
     
     // Listen for auth state changes
-    this.on('auth', 'authStateChanged', async (state: { isAuthenticated: boolean }) => {
+    this.on('auth', 'authStateChanged', async (state: { isAuthenticated: boolean; token?: string }) => {
       if (state.isAuthenticated) {
+        // Update API client token if provided (e.g. after token refresh)
+        if (state.token && this.apiClient) {
+          this.apiClient.setToken(state.token)
+        }
         await this.initializeProvider()
         await this.loadConfig()
         // Start autosave if enabled
@@ -262,6 +266,13 @@ export class S3StoragePlugin extends Plugin {
         // Clear config on logout
         this.config = null
         this.stopAutosave()
+      }
+    })
+
+    // Listen for token refresh to update API client without full re-init
+    this.on('auth', 'tokenRefreshed', async (data: { token: string }) => {
+      if (this.apiClient && data.token) {
+        this.apiClient.setToken(data.token)
       }
     })
     
@@ -1332,6 +1343,7 @@ export class S3StoragePlugin extends Plugin {
   onDeactivation(): void {
     console.log('[S3StoragePlugin] Deactivated')
     this.off('auth', 'authStateChanged')
+    this.off('auth', 'tokenRefreshed')
     this.stopAutosave()
   }
   

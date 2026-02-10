@@ -8,7 +8,7 @@ const profile = {
   displayName: 'Authentication',
   description: 'Handles SSO authentication and credits',
   methods: ['login', 'logout', 'getUser', 'getCredits', 'refreshCredits', 'linkAccount', 'getLinkedAccounts', 'unlinkAccount', 'getApiClient', 'getSSOApi', 'getCreditsApi', 'getPermissionsApi', 'getBillingApi', 'checkPermission', 'hasPermission', 'getAllPermissions', 'checkPermissions', 'getFeaturesByCategory', 'getFeatureLimit', 'getPaddleConfig', 'getToken', 'isAuthenticated'],
-  events: ['authStateChanged', 'creditsUpdated', 'accountLinked']
+  events: ['authStateChanged', 'creditsUpdated', 'accountLinked', 'tokenRefreshed']
 }
 
 export class AuthPlugin extends Plugin {
@@ -499,6 +499,7 @@ export class AuthPlugin extends Plugin {
       // Update other API services too
       this.creditsApi.setToken(token)
       this.permissionsApi.setToken(token)
+      this.billingApi.setToken(token)
     }
 
     return token
@@ -535,10 +536,30 @@ export class AuthPlugin extends Plugin {
         this.apiClient.setToken(newAccessToken)
         this.creditsApi.setToken(newAccessToken)
         this.permissionsApi.setToken(newAccessToken)
+        this.billingApi.setToken(newAccessToken)
 
         console.log('[AuthPlugin] Access token refreshed successfully')
         // Reschedule next proactive refresh
         this.scheduleRefresh(newAccessToken)
+
+        // Notify all listeners about the new token
+        this.emit('tokenRefreshed', { token: newAccessToken })
+
+        // Also emit authStateChanged so UI state and other plugins stay in sync
+        const userStr = localStorage.getItem('remix_user')
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr)
+            this.emit('authStateChanged', {
+              isAuthenticated: true,
+              user,
+              token: newAccessToken
+            })
+          } catch (e) {
+            // Invalid stored user data, still emit token refresh
+          }
+        }
+
         return newAccessToken
       }
 

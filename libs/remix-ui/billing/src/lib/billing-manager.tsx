@@ -144,10 +144,10 @@ export const BillingManager: React.FC<BillingManagerProps> = ({
     checkAuth()
 
     // Listen for auth changes
-    const handleAuthChange = (authState: { isAuthenticated: boolean }) => {
+    const handleAuthChange = (authState: { isAuthenticated: boolean; token?: string }) => {
       setIsAuthenticated(authState.isAuthenticated)
       if (authState.isAuthenticated) {
-        const token = localStorage.getItem('remix_access_token')
+        const token = authState.token || localStorage.getItem('remix_access_token')
         if (token) billingApi.setToken(token)
         loadUserData()
       } else {
