@@ -25,6 +25,7 @@ import { Topbar } from './app/components/top-bar'
 import { ThemeModule } from './app/tabs/theme-module'
 import { VerticalIcons } from './app/components/vertical-icons'
 import { RemixAIAssistant } from './app/plugins/remix-ai-assistant'
+import { QuickDappV2 } from './app/plugins/quick-dapp-v2'
 import { SolidityUmlGen } from './app/plugins/solidity-umlgen'
 import { VyperCompilationDetailsPlugin } from './app/plugins/vyper-compilation-details'
 import { ContractFlattener } from './app/plugins/contractFlattener'
@@ -353,6 +354,7 @@ class AppComponent {
     // ----------------- AI --------------------------------------
     const remixAI = new RemixAIPlugin()
     const remixAiAssistant = new RemixAIAssistant()
+    const quickDappV2 = new QuickDappV2()
 
     // ----------------- import content service ------------------------
     const contentImport = new CompilerImports()
@@ -505,6 +507,7 @@ class AppComponent {
       scriptRunnerUI,
       remixAI,
       remixAiAssistant,
+      quickDappV2,
       walletConnect,
       amp,
       // vega,
@@ -690,7 +693,8 @@ class AppComponent {
       'gistHandler',
       'compilerloader',
       'remixAI',
-      'remixaiassistant'
+      'remixaiassistant',
+      'quick-dapp-v2'
     ])
 
     await this.appManager.activatePlugin(['auth'])
