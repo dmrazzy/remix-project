@@ -66,9 +66,9 @@ export const fetchContractFromEtherscan = async (plugin, endpoint: string | Netw
             data.result[0].SourceCode = JSON.parse(data.result[0].SourceCode.replace(/(?:\r\n|\r|\n)/g, '').replace(/^{{/, '{').replace(/}}$/, '}'))
           }
         }
-      } else throw new Error('unable to retrieve contract data ' + data.message)
+      } else throw new Error('unable to retrieve contract data ' + JSON.stringify(data.message))
     } catch (e) {
-      throw new Error('unable to retrieve contract data: ' + e.message)
+      throw new Error('unable to retrieve contract data: ' + JSON.stringify(e.message))
     }
   } else throw new Error('unable to try fetching the source code from etherscan: etherscan access token not found. please go to the Remix settings page and provide an access token.')
 
