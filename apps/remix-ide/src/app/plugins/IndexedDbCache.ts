@@ -44,7 +44,7 @@ export class IndexedDbCachePlugin extends Plugin {
   private readonly dbName = 'RemixPluginCache'
   private readonly dbVersion = 1
   private readonly storeName = 'cache'
-  private readonly disabled = true
+  private readonly disabled = false
 
   constructor() {
     super(profile)
