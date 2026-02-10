@@ -56,6 +56,8 @@ export interface LocalVariable {
   isReturnParameter?: boolean
 }
 
+export type ScopeFilterMode = 'all' | 'call' | 'nojump'
+
 export interface NestedScope extends Scope {
   scopeId: string
   children: NestedScope[]
@@ -521,14 +523,44 @@ export class InternalCallTree {
    * Converts the flat scopes structure to a nested JSON structure.
    * Transforms scopeIds like "1", "1.1", "1.2", "1.1.1" into a hierarchical tree.
    *
-   * @param {boolean} mergeLowLevelScope - If true, merges low-level scopes with their parent (except for call instructions)
+   * @param {ScopeFilterMode} filterMode - Filtering mode: 'all' (no filtering), 'call' (only keep CALLs), 'nojump' (merge low-level scopes)
    * @returns {NestedScope[]} Array of nested scopes with children as arrays
    */
-  getScopesAsNestedJSON (mergeLowLevelScope: boolean = false): NestedScope[] {
+  getScopesAsNestedJSON (filterMode: ScopeFilterMode = 'all'): NestedScope[] {
     const scopeMap = new Map<string, NestedScope>()
 
-    // Create NestedScope objects for all scopes
+    // Helper function to check if a scope or its children contain external calls
+    const containsExternalCall = (scopeId: string): boolean => {
+      // Check all scopes to see if any are descendants and contain external calls
+      for (const [checkScopeId, checkScope] of Object.entries(this.scopes)) {
+        // Check if this scope is a descendant of the given scopeId
+        const isDescendant = checkScopeId.startsWith(scopeId + '.') || checkScopeId === scopeId
+        
+        if (isDescendant) {
+          // Check if this descendant scope is an external call
+          // External calls have CALL instruction and lowLevelScope = false
+          if (isCallInstruction(checkScope.opcodeInfo) && !checkScope.lowLevelScope) {
+            return true
+          }
+        }
+      }
+      
+      return false
+    }
+
+    // Create NestedScope objects for all scopes, filtering based on mode
     for (const [scopeId, scope] of Object.entries(this.scopes)) {
+      // Filter scopes based on filterMode
+      if (filterMode === 'call') {
+        // For 'call' mode: include external CALLs OR internal functions that contain external calls
+        const isExternalCall = isCallInstruction(scope.opcodeInfo) && !scope.lowLevelScope
+        const hasExternalCallsInside = !isExternalCall && containsExternalCall(scopeId)
+        
+        if (!isExternalCall && !hasExternalCallsInside) {
+          continue
+        }
+      }
+      
       scopeMap.set(scopeId, {
         ...scope,
         scopeId,
@@ -546,7 +578,7 @@ export class InternalCallTree {
         rootScopes.push(nestedScope)
       } else {
         // Check if this scope should be merged with its parent
-        const shouldMerge = mergeLowLevelScope &&
+        const shouldMerge = (filterMode === 'nojump' || filterMode === 'call') &&
                            nestedScope.lowLevelScope &&
                            !isCallInstruction(nestedScope.opcodeInfo)
 
