@@ -7,6 +7,8 @@ import { isContractCreation, isCallInstruction, isStaticCallInstruction, isCreat
 import { SymbolicStackManager, SymbolicStackSlot } from './symbolicStack'
 import { updateSymbolicStack } from './opcodeStackHandler'
 import { includedSource, isConstructorExit, callDepthChange, addReducedTrace, getGeneratedSources, resolveNodesAtSourceLocation, resolveFunctionDefinition, registerFunctionParameters, countConsecutivePopOpcodes, includeVariableDeclaration } from './helpers/callTreeHelper'
+import type { SolidityProxy } from './solidityProxy'
+import { CompilerAbstract } from '@remix-project/remix-solidity'
 
 /**
  * Represents detailed information about a single step in the VM execution trace.
@@ -168,7 +170,7 @@ export class InternalCallTree {
   /** Event manager for emitting call tree lifecycle events */
   event
   /** Proxy for interacting with Solidity compilation results and AST */
-  solidityProxy
+  solidityProxy: SolidityProxy
   /** Manager for accessing and navigating the execution trace */
   traceManager
   /** Tracker for mapping VM trace indices to source code locations */
@@ -220,6 +222,8 @@ export class InternalCallTree {
   symbolicStackManager: SymbolicStackManager
   /** Debug mode */
   debug: boolean
+  /** get from cache */
+  getCache: (key: string) => Promise<any>
 
   /**
     * constructor
@@ -232,6 +236,7 @@ export class InternalCallTree {
     */
   constructor (debuggerEvent, traceManager, solidityProxy, codeManager, opts, offsetToLineColumnConverter?) {
     this.debug = opts.debug || false
+    this.getCache = opts.getCache
     this.includeLocalVariables = opts.includeLocalVariables
     this.debugWithGeneratedSources = opts.debugWithGeneratedSources
     this.event = new EventManager()
@@ -624,7 +629,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
   let currentSourceLocation = sourceLocation || { start: -1, length: -1, file: -1, jump: '-' }
   let previousSourceLocation = currentSourceLocation
   let previousValidSourceLocation = validSourceLocation || currentSourceLocation
-  let compilationResult
+  let compilationResult: CompilerAbstract
   let currentAddress = ''
   while (step < tree.traceManager.trace.length) {
     let sourceLocation
@@ -639,6 +644,11 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
       if (currentAddress !== address) {
         compilationResult = await tree.solidityProxy.compilationResult(address)
         currentAddress = address
+        const contractName = await tree.getCache(`nameof-${currentAddress}`)
+        const contract = compilationResult.getContract(contractName)
+        if (contract) {
+          tree.sourceLocationTracker.sourceMapByAddress[currentAddress] = isCreation ? contract.object.evm.bytecode.sourceMap : contract.object.evm.deployedBytecode.sourceMap
+        }        
       }
       const amountOfSources = tree.sourceLocationTracker.getTotalAmountOfSources(address, compilationResult.data.contracts)
       if (tree.sourceLocationTracker.isInvalidSourceLocation(currentSourceLocation, amountOfSources)) { // file is -1 or greater than amount of sources
