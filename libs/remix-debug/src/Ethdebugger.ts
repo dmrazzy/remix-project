@@ -173,7 +173,6 @@ export class Ethdebugger {
    */
   async decodeLocalVariableById (step: number, id: number) {
     const variable = this.callTree.getLocalVariableById(id)
-    console.log('returning debug local vars null', variable, this.callTree)
 
     if (!variable) return null
     const stack = this.traceManager.getStackAt(step)
