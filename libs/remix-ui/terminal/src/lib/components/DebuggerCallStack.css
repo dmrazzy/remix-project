@@ -7,90 +7,128 @@
 .call-stack-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace;
 }
 
 .call-stack-item {
-  font-family: monospace;
-  font-size: 13px;
-  border-left: 2px solid var(--secondary);
-  transition: all 0.2s ease;
+  transition: all 0.2s;
+  cursor: pointer;
 }
 
 .call-stack-item:hover {
-  background-color: var(--secondary);
-  border-left-color: var(--primary);
+  background-color: var(--custom-onsurface-layer-1);
 }
 
 .call-stack-line {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  flex-wrap: wrap;
+  padding: 0.25rem 0;
+  line-height: 1.4;
 }
 
 .call-stack-step {
-  color: var(--secondary);
+  color: var(--text-muted);
   font-weight: 600;
-  min-width: 40px;
+  min-width: 3rem;
+  max-width: 3rem;
+  font-family: monospace;
+  font-size: 0.7rem;
   text-align: right;
+  padding-right: 0.5rem;
+  padding-left: 0.25rem;
+  flex-shrink: 0;
 }
 
 .call-stack-type {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
-  min-width: 80px;
-  text-align: center;
+  text-transform: uppercase;
+  min-width: 6rem;
+  justify-content: center;
 }
 
 .call-stack-type.call {
-  background-color: #17a2b8;
-  color: white;
-}
-
-.call-stack-type.create {
-  background-color: #28a745;
-  color: white;
-}
-
-.call-stack-type.internal {
-  background-color: #6c757d;
-  color: white;
-}
-
-.call-stack-type.external {
-  background-color: #007bff;
-  color: white;
+  background-color: rgba(111, 66, 193, 0.15);
+  color: #6f42c1;
 }
 
 .call-stack-type.delegatecall {
-  background-color: #ffc107;
-  color: black;
+  background-color: rgba(253, 126, 20, 0.15);
+  color: #fd7e14;
 }
 
 .call-stack-type.staticcall {
-  background-color: #dc3545;
-  color: white;
+  background-color: rgba(13, 202, 240, 0.15);
+  color: #0dcaf0;
+}
+
+.call-stack-type.create {
+  background-color: rgba(25, 135, 84, 0.15);
+  color: #198754;
+}
+
+.call-stack-type.internal {
+  background-color: rgba(66, 99, 235, 0.15);
+  color: #4263eb;
+}
+
+.call-stack-type.external {
+  background-color: rgba(0, 123, 255, 0.15);
+  color: #007bff;
+}
+
+.call-stack-expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 0.85rem;
+  color: var(--bs-body-color);
+  transition: color 0.2s;
+}
+
+.call-stack-expand-icon:hover {
+  color: var(--bs-primary);
 }
 
 .call-stack-function {
-  color: var(--text);
-  font-weight: 500;
   flex: 1;
-  min-width: 150px;
+  color: var(--bs-body-color);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.call-stack-function .contract-name {
+  color: #17a2b8;
+  font-weight: 600;
+}
+
+.call-stack-function .method-name {
+  color: #e83e8c;
+  font-weight: 600;
 }
 
 .call-stack-gas {
-  color: var(--text-secondary);
-  font-size: 11px;
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #17a2b8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.call-stack-children {
-  border-left: 1px solid var(--secondary);
-  margin-left: 8px;
+.call-stack-gas i {
+  font-size: 0.8rem;
+  color: #17a2b8;
 }
