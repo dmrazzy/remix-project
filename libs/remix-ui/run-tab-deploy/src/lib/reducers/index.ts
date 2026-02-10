@@ -4,6 +4,7 @@ export const deployInitialState: DeployWidgetState = {
   contracts: {
     contractList: []
   },
+  selectedContractIndex: 0,
   value: 0,
   valueUnit: 'wei',
   gasLimit: 0,
@@ -19,21 +20,30 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
   switch (action.type) {
 
   case 'ADD_CONTRACT_FILE': {
-    const contract = {
-      name: action.payload.name,
-      filePath: action.payload.filePath,
-      contractData: null,
-      isUpgradeable: false,
-      isCompiled: false,
-      isCompiling: false
-    }
-    const contractList = state.contracts.contractList.find((contract) => contract.filePath === action.payload.filePath) ? state.contracts.contractList : [...state.contracts.contractList, contract]
+    const existingContractFile = state.contracts.contractList.findIndex((contract) => contract.filePath === action.payload.filePath)
 
-    return {
-      ...state,
-      contracts: {
-        ...state.contracts,
-        contractList
+    if (existingContractFile > -1) {
+      return {
+        ...state,
+        selectedContractIndex: existingContractFile
+      }
+    } else {
+      const contract = {
+        name: action.payload.name,
+        filePath: action.payload.filePath,
+        contractData: null,
+        isUpgradeable: false,
+        isCompiled: false,
+        isCompiling: false
+      }
+
+      return {
+        ...state,
+        contracts: {
+          ...state.contracts,
+          contractList: [...state.contracts.contractList, contract]
+        },
+        selectedContractIndex: state.contracts.contractList.length
       }
     }
   }
@@ -150,6 +160,13 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
     return {
       ...state,
       maxFee: action.payload
+    }
+  }
+
+  case 'SET_SELECTED_CONTRACT_INDEX': {
+    return {
+      ...state,
+      selectedContractIndex: action.payload
     }
   }
 

@@ -57,39 +57,6 @@ function DeployWidget({ plugin }: DeployWidgetProps) {
         dispatch({ type: 'REMOVE_CONTRACT_FILE', payload: filePath })
       }
     })
-    // plugin.blockchain.events.on('newTransaction', (tx, receipt) => {
-    //   plugin.emit('newTransaction', tx, receipt)
-    // })
-
-    // plugin.blockchain.event.register('networkStatus', async ({ error, network }) => {
-    //   if (error) {
-    //     const netUI = 'can\'t detect network'
-    //     setNetworkNameFromProvider(dispatch, netUI)
-    //     return
-    //   }
-    //   const networkProvider = plugin.networkModule.getNetworkProvider.bind(plugin.networkModule)
-    //   const isVM = networkProvider().startsWith('vm') ? true : false
-    //   const netUI = !isVM ? `${network.name} (${network.id || '-'}) network` : 'VM'
-    //   const pinnedChainId = !isVM ? network.id : networkProvider()
-    //   setNetworkNameFromProvider(dispatch, netUI)
-    //   setPinnedChainId(dispatch, pinnedChainId)
-
-    //   // Check if provider is changed or network is changed for same provider e.g; Metamask
-    //   if (currentNetwork.provider !== networkProvider() || (!isVM && currentNetwork.chainId !== network.id)) {
-    //     currentNetwork.provider = networkProvider()
-    //     if (!isVM) {
-    //       fillAccountsList(plugin, dispatch)
-    //       currentNetwork.chainId = network.id
-    //       await loadPinnedContracts(plugin, dispatch, pinnedChainId)
-    //     }
-    //   }
-    // })
-
-    // plugin.on('blockchain', 'shouldAddProvidertoUdapp', (name, provider) => addExternalProvider(dispatch, provider))
-
-    // plugin.on('blockchain', 'shouldRemoveProviderFromUdapp', (name, provider) => removeExternalProvider(dispatch, name))
-
-    // plugin.blockchain.events.on('newProxyDeployment', (address, date, contractName) => addNewProxyDeployment(dispatch, address, date, contractName))
 
     plugin.on('solidity', 'compilationFinished', (file, source, languageVersion, data, input) => broadcastCompilationResult('remix', { file, source, languageVersion, data, input }, plugin, dispatch))
 

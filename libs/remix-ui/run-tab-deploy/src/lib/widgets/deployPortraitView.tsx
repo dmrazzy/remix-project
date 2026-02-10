@@ -21,7 +21,6 @@ function DeployPortraitView() {
   const [isExpanded, setIsExpanded] = useState(true)
   const [defaultProvider, setDefaultProvider] = useState<string | null>(null)
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
-  const [selectedContractIndex, setSelectedContractIndex] = useState<number | null>(0)
   const [expandedInputs, setExpandedInputs] = useState<Set<number>>(new Set())
   const [inputValues, setInputValues] = useState<{[key: number]: string}>({})
   const [expandedProxyInputs, setExpandedProxyInputs] = useState<Set<number>>(new Set())
@@ -50,8 +49,8 @@ function DeployPortraitView() {
   }, [])
 
   const selectedContract = useMemo(() => {
-    return widgetState.contracts.contractList[selectedContractIndex] || null
-  }, [widgetState.contracts.contractList, selectedContractIndex])
+    return widgetState.contracts.contractList[widgetState.selectedContractIndex] || null
+  }, [widgetState.contracts.contractList, widgetState.selectedContractIndex])
 
   useEffect(() => {
     (async () => {
@@ -369,7 +368,7 @@ function DeployPortraitView() {
                 {widgetState.contracts.contractList.length > 0 && (
                   <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties} data-id="contractDropdownMenu">
                     {widgetState.contracts.contractList.map((contract, index) => (
-                      <Dropdown.Item key={`${contract.filePath}:${contract.name}`} className="d-flex align-items-center contract-dropdown-item-hover" onClick={() => setSelectedContractIndex(index)} data-id={`contractDropdownItem-${contract.name}`}>
+                      <Dropdown.Item key={`${contract.filePath}:${contract.name}`} className="d-flex align-items-center contract-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_SELECTED_CONTRACT_INDEX', payload: index })} data-id={`contractDropdownItem-${contract.name}`}>
                         <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                           <div className="d-flex align-items-center justify-content-between w-100">
                             <div className='d-flex flex-column align-items-start'>
