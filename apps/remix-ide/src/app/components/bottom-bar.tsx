@@ -180,7 +180,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
             onClick={() => stepManager?.jumpPreviousBreakpoint && stepManager.jumpPreviousBreakpoint()}
             disabled={stepState === 'initial'}
             data-id="btnJumpPreviousBreakpoint"
-            title="Jump to Previous Breakpoint"
           >
             <i className="fas fa-step-backward"></i>
             <span className="btn-label">Previous Breakpoint</span>
@@ -190,7 +189,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
             onClick={() => stepManager?.stepOverBack && stepManager.stepOverBack(true)}
             disabled={stepState === 'initial'}
             data-id="btnStepBackward"
-            title="Step Backward"
           >
             <i className="fas fa-reply"></i>
             <span className="btn-label">Step Backward</span>
@@ -200,7 +198,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
             onClick={() => stepManager?.stepIntoBack && stepManager.stepIntoBack(true)}
             disabled={stepState === 'initial'}
             data-id="btnStepBack"
-            title="Step Back"
           >
             <i className="fas fa-level-up-alt"></i>
             <span className="btn-label">Step Back</span>
@@ -210,7 +207,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
             onClick={() => stepManager?.stepIntoForward && stepManager.stepIntoForward(true)}
             disabled={stepState === 'end'}
             data-id="btnStepInto"
-            title="Step Into"
           >
             <i className="fas fa-level-down-alt"></i>
             <span className="btn-label">Step Into</span>
@@ -220,7 +216,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
             onClick={() => stepManager?.stepOverForward && stepManager.stepOverForward()}
             disabled={stepState === 'end'}
             data-id="btnStepForward"
-            title="Step Forward"
           >
             <i className="fas fa-share"></i>
             <span className="btn-label">Step Forward</span>
@@ -230,7 +225,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
             onClick={() => stepManager?.jumpNextBreakpoint && stepManager.jumpNextBreakpoint()}
             disabled={stepState === 'end'}
             data-id="btnJumpNextBreakpoint"
-            title="Jump to Next Breakpoint"
           >
             <i className="fas fa-step-forward"></i>
             <span className="btn-label">Next Breakpoint</span>

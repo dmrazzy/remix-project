@@ -284,16 +284,12 @@ export const DebugLayout = ({
 
     // Get contract name from address
     const contractName = getContractName(scope.address)
-    const contractIdentifier = contractName || (scope.address ? `${scope.address.substring(0, 6)}...${scope.address.substring(scope.address.length - 4)}` : '')
-
-    // Format as contractName.methodName or contractName.EventName
-    const displayName = contractIdentifier ? `${contractIdentifier}.${itemName}` : itemName
+    const contractAddress = scope.address ? `${scope.address.substring(0, 6)}...${scope.address.substring(scope.address.length - 4)}` : ''
 
     return (
       <div key={scope.scopeId}>
         <div
           className={`call-trace-item ${isSelected ? 'selected' : ''}`}
-          style={{ paddingLeft: `${depth * 20}px` }}
           onClick={() => {
             setSelectedScope(scope)
             if (onScopeSelected) {
@@ -302,33 +298,52 @@ export const DebugLayout = ({
           }}
         >
           <div className="call-trace-line">
-            {hasChildren && (
-              <span
-                className="call-trace-expand-icon"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  toggleScope(scope.scopeId)
-                }}
-                style={{ cursor: 'pointer', marginRight: '8px', userSelect: 'none' }}
-              >
-                {isExpanded ? '−' : '+'}
-              </span>
-            )}
-            {!hasChildren && <span style={{ marginRight: '20px' }}></span>}
             <span className="call-trace-step">{scope.firstStep}</span>
-            <span className={`call-trace-type ${callTypeLabel.toLowerCase()}`}>
-              {callTypeLabel}
-            </span>
-            <span className="call-trace-function">
-              {displayName}
-            </span>
-            <span className="call-trace-gas">{scope.gasCost} gas</span>
+            <div style={{
+              paddingLeft: `${0.5 + depth * 20}px`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              flex: 1,
+              borderLeft: depth > 0 ? '2px solid var(--bs-border-color)' : 'none',
+              marginLeft: depth > 0 ? '0.5rem' : '0'
+            }}>
+              {hasChildren && (
+                <i
+                  className={`fas ${isExpanded ? 'fa-minus-square' : 'fa-plus-square'} call-trace-expand-icon`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleScope(scope.scopeId)
+                  }}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                />
+              )}
+              {!hasChildren && <span style={{ width: '14px' }}></span>}
+              <span className={`call-trace-type ${callTypeLabel.toLowerCase()}`}>
+                {callTypeLabel}
+              </span>
+              <span className="call-trace-function">
+                {contractName ? (
+                  <>
+                    <span className="contract-name">{contractName}</span>
+                    <span>.</span>
+                  </>
+                ) : contractAddress ? (
+                  <>
+                    <span className="contract-name">({contractAddress})</span>
+                    <span>.</span>
+                  </>
+                ) : null}
+                <span className="method-name">{itemName}</span>
+              </span>
+              <span className="call-trace-gas">{scope.gasCost} gas</span>
+            </div>
           </div>
         </div>
         {hasChildren && isExpanded && (
-          <div className="call-trace-children">
+          <>
             {externalChildren.map((child: any) => renderScopeItem(child, depth + 1))}
-          </div>
+          </>
         )}
       </div>
     )
@@ -375,16 +390,26 @@ export const DebugLayout = ({
           }
 
           return (
-            <div key={index} className="call-trace-item" style={{ paddingLeft: `${index * 12}px` }}>
+            <div key={index} className="call-trace-item">
               <div className="call-trace-line">
                 <span className="call-trace-step">{step}</span>
-                <span className={`call-trace-type ${callTypeLabel.toLowerCase()}`}>
-                  {callTypeLabel}
-                </span>
-                <span className="call-trace-function">
-                  {functionName}({inputs.join(', ')})
-                </span>
-                <span className="call-trace-gas">{gasCost} gas</span>
+                <div style={{
+                  paddingLeft: `${0.5 + index * 12}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  flex: 1,
+                  borderLeft: index > 0 ? '2px solid var(--bs-border-color)' : 'none',
+                  marginLeft: index > 0 ? '0.5rem' : '0'
+                }}>
+                  <span className={`call-trace-type ${callTypeLabel.toLowerCase()}`}>
+                    {callTypeLabel}
+                  </span>
+                  <span className="call-trace-function">
+                    <span className="method-name">{functionName}</span>({inputs.join(', ')})
+                  </span>
+                  <span className="call-trace-gas">{gasCost} gas</span>
+                </div>
               </div>
             </div>
           )
@@ -484,6 +509,22 @@ export const DebugLayout = ({
           </h6>
         </div>
         <div className="debug-section-content debug-section-scrollable">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', paddingLeft: '0.5rem' }}>
+            <span className="call-trace-type sender">SENDER</span>
+            <span className="call-trace-function">
+              {currentTransaction?.from || 'N/A'}
+              {currentTransaction?.from && (
+                <CustomTooltip tooltipText={copyTooltips.from} tooltipId="sender-address-tooltip" placement="top">
+                  <i
+                    className={`far ${copyTooltips.from === 'Copied!' ? 'fa-check' : 'fa-copy'} ms-2`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => copyToClipboard(currentTransaction.from, 'from')}
+                    onMouseLeave={() => resetTooltip('from')}
+                  />
+                </CustomTooltip>
+              )}
+            </span>
+          </div>
           {renderCallTrace()}
         </div>
       </div>
