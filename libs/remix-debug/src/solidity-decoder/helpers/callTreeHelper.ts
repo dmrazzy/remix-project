@@ -132,10 +132,9 @@ export async function registerFunctionParameters (tree, functionDefinition, step
     const stack = tree.traceManager.getStackAt(step + 1)
     const states = await tree.solidityProxy.extractStatesDefinitions(address)
 
-    console.log(`[registerFunctionParameters] Function ${functionDefinition.name} at step ${step}, stack length: ${stack.length}`)
-
     // Debug function entry before parameter binding
     if (tree.debug) {
+      console.log(`[registerFunctionParameters] Function ${functionDefinition.name} at step ${step}, stack length: ${stack.length}`)
       debugVariableTracking(tree, step, scopeId, `Function ${functionDefinition.name} entry - before parameter binding`)
     }
 
@@ -187,8 +186,10 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
   const variableDeclarations = await resolveVariableDeclarationEnhanced(tree, sourceLocation, generatedSources, address, scopeId)
 
   if (variableDeclarations && variableDeclarations.length > 0) {
-    console.log(`[includeVariableDeclaration] Found ${variableDeclarations.length} variable declarations at step ${step}`)
-    debugVariableTracking(tree, step, scopeId, 'Before variable declaration')
+    if (tree.debug) {
+      console.log(`[includeVariableDeclaration] Found ${variableDeclarations.length} variable declarations at step ${step}`)
+      debugVariableTracking(tree, step, scopeId, 'Before variable declaration')
+    }
   }
   // using the vm trace step, the current source location and the ast,
   // we check if the current vm trace step target a new ast node of type VariableDeclaration
@@ -239,11 +240,11 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
               existingReturnParam.safeToDecodeAtStep = safeStep
               existingReturnParam.declarationStep = step
               tree.scopes[scopeId].locals[variableDeclaration.name] = existingReturnParam
-              console.log(`[includeVariableDeclaration] Return parameter ${variableDeclaration.name} now on stack at index ${stack.length}`)
+              if (tree.debug) console.log(`[includeVariableDeclaration] Return parameter ${variableDeclaration.name} now on stack at index ${stack.length}`)
             } else {
               tree.scopes[scopeId].locals[variableDeclaration.name] = newVar
               tree.variables[variableDeclaration.id] = newVar
-              console.log(`[includeVariableDeclaration] Local variable ${variableDeclaration.name} declared at stack index ${stack.length}`)
+              if (tree.debug) console.log(`[includeVariableDeclaration] Local variable ${variableDeclaration.name} declared at stack index ${stack.length}`)
             }
 
             addReducedTrace(tree, safeStep)
@@ -407,10 +408,11 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
   const contractName = contractObj.name
   const params = []
   const paramCount = parameterList.parameters.length
-
-  console.log(`[addInputParams] Adding ${paramCount} input parameters for function ${functionDefinition.name}`)
-  console.log(`  - scopeId: ${scopeId}`)
-  console.log(`  - stackLength: ${stackLength}, paramCount: ${paramCount}`)
+  if (tree.debug) {
+    console.log(`[addInputParams] Adding ${paramCount} input parameters for function ${functionDefinition.name}`)
+    console.log(`  - scopeId: ${scopeId}`)
+    console.log(`  - stackLength: ${stackLength}, paramCount: ${paramCount}`)
+  }  
 
   const stackLengthAtStart = functionDefinition.kind === 'constructor' ? 0 : stackLength
   for (let i = 0; i < paramCount; i++) {
@@ -421,7 +423,7 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
 
     // Ensure stack index is valid
     if (stackIndex < 0 || stackIndex >= stackLength) {
-      console.warn(`[addInputParams] Invalid stack index ${stackIndex} for parameter ${param.name} (stackLength: ${stackLength}), using fallback positioning`)
+      if (tree.debug) console.warn(`[addInputParams] Invalid stack index ${stackIndex} for parameter ${param.name} (stackLength: ${stackLength}), using fallback positioning`)
       stackIndex = Math.max(0, Math.min(i, stackLength - 1))
     }
 
@@ -451,7 +453,7 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
     // Use step + 1 because the symbolic stack represents the state AFTER the opcode execution
     tree.symbolicStackManager.bindVariableWithLifecycle(step + 1, newParam, stackIndex, 'assigned', scopeId)
 
-    console.log(`[addInputParams] Bound parameter: ${attributesName} at stack index ${stackIndex}`)
+    if (tree.debug) console.log(`[addInputParams] Bound parameter: ${attributesName} at stack index ${stackIndex}`)
   }
 
   return params
@@ -479,7 +481,7 @@ export function addReturnParams (step, functionDefinition, parameterList, tree: 
   const contractName = contractObj.name
   const paramCount = parameterList.parameters.length
 
-  console.log(`[addReturnParams] Adding ${paramCount} return parameters for function ${functionDefinition.name}`)
+  if (tree.debug) console.log(`[addReturnParams] Adding ${paramCount} return parameters for function ${functionDefinition.name}`)
 
   for (let i = 0; i < paramCount; i++) {
     const param = parameterList.parameters[i]
@@ -505,7 +507,7 @@ export function addReturnParams (step, functionDefinition, parameterList, tree: 
     // Don't add to locals yet - will be added when actually declared in the function body
     if (!tree.variables[param.id]) tree.variables[param.id] = newReturnParam
 
-    console.log(`[addReturnParams] Registered return parameter: ${attributesName} (not yet on stack)`)
+    if (tree.debug) console.log(`[addReturnParams] Registered return parameter: ${attributesName} (not yet on stack)`)
   }
 }
 
