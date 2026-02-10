@@ -917,16 +917,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
           okLabel: 'Restore to Current Workspace',
           cancelLabel: 'Create Separate Copy',
           okFn: async () => {
-            try {
-              await this.call('s3Storage', 'restoreWorkspace', backupPath)
-            } catch (e) {
-              console.error('[CloudWorkspacesPlugin] Restore to current failed:', e)
-              await this.call('notification', 'alert', {
-                id: 'restoreError',
-                title: 'Restore Failed',
-                message: e.message || 'Failed to restore backup'
-              })
-            }
+            await this.promptCleanOrMergeRestore(backupPath)
           },
           cancelFn: async () => {
             // Separate copy — prompt for workspace name
@@ -948,9 +939,9 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
           cancelLabel: 'Create Separate Copy',
           okFn: async () => {
             try {
-              // Switch to that workspace and restore into it
+              // Switch to that workspace, then ask clean vs merge
               await this.call('filePanel', 'setWorkspace', { name: localWorkspacesWithSameId[0] })
-              await this.call('s3Storage', 'restoreWorkspace', backupPath)
+              await this.promptCleanOrMergeRestore(backupPath)
             } catch (e) {
               console.error('[CloudWorkspacesPlugin] Restore to existing local failed:', e)
               await this.call('notification', 'alert', {
@@ -976,6 +967,47 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       console.error('[CloudWorkspacesPlugin] Restore failed:', e)
       throw e
     }
+  }
+
+  /**
+   * Prompt user to choose between clean restore and merge restore,
+   * then execute the restore on the current workspace.
+   */
+  private async promptCleanOrMergeRestore(backupPath: string): Promise<void> {
+    const restoreModeModal = {
+      id: 'restoreModeModal',
+      title: 'Restore Mode',
+      message: 'This workspace has existing files. How should they be handled?',
+      modalType: 'modal',
+      okLabel: 'Clean Restore',
+      cancelLabel: 'Merge',
+      okFn: async () => {
+        try {
+          await this.call('s3Storage', 'restoreWorkspace', backupPath, { cleanRestore: true })
+        } catch (e) {
+          console.error('[CloudWorkspacesPlugin] Clean restore failed:', e)
+          await this.call('notification', 'alert', {
+            id: 'restoreError',
+            title: 'Restore Failed',
+            message: e.message || 'Failed to restore backup'
+          })
+        }
+      },
+      cancelFn: async () => {
+        try {
+          await this.call('s3Storage', 'restoreWorkspace', backupPath, { cleanRestore: false })
+        } catch (e) {
+          console.error('[CloudWorkspacesPlugin] Merge restore failed:', e)
+          await this.call('notification', 'alert', {
+            id: 'restoreError',
+            title: 'Restore Failed',
+            message: e.message || 'Failed to restore backup'
+          })
+        }
+      },
+      hideFn: () => null
+    }
+    await this.call('notification', 'modal', restoreModeModal)
   }
 
   /**

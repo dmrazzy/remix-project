@@ -1747,6 +1747,35 @@ export class S3StoragePlugin extends Plugin {
     
     return false
   }
+
+  /**
+   * Wipe all user files in the current workspace.
+   * Removes everything except excluded patterns (.deps, artifacts, etc.) and remix.config.json.
+   * Used for clean restore to ensure the workspace matches the backup exactly.
+   */
+  private async wipeWorkspaceFiles(): Promise<void> {
+    try {
+      const entries = await this.call('fileManager', 'readdir', '/')
+      for (const [entryPath] of Object.entries(entries)) {
+        const normalized = entryPath.replace(/^\//, '')
+        // Keep excluded folders (they're regeneratable and not in backups)
+        if (this.shouldExclude(normalized)) {
+          console.log(`[S3StoragePlugin] 🧹 Keeping excluded folder: ${normalized}`)
+          continue
+        }
+        // Keep remix.config.json (cloud settings) — it's skipped during zip extraction anyway
+        if (normalized === REMIX_CONFIG_FILE) continue
+        try {
+          await this.call('fileManager', 'remove', entryPath)
+          console.log(`[S3StoragePlugin] 🧹 Removed: ${normalized}`)
+        } catch (e) {
+          console.warn(`[S3StoragePlugin] Could not remove ${normalized}:`, e)
+        }
+      }
+    } catch (e) {
+      console.error('[S3StoragePlugin] Error wiping workspace files:', e)
+    }
+  }
   
   /**
    * Recursively collect all files in the workspace.
@@ -1911,12 +1940,14 @@ export class S3StoragePlugin extends Plugin {
    * Restore workspace from a backup zip
    * 
    * @param backupKey - The S3 key of the backup to restore (optional, uses latest if not provided)
+   * @param options - Optional settings
+   * @param options.cleanRestore - If true, wipe existing files before restoring (except excluded/regeneratable folders)
    * 
    * @example
    * await s3Storage.restoreWorkspace()  // Restores latest backup
-   * await s3Storage.restoreWorkspace('backups/backup-2025-12-26.zip')
+   * await s3Storage.restoreWorkspace('backups/backup-2025-12-26.zip', { cleanRestore: true })
    */
-  async restoreWorkspace(backupKey?: string): Promise<void> {
+  async restoreWorkspace(backupKey?: string, options?: { cleanRestore?: boolean }): Promise<void> {
     const provider = this.ensureProvider()
     
     // Check if user is authenticated
@@ -2015,8 +2046,12 @@ export class S3StoragePlugin extends Plugin {
     // Check if backup contains .git files
     const backupHasGit = zip.file(/^\.git[\/]/).length > 0 || zip.file('.git') !== null
     
-    // If backup contains .git, wipe local .git first to prevent corruption
-    if (backupHasGit) {
+    // Clean restore: wipe existing files first
+    if (options?.cleanRestore) {
+      console.log('[S3StoragePlugin] 🧹 Clean restore: wiping existing workspace files')
+      await this.wipeWorkspaceFiles()
+    } else if (backupHasGit) {
+      // Even in merge mode, wipe local .git if backup contains .git to prevent corruption
       try {
         const localGitExists = await this.call('fileManager', 'exists', '.git')
         if (localGitExists) {
@@ -2204,7 +2239,7 @@ export class S3StoragePlugin extends Plugin {
    */
   async restoreBackupToNewWorkspace(
     backupPath: string,
-    options?: { targetWorkspaceName?: string; overwriteIfExists?: boolean; keepRemoteId?: boolean }
+    options?: { targetWorkspaceName?: string; overwriteIfExists?: boolean; keepRemoteId?: boolean; cleanRestore?: boolean }
   ): Promise<void> {
     const provider = this.ensureProvider()
     
@@ -2319,9 +2354,12 @@ export class S3StoragePlugin extends Plugin {
     // Check if backup contains .git files
     const backupHasGit = zip.file(/^\.git[\/]/).length > 0 || zip.file('.git') !== null
     
-    // If backup contains .git, wipe local .git first to prevent corruption
-    // (even in a new workspace, createWorkspace with 'blank' might init .git)
-    if (backupHasGit) {
+    // Clean restore: wipe existing files first (relevant when overwriting an existing workspace)
+    if (options?.cleanRestore) {
+      console.log('[S3StoragePlugin] 🧹 Clean restore: wiping existing workspace files')
+      await this.wipeWorkspaceFiles()
+    } else if (backupHasGit) {
+      // Even in merge mode, wipe local .git if backup contains .git to prevent corruption
       try {
         const localGitExists = await this.call('fileManager', 'exists', '.git')
         if (localGitExists) {
