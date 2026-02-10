@@ -189,6 +189,16 @@ export async function openTransactionInTerminal (plugin: TransactionsPlugin, tra
       type: 'info',
       value: `Transaction: ${transaction.record?.txHash}\nFunction: ${transaction.record?.name}\nStatus: ${transaction.record?.status}`
     })
+
+    // Scroll to the transaction element in the terminal and click it
+    const txHash = transaction.record?.txHash
+    if (txHash) {
+      const dataId = `block_tx${txHash}`
+      const element = document.querySelector(`[data-id="${dataId}"]`) as HTMLElement
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
   } catch (error) {
     console.error('Error opening in terminal:', error)
     await plugin.call('notification', 'toast', `Error: ${error.message}`)
