@@ -684,7 +684,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
       if (currentAddress !== address) {
         compilationResult = await tree.solidityProxy.compilationResult(address)
         currentAddress = address
-        const contractName = await tree.getCache(`nameof-${currentAddress}`)
+        const contractName = tree.getCache && await tree.getCache(`nameof-${currentAddress}`)
         const contract = compilationResult.getContract(contractName)
         if (contract) {
           tree.sourceLocationTracker.sourceMapByAddress[currentAddress] = isCreation ? contract.object.evm.bytecode.sourceMap : contract.object.evm.deployedBytecode.sourceMap
