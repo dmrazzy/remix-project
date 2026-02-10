@@ -1,6 +1,12 @@
 'use strict'
 
-import { CompilationResult, visitContractsCallbackParam, visitContractsCallbackInterface } from './types'
+import { CompilationResult, visitContractsCallbackParam, visitContractsCallbackInterface, CompiledContract} from './types'
+
+type ContractObj = {
+  object: CompiledContract,
+  file: string
+}
+
 export default {
 
   /**
@@ -9,7 +15,7 @@ export default {
    * @param contracts 'contracts' object from last compilation result
    */
 
-  getContract: (contractName: string, contracts: CompilationResult['contracts']) : Record<string, any> | null => {
+  getContract: (contractName: string, contracts: CompilationResult['contracts']) : ContractObj | null => {
     for (const file in contracts) {
       if (contracts[file][contractName]) {
         return { object: contracts[file][contractName], file: file }
