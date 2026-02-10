@@ -105,15 +105,6 @@ export async function replayTransaction (transaction: Transaction, recorderData:
     const accounts = recorderData._usedAccounts
     const abis = recorderData._abis
     const linkReferences = recorderData._linkReferences
-
-    // if (tx.record.type === 'constructor') {
-    //   // resolve the bytecode and ABI using the contract name, this ensure getting the last compiled one.
-    //   const data = await plugin.call('compilerArtefacts', 'getArtefactsByContractName', tx.record.contractName)
-    //   tx.record.bytecode = data.artefact.evm.bytecode.object
-    //   const updatedABIKeccak = bytesToHex(hash.keccakFromString(JSON.stringify(data.artefact.abi)))
-    //   abis[updatedABIKeccak] = data.artefact.abi
-    //   tx.record.abi = updatedABIKeccak
-    // }
     const record = resolveAddress(tx.record, accounts)
     const abi = abis[tx.record.abi]
 
@@ -170,7 +161,7 @@ export async function replayTransaction (transaction: Transaction, recorderData:
     }
 
     try {
-      const txData = { ...record, data: { dataHex: data.data, funArgs: tx.record.parameters, funAbi: fnABI, contractBytecode: tx.record.bytecode, contractName: tx.record.contractName, timestamp: tx.timestamp, contractABI: recorderData._abis[transaction.record.abi] } }
+      const txData = { ...record, data: { dataHex: data.data, funArgs: tx.record.parameters, funAbi: fnABI, contractBytecode: tx.record.bytecode, contractName: tx.record.contractName, timestamp: tx.timestamp, contractABI: recorderData._abis[transaction.record.abi], value: record.value } }
 
       await plugin.call('blockchain', 'runTx', txData)
     } catch (err) {
