@@ -335,7 +335,6 @@ export class InternalCallTree {
     let scopeId = this.findScopeId(vmtraceIndex)
     if (scopeId !== '' && !scopeId) return null
     let scope = this.scopes[scopeId]
-    console.log('findScope', this.scopes)
     while (scope.lastStep && scope.lastStep < vmtraceIndex && scope.firstStep > 0) {
       scopeId = this.parentScope(scopeId)
       scope = this.scopes[scopeId]
