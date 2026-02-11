@@ -118,7 +118,7 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
     try {
 
       const result = await plugin.call('debugger', 'getCurrentSourceLocation')
-      const stack = await plugin.call('debugger', 'getStackAt')
+      const stack = await plugin.call('debugger', 'getStackAt', result.step)
       if (!result) {
         return this.createTextContent(
           'debug://current-debugging-step',
@@ -128,7 +128,7 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
       console.log('current-debugging-step', result)
       return this.createJsonContent('debug://current-debugging-step', {
         success: true,
-        description: 'Current source code highlighted in the editor',
+        description: 'Current source code highlighted in the editor in the debug session and the corresponding stack.',
         result,
         stack
       });
