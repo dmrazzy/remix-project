@@ -81,7 +81,7 @@ export const ScopePanel = ({ data, className, stepManager }: ScopePanelProps) =>
 
   const handleGoTo = (event, scope: NestedScope) => {
     event.stopPropagation();
-    stepManager.jumpTo(traceHelper.isCallInstruction(scope.opcodeInfo) ? scope.firstStep : scope.firstStep + 1) // JUMPDEST
+    stepManager.jumpTo(traceHelper.isCallInstruction(scope.opcodeInfo) ? scope.firstStep : scope.firstStep)
   }
 
   const formatScopeLabel = (scope: NestedScope): JSX.Element => {
