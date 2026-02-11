@@ -2031,11 +2031,12 @@ export class S3StoragePlugin extends Plugin {
     const zip = await JSZip.loadAsync(content)
     
     // Read metadata
+    let backupMetadata: any = null
     const metadataFile = zip.file('_backup_metadata.json')
     if (metadataFile) {
       const metadataStr = await metadataFile.async('string')
-      const metadata = JSON.parse(metadataStr)
-      console.log('[S3StoragePlugin] Backup metadata:', metadata)
+      backupMetadata = JSON.parse(metadataStr)
+      console.log('[S3StoragePlugin] Backup metadata:', backupMetadata)
     }
     
     // Check for git metadata
@@ -2095,6 +2096,24 @@ export class S3StoragePlugin extends Plugin {
     await Promise.all(filePromises)
     
     console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files`)
+    
+    // Update last save/backup timestamp in remix.config.json based on what was restored
+    try {
+      const backupTimestamp = backupMetadata?.createdAt || new Date().toISOString()
+      const isAutosaveRestore = `${backupFolder}/${backupFilename}`.includes('/autosave/')
+      let config = await this.getRemixConfig()
+      if (config && config['remote-workspace']) {
+        if (isAutosaveRestore) {
+          config['remote-workspace'].lastSaveAt = backupTimestamp
+        } else {
+          config['remote-workspace'].lastBackupAt = backupTimestamp
+        }
+        await this.saveRemixConfig(config)
+        console.log(`[S3StoragePlugin] Updated ${isAutosaveRestore ? 'lastSaveAt' : 'lastBackupAt'} to ${backupTimestamp}`)
+      }
+    } catch (e) {
+      console.warn('[S3StoragePlugin] Could not update restore timestamp:', e)
+    }
     
     // Notify user about git repo info if present
     if (gitBackupInfo?.isGitRepo) {
@@ -2300,13 +2319,14 @@ export class S3StoragePlugin extends Plugin {
     
     // Read metadata to get original workspace name
     let originalWorkspaceName = 'restored-workspace'
+    let backupMetadata: any = null
     const metadataFile = zip.file('_backup_metadata.json')
     if (metadataFile) {
       try {
         const metadataStr = await metadataFile.async('string')
-        const metadata = JSON.parse(metadataStr)
-        if (metadata.workspaceName) {
-          originalWorkspaceName = metadata.workspaceName
+        backupMetadata = JSON.parse(metadataStr)
+        if (backupMetadata.workspaceName) {
+          originalWorkspaceName = backupMetadata.workspaceName
         }
       } catch (e) {
         console.warn('[S3StoragePlugin] Could not parse backup metadata:', e)
@@ -2410,7 +2430,12 @@ export class S3StoragePlugin extends Plugin {
       'remote-workspace': {
         remoteId: assignedRemoteId,
         userId: user?.sub,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        // Carry over the backup's timestamp so "Saved" / "Backup" shows correctly
+        ...(backupPath.includes('/autosave/') 
+          ? { lastSaveAt: backupMetadata?.createdAt || new Date().toISOString() }
+          : { lastBackupAt: backupMetadata?.createdAt || new Date().toISOString() }
+        )
       }
     }
     await this.call('fileManager', 'writeFile', REMIX_CONFIG_FILE, JSON.stringify(remixConfig, null, 2))

@@ -319,6 +319,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.off('filePanel', 'setWorkspace')
     this.off('s3Storage', 'backupCompleted')
     this.off('s3Storage', 'saveCompleted')
+    this.off('s3Storage', 'autosaveStarted')
     this.off('s3Storage', 'autosaveChanged')
     this.off('s3Storage', 'conflictDetected')
   }
@@ -907,7 +908,16 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       const localRemoteIds = await this.scanLocalRemoteIds()
       const localWorkspacesWithSameId = localRemoteIds.get(backupRemoteId) || []
       
+      console.log('[CloudWorkspaces] 🔄 restoreBackup called:', {
+        backupPath,
+        backupRemoteId,
+        currentRemoteId,
+        canRestoreToCurrent,
+        localWorkspacesWithSameId
+      })
+      
       if (canRestoreToCurrent) {
+        console.log('[CloudWorkspaces] 🔄 Path: canRestoreToCurrent — showing Restore/Copy modal')
         // Current workspace owns this remote — offer restore to current or create a separate copy
         const restoreModal = {
           id: 'restoreBackupModal',
@@ -917,16 +927,21 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
           okLabel: 'Restore to Current Workspace',
           cancelLabel: 'Create Separate Copy',
           okFn: async () => {
+            console.log('[CloudWorkspaces] 🔄 User chose: Restore to Current Workspace')
             await this.promptCleanOrMergeRestore(backupPath)
           },
           cancelFn: async () => {
+            console.log('[CloudWorkspaces] 🔄 User chose: Create Separate Copy')
             // Separate copy — prompt for workspace name
             await this.promptAndRestoreToNewWorkspace(backupPath, { keepRemoteId: false })
           },
-          hideFn: () => null
+          hideFn: () => {
+            console.log('[CloudWorkspaces] 🔄 Restore modal dismissed (hideFn)')
+          }
         }
         await this.call('notification', 'modal', restoreModal)
       } else if (localWorkspacesWithSameId.length > 0) {
+        console.log('[CloudWorkspaces] 🔄 Path: localWorkspacesWithSameId — showing conflict modal')
         // Another local workspace already syncs to this remote — warn the user
         const existingNames = localWorkspacesWithSameId.join(', ')
         const restoreModal = {
@@ -939,8 +954,10 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
           cancelLabel: 'Create Separate Copy',
           okFn: async () => {
             try {
-              // Switch to that workspace, then ask clean vs merge
-              await this.call('filePanel', 'setWorkspace', { name: localWorkspacesWithSameId[0] })
+              console.log('[CloudWorkspaces] 🔄 User chose: Restore to existing local workspace:', localWorkspacesWithSameId[0])
+              // Switch to that workspace (full switch including file provider root)
+              await this.switchToWorkspaceAndWait(localWorkspacesWithSameId[0])
+              console.log('[CloudWorkspaces] 🔄 Switched to workspace:', localWorkspacesWithSameId[0])
               await this.promptCleanOrMergeRestore(backupPath)
             } catch (e) {
               console.error('[CloudWorkspacesPlugin] Restore to existing local failed:', e)
@@ -952,13 +969,17 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
             }
           },
           cancelFn: async () => {
+            console.log('[CloudWorkspaces] 🔄 User chose: Create Separate Copy (from conflict modal)')
             // Separate copy — prompt for workspace name
             await this.promptAndRestoreToNewWorkspace(backupPath, { keepRemoteId: false })
           },
-          hideFn: () => null
+          hideFn: () => {
+            console.log('[CloudWorkspaces] 🔄 Conflict modal dismissed (hideFn)')
+          }
         }
         await this.call('notification', 'modal', restoreModal)
       } else {
+        console.log('[CloudWorkspaces] 🔄 Path: remote not on device — restoring with keepRemoteId=true')
         // Remote is NOT on this device — this is the "moved to another computer" case
         // Keep the remoteId so the user continues syncing to the same cloud
         await this.promptAndRestoreToNewWorkspace(backupPath, { keepRemoteId: true })
@@ -970,10 +991,76 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   }
 
   /**
+   * Properly switch to a workspace and wait for the switch to complete.
+   * filePanel.setWorkspace only updates metadata — it does NOT change the file provider root.
+   * filePanel.switchToWorkspace emits an event that triggers the full switch asynchronously.
+   * 
+   * IMPORTANT: We fire switchToWorkspace without await because the plugin engine
+   * waits for ALL event listeners to complete (including our own setWorkspace handler
+   * which runs loadCurrentWorkspaceStatus + updateStatus). Awaiting would block the
+   * polling loop from ever starting, causing a deadlock when the modal closes.
+   */
+  private async switchToWorkspaceAndWait(workspaceName: string, timeoutMs = 10000): Promise<void> {
+    console.log('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: switching to', workspaceName)
+    
+    // Check if we're already on this workspace
+    const current = await this.call('filePanel', 'getCurrentWorkspace')
+    if (current?.name === workspaceName) {
+      console.log('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: already on', workspaceName)
+      return
+    }
+    
+    // Fire and forget — do NOT await. The plugin engine's emit waits for all listeners
+    // (including our own setWorkspace handler), so awaiting would block the poll loop below.
+    this.call('filePanel', 'switchToWorkspace', { name: workspaceName }).catch(e => {
+      console.error('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: switchToWorkspace call failed:', e)
+    })
+    
+    // Poll until getCurrentWorkspace reflects the new workspace
+    const startTime = Date.now()
+    while (Date.now() - startTime < timeoutMs) {
+      await new Promise(r => setTimeout(r, 200))
+      
+      try {
+        const ws = await this.call('filePanel', 'getCurrentWorkspace')
+        if (ws?.name === workspaceName) {
+          console.log('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: workspace is now', ws.name)
+          return
+        }
+        console.log('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: still waiting... current:', ws?.name)
+      } catch (e) {
+        console.log('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: still waiting... (error:', e.message, ')')
+      }
+    }
+    
+    throw new Error(`Timed out waiting for workspace switch to "${workspaceName}"`)
+  }
+
+  /**
+   * Refresh the full UI after a restore operation completes.
+   * Called explicitly at the end of each restore code path (after all modals are resolved).
+   */
+  private async refreshAfterRestore(): Promise<void> {
+    console.log('[CloudWorkspaces] 🔄 refreshAfterRestore: START')
+    try {
+      console.log('[CloudWorkspaces] 🔄 refreshAfterRestore: calling refresh() (reloads remote list + localWorkspaceNames)')
+      await this.refresh()
+      console.log('[CloudWorkspaces] 🔄 refreshAfterRestore: calling loadCurrentWorkspaceStatus()')
+      await this.loadCurrentWorkspaceStatus()
+      console.log('[CloudWorkspaces] 🔄 refreshAfterRestore: calling updateStatus()')
+      await this.updateStatus()
+      console.log('[CloudWorkspaces] 🔄 refreshAfterRestore: DONE ✅')
+    } catch (e) {
+      console.error('[CloudWorkspaces] 🔄 refreshAfterRestore: ERROR', e)
+    }
+  }
+
+  /**
    * Prompt user to choose between clean restore and merge restore,
    * then execute the restore on the current workspace.
    */
   private async promptCleanOrMergeRestore(backupPath: string): Promise<void> {
+    console.log('[CloudWorkspaces] 🔄 promptCleanOrMergeRestore called, backupPath:', backupPath)
     const restoreModeModal = {
       id: 'restoreModeModal',
       title: 'Restore Mode',
@@ -983,7 +1070,10 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       cancelLabel: 'Merge',
       okFn: async () => {
         try {
+          console.log('[CloudWorkspaces] 🔄 User chose: Clean Restore — calling s3Storage.restoreWorkspace')
           await this.call('s3Storage', 'restoreWorkspace', backupPath, { cleanRestore: true })
+          console.log('[CloudWorkspaces] 🔄 Clean restore completed, now refreshing UI...')
+          await this.refreshAfterRestore()
         } catch (e) {
           console.error('[CloudWorkspacesPlugin] Clean restore failed:', e)
           await this.call('notification', 'alert', {
@@ -995,7 +1085,10 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       },
       cancelFn: async () => {
         try {
+          console.log('[CloudWorkspaces] 🔄 User chose: Merge — calling s3Storage.restoreWorkspace')
           await this.call('s3Storage', 'restoreWorkspace', backupPath, { cleanRestore: false })
+          console.log('[CloudWorkspaces] 🔄 Merge restore completed, now refreshing UI...')
+          await this.refreshAfterRestore()
         } catch (e) {
           console.error('[CloudWorkspacesPlugin] Merge restore failed:', e)
           await this.call('notification', 'alert', {
@@ -1005,9 +1098,13 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
           })
         }
       },
-      hideFn: () => null
+      hideFn: () => {
+        console.log('[CloudWorkspaces] 🔄 Clean/Merge modal dismissed (hideFn)')
+      }
     }
+    console.log('[CloudWorkspaces] 🔄 Showing Clean/Merge modal...')
     await this.call('notification', 'modal', restoreModeModal)
+    console.log('[CloudWorkspaces] 🔄 Clean/Merge modal call returned')
   }
 
   /**
@@ -1019,10 +1116,12 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     backupPath: string,
     options: { keepRemoteId: boolean }
   ): Promise<void> {
+    console.log('[CloudWorkspaces] 🔄 promptAndRestoreToNewWorkspace called:', { backupPath, keepRemoteId: options.keepRemoteId })
     try {
       // Get backup metadata to find the original workspace name
       const backupInfo = await this.call('s3Storage', 'getBackupInfo', backupPath)
       const suggestedName = backupInfo.workspaceName || 'restored-workspace'
+      console.log('[CloudWorkspaces] 🔄 Backup info:', { suggestedName, backupInfo })
 
       // Show prompt modal asking for workspace name
       const nameModal = {
@@ -1034,6 +1133,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         cancelLabel: 'Cancel',
         defaultValue: suggestedName,
         okFn: async (workspaceName: string) => {
+          console.log('[CloudWorkspaces] 🔄 User entered workspace name:', workspaceName)
           if (!workspaceName || !workspaceName.trim()) {
             await this.call('notification', 'alert', {
               id: 'restoreError',
@@ -1046,14 +1146,18 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
           
           // Check if workspace already exists
           const workspaceExists = await this.call('filePanel', 'workspaceExists', trimmedName)
+          console.log('[CloudWorkspaces] 🔄 Workspace exists check:', { trimmedName, workspaceExists })
 
           if (!workspaceExists) {
             // Doesn't exist — restore directly
             try {
+              console.log('[CloudWorkspaces] 🔄 Workspace does not exist — calling restoreBackupToNewWorkspace')
               await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
                 targetWorkspaceName: trimmedName,
                 keepRemoteId: options.keepRemoteId
               })
+              console.log('[CloudWorkspaces] 🔄 restoreBackupToNewWorkspace completed, now refreshing UI...')
+              await this.refreshAfterRestore()
             } catch (e) {
               console.error('[CloudWorkspacesPlugin] Restore failed:', e)
               await this.call('notification', 'alert', {
@@ -1063,6 +1167,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
               })
             }
           } else {
+            console.log('[CloudWorkspaces] 🔄 Workspace exists — showing overwrite modal')
             // Already exists — ask to overwrite or pick another name
             const overwriteModal = {
               id: 'restoreWorkspaceOverwriteModal',
@@ -1073,11 +1178,14 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
               cancelLabel: 'Cancel',
               okFn: async () => {
                 try {
+                  console.log('[CloudWorkspaces] 🔄 User chose: Overwrite — calling restoreBackupToNewWorkspace')
                   await this.call('s3Storage', 'restoreBackupToNewWorkspace', backupPath, {
                     targetWorkspaceName: trimmedName,
                     overwriteIfExists: true,
                     keepRemoteId: options.keepRemoteId
                   })
+                  console.log('[CloudWorkspaces] 🔄 Overwrite restore completed, now refreshing UI...')
+                  await this.refreshAfterRestore()
                 } catch (e) {
                   console.error('[CloudWorkspacesPlugin] Restore with overwrite failed:', e)
                   await this.call('notification', 'alert', {
@@ -1088,17 +1196,24 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
                 }
               },
               cancelFn: () => {
+                console.log('[CloudWorkspaces] 🔄 User cancelled overwrite — re-prompting')
                 // User cancelled overwrite — re-prompt with a different name
                 this.promptAndRestoreToNewWorkspace(backupPath, options)
               },
-              hideFn: () => null
+              hideFn: () => {
+                console.log('[CloudWorkspaces] 🔄 Overwrite modal dismissed (hideFn)')
+              }
             }
             await this.call('notification', 'modal', overwriteModal)
           }
         },
-        hideFn: () => null
+        hideFn: () => {
+          console.log('[CloudWorkspaces] 🔄 Name prompt modal dismissed (hideFn)')
+        }
       }
+      console.log('[CloudWorkspaces] 🔄 Showing name prompt modal...')
       await this.call('notification', 'modal', nameModal)
+      console.log('[CloudWorkspaces] 🔄 Name prompt modal call returned')
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Restore to new workspace failed:', e)
       await this.call('notification', 'alert', {
