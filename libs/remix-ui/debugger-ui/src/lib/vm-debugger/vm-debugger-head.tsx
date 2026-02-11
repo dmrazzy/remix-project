@@ -19,6 +19,8 @@ export const VmDebuggerHead = ({ vmDebugger: { registerEvent, triggerEvent }, de
 
   const [scopeData, setScopeData] = useState([])
 
+  const [callsData, setCallsData] = useState([])
+
   const [solidityState, setSolidityState] = useState({
     calldata: null,
     message: null
@@ -134,8 +136,8 @@ export const VmDebuggerHead = ({ vmDebugger: { registerEvent, triggerEvent }, de
       registerEvent('newCallTree', (internalCallTree) => {
         // Get nested scopes from the InternalCallTree
         if (internalCallTree && typeof internalCallTree.getScopesAsNestedJSON === 'function') {
-          const nestedScopes = internalCallTree.getScopesAsNestedJSON(true)
-          setScopeData(nestedScopes)
+          setScopeData(internalCallTree.getScopesAsNestedJSON('nojump'))
+          setCallsData(internalCallTree.getScopesAsNestedJSON('call'))
         }
       })
 
@@ -153,6 +155,7 @@ export const VmDebuggerHead = ({ vmDebugger: { registerEvent, triggerEvent }, de
         <CodeListView className="pb-2 flex-grow-1" registerEvent={registerEvent} onShowOpcodesChange={onShowOpcodesChange} />
       </div>
       <div className="d-flex flex-column ps-2" style={{ flex: 1 }}>
+        <ScopePanel className="pb-1" data={callsData} stepManager={stepManager} />
         <SolidityState className="pb-1" calldata={solidityState.calldata} message={solidityState.message} />
         <StepDetail className="pb-1 pb-2 h-100 flex-grow-1" stepDetail={stepDetail} />
       </div>

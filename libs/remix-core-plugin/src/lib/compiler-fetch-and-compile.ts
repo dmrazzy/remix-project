@@ -160,13 +160,14 @@ export class FetchAndCompile extends Plugin {
 
     targetPath = `${targetPath}/${network.id}/${contractAddress}`
     let data
+    /*
     try {
       data = await fetchContractFromSourcify(this, network, contractAddress, targetPath)
     } catch (e) {
       this.error(e.message)
       console.log(e) // and fallback to getting the compilation result from etherscan
     }
-
+    */
     if (!data) {
       try {
         this.log(`Fetching source code ${contractAddress} from Etherscan...`)
@@ -217,6 +218,7 @@ export class FetchAndCompile extends Plugin {
     }
 
     try {
+      // config.settings.optimizer = { enabled: false }
       this.log(`recompiling source code ${contractAddress} with Solidity v${version}...`)
       const compData = await compile(
         compilationTargets,
