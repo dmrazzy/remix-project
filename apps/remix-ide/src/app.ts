@@ -12,6 +12,7 @@ import { SidePanel } from './app/components/side-panel'
 import { HiddenPanel } from './app/components/hidden-panel'
 import { RightSidePanel } from './app/components/right-side-panel'
 import { PopupPanel } from './app/components/popup-panel'
+import { OverlayPanel } from './app/components/overlay-panel'
 import { LandingPage } from './app/ui/landing-page/landing-page'
 import { MainPanel } from './app/components/main-panel'
 import { PermissionHandlerPlugin } from './app/plugins/permission-handler-plugin'
@@ -24,6 +25,7 @@ import { Topbar } from './app/components/top-bar'
 import { ThemeModule } from './app/tabs/theme-module'
 import { VerticalIcons } from './app/components/vertical-icons'
 import { RemixAIAssistant } from './app/plugins/remix-ai-assistant'
+import { QuickDappV2 } from './app/plugins/quick-dapp-v2'
 import { SolidityUmlGen } from './app/plugins/solidity-umlgen'
 import { VyperCompilationDetailsPlugin } from './app/plugins/vyper-compilation-details'
 import { ContractFlattener } from './app/plugins/contractFlattener'
@@ -53,6 +55,7 @@ import { TransactionSimulator } from './app/plugins/transaction-simulator'
 import { CodeFormat } from './app/plugins/code-format'
 import { CompilationDetailsPlugin } from './app/plugins/compile-details'
 import { AuthPlugin } from './app/plugins/auth-plugin'
+import { AccountPlugin } from './app/plugins/account-plugin'
 import { RemixGuidePlugin } from './app/plugins/remixGuide'
 import { TemplatesPlugin } from './app/plugins/remix-templates'
 import { fsPlugin } from './app/plugins/electron/fsPlugin'
@@ -78,6 +81,7 @@ import { DesktopClient } from './app/plugins/desktop-client'
 import { DesktopHost } from './app/plugins/electron/desktopHostPlugin'
 import { WalletConnect } from './app/plugins/walletconnect'
 import { AIDappGenerator } from './app/plugins/ai-dapp-generator'
+import { IndexedDbCachePlugin } from './app/plugins/IndexedDbCache'
 
 import { TemplatesSelectionPlugin } from './app/plugins/templates-selection/templates-selection-plugin'
 
@@ -162,11 +166,13 @@ class AppComponent {
   hiddenPanel: HiddenPanel
   rightSidePanel: RightSidePanel
   popupPanel: PopupPanel
+  overlayPanel: OverlayPanel
   statusBar: StatusBar
   topBar: Topbar
   templateExplorerModal: TemplateExplorerModalPlugin
   settings: SettingsTab
   authPlugin: AuthPlugin
+  accountPlugin: AccountPlugin
   params: any
   desktopClientMode: boolean
 
@@ -289,6 +295,9 @@ class AppComponent {
       if (currentFile.endsWith('.circom')) this.appManager.activatePlugin(['circuit-compiler'])
     })
 
+    // ----------------- cache plugin ----------------------------
+    const indexedDbCache = new IndexedDbCachePlugin()
+
     // ----------------- fileManager service ----------------------------
     const fileManager = new FileManager(editor, appManager)
     Registry.getInstance().put({ api: fileManager, name: 'filemanager' })
@@ -344,6 +353,7 @@ class AppComponent {
     // ----------------- AI --------------------------------------
     const remixAI = new RemixAIPlugin()
     const remixAiAssistant = new RemixAIAssistant()
+    const quickDappV2 = new QuickDappV2()
 
     // ----------------- import content service ------------------------
     const contentImport = new CompilerImports()
@@ -494,10 +504,12 @@ class AppComponent {
       scriptRunnerUI,
       remixAI,
       remixAiAssistant,
+      quickDappV2,
       walletConnect,
       amp,
       // vega,
-      chartjs
+      chartjs,
+      indexedDbCache
     ])
 
     //---- fs plugin
@@ -555,6 +567,7 @@ class AppComponent {
     this.hiddenPanel = new HiddenPanel()
     this.rightSidePanel = new RightSidePanel()
     this.popupPanel = new PopupPanel()
+    this.overlayPanel = new OverlayPanel()
 
     const pluginManagerComponent = new PluginManagerComponent(appManager, this.engine)
     const filePanel = new Filepanel(appManager, contentImport)
@@ -562,10 +575,11 @@ class AppComponent {
     this.topBar = new Topbar(filePanel, git, this.desktopClientMode)
     const landingPage = new LandingPage(appManager, this.menuicons, fileManager, filePanel, contentImport)
     this.settings = new SettingsTab(Registry.getInstance().get('config').api, editor)//, appManager)
+    this.accountPlugin = new AccountPlugin()
 
     const bottomBarPanel = new BottomBarPanel()
 
-    this.engine.register([this.menuicons, landingPage, this.hiddenPanel, this.sidePanel, this.statusBar, filePanel, pluginManagerComponent, this.settings, this.rightSidePanel, this.popupPanel, bottomBarPanel])
+    this.engine.register([this.menuicons, landingPage, this.hiddenPanel, this.sidePanel, this.statusBar, filePanel, pluginManagerComponent, this.settings, this.rightSidePanel, this.popupPanel, this.overlayPanel, bottomBarPanel])
 
     // CONTENT VIEWS & DEFAULT PLUGINS
     const openZeppelinProxy = new OpenZeppelinProxy(blockchain)
@@ -608,7 +622,8 @@ class AppComponent {
       deployLibraries,
       openZeppelinProxy,
       run.recorder,
-      this.authPlugin
+      this.authPlugin,
+      this.accountPlugin
     ])
     this.engine.register([templateExplorerModal, this.topBar])
 
@@ -646,7 +661,8 @@ class AppComponent {
       'offsetToLineColumnConverter',
       'pluginStateLogger',
       'matomo',
-      'ai-dapp-generator'
+      'ai-dapp-generator',
+      'indexedDbCache'
     ])
 
     await this.appManager.activatePlugin(['mainPanel', 'menuicons', 'tabs'])
@@ -657,6 +673,7 @@ class AppComponent {
     await this.appManager.activatePlugin(['sidePanel']) // activating  host plugin separately
     await this.appManager.activatePlugin(['rightSidePanel'])
     await this.appManager.activatePlugin(['popupPanel'])
+    await this.appManager.activatePlugin(['overlay'])
     await this.appManager.activatePlugin(['home'])
     await this.appManager.activatePlugin(['settings', 'config'])
     await this.appManager.activatePlugin([
@@ -673,10 +690,12 @@ class AppComponent {
       'gistHandler',
       'compilerloader',
       'remixAI',
-      'remixaiassistant'
+      'remixaiassistant',
+      'quick-dapp-v2'
     ])
 
     await this.appManager.activatePlugin(['auth'])
+    await this.appManager.activatePlugin(['account'])
     await this.appManager.activatePlugin(['settings'])
 
     await this.appManager.activatePlugin(['walkthrough', 'storage', 'storageMonitor', 'search', 'compileAndRun', 'recorder', 'dgitApi', 'dgit'])

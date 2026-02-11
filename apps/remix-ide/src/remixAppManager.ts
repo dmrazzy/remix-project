@@ -89,26 +89,30 @@ let requiredModules = [
   'matomo',
   'walletconnect',
   'popupPanel',
+  'overlay',
   'remixAI',
   'remixAID',
   'remixaiassistant',
+  'quick-dapp-v2',
   'topbar',
   'templateexplorermodal',
   'githubAuthHandler',
   'desktopClient',
   'auth',
+  'account',
   'transactionSimulator',
   'resolutionIndex',
   'amp',
   'vega',
   'chartjs',
-  'storageMonitor'
+  'storageMonitor',
+  'indexedDbCache',
 ]
 
 // dependentModules shouldn't be manually activated (e.g hardhat is activated by remixd)
 const dependentModules = ['foundry', 'hardhat', 'truffle', 'slither']
 
-const loadLocalPlugins = ['doc-gen', 'doc-viewer', 'contract-verification', 'vyper', 'solhint', 'circuit-compiler', 'learneth', 'quick-dapp', 'quick-dapp-v2', 'noir-compiler']
+const loadLocalPlugins = ['doc-gen', 'doc-viewer', 'contract-verification', 'vyper', 'solhint', 'circuit-compiler', 'learneth', 'quick-dapp', 'noir-compiler']
 
 const partnerPlugins = ['cookbookdev']
 
@@ -462,7 +466,8 @@ class PluginLoader {
       'solidityumlgen',
       'remixGuide',
       'doc-viewer',
-      'UIScriptRunner'
+      'UIScriptRunner',
+      'quick-dapp-v2'
     ]
     this.loaders = {}
     this.loaders.localStorage = {
