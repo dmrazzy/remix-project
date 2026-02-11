@@ -203,7 +203,6 @@ export class DecodeStateVariableHandler extends BaseToolHandler {
   }
 }
 
-
 /**
  * Get Valid Source Location From VM Trace Index Handler
  */
@@ -632,7 +631,7 @@ export class GetStackAtHandler extends BaseToolHandler {
   async execute(args: { step?: number }, plugin: Plugin): Promise<IMCPToolResult> {
     try {
       const result = await plugin.call('debugger', 'getStackAt', args.step);
-      
+
       if (!result) {
         return this.createErrorResult('Stack information not available. Ensure a debug session is active.');
       }
@@ -688,7 +687,7 @@ export class GetScopesNoJumpWithRootHandler extends BaseToolHandler {
     try {
       const rootScopeId = args.rootScopeId || '1';
       const result = await plugin.call('debugger', 'getScopesAsNestedJSON', 'nojump', rootScopeId);
-      
+
       if (!result || !Array.isArray(result)) {
         return this.createErrorResult('Focused scope information not available for root scope: ' + rootScopeId + '. Ensure a debug session is active.');
       }

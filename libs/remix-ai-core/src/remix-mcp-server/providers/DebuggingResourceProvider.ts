@@ -90,7 +90,6 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
     return resources;
   }
 
-
   async getResourceContent(uri: string, plugin: Plugin): Promise<IMCPResourceContent> {
     if (uri === 'debug://scopes-summary') {
       return this.getScopessummary(plugin);
@@ -117,7 +116,7 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
 
   private async getCurrentSourceLocation(plugin: Plugin): Promise<IMCPResourceContent> {
     try {
-      
+
       const result = await plugin.call('debugger', 'getCurrentSourceLocation')
       const stack = await plugin.call('debugger', 'getStackAt')
       if (!result) {
@@ -184,7 +183,6 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
       );
     }
   }
-
 
   private async getGlobalContext(plugin: Plugin): Promise<IMCPResourceContent> {
     try {

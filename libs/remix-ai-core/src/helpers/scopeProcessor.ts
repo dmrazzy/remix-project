@@ -32,8 +32,8 @@ export interface ProcessedScope {
  * @returns Processed scope with depth-limited children
  */
 export function processScope(
-  scope: NestedScope, 
-  depth: number = 0, 
+  scope: NestedScope,
+  depth: number = 0,
   maxDepth: number = 3
 ): ProcessedScope {
   const processed: ProcessedScope = {
@@ -55,7 +55,7 @@ export function processScope(
   // Process children with depth limit
   if (scope.children && scope.children.length > 0) {
     processed.childCount = scope.children.length;
-    
+
     if (depth < maxDepth) {
       // Recursively process children if under depth limit
       processed.children = scope.children.map(child => processScope(child, depth + 1, maxDepth));
@@ -81,7 +81,7 @@ export function processScope(
  * @returns Array of processed scopes
  */
 export function processScopes(
-  scopes: NestedScope[], 
+  scopes: NestedScope[],
   maxDepth: number = 3
 ): ProcessedScope[] {
   return scopes.map(scope => processScope(scope, 0, maxDepth));
@@ -133,7 +133,7 @@ export function getFunctionSummary(scopes: ProcessedScope[]): Array<{
     childCount: number;
     stepRange: { first: number; last: number };
   }> = [];
-  
+
   const collectFunctions = (scopeList: ProcessedScope[]) => {
     for (const scope of scopeList) {
       if (scope.functionName) {
