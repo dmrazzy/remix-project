@@ -218,7 +218,6 @@ export class FetchAndCompile extends Plugin {
     }
 
     try {
-      // config.settings.optimizer = { enabled: false }
       this.log(`recompiling source code ${contractAddress} with Solidity v${version}...`)
       const compData = await compile(
         compilationTargets,

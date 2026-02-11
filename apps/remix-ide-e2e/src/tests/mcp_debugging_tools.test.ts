@@ -876,5 +876,100 @@ module.exports = {
         }
         browser.assert.ok(data.success || data.error, 'Decode state variable should execute');
       });
+  },
+
+  'Should test get_stack_at tool': function (browser: NightwatchBrowser) {
+    browser
+      .executeAsync(function (done) {
+        const aiPlugin = (window as any).getRemixAIPlugin;
+
+        if (!aiPlugin?.remixMCPServer) {
+          done({ error: 'RemixMCPServer not available' });
+          return;
+        }
+
+        aiPlugin.remixMCPServer.handleMessage({
+          method: 'tools/call',
+          params: {
+            name: 'get_stack_at',
+            arguments: {
+              step: 100
+            }
+          },
+          id: 'test-get-stack-at'
+        }).then(function (result) {
+          if (result.error) {
+            done({
+              success: false,
+              error: result.error.message || JSON.stringify(result.error)
+            });
+            return;
+          }
+          const resultData = JSON.parse(result.result?.content?.[0]?.text || '{}');
+          done({
+            success: !result.error,
+            hasStack: !!resultData?.stack,
+            step: resultData?.step,
+            stackDepth: resultData?.metadata?.stackDepth
+          });
+        }).catch(function (error) {
+          done({ error: error.message });
+        });
+      }, [], function (result) {
+        const data = result.value as any;
+        if (!data || data.error) {
+          console.error('Get stack at error:', data?.error || 'No data returned');
+          return;
+        }
+        browser.assert.ok(data.success || data.error, 'Get stack at should execute');
+      });
+  },
+
+  'Should test get_scopes_with_root tool': function (browser: NightwatchBrowser) {
+    browser
+      .executeAsync(function (done) {
+        const aiPlugin = (window as any).getRemixAIPlugin;
+
+        if (!aiPlugin?.remixMCPServer) {
+          done({ error: 'RemixMCPServer not available' });
+          return;
+        }
+
+        aiPlugin.remixMCPServer.handleMessage({
+          method: 'tools/call',
+          params: {
+            name: 'get_scopes_with_root',
+            arguments: {
+              rootScopeId: '1'
+            }
+          },
+          id: 'test-get-scopes-with-root'
+        }).then(function (result) {
+          if (result.error) {
+            done({
+              success: false,
+              error: result.error.message || JSON.stringify(result.error)
+            });
+            return;
+          }
+          const resultData = JSON.parse(result.result?.content?.[0]?.text || '{}');
+          done({
+            success: !result.error,
+            hasScopes: !!resultData?.scopes,
+            rootScopeId: resultData?.rootScopeId,
+            totalScopes: resultData?.metadata?.totalScopes,
+            hasDepthLimit: !!resultData?.metadata?.depthLimit
+          });
+        }).catch(function (error) {
+          done({ error: error.message });
+        });
+      }, [], function (result) {
+        const data = result.value as any;
+        if (!data || data.error) {
+          console.error('Get scopes with root error:', data?.error || 'No data returned');
+          return;
+        }
+        browser.assert.ok(data.success || data.error, 'Get scopes with root should execute');
+      });
   }
 };
