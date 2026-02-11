@@ -82,6 +82,7 @@ import { DesktopHost } from './app/plugins/electron/desktopHostPlugin'
 import { WalletConnect } from './app/plugins/walletconnect'
 import { AIDappGenerator } from './app/plugins/ai-dapp-generator'
 import { IndexedDbCachePlugin } from './app/plugins/IndexedDbCache'
+import { FeedbackPlugin } from './app/plugins/feedback'
 
 import { TemplatesSelectionPlugin } from './app/plugins/templates-selection/templates-selection-plugin'
 
@@ -609,6 +610,7 @@ class AppComponent {
     )
 
     this.authPlugin = new AuthPlugin()
+    const feedbackPlugin = new FeedbackPlugin()
 
     this.engine.register([
       compileTab,
@@ -623,7 +625,8 @@ class AppComponent {
       openZeppelinProxy,
       run.recorder,
       this.authPlugin,
-      this.accountPlugin
+      this.accountPlugin,
+      feedbackPlugin
     ])
     this.engine.register([templateExplorerModal, this.topBar])
 
@@ -696,6 +699,7 @@ class AppComponent {
 
     await this.appManager.activatePlugin(['auth'])
     await this.appManager.activatePlugin(['account'])
+    await this.appManager.activatePlugin(['feedback'])
     await this.appManager.activatePlugin(['settings'])
 
     await this.appManager.activatePlugin(['walkthrough', 'storage', 'storageMonitor', 'search', 'compileAndRun', 'recorder', 'dgitApi', 'dgit'])
