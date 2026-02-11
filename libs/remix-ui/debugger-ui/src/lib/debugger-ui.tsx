@@ -54,6 +54,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   const [currentFunction, setCurrentFunction] = useState<string>('')
   const [functionStack, setFunctionStack] = useState<any[]>([])
   const [nestedScopes, setNestedScopes] = useState<any[]>([])
+  const [solidityLocals, setSolidityLocals] = useState<any>(null)
+  const [solidityState, setSolidityState] = useState<any>(null)
 
   if (props.onReady) {
     props.onReady({
@@ -265,6 +267,20 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
       }
 
       state.debugger.vmDebuggerLogic.event.register('functionsStackUpdate', updateFunctionStack)
+
+      // Listen for solidityState updates
+      const updateSolidityState = (stateData) => {
+        console.log('[Debugger] solidityState event received:', stateData)
+        setSolidityState(stateData)
+      }
+      state.debugger.vmDebuggerLogic.event.register('solidityState', updateSolidityState)
+
+      // Listen for solidityLocals updates
+      const updateSolidityLocals = (localsData) => {
+        console.log('[Debugger] solidityLocals event received:', localsData)
+        setSolidityLocals(localsData)
+      }
+      state.debugger.vmDebuggerLogic.event.register('solidityLocals', updateSolidityLocals)
     }
   }, [state.debugger])
 
@@ -401,6 +417,9 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
         debugging: false
       }
     })
+    // Reset solidity locals and state
+    setSolidityLocals(null)
+    setSolidityState(null)
     // Emit debugging stopped event
     debuggerModule.emit('debuggingStopped')
   }
@@ -685,6 +704,9 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
                 debuggerModule.emit('scopeSelected', scope, deployments)
               }
             }}
+            solidityLocals={solidityLocals}
+            solidityState={solidityState}
+            stepManager={stepManager}
           />
         </div>
       )}

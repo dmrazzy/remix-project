@@ -18,6 +18,9 @@ interface DebugLayoutProps {
   nestedScopes?: any[]
   deployments?: any[]
   onScopeSelected?: (scope: any) => void
+  solidityLocals?: any
+  solidityState?: any
+  stepManager?: any
 }
 
 export const DebugLayout = ({
@@ -33,7 +36,10 @@ export const DebugLayout = ({
   functionStack,
   nestedScopes,
   deployments,
-  onScopeSelected
+  onScopeSelected,
+  solidityLocals,
+  solidityState,
+  stepManager
 }: DebugLayoutProps) => {
   const [activeObjectTab, setActiveObjectTab] = useState<'json' | 'raw'>('json')
   const [copyTooltips, setCopyTooltips] = useState<{ [key: string]: string }>({
@@ -457,6 +463,10 @@ export const DebugLayout = ({
           className={`call-trace-item ${isSelected ? 'selected' : ''}`}
           onClick={() => {
             setSelectedScope(scope)
+            // Jump to the first step of this scope to trigger solidity locals/state update
+            if (stepManager && stepManager.jumpTo && scope.firstStep !== undefined) {
+              stepManager.jumpTo(scope.firstStep)
+            }
             if (onScopeSelected) {
               onScopeSelected(scope)
             }
@@ -651,12 +661,21 @@ export const DebugLayout = ({
       ? receipt.logs
       : 'No events emitted'
 
-    const objectData = {
+    const objectData: any = {
       'msg.sender': msgSender,
       function: functionName,
       parameters: parameters,
       returnValues: returnValues
     }
+
+    // Debug logging
+    console.log('[DebugLayout] solidityLocals:', solidityLocals)
+    console.log('[DebugLayout] solidityState:', solidityState)
+
+    // Always add solidityLocals and solidityState sections
+    // Show empty object if no data, or the actual data
+    objectData.solidityLocals = solidityLocals || 'No local variables at current step'
+    objectData.solidityState = solidityState || 'No state variables at current step'
 
     if (activeObjectTab === 'json') {
       return (
