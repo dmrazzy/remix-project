@@ -270,6 +270,26 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   })
 
+  useEffect(() => {
+    const loadSelectedModel = async () => {
+      try {
+        const modelId = await props.plugin.call('remixAI', 'getSelectedModel')
+        console.log('got selected model', modelId)
+        if (modelId) {
+          const model = AVAILABLE_MODELS.find(m => m.id === modelId)
+          if (model) {
+            setSelectedModelId(modelId)
+            setSelectedModel(model)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load selected model:', err)
+      }
+    }
+
+    loadSelectedModel()
+  }, [props.plugin])
+
   // Listen for auth state changes and refresh model access
   useEffect(() => {
     const handleAuthChange = async (authState: { isAuthenticated: boolean; user: any; token: string | null }) => {
