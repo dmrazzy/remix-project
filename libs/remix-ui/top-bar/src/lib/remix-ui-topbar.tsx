@@ -20,6 +20,7 @@ import { TrackingContext } from '@remix-ide/tracking'
 import { MatomoEvent, TopbarEvent, WorkspaceEvent } from '@remix-api'
 import { LoginButton } from '@remix-ui/login'
 import { appActionTypes } from 'libs/remix-ui/app/src/lib/remix-app/actions/app'
+import { FeedbackPanel } from '../components/FeedbackPanel'
 
 export function RemixUiTopbar() {
   const intl = useIntl()
@@ -54,6 +55,7 @@ export function RemixUiTopbar() {
   const [error, setError] = useState<string | null>(null);
   const [enableLogin, setEnableLogin] = useState<boolean>(false);
   const [feedbackFormUrl, setFeedbackFormUrl] = useState<string | null>(null);
+  const [feedbackPanelOpen, setFeedbackPanelOpen] = useState<boolean>(false);
 
   // Use the clone repository modal hook
   const { showCloneModal } = useCloneRepositoryModal({
@@ -657,20 +659,7 @@ export function RemixUiTopbar() {
                 className="btn btn-sm btn-primary d-flex align-items-center gap-1 ms-3"
                 style={{ cursor: 'pointer', padding: '0.25rem 0.6rem' }}
                 onClick={() => {
-                  const formId = new URL(feedbackFormUrl).pathname.split('/').pop()
-                  if (typeof (window as any).Tally !== 'undefined') {
-                    (window as any).Tally.openPopup(formId, {
-                      layout: 'modal',
-                      width: 700,
-                      overlay: true,
-                      autoClose: 3000,
-                      onSubmit: () => {
-                        trackMatomoEvent({ category: 'topbar', action: 'feedback', name: 'FeedbackSubmitted', isClick: true })
-                      }
-                    })
-                  } else {
-                    window.open(feedbackFormUrl, '_blank')
-                  }
+                  setFeedbackPanelOpen(true)
                   trackMatomoEvent({ category: 'topbar', action: 'feedback', name: 'FeedbackOpened', isClick: true })
                 }}
                 data-id="topbar-feedbackIcon"
@@ -695,6 +684,13 @@ export function RemixUiTopbar() {
           </span>
         </div>
       </div>
+      {feedbackFormUrl && (
+        <FeedbackPanel
+          isOpen={feedbackPanelOpen}
+          onClose={() => setFeedbackPanelOpen(false)}
+          formUrl={feedbackFormUrl}
+        />
+      )}
     </section>
   )
 }
