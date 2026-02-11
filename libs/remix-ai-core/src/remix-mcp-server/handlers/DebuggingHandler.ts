@@ -634,6 +634,62 @@ export class JumpToHandler extends BaseToolHandler {
 }
 
 /**
+ * Get Scopes No Jump With Root Handler
+ */
+export class GetScopesNoJumpWithRootHandler extends BaseToolHandler {
+  name = 'get_scopes_with_root';
+  description = 'Get focused scope information for a specific root scope and its children';
+  inputSchema = {
+    type: 'object',
+    properties: {
+      rootScopeId: {
+        type: 'string',
+        description: 'Root scope ID to focus on (e.g., "1", "1.2", "1.2.3")',
+        default: '1'
+      }
+    },
+    required: []
+  };
+
+  getPermissions(): string[] {
+    return ['debug:read'];
+  }
+
+  validate(args: { rootScopeId?: string }): boolean | string {
+    if (args.rootScopeId !== undefined) {
+      const types = this.validateTypes(args, { rootScopeId: 'string' });
+      if (types !== true) return types;
+    }
+    return true;
+  }
+
+  async execute(args: { rootScopeId?: string }, plugin: Plugin): Promise<IMCPToolResult> {
+    try {
+      const rootScopeId = args.rootScopeId || '1';
+      const result = await plugin.call('debugger', 'getScopesAsNestedJSON', 'nojump', rootScopeId);
+      
+      if (!result || !Array.isArray(result)) {
+        return this.createErrorResult('Focused scope information not available for root scope: ' + rootScopeId + '. Ensure a debug session is active.');
+      }
+
+      return this.createSuccessResult({
+        success: true,
+        rootScopeId,
+        scopes: result,
+        metadata: {
+          description: 'Focused scope information for specific root scope and children, filtered to exclude jump instructions',
+          totalScopes: result.length,
+          retrievedAt: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      return this.createErrorResult(`Failed to get scopes ${args.rootScopeId}: ${error.message}`);
+    }
+  }
+}
+
+/**
  * Create debugging tool definitions
  */
 export function createDebuggingTools(): RemixToolDefinition[] {
@@ -725,6 +781,14 @@ export function createDebuggingTools(): RemixToolDefinition[] {
       category: ToolCategory.DEBUGGING,
       permissions: ['debug:control'],
       handler: new JumpToHandler()
+    },
+    {
+      name: 'get_scopes_with_root',
+      description: 'Get focused scope information for a specific root scope and its children, filtered to exclude jump instructions',
+      inputSchema: new GetScopesNoJumpWithRootHandler().inputSchema,
+      category: ToolCategory.DEBUGGING,
+      permissions: ['debug:read'],
+      handler: new GetScopesNoJumpWithRootHandler()
     }
   ];
 }

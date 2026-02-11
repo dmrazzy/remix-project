@@ -6,7 +6,7 @@ import { Plugin } from '@remixproject/engine';
 import { IMCPResource, IMCPResourceContent } from '../../types/mcp';
 import { BaseResourceProvider } from '../registry/RemixResourceProviderRegistry';
 import { ResourceCategory } from '../types/mcpResources';
-import type { ScopesData } from '@remix-project/remix-debug'
+import { NestedScope } from '@remix-project/remix-debug';
 
 export class DebuggingResourceProvider extends BaseResourceProvider {
   name = 'debugging';
@@ -22,20 +22,21 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
     const resources: IMCPResource[] = [];
 
     try {
-      // Add call tree scopes resource
+      // Add scopes with summary filter (summarized)
       resources.push(
         this.createResource(
-          'debug://call-tree-scopes',
-          'Call Tree Scopes',
-          'Comprehensive scope information from call tree analysis including function calls, scopes, and local variables',
+          'debug://scopes-summary',
+          'Scopes (summary)',
+          'Summarized scope information filtered to exclude jump instructions, providing essential function calls and variables without overwhelming detail',
           'application/json',
           {
             category: ResourceCategory.DEBUG_SESSIONS,
-            tags: ['debugging', 'call-tree', 'scopes', 'functions', 'variables'],
+            tags: ['debugging', 'scopes', 'summary', 'functions', 'variables'],
             priority: 9
           }
         )
       );
+
 
       // Add trace cache resource
       resources.push(
@@ -74,10 +75,12 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
     return resources;
   }
 
+
   async getResourceContent(uri: string, plugin: Plugin): Promise<IMCPResourceContent> {
-    if (uri === 'debug://call-tree-scopes') {
-      return this.getCallTreeScopes(plugin);
+    if (uri === 'debug://scopes-summary') {
+      return this.getScopessummary(plugin);
     }
+
 
     if (uri === 'debug://trace-cache') {
       return this.getTraceCache(plugin);
@@ -118,96 +121,125 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
     }
   }
 
-  callTreeScopesDesc = `
-  /**
-   * Retrieves comprehensive scope information from the call tree analysis.
-   *
-   * Returns an object with the following properties:
-   *
-   * 1. scopes: Map of all scopes in the execution trace
-   *    - Keys: scopeId strings in dotted notation (e.g., "1", "1.2", "1.2.3" for nested scopes)
-   *    - Values: Scope objects with:
-   *      * firstStep: VM trace index where scope begins
-   *      * lastStep: VM trace index where scope ends
-   *      * lastSafeStep: VM trace index where scope ends
-   *      * locals: Map of local variables (variable name -> {name, id})
-   *      * isCreation: Boolean indicating if this is a contract creation context
-   *      * gasCost: Total gas consumed within this scope
-   *
-   * 2. functionDefinitionsByScope: Map of function definitions for each scope
-   *    - Keys: scopeId strings
-   *    - Values: Objects containing:
-   *      * functionDefinition: AST node with function metadata (name, parameters, returnParameters, etc.)
-   *      * inputs: Array of input parameter names
-   *
-   * 4. functionCallStack: Array of VM trace step indices where function calls occur, ordered chronologically
-   */
-  `
-  private async getCallTreeScopes(plugin: Plugin): Promise<IMCPResourceContent> {
+  private async getScopessummary(plugin: Plugin): Promise<IMCPResourceContent> {
     try {
-      const result = await plugin.call('debugger', 'getCallTreeScopes') as ScopesData
-      if (!result) {
+      const result: NestedScope[] = await plugin.call('debugger', 'getScopesAsNestedJSON', 'nojump');
+      if (!result || !Array.isArray(result)) {
         return this.createTextContent(
-          'debug://call-tree-scopes',
-          'Call tree scopes not available. There is no debug session going on.'
+          'debug://scopes-summary',
+          'Scope information not available. There is no debug session going on.'
         );
       }
 
-      // Process scopes to replace functionDefinition with id and name only, and remove abi properties
-      let processedScopes = {};
-      try {
-        if (result.scopes) {
-          for (const [scopeId, scope] of Object.entries(result.scopes)) {
-            const scopeData = scope
-            const processedScope = { ...scopeData } as any
+      // Recursive function to process all scopes and their children
+      const processScope = (scope: NestedScope): any => {
+        const processed = {
+          id: scope.scopeId,
+          variableCount: scope.locals ? Object.keys(scope.locals).length : 0,
+          variableNames: scope.locals ? Object.keys(scope.locals) : [],
+          stepRange: { first: scope.firstStep, last: scope.lastStep },
+          gasCost: scope.gasCost,
+          isCreation: scope.isCreation,
+          children: null,
+          childCount: 0,
+          totalDescendants: 0
+        };
 
-            // Replace functionDefinition with just id and name
-            if (scopeData.functionDefinition) {
-              processedScope.functionDefinition = {
-                id: scopeData.functionDefinition.id,
-                name: scopeData.functionDefinition.name
-              };
-            }
-
-            // Process locals to remove abi properties
-            if (scopeData.locals) {
-              const processedLocals = {};
-              for (const [varName, variable] of Object.entries(scopeData.locals)) {
-                const variableData = variable as any;
-                const processedVariable = { ...variableData };
-                // Remove abi property if it exists
-                delete processedVariable.abi;
-                processedLocals[varName] = processedVariable;
-              }
-              processedScope.locals = processedLocals;
-            }
-
-            processedScopes[scopeId] = processedScope;
-          }
+        // Recursively process children if they exist
+        if (scope.children && scope.children.length > 0) {
+          processed.children = scope.children.map(processScope);
+          processed.childCount = scope.children.length;
+          // Calculate total descendants recursively
+          processed.totalDescendants = scope.children.reduce((total, child) => {
+            return total + 1 + (child.children ? this.countAllDescendants(child) : 0);
+          }, 0);
+        } else {
+          processed.childCount = 0;
+          processed.totalDescendants = 0;
         }
-      } catch (e) {
-        console.warn('Error processing call tree scopes for output (using the full output): ', e)
-        processedScopes = result.scopes
-      }
 
-      return this.createJsonContent('debug://call-tree-scopes', {
+        return processed;
+      };
+
+      // Process all top-level scopes recursively
+      const processedScopes = result.map(processScope);
+
+      // Create comprehensive summary
+      const summary = {
+        totalTopLevelScopes: result.length,
+        totalAllScopes: this.countAllScopes(processedScopes),
+        totalVariables: this.countAllVariables(processedScopes),
+        functionScopes: this.getFunctionSummary(processedScopes),
+        scopeHierarchy: processedScopes
+      };
+
+      return this.createJsonContent('debug://scopes-summary', {
         success: true,
-        scopes: processedScopes,
+        summary,
         metadata: {
-          description: this.callTreeScopesDesc,
-          totalScopes: result.scopes ? Object.keys(result.scopes).length : 0,
-          totalFunctionCalls: result.functionCallStack ? result.functionCallStack.length : 0,
+          description: 'Comprehensive summarized scope information with recursive children processing, filtered to exclude jump instructions',
           retrievedAt: new Date().toISOString()
         }
       });
 
     } catch (error) {
       return this.createTextContent(
-        'debug://call-tree-scopes',
-        `Error getting call tree scopes: ${error.message}`
+        'debug://scopes-summary',
+        `Error getting scopes (summary): ${error.message}`
       );
     }
   }
+
+  // Helper method to count all descendants recursively
+  private countAllDescendants(scope: any): number {
+    if (!scope.children || scope.children.length === 0) return 0;
+    return scope.children.reduce((total, child) => {
+      return total + 1 + this.countAllDescendants(child);
+    }, 0);
+  }
+
+  // Helper method to count all scopes including nested ones
+  private countAllScopes(scopes: any[]): number {
+    return scopes.reduce((total, scope) => {
+      return total + 1 + (scope.children ? this.countAllScopes(scope.children) : 0);
+    }, 0);
+  }
+
+  // Helper method to count all variables across all scopes
+  private countAllVariables(scopes: any[]): number {
+    return scopes.reduce((total, scope) => {
+      const scopeVars = scope.variableCount || 0;
+      const childVars = scope.children ? this.countAllVariables(scope.children) : 0;
+      return total + scopeVars + childVars;
+    }, 0);
+  }
+
+  // Helper method to get function summary across all scopes
+  private getFunctionSummary(scopes: any[]): any[] {
+    const functions = [];
+    
+    const collectFunctions = (scopeList: any[]) => {
+      for (const scope of scopeList) {
+        if (scope.type === 'function') {
+          functions.push({
+            name: scope.name,
+            id: scope.id,
+            variableCount: scope.variableCount,
+            variableNames: scope.variableNames,
+            childCount: scope.childCount,
+            stepRange: scope.stepRange
+          });
+        }
+        if (scope.children) {
+          collectFunctions(scope.children);
+        }
+      }
+    };
+
+    collectFunctions(scopes);
+    return functions;
+  }
+
 
   traceCacheDesc = `
   /**
