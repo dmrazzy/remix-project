@@ -10,7 +10,7 @@ import { BreakpointManager } from './code/breakpointManager'
 import * as sourceMappingDecoder from './source/sourceMappingDecoder'
 import * as traceHelper from './trace/traceHelper'
 import { LineColumnLocation, RawLocation, Asts, TransactionReceipt, OffsetToLineColumnConverterFn } from './types'
-import { ScopesData, ScopeFilterMode, NestedScope } from './solidity-decoder/internalCallTree'
+import { ScopesData, ScopeFilterMode, NestedScope, StepDetail } from './solidity-decoder/internalCallTree'
 
 const storage = {
   StorageViewer: StorageViewer,
@@ -47,5 +47,6 @@ export {
   OffsetToLineColumnConverterFn,
   ScopesData,
   ScopeFilterMode,
-  NestedScope
+  NestedScope,
+  StepDetail
 }

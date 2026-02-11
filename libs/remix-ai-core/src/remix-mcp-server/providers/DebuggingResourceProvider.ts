@@ -7,6 +7,7 @@ import { IMCPResource, IMCPResourceContent } from '../../types/mcp';
 import { BaseResourceProvider } from '../registry/RemixResourceProviderRegistry';
 import { ResourceCategory } from '../types/mcpResources';
 import { NestedScope } from '@remix-project/remix-debug';
+import { processScopes, countAllScopes, countAllVariables, getFunctionSummary } from '../../helpers/scopeProcessor';
 
 export class DebuggingResourceProvider extends BaseResourceProvider {
   name = 'debugging';
@@ -37,6 +38,20 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
         )
       );
 
+      // Add global context resource
+      resources.push(
+        this.createResource(
+          'debug://global-context',
+          'Global Context',
+          'Global execution context (block, msg, tx) for the transaction being debugged',
+          'application/json',
+          {
+            category: ResourceCategory.DEBUG_SESSIONS,
+            tags: ['debugging', 'context', 'block', 'msg', 'tx'],
+            priority: 7
+          }
+        )
+      );
 
       // Add trace cache resource
       resources.push(
@@ -81,6 +96,9 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
       return this.getScopessummary(plugin);
     }
 
+    if (uri === 'debug://global-context') {
+      return this.getGlobalContext(plugin);
+    }
 
     if (uri === 'debug://trace-cache') {
       return this.getTraceCache(plugin);
@@ -99,18 +117,21 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
 
   private async getCurrentSourceLocation(plugin: Plugin): Promise<IMCPResourceContent> {
     try {
+      
       const result = await plugin.call('debugger', 'getCurrentSourceLocation')
+      const stack = await plugin.call('debugger', 'getStackAt')
       if (!result) {
         return this.createTextContent(
           'debug://current-debugging-step',
           'current source location is not available. There is no debug session going on.'
         );
       }
-
+      console.log('current-debugging-step', result)
       return this.createJsonContent('debug://current-debugging-step', {
         success: true,
         description: 'Current source code highlighted in the editor',
-        result
+        result,
+        stack
       });
 
     } catch (error) {
@@ -131,53 +152,27 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
         );
       }
 
-      // Recursive function to process all scopes and their children
-      const processScope = (scope: NestedScope): any => {
-        const processed = {
-          id: scope.scopeId,
-          variableCount: scope.locals ? Object.keys(scope.locals).length : 0,
-          variableNames: scope.locals ? Object.keys(scope.locals) : [],
-          stepRange: { first: scope.firstStep, last: scope.lastStep },
-          gasCost: scope.gasCost,
-          isCreation: scope.isCreation,
-          children: null,
-          childCount: 0,
-          totalDescendants: 0
-        };
+      // Process all top-level scopes with depth limit using shared helper
+      const processedScopes = processScopes(result, 3);
 
-        // Recursively process children if they exist
-        if (scope.children && scope.children.length > 0) {
-          processed.children = scope.children.map(processScope);
-          processed.childCount = scope.children.length;
-          // Calculate total descendants recursively
-          processed.totalDescendants = scope.children.reduce((total, child) => {
-            return total + 1 + (child.children ? this.countAllDescendants(child) : 0);
-          }, 0);
-        } else {
-          processed.childCount = 0;
-          processed.totalDescendants = 0;
-        }
-
-        return processed;
-      };
-
-      // Process all top-level scopes recursively
-      const processedScopes = result.map(processScope);
-
-      // Create comprehensive summary
+      // Create comprehensive summary with statistics
       const summary = {
         totalTopLevelScopes: result.length,
-        totalAllScopes: this.countAllScopes(processedScopes),
-        totalVariables: this.countAllVariables(processedScopes),
-        functionScopes: this.getFunctionSummary(processedScopes),
-        scopeHierarchy: processedScopes
+        totalAllScopes: countAllScopes(processedScopes),
+        totalVariables: countAllVariables(processedScopes),
+        functionScopes: getFunctionSummary(processedScopes),
+        scopeHierarchy: processedScopes,
+        depthLimit: {
+          maxDepth: 3,
+          note: "For deeper exploration beyond depth 3, use the get_scopes_with_root tool with specific scope IDs"
+        }
       };
 
       return this.createJsonContent('debug://scopes-summary', {
         success: true,
         summary,
         metadata: {
-          description: 'Comprehensive summarized scope information with recursive children processing, filtered to exclude jump instructions',
+          description: 'Comprehensive summarized scope information with recursive children processing (depth limited to 3), filtered to exclude jump instructions',
           retrievedAt: new Date().toISOString()
         }
       });
@@ -190,56 +185,43 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
     }
   }
 
-  // Helper method to count all descendants recursively
-  private countAllDescendants(scope: any): number {
-    if (!scope.children || scope.children.length === 0) return 0;
-    return scope.children.reduce((total, child) => {
-      return total + 1 + this.countAllDescendants(child);
-    }, 0);
-  }
 
-  // Helper method to count all scopes including nested ones
-  private countAllScopes(scopes: any[]): number {
-    return scopes.reduce((total, scope) => {
-      return total + 1 + (scope.children ? this.countAllScopes(scope.children) : 0);
-    }, 0);
-  }
+  private async getGlobalContext(plugin: Plugin): Promise<IMCPResourceContent> {
+    try {
+      const result = await plugin.call('debugger', 'globalContext');
 
-  // Helper method to count all variables across all scopes
-  private countAllVariables(scopes: any[]): number {
-    return scopes.reduce((total, scope) => {
-      const scopeVars = scope.variableCount || 0;
-      const childVars = scope.children ? this.countAllVariables(scope.children) : 0;
-      return total + scopeVars + childVars;
-    }, 0);
-  }
-
-  // Helper method to get function summary across all scopes
-  private getFunctionSummary(scopes: any[]): any[] {
-    const functions = [];
-    
-    const collectFunctions = (scopeList: any[]) => {
-      for (const scope of scopeList) {
-        if (scope.type === 'function') {
-          functions.push({
-            name: scope.name,
-            id: scope.id,
-            variableCount: scope.variableCount,
-            variableNames: scope.variableNames,
-            childCount: scope.childCount,
-            stepRange: scope.stepRange
-          });
-        }
-        if (scope.children) {
-          collectFunctions(scope.children);
-        }
+      if (!result || (!result.block && !result.msg && !result.tx)) {
+        return this.createTextContent(
+          'debug://global-context',
+          'Global context is not available. Please start a debug session first.'
+        );
       }
-    };
 
-    collectFunctions(scopes);
-    return functions;
+      console.log('debug://global-context', {
+        success: true,
+        context: result,
+        metadata: {
+          description: 'Global execution context including block, message, and transaction data',
+          retrievedAt: new Date().toISOString()
+        }
+      });
+
+      return this.createJsonContent('debug://global-context', {
+        success: true,
+        context: result,
+        metadata: {
+          description: 'Global execution context including block, message, and transaction data',
+          retrievedAt: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      return this.createTextContent(
+        'debug://global-context',
+        `Error getting global context: ${error.message}`
+      );
+    }
   }
-
 
   traceCacheDesc = `
   /**
@@ -283,7 +265,20 @@ export class DebuggingResourceProvider extends BaseResourceProvider {
           'Debug cache not available. There is no debug session going on.'
         );
       }
-
+      console.log('debug://trace-cache', {
+        success: true,
+        cache: result,
+        metadata: {
+          description: this.traceCacheDesc,
+          totalAddresses: result.addresses ? result.addresses.length : 0,
+          totalStorageChanges: result.storageChanges ? result.storageChanges.length : 0,
+          totalMemoryChanges: result.memoryChanges ? result.memoryChanges.length : 0,
+          totalCallDataChanges: result.callDataChanges ? result.callDataChanges.length : 0,
+          stopOperations: result.stopIndexes ? result.stopIndexes.length : 0,
+          outOfGasEvents: result.outofgasIndexes ? result.outofgasIndexes.length : 0,
+          retrievedAt: new Date().toISOString()
+        }
+      })
       return this.createJsonContent('debug://trace-cache', {
         success: true,
         cache: result,
