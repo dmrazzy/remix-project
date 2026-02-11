@@ -29,7 +29,8 @@ const profile = {
     'getCallTreeScopes',
     'getAllDebugCache',
     'getCurrentSourceLocation',
-    'getScopesAsNestedJSON'
+    'getScopesAsNestedJSON',
+    'getStackAt'
   ],
   events: [],
   icon: 'assets/img/debuggerLogo.webp',
