@@ -18,7 +18,8 @@
 
 .debug-section-trace {
   flex-shrink: 0;
-  max-height: 30%;
+  max-height: 33.33%;
+  min-height: 200px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -26,7 +27,7 @@
 
 .debug-section-object {
   flex: 1;
-  min-height: 0;
+  min-height: 400px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -56,7 +57,6 @@
 
 .debug-section-content {
   padding: 1rem;
-  overflow-y: auto;
 }
 
 .debug-section-trace .debug-section-content {
@@ -65,9 +65,12 @@
 }
 
 .debug-section-scrollable {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 .debug-tabs {
@@ -106,7 +109,6 @@
   padding: 0.75rem;
   border-radius: 0.25rem;
   margin: 0;
-  overflow-x: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -181,6 +183,8 @@
   gap: 0.25rem;
   font-size: 0.75rem;
   font-family: 'Courier New', monospace;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .call-trace-item {
@@ -316,4 +320,91 @@
 .method-name {
   color: #e83e8c;
   font-weight: 600;
+}
+
+/* JSON Renderer Styles */
+.json-renderer {
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace;
+  line-height: 1.6;
+  padding: 0.75rem;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.json-line {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.json-expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 0.85rem;
+  color: var(--bs-body-color);
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.json-expand-icon:hover {
+  color: var(--bs-primary);
+}
+
+.json-expand-icon-placeholder {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.json-key {
+  color: #20c997;
+  font-weight: 600;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  flex-shrink: 0;
+}
+
+.json-separator {
+  color: var(--bs-body-color);
+  flex-shrink: 0;
+}
+
+.json-value {
+  color: #ffc107;
+  font-weight: 500;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.json-bracket {
+  color: var(--bs-body-color);
+  font-weight: 700;
+}
+
+.json-comma {
+  color: var(--bs-body-color);
+  flex-shrink: 0;
+}
+
+.json-ellipsis {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.json-nested {
+  display: flex;
+  flex-direction: column;
 }

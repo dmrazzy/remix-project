@@ -42,6 +42,7 @@ export const DebugLayout = ({
   })
   const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
   const [selectedScope, setSelectedScope] = useState<any>(null)
+  const [expandedObjectPaths, setExpandedObjectPaths] = useState<Set<string>>(new Set())
 
   const formatAddress = (address: string | undefined) => {
     if (!address) return ''
@@ -216,6 +217,129 @@ export const DebugLayout = ({
       }
       return newSet
     })
+  }
+
+  const toggleObjectPath = (path: string) => {
+    setExpandedObjectPaths(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(path)) {
+        newSet.delete(path)
+      } else {
+        newSet.add(path)
+      }
+      return newSet
+    })
+  }
+
+  const isObject = (value: any): boolean => {
+    return value !== null && typeof value === 'object'
+  }
+
+  const renderJsonValue = (value: any, key: string, path: string, depth: number = 0): JSX.Element => {
+    const isExpanded = expandedObjectPaths.has(path)
+    const indent = depth * 12
+
+    if (Array.isArray(value)) {
+      const hasItems = value.length > 0
+      return (
+        <div key={path} style={{ marginLeft: `${indent}px` }}>
+          <div className="json-line">
+            {hasItems && (
+              <i
+                className={`fas ${isExpanded ? 'fa-minus-square' : 'fa-plus-square'} json-expand-icon`}
+                onClick={() => toggleObjectPath(path)}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+              />
+            )}
+            {!hasItems && <span className="json-expand-icon-placeholder"></span>}
+            <span className="json-key">"{key}"</span>
+            <span className="json-separator">: </span>
+            <span className="json-bracket">[</span>
+            {!isExpanded && hasItems && <span className="json-ellipsis">...</span>}
+            {!hasItems && <span className="json-bracket">]</span>}
+          </div>
+          {isExpanded && hasItems && (
+            <div className="json-nested">
+              {value.map((item, index) => {
+                const itemPath = `${path}[${index}]`
+                if (isObject(item)) {
+                  return renderJsonValue(item, String(index), itemPath, depth + 1)
+                }
+                return (
+                  <div key={itemPath} className="json-line" style={{ marginLeft: `${(depth + 1) * 12}px` }}>
+                    <span className="json-expand-icon-placeholder"></span>
+                    <span className="json-value">{JSON.stringify(item)}</span>
+                    {index < value.length - 1 && <span className="json-comma">,</span>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {isExpanded && hasItems && (
+            <div className="json-line" style={{ marginLeft: `${indent}px` }}>
+              <span className="json-expand-icon-placeholder"></span>
+              <span className="json-bracket">]</span>
+            </div>
+          )}
+        </div>
+      )
+    } else if (typeof value === 'object' && value !== null) {
+      const keys = Object.keys(value)
+      const hasKeys = keys.length > 0
+      return (
+        <div key={path} style={{ marginLeft: `${indent}px` }}>
+          <div className="json-line">
+            {hasKeys && (
+              <i
+                className={`fas ${isExpanded ? 'fa-minus-square' : 'fa-plus-square'} json-expand-icon`}
+                onClick={() => toggleObjectPath(path)}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+              />
+            )}
+            {!hasKeys && <span className="json-expand-icon-placeholder"></span>}
+            <span className="json-key">"{key}"</span>
+            <span className="json-separator">: </span>
+            <span className="json-bracket">{'{'}</span>
+            {!isExpanded && hasKeys && <span className="json-ellipsis">...</span>}
+            {!hasKeys && <span className="json-bracket">{'}'}</span>}
+          </div>
+          {isExpanded && hasKeys && (
+            <div className="json-nested">
+              {keys.map((objKey, index) => {
+                const objPath = `${path}.${objKey}`
+                if (isObject(value[objKey])) {
+                  return renderJsonValue(value[objKey], objKey, objPath, depth + 1)
+                }
+                return (
+                  <div key={objPath} className="json-line" style={{ marginLeft: `${(depth + 1) * 12}px` }}>
+                    <span className="json-expand-icon-placeholder"></span>
+                    <span className="json-key">"{objKey}"</span>
+                    <span className="json-separator">: </span>
+                    <span className="json-value">{JSON.stringify(value[objKey])}</span>
+                    {index < keys.length - 1 && <span className="json-comma">,</span>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {isExpanded && hasKeys && (
+            <div className="json-line" style={{ marginLeft: `${indent}px` }}>
+              <span className="json-expand-icon-placeholder"></span>
+              <span className="json-bracket">{'}'}</span>
+            </div>
+          )}
+        </div>
+      )
+    } else {
+      return (
+        <div key={path} className="json-line" style={{ marginLeft: `${indent}px` }}>
+          <span className="json-expand-icon-placeholder"></span>
+          <span className="json-key">"{key}"</span>
+          <span className="json-separator">: </span>
+          <span className="json-value">{JSON.stringify(value)}</span>
+        </div>
+      )
+    }
   }
 
   const getContractName = (address: string, scope?: any): string => {
@@ -536,9 +660,30 @@ export const DebugLayout = ({
 
     if (activeObjectTab === 'json') {
       return (
-        <pre className="debug-object-content">
-          {JSON.stringify(objectData, null, 2)}
-        </pre>
+        <div className="debug-object-content json-renderer">
+          <div className="json-line">
+            <span className="json-bracket">{'{'}</span>
+          </div>
+          {Object.keys(objectData).map((key) => {
+            const value = objectData[key]
+            const path = `root.${key}`
+            if (isObject(value)) {
+              return renderJsonValue(value, key, path, 1)
+            }
+            return (
+              <div key={path} className="json-line" style={{ marginLeft: '12px' }}>
+                <span className="json-expand-icon-placeholder"></span>
+                <span className="json-key">"{key}"</span>
+                <span className="json-separator">: </span>
+                <span className="json-value">{JSON.stringify(value)}</span>
+                {key !== Object.keys(objectData)[Object.keys(objectData).length - 1] && <span className="json-comma">,</span>}
+              </div>
+            )
+          })}
+          <div className="json-line">
+            <span className="json-bracket">{'}'}</span>
+          </div>
+        </div>
       )
     } else {
       return (

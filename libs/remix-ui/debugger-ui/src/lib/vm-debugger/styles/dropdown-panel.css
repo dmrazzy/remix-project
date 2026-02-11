@@ -22,6 +22,9 @@
   .dropdownpanel {
     width: 100%;
     word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   .dropdownrawcontent {
     padding: 2px;
@@ -30,6 +33,11 @@
   .message {
     padding: 2px;
     word-break: break-word;
+  }
+  .dropdowncontent {
+    max-height: 280px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   .refresh {
     display: none;
