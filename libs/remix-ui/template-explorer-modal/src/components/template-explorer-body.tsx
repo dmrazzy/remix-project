@@ -15,7 +15,7 @@ export function TemplateExplorerBody() {
       <TopCards />
       {
         (dedupedTemplates.length === 0) ? <NotFound /> : (
-          <div className={"body pt-2 mb-3"} style={{ height: `calc(90vh - ${fileMode ? 350 : 410}px)` }}>
+          <div className={"body pt-2 mb-3"} style={{ height: `calc(88vh - ${fileMode ? 350 : 410}px)` }}>
             <>
               <div className="d-flex flex-column gap-1">
                 <label
