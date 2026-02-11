@@ -7,6 +7,21 @@ import {
   IMCPToolResult,
   IMCPResourceContent
 } from '../types/mcp';
+
+// Helper function to track events using MatomoManager instance
+function trackMatomoEvent(category: string, action: string, name: string) {
+  try {
+    if (typeof window !== 'undefined' && (window as any)._matomoManagerInstance) {
+      const matomoInstance = (window as any)._matomoManagerInstance;
+      if (typeof matomoInstance.trackEvent === 'function') {
+        matomoInstance.trackEvent(category, action, name);
+      }
+    }
+  } catch (error) {
+    // Silent fail for tracking
+    console.debug('Matomo tracking failed:', error);
+  }
+}
 import {
   IRemixMCPServer,
   RemixMCPServerConfig,
@@ -413,6 +428,7 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
       execution.endTime = new Date();
       this._stats.totalToolCalls++;
 
+      trackMatomoEvent('ai', 'remixAI', `mcp_tool_executed_${call.name}`);
       console.log(`[RemixMCPServer] Tool '${call.name}' executed successfully`);
       this.emit('tool-executed', execution);
       return result;
@@ -449,6 +465,10 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
 
     // Get from provider
     const content = await this._resources.getResourceContent(uri);
+
+    // Track resource read
+    const resourceName = uri.replace('://', '_');
+    trackMatomoEvent('ai', 'remixAI', `mcp_resource_read_${resourceName}`);
 
     // Cache result
     if (this._config.enableResourceCache !== false) {
