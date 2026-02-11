@@ -5,6 +5,7 @@ import { CopyToClipboard } from '@remix-ui/clipboard'
 import * as remixLib from '@remix-project/remix-lib'
 import { Dropdown } from 'react-bootstrap'
 import { parseUnits } from 'ethers'
+import { FuncABI } from '@remix-project/core-plugin'
 import { DeployedContractsAppContext } from '../contexts'
 import { DeployedContract } from '../types'
 import { runTransactions } from '../actions'
@@ -354,7 +355,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
         style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', cursor: 'pointer' }}
       >
         <div className="me-auto w-100">
-          <div className="d-flex align-items-center justify-content-between w-100 p-3 text-nowrap text-truncate overflow-hidden" onClick={handleContractClick}>
+          <div className="d-flex align-items-center justify-content-between w-100 p-3 text-nowrap text-truncate overflow-hidden" onClick={handleContractClick} data-id={`deployedContractItem-${index}`}>
             <div className='d-flex'>
               <CustomTooltip
                 placement="top"
@@ -390,6 +391,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                 className="fas fa-ellipsis-v align-self-center p-2 mx-1"
                 style={{ cursor: 'pointer' }}
                 onClick={handleKebabClick}
+                data-id={`contractKebabIcon-${index}`}
               ></i>
             </div>
           </div>
@@ -413,11 +415,12 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                     <p className='mb-1'>High level interaction</p>
                     {contractABI
                       .filter((item: any) => item.type === 'function')
-                      .map((funcABI: any, funcIndex: number) => {
+                      .map((funcABI: FuncABI, funcIndex: number) => {
                         if (funcABI.type !== 'function') return null
                         const isConstant = funcABI.constant !== undefined ? funcABI.constant : false
                         const lookupOnly = funcABI.stateMutability === 'view' || funcABI.stateMutability === 'pure' || isConstant
-                        const inputs = funcABI.inputs ? txHelper.inputParametersDeclarationToString(funcABI.inputs) : ''
+                        const inputNames = funcABI.inputs.map(input => input.name).join(', ')
+                        const inputTypes = funcABI.inputs.map(input => input.type).join(', ')
 
                         return (
                           <div key={funcIndex} className="mb-1 px-0 py-2 rounded">
@@ -431,28 +434,30 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                               <label className="mb-0 me-1 text-secondary">
                                 { funcABI.name }
                               </label>
-                              <span style={{ fontWeight: 'lighter' }}>
-                                { inputs }
+                              <span className="text-nowrap" style={{ fontWeight: 'lighter' }}>
+                                { inputNames }
                               </span>
                             </div>
                             <div className="position-relative flex-fill">
                               <input
                                 type="text"
-                                placeholder={inputs ? inputs.split(' ')[0] : ''}
+                                placeholder={inputTypes}
                                 className="form-control"
                                 value={funcInputs[funcIndex] || ''}
                                 onChange={(e) => handleInputChange(funcIndex, e.target.value)}
                                 style={{
                                   backgroundColor: 'var(--bs-body-bg)',
                                   color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '4.5rem', fontSize: '0.75rem',
-                                  cursor: !inputs ? 'not-allowed' : 'text'
+                                  cursor: !inputNames ? 'not-allowed' : 'text'
                                 }}
-                                disabled={!inputs}
+                                disabled={!inputNames}
+                                data-id={`deployedContractItem-${index}-input-${funcIndex}`}
                               />
                               <button
                                 className="btn btn-sm btn-secondary"
                                 onClick={() => handleExecuteTransaction(funcABI, funcIndex, lookupOnly)}
                                 style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 2, fontSize: '0.65rem', fontWeight: 'bold' }}
+                                data-id={`deployedContractItem-${index}-button-${funcIndex}`}
                               >
                               Execute
                               </button>

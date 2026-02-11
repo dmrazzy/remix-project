@@ -17,30 +17,30 @@ module.exports = {
     return sources
   },
 
-  'Set Ballot 0.4.14': '' + function (browser: NightwatchBrowser) {
+  'Set Ballot 0.4.14': function (browser: NightwatchBrowser) {
     browser
       .setSolidityCompilerVersion('soljson-v0.4.14+commit.c2215d46.js')
   },
 
-  'Add Ballot': '' + function (browser: NightwatchBrowser) {
+  'Add Ballot': function (browser: NightwatchBrowser) {
     browser
       .addFile('Untitled.sol', sources[0]['Untitled.sol'])
   },
 
-  'Compile Ballot with compiler version 0.4.14': '' + function (browser: NightwatchBrowser) {
+  'Compile Ballot with compiler version 0.4.14': function (browser: NightwatchBrowser) {
     browser
       .testContracts('Untitled.sol', sources[0]['Untitled.sol'], ['Ballot'])
   },
 
-  'Deploy Ballot #group1': '' + function (browser: NightwatchBrowser) {
+  'Deploy Ballot #group1': function (browser: NightwatchBrowser) {
     browser.pause(500)
       .clickLaunchIcon('udapp')
       .selectAccount('0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c')
       .setValue('input[placeholder="uint8"]', '2')
       .click('*[data-id="deployButton"]')
-      .waitForElementPresent('*[data-id="universalDappUiContractActionWrapper"]', 60000)
+      .waitForElementPresent('*[data-id="deployedContractItem-0"]', 60000)
       .clickInstance(0)
-      .clickFunction('delegate - transact (not payable)', { types: 'address to', values: '"0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db"' })
+      .clickFunction(0, 0, { types: 'address to', values: '"0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db"' })
       .testFunction('last',
         {
           status: '1 Transaction mined and execution succeed',
@@ -48,7 +48,7 @@ module.exports = {
         })
   },
 
-  'Debug Ballot / delegate #group1': '' + function (browser: NightwatchBrowser) {
+  'Debug Ballot / delegate #group1': function (browser: NightwatchBrowser) {
     browser.pause(500)
       .debugTransaction(1)
       .pause(2000)
@@ -60,33 +60,24 @@ module.exports = {
       .checkVariableDebug('callstackpanel', ['0x692a70D2e424a56D2C6C27aA97D1a86395877b3A'])
   },
 
-  'Access Ballot via at address #group1': '' + function (browser: NightwatchBrowser) {
+  'Access Ballot via at address #group1': function (browser: NightwatchBrowser) {
     browser.clickLaunchIcon('udapp')
-      .click('*[data-id="universalDappUiUdappClose"]')
       .addFile('ballot.abi', { content: ballotABI })
-      .clickLaunchIcon('udapp')
-      .click({
-        selector: '*[data-id="deployAndRunClearInstances"]',
-        abortOnFailure: false,
-        suppressNotFoundErrors: true,
-      })
+      .clearDeployedContracts() // Clear any existing deployed contracts
       // we are not changing the visibility for not checksummed contracts
       // .addAtAddressInstance('0x692a70D2e424a56D2C6C27aA97D1a86395877b3B', true, false)
       .clickLaunchIcon('filePanel')
       .addAtAddressInstance('0x692a70D2e424a56D2C6C27aA97D1a86395877b3A', true, true)
-      .waitForElementVisible({
-        locateStrategy: 'xpath',
-        selector: "//*[@id='instance0x692a70D2e424a56D2C6C27aA97D1a86395877b3A']"
-      })
+      .waitForElementVisible('[data-id="deployedContractItem-0"]')
       .clickInstance(0)
-      .clickFunction('delegate - transact (not payable)', { types: 'address to', values: '"0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db"' })
+      .clickFunction(0, 0, { types: 'address to', values: '"0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db"' })
       .testFunction('last',
         {
           status: '1 Transaction mined and execution succeed',
           'decoded input': { 'address to': '0x4B0897b0513fdC7C541B6d9D7E929C4e5364D2dB' }
         })
   },
-  'Deploy and use Ballot using external web3 #group2': '' + function (browser: NightwatchBrowser) {
+  'Deploy and use Ballot using external web3 #group2': function (browser: NightwatchBrowser) {
     browser
 
       .clickLaunchIcon('udapp')
@@ -95,7 +86,7 @@ module.exports = {
       .createContract('2')
       .clickInstance(0)
       .click('*[data-id="terminalClearConsole"]')
-      .clickFunction('delegate - transact (not payable)', { types: 'address to', values: '0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c' })
+      .clickFunction(0, 0, { types: 'address to', values: '0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c' })
       .journalLastChildIncludes('Ballot.delegate(address)')
       .journalLastChildIncludes('data: 0x5c1...a733c')
   }

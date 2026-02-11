@@ -97,7 +97,7 @@ export default function DeployedContractsPortraitView() {
   }
 
   return (
-    <div className="deployed-contracts-container card mx-2 my-2" style={{ backgroundColor: 'var(--custom-onsurface-layer-1)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties}>
+    <div className="deployed-contracts-container card mx-2 my-2" data-id="deployedContractsContainer" style={{ backgroundColor: 'var(--custom-onsurface-layer-1)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties}>
       <div className="p-3 d-flex align-items-center justify-content-between" style={{ cursor: 'pointer' }}>
         <div className='d-flex align-items-center gap-2'>
           <h6 className="my-auto" style={{ color: themeQuality === 'dark' ? 'white' : 'black', margin: 0 }}>
@@ -106,7 +106,7 @@ export default function DeployedContractsPortraitView() {
           <span className="text-secondary">{deployedContracts.length}</span>
         </div>
         <div>
-          <button className='btn btn-primary btn-sm small' style={{ fontSize: '0.7rem' }} onClick={handleAddClick}>
+          <button className='btn btn-primary btn-sm small' style={{ fontSize: '0.7rem' }} onClick={handleAddClick} data-id="addDeployedContract">
             <i className='fa-solid fa-plus'></i> Add
           </button>
           {deployedContracts.length > 0 && (
@@ -160,12 +160,14 @@ export default function DeployedContractsPortraitView() {
               placeholder='0x...'
               className="form-control"
               onChange={handleAddressInputChange}
+              data-id="deployedContractAddressInput"
               style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '3.5rem', fontSize: '0.75rem' }}
             />
             <button
               className="btn btn-sm btn-primary"
               disabled={!enableAtAddress}
               onClick={handleAddContract}
+              data-id="addDeployedContractButton"
               style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 2, fontSize: '0.65rem', fontWeight: 'bold' }}
             >
                 Add

@@ -184,7 +184,7 @@ export class RunTab extends ViewPlugin {
 
   render() {
     return (
-      <div style={{ position: 'relative', height: '100%', overflow: 'auto' }}>
+      <div id="runTabView" style={{ position: 'relative', height: '100%', overflow: 'auto' }}>
         <div id="udappEnvComponent" style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--body-bg)' }}></div>
         <div id="udappDeployComponent"></div>
         <div id="udappDeployedContractsComponent"></div>

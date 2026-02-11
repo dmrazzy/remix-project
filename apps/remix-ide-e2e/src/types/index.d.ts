@@ -16,11 +16,14 @@ declare module 'nightwatch' {
     verifyContracts(compiledContractNames: string[], opts?: {wait: number; version?: string; runs?: string}): NightwatchBrowser
     selectAccount(account?: string): NightwatchBrowser
     clickFunction(fnFullName: string, expectedInput?: NightwatchClickFunctionExpectedInput): NightwatchBrowser
+    clickFunction(instanceIndex: number, functionIndex: number, expectedInput?: NightwatchClickFunctionExpectedInput): NightwatchBrowser
     checkClipboard(): NightwatchBrowser
     testFunction(txHash: string, expectedInput: NightwatchTestFunctionExpectedInput): NightwatchBrowser
     goToVMTraceStep(step: number, incr?: number): NightwatchBrowser
     checkVariableDebug(id: string, debugValue: NightwatchCheckVariableDebugValue): NightwatchBrowser
     addAtAddressInstance(address: string, isValidFormat: boolean, isValidChecksum: boolean, isAbi?: boolean): NightwatchBrowser
+    clearDeployedContracts(): NightwatchBrowser
+    clearDeployedContract(index: number): NightwatchBrowser
     modalFooterOKClick(id?: string): NightwatchBrowser
     clickInstance(index: number): NightwatchBrowser
     journalLastChildIncludes(val: string): NightwatchBrowser
