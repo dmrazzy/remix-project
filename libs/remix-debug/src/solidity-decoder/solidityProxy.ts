@@ -2,7 +2,8 @@
 import { util } from '@remix-project/remix-lib'
 import { isContractCreation } from '../trace/traceHelper'
 import { extractStateVariables } from './stateDecoder'
-import { extractContractDefinitions, extractStatesDefinitions } from './astHelper'
+import { extractContractDefinitions, extractStatesDefinitions } from './helpers/astHelper'
+import type { CompilerAbstract } from '@remix-project/remix-solidity'
 
 export class SolidityProxy {
   cache
@@ -10,7 +11,7 @@ export class SolidityProxy {
   getCode
   sources
   contracts
-  compilationResult
+  compilationResult: (address: string) => Promise<CompilerAbstract>
   sourcesCode
 
   constructor ({ getCurrentCalledAddressAt, getCode, compilationResult }) {
