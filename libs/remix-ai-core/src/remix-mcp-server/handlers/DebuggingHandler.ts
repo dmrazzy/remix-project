@@ -122,7 +122,6 @@ export class DecodeLocalVariableHandler extends BaseToolHandler {
   async execute(args: { variableId: number; stepIndex?: number }, plugin: Plugin): Promise<IMCPToolResult> {
     try {
       const result = await plugin.call('debugger', 'decodeLocalVariable', args.variableId, args.stepIndex);
-
       if (result === null) {
         return this.createErrorResult('The local variable might not be available at the current debug step. Please check the current execution step!');
       }
