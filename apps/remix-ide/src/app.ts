@@ -423,7 +423,7 @@ class AppComponent {
     // ----------------- run script after each compilation results -----------
     const compileAndRun = new CompileAndRun()
     // -------------------Terminal----------------------------------------
-    makeUdapp(blockchain, compilersArtefacts, (domEl) => terminal.logHtml(domEl))
+    makeUdapp(blockchain, (domEl) => terminal.logHtml(domEl))
     const terminal = new Terminal(
       { appManager, blockchain },
       {
