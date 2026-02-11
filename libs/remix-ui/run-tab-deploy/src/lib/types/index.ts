@@ -47,7 +47,8 @@ export interface ActionPayloadTypes {
   SET_CONFIRM_SETTINGS: boolean,
   SET_MAX_PRIORITY_FEE: string,
   SET_GAS_PRICE: string,
-  SET_MAX_FEE: string
+  SET_MAX_FEE: string,
+  SET_BASE_FEE_PER_GAS: string
 }
 
 export interface Action<T extends keyof ActionPayloadTypes> {

@@ -163,6 +163,13 @@ export const deployReducer = (state = deployInitialState, action: Actions): Depl
     }
   }
 
+  case 'SET_BASE_FEE_PER_GAS': {
+    return {
+      ...state,
+      baseFeePerGas: action.payload
+    }
+  }
+
   case 'SET_SELECTED_CONTRACT_INDEX': {
     return {
       ...state,

@@ -1,7 +1,7 @@
 'use strict'
 import { EventManager } from '../eventManager'
 import type { Transaction as InternalTransaction, TxResult } from '../index'
-import { BrowserProvider, getAddress, parseUnits } from 'ethers'
+import { BrowserProvider, getAddress, parseUnits, formatUnits } from 'ethers'
 import { normalizeHexAddress } from '../helpers/uiHelper'
 import { aaSupportedNetworks, aaLocalStorageKey, getPimlicoBundlerURL, aaDeterminiticProxyAddress } from '../helpers/aaConstants'
 import { randomBytes } from 'crypto'
@@ -14,6 +14,7 @@ const { createSmartAccountClient } = require("permissionless")
 const { toSafeSmartAccount } = require("permissionless/accounts")
 const { createPimlicoClient } = require("permissionless/clients/pimlico")
 import { Plugin } from '@remixproject/engine'
+import { toInt } from './typeConversion'
 
 export class TxRunnerWeb3 {
   event
@@ -142,20 +143,20 @@ export class TxRunnerWeb3 {
   }
 
   async execute (args: InternalTransaction) {
-    const result = await this.runInNode(args.from, args.fromSmartAccount, args.deployedBytecode, args.to, args.data, args.value, args.gasLimit, args.useCall, args.timestamp, args.web3, args.provider, args.isVM)
+    const result = await this.runInNode(args)
 
     return result
   }
 
-  async runInNode (from, fromSmartAccount, deployedBytecode, to, data, value, gasLimit, useCall, timestamp, web3Provider?: any, provider?: string, isVMParam?: boolean) {
-    const tx = { from: from, fromSmartAccount, deployedBytecode, to: to, data: data, value: value, web3: web3Provider, provider: provider, isVM: isVMParam }
-    if (!from) throw new Error('the value of "from" is not defined. Please make sure an account is selected.')
-    if (useCall) {
+  async runInNode (args: InternalTransaction) {
+    const tx = { from: args.from, fromSmartAccount: args.fromSmartAccount, deployedBytecode: args.deployedBytecode, to: args.to, data: args.data, value: args.value, web3: args.web3, provider: args.provider, isVM: args.isVM }
+    if (!args.from) throw new Error('the value of "from" is not defined. Please make sure an account is selected.')
+    if (args.useCall) {
       const isVM = tx.isVM !== undefined ? tx.isVM : await this._api.call('blockchain', 'isVM')
       const web3 = tx.web3 || await this._api.call('blockchain', 'getWeb3')
 
       if (isVM) {
-        web3.remix.registerCallId(timestamp)
+        web3.remix.registerCallId(args.timestamp)
       }
       const result = await web3.call(tx)
 
@@ -188,41 +189,35 @@ export class TxRunnerWeb3 {
         * gasLimit is a value that can be set in the UI to hardcap value that can be put in a tx.
         * e.g if the gasestimate
         */
-      if (gasLimit !== '0x0' && gasEstimation > gasLimit) {
-        throw new Error(`estimated gas for this transaction (${gasEstimation}) is higher than gasLimit set in the configuration  (${gasLimit}). Please raise the gas limit.`)
+      const gasLimitNum = typeof args.gasLimit === 'string' ? parseInt(args.gasLimit, 16) : args.gasLimit
+      if (args.gasLimit !== '0x0' && gasEstimation > gasLimitNum) {
+        throw new Error(`estimated gas for this transaction (${gasEstimation}) is higher than gasLimit set in the configuration  (${args.gasLimit}). Please raise the gas limit.`)
       }
 
-      if (gasLimit === '0x0') {
+      if (args.gasLimit === '0x0') {
         tx['gasLimit'] = gasEstimation
       } else {
-        tx['gasLimit'] = gasLimit
+        tx['gasLimit'] = args.gasLimit
       }
 
       if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
         return await this._executeTx(tx, network, null)
       }
 
-      // confirmCb(network, tx, tx['gasLimit'], (txFee) => {
-      //   return this._executeTx(tx, network, txFee, this._api, promptCb, callback)
-      // }, (error) => {
-      //   callback(error)
-      // })
-      // }, callback)
       if (network.name !== 'Main') {
         return await this._executeTx(tx, network, null)
       }
-      return await this.confirmTransaction(tx, network, gasEstimation)
+      return await this.confirmTransaction(tx, network, tx['gasLimit'], args.determineGasPrice)
     } catch (err) {
       console.error(err)
       if (err && err.error && err.error.indexOf('Invalid JSON RPC response') !== -1) {
         // // @todo(#378) this should be removed when https://github.com/WalletConnect/walletconnect-monorepo/issues/334 is fixed
         // Should log in terminal
-        // callback(new Error('Gas estimation failed because of an unknown internal error. This may indicated that the transaction will fail.'))
-        return
+        throw new Error('Gas estimation failed because of an unknown internal error. This may indicated that the transaction will fail.')
       }
       const defaultGasLimit = 3000000
 
-      tx['gasLimit'] = gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : gasLimit
+      tx['gasLimit'] = args.gasLimit === '0x0' ? '0x' + defaultGasLimit.toString(16) : args.gasLimit
       if (network.name === 'VM') {
         return await this._executeTx(tx, network, null)
       } else {
@@ -235,7 +230,7 @@ export class TxRunnerWeb3 {
           if (config.getUnpersistedProperty('doNotShowTransactionConfirmationAgain')) {
             return await this._executeTx(tx, network, null)
           }
-          return await this.confirmTransaction(tx, network, tx['gasLimit'])
+          return await this.confirmTransaction(tx, network, tx['gasLimit'], args.determineGasPrice)
         } else {
           let msg = ''
           if (typeof err === 'string') {
@@ -279,9 +274,9 @@ export class TxRunnerWeb3 {
     }
   }
 
-  async confirmTransaction (tx, network, gasEstimation) {
-    const amount = await this._api.call('blockchain', 'fromWei', tx.value, true, 'ether')
-    const content = await this._api.call('udappDeploy', 'getMainnetPrompt', tx, network, amount, gasEstimation)
+  async confirmTransaction (tx, network, gasEstimation, gasPriceValue) {
+    const amount = formatUnits(toInt(tx.value), 'ether') // Direct call to avoid circular callback deadlock
+    const content = await this._api.call('udappDeploy', 'getMainnetPrompt', tx, network, amount, gasEstimation, gasPriceValue)
 
     return new Promise((resolve, reject) => {
       this._api.call('notification', 'modal', {
@@ -305,7 +300,7 @@ export class TxRunnerWeb3 {
             // @ts-ignore
             const gasPrice = await this._api.call('udappDeploy', 'getGasPrice')
 
-            (Registry.getInstance().get('config').api).setUnpersistedProperty('doNotShowTransactionConfirmationAgain', confirmSettings)
+            ;(Registry.getInstance().get('config').api).setUnpersistedProperty('doNotShowTransactionConfirmationAgain', confirmSettings)
             if (!gasPriceStatus) {
               reject(new Error('Given transaction fee is not correct'))
             } else {

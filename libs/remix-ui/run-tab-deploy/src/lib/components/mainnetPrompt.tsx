@@ -6,26 +6,41 @@ import { formatUnits, parseUnits } from 'ethers'
 import { DeployPlugin } from 'apps/remix-ide/src/app/udapp/udappDeploy'
 import { DeployUdappTx, DeployUdappNetwork } from '../types'
 
-export function MainnetPrompt({ udappDeploy, tx, network, amount, gasEstimation }: { udappDeploy: DeployPlugin, tx: DeployUdappTx, network: DeployUdappNetwork, amount: string, gasEstimation: string }) {
+export function MainnetPrompt({ udappDeploy, tx, network, amount, gasEstimation, gasPriceValue }: { udappDeploy: DeployPlugin, tx: DeployUdappTx, network: DeployUdappNetwork, amount: string, gasEstimation: string, gasPriceValue: string }) {
   const intl = useIntl()
   const [baseFee, setBaseFee] = useState<string>('')
   const [transactionFee, setTransactionFee] = useState<string>('')
   const [maxPriorityFee, setMaxPriorityFee] = useState<string>('')
 
   useEffect(() => {
-    (async () => {
-      const maxPriorityFee = await udappDeploy.getMaxPriorityFee()
-      setMaxPriorityFee(maxPriorityFee)
+    const maxPriorityFee = udappDeploy.getMaxPriorityFee()
 
-      const gasPriceValue = await udappDeploy.call('blockchain', 'determineGasPrice')
-      if (gasPriceValue) onGasPriceChange(gasPriceValue)
-      if (network && network.lastBlock && network.lastBlock.baseFeePerGas) {
-        const baseFee = formatUnits(BigInt(network.lastBlock.baseFeePerGas), 'gwei')
-        setBaseFee(baseFee)
-        onMaxFeeChange(baseFee)
-      }
-    })()
-  }, [])
+    setMaxPriorityFee(maxPriorityFee)
+    if (gasPriceValue) onGasPriceChange(gasPriceValue)
+    if (network && network.lastBlock && network.lastBlock.baseFeePerGas) {
+      const baseFee = formatUnits(BigInt(network.lastBlock.baseFeePerGas), 'gwei')
+
+      setBaseFee(baseFee)
+      onMaxFeeChange(baseFee)
+    }
+  }, [tx, network, amount, gasEstimation])
+
+  const determineGasFees = (gasPriceValue) => {
+    try {
+      const fee = BigInt(gasEstimation) * BigInt(parseUnits(gasPriceValue.toString(10) as string, 'gwei'))
+      const txFeeText = ' ' + formatUnits(fee.toString(10), 'ether') + ' Ether'
+
+      setTransactionFee(txFeeText)
+      udappDeploy.setGasPriceStatus(true)
+      udappDeploy.setConfirmSettings(false)
+    } catch (e) {
+      const txFeeText = ' Please fix this issue before sending any transaction. ' + e.message
+
+      setTransactionFee(txFeeText)
+      udappDeploy.setGasPriceStatus(false)
+      udappDeploy.setConfirmSettings(true)
+    }
+  }
 
   const onMaxFeeChange = (value: string) => {
     const maxFee = value
@@ -38,10 +53,14 @@ export function MainnetPrompt({ udappDeploy, tx, network, amount, gasEstimation 
       udappDeploy.setGasPriceStatus(true)
       udappDeploy.setConfirmSettings(false)
     }
-    udappDeploy.setMaxFee(value)
+    determineGasFees(maxFee)
+    udappDeploy.setMaxFee(maxFee)
+    udappDeploy.setBaseFeePerGas(network.lastBlock.baseFeePerGas)
   }
 
   const onGasPriceChange = (value: string) => {
+    determineGasFees(value)
+    udappDeploy.setGasPriceStatus(true)
     udappDeploy.setGasPrice(value)
   }
 

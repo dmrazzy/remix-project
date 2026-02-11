@@ -9,7 +9,7 @@ const profile = {
   name: 'udappDeploy',
   displayName: 'Udapp Deploy',
   description: 'Handles contract deployment UI and state',
-  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'getMaxFee', 'getMaxPriorityFee', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue', 'getGasEstimationPrompt', 'getMainnetPrompt', 'getGasPriceStatus', 'setValue', 'setValueUnit', 'getCompiledContracts'],
+  methods: ['getUI', 'getGasLimit', 'getValueUnit', 'getMaxFee', 'getMaxPriorityFee', 'getBaseFeePerGas', 'getGasPrice', 'getConfirmSettings', 'getValue', 'getGasEstimationPrompt', 'getMainnetPrompt', 'getGasPriceStatus', 'setValue', 'setValueUnit', 'setBaseFeePerGas', 'getCompiledContracts'],
   events: []
 }
 
@@ -66,8 +66,8 @@ export class DeployPlugin extends Plugin {
     return <GasEstimationPrompt msg={msg} />
   }
 
-  getMainnetPrompt(tx: DeployUdappTx, network: DeployUdappNetwork, amount: string, gasEstimation: string): React.ReactElement {
-    return <MainnetPrompt udappDeploy={this} tx={tx} network={network} amount={amount} gasEstimation={gasEstimation} />
+  getMainnetPrompt(tx: DeployUdappTx, network: DeployUdappNetwork, amount: string, gasEstimation: string, gasPriceValue: string): React.ReactElement {
+    return <MainnetPrompt udappDeploy={this} tx={tx} network={network} amount={amount} gasEstimation={gasEstimation} gasPriceValue={gasPriceValue} />
   }
 
   getGasPriceStatus(): boolean {
@@ -96,6 +96,10 @@ export class DeployPlugin extends Plugin {
 
   setMaxFee(fee: string) {
     this.getDispatch()({ type: 'SET_MAX_FEE', payload: fee })
+  }
+
+  setBaseFeePerGas(fee: string) {
+    this.getDispatch()({ type: 'SET_BASE_FEE_PER_GAS', payload: fee })
   }
 
   setValue(value: string) {

@@ -37,7 +37,7 @@ export type Transaction = {
   deployedBytecode?: string
   value: string,
   data: string,
-  gasLimit: number,
+  gasLimit: any,
   useCall?: boolean,
   timestamp?: number,
   signed?: boolean,
@@ -46,6 +46,7 @@ export type Transaction = {
   web3?: any // Web3 provider to avoid circular callback deadlock
   provider?: string // Provider type to avoid circular callback deadlock
   isVM?: boolean // VM flag to avoid circular callback deadlock
+  determineGasPrice?: any // Gas price to avoid circular callback deadlock
 }
 
 type TxResult = {

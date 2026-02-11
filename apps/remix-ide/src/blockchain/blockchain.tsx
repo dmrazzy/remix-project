@@ -559,29 +559,6 @@ export class Blockchain extends Plugin {
     return (parseUnits(value, unit || 'gwei')).toString()
   }
 
-  calculateFee(gas, gasPrice, unit?) {
-    return BigInt(gas) * BigInt(parseUnits(gasPrice.toString(10) as string, unit || 'gwei'))
-  }
-
-  determineGasFees(tx) {
-    const determineGasFeesCb = (gasPrice, cb) => {
-      let txFeeText, priceStatus
-      // TODO: this try catch feels like an anti pattern, can/should be
-      // removed, but for now keeping the original logic
-      try {
-        const fee = this.calculateFee(tx.gasLimit, gasPrice)
-        txFeeText = ' ' + this.fromWei(fee, false, 'ether') + ' Ether'
-        priceStatus = true
-      } catch (e) {
-        txFeeText = ' Please fix this issue before sending any transaction. ' + e.message
-        priceStatus = false
-      }
-      cb(txFeeText, priceStatus)
-    }
-
-    return determineGasFeesCb
-  }
-
   changeExecutionContext(context) {
     if (this.currentRequest && this.currentRequest.from && !(this.currentRequest.from.startsWith('injected') || this.currentRequest.from === 'remixAI' || this.currentRequest.from === 'udappEnv')) {
       // only injected provider can update the provider.
@@ -1031,7 +1008,8 @@ export class Blockchain extends Plugin {
       authorizationList: args.authorizationList,
       web3: await this.getWeb3(), // Pass web3 to avoid circular callback
       provider: this.getProvider(), // Pass provider to avoid circular callback deadlock
-      isVM: this.executionContext.isVM() // Pass isVM to avoid circular callback deadlock
+      isVM: this.executionContext.isVM(), // Pass isVM to avoid circular callback deadlock
+      determineGasPrice: await this.determineGasPrice() // Pass gasPrice to avoid circular callback deadlock
     }
     const payLoad = {
       funAbi: args.data.funAbi,
