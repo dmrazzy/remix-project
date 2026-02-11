@@ -86,28 +86,8 @@ export class RemixAIPlugin extends Plugin {
       this.isInferencing = false
     })
 
-    // Load saved model preference
-    const savedModelId = await this.call('settings', 'get', 'ai/selectedModel')
-    if (savedModelId) {
-      await this.setModel(savedModelId)
-    } else {
-      // Migration: Convert old provider preference to model
-      const oldProvider = await this.call('settings', 'get', 'ai/assistantProvider')
-      if (oldProvider) {
-        const migrationMap = {
-          'openai': 'gpt-4-turbo',
-          'mistralai': 'mistral-small-latest',
-          'anthropic': 'claude-sonnet-4-5',
-          'ollama': 'ollama'
-        }
-        const modelId = migrationMap[oldProvider] || getDefaultModel().id
-        await this.call('settings', 'set', 'ai/selectedModel', modelId)
-        await this.setModel(modelId)
-      } else {
-        // Set default model
-        await this.setModel(this.selectedModelId)
-      }
-    }
+    // Always initialize with default model on page reload
+    await this.setModel(this.selectedModelId)
 
     this.aiIsActivated = true
 
@@ -368,10 +348,9 @@ export class RemixAIPlugin extends Plugin {
   }
 
   async setAssistantProvider(provider: string) {
-    // Legacy method - map provider to a default model for backwards compatibility
     const providerToModelMap: Record<string, string> = {
       'openai': 'gpt-4-turbo',
-      'mistralai': 'mistral-small-latest',
+      'mistralai': 'mistral-medium-latest',
       'anthropic': 'claude-sonnet-4-5',
       'ollama': 'ollama'
     }
@@ -471,9 +450,6 @@ export class RemixAIPlugin extends Plugin {
       })
       await this.mcpInferencer.connectAllServers();
     }
-
-    // Save preference
-    await this.call('settings', 'set', 'ai/selectedModel', modelId)
 
     // Emit event for UI updates
     this.emit('modelChanged', modelId)

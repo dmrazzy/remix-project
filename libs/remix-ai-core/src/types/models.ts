@@ -15,8 +15,8 @@ export interface AIModel {
 export const AVAILABLE_MODELS: AIModel[] = [
   // Default free model (no auth required)
   {
-    id: 'mistral-small-latest',
-    name: 'Mistral Small (Free)',
+    id: 'mistral-medium-latest',
+    name: 'Mistral medium (Free)',
     provider: 'mistralai',
     description: 'Fast and efficient for basic tasks',
     requiresAuth: false,
@@ -51,16 +51,6 @@ export const AVAILABLE_MODELS: AIModel[] = [
     name: 'Claude Sonnet 4.5',
     provider: 'anthropic',
     description: 'Balanced performance and speed',
-    requiresAuth: true,
-    isDefault: false,
-    category: 'coding',
-    capabilities: ['chat', 'code', 'completion']
-  },
-  {
-    id: 'mistral-medium-latest',
-    name: 'Mistral medium',
-    provider: 'mistralai',
-    description: 'Advanced coding assistance',
     requiresAuth: true,
     isDefault: false,
     category: 'coding',
