@@ -9,8 +9,6 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
 
     await helper.decodeLocals(st, 1615, traceManager, callTree, function (locals) {
       try {
-        console.log('at 1600', locals)
-        
         // Test all struct and array values
         st.equals(locals['bytesSimple'].length, '0x14')
         st.equals(locals['bytesSimple'].value, '0x746573745f7375706572')
