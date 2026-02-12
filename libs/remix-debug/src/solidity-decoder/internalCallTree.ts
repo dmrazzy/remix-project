@@ -806,7 +806,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
       try {
         previousSourceLocation = null
         const newScopeId = scopeId === '' ? subScope.toString() : scopeId + '.' + subScope
-        console.log('Entering new scope at step ', step, newScopeId, isInternalTxInstrn, internalfunctionCall, newSymbolicStack)
+        console.log('Entering new scope at step ', step, newScopeId, isInternalTxInstrn, internalfunctionCall)
         tree.scopeStarts[step] = newScopeId
         const startExecutionLine = lineColumnPos && lineColumnPos.start ? lineColumnPos.start.line + 1 : undefined
         tree.scopes[newScopeId] = { firstStep: step, locals: {}, isCreation, gasCost: 0, startExecutionLine, functionDefinition: null, opcodeInfo: stepDetail, stackBeforeJumping: newSymbolicStack, lowLevelScope: true }

@@ -18,7 +18,7 @@ export interface DebuggerSetup {
 /*
   Setup debugging infrastructure for tests
 */
-export async function setupDebugger(privateKey: string, contractBytecode: string, compilationResult: any, contractCode: string, txData?: string): Promise<DebuggerSetup> {
+export async function setupDebugger(privateKey: string | Buffer, contractBytecode: string, compilationResult: any, contractCode: string, txData?: string): Promise<DebuggerSetup> {
   const web3 = await (vmCall as any).getWeb3()
   
   const sendTransaction = (web3, txParams, to, value, data) => {
