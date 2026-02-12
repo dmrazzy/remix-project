@@ -226,6 +226,10 @@ export class InternalCallTree {
   debug: boolean
   /** get from cache */
   getCache: (key: string) => Promise<any>
+   /** fn entry location */
+  fnJumpDest: {
+    [Key: string]: number
+  }
 
   /**
     * constructor
@@ -316,6 +320,7 @@ export class InternalCallTree {
     this.variables = {}
     this.symbolicStackManager.reset()
     this.mergedScope = {}
+    this.fnJumpDest = {}
   }
 
   /**
@@ -671,7 +676,6 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
   let previousValidSourceLocation = validSourceLocation || currentSourceLocation
   let compilationResult: CompilerAbstract
   let currentAddress = ''
-  const fnJumpDest = {}
   while (step < tree.traceManager.trace.length) {
     let sourceLocation
     let validSourceLocation
@@ -763,7 +767,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
 
     functionDefinition = await resolveFunctionDefinition(tree, sourceLocation, generatedSources, address)
 
-    if (!tree.scopes[scopeId].functionDefinition && stepDetail.op === 'JUMPDEST' && functionDefinition && tree.scopes[scopeId].firstStep === step - 1) {
+    if (!tree.scopes[scopeId].functionDefinition && stepDetail.op === 'JUMPDEST' && functionDefinition && (tree.scopes[scopeId].firstStep === step - 1 || tree.scopes[scopeId].firstStep === step - 2)) {
       tree.scopes[scopeId].functionDefinition = functionDefinition
       tree.scopes[scopeId].lowLevelScope = false
       await registerFunctionParameters(tree, functionDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
@@ -789,12 +793,12 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
     const internalfunctionCall = /*functionDefinition &&*/ (sourceLocation && sourceLocation.jump === 'i') /*&& functionDefinition.kind !== 'constructor'*/
     const isJumpOutOfFunction = /*functionDefinition &&*/ (sourceLocation && sourceLocation.jump === 'o') /*&& functionDefinition.kind !== 'constructor'*/
 
-    if (stepDetail.op === 'JUMP' && functionDefinition && internalfunctionCall && !fnJumpDest[functionDefinition.id]) {
+    if (stepDetail.op === 'JUMP' && functionDefinition && internalfunctionCall && !tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id]) {
       // record entry point for that function
-      fnJumpDest[functionDefinition.id] = nextStepDetail && nextStepDetail.pc // JUMPDEST
+      tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id] = nextStepDetail && nextStepDetail.pc // JUMPDEST
     }
 
-    const currentStepIsFunctionEntryPoint = functionDefinition && nextStepDetail && nextStepDetail.pc === fnJumpDest[functionDefinition.id]
+    const currentStepIsFunctionEntryPoint = functionDefinition && nextStepDetail && nextStepDetail.pc === tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id]
     let lowLevelScope = internalfunctionCall // by default assume it's a low level scope
     if (isInternalTxInstrn) lowLevelScope = false
     if (currentStepIsFunctionEntryPoint) lowLevelScope = false
