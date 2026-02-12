@@ -159,7 +159,7 @@ const EXCLUDED_PATTERNS = [
 
 // .git is handled separately with a size cap rather than blanket exclusion
 // Shallow single-branch clones (the dgit default) are typically small and should be preserved
-const MAX_GIT_FOLDER_SIZE = 5 * 1024 // 5KB - tiny limit for testing
+const MAX_GIT_FOLDER_SIZE = 5 * 1024 * 1024 // 5MB
 
 const profile = {
   name: 's3Storage',
