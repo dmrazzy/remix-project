@@ -14,6 +14,13 @@ class CreateContract extends EventEmitter {
 }
 
 function createContract (browser: NightwatchBrowser, inputParams: string, callback: VoidFunction) {
+  browser.execute(function () {
+    // Use JavaScript to click the button, avoiding sticky header issues
+    const deployButton = document.querySelector('[data-id="deployButton"]') as HTMLElement
+    if (deployButton) {
+      deployButton.scrollIntoView({ behavior: 'auto', block: 'center' })
+    }
+  })
   if (inputParams) {
     const params = inputParams.split(',')
 

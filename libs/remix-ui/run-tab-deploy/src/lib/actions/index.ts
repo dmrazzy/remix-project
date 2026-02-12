@@ -1,3 +1,4 @@
+import React from "react"
 import { Actions, CompilationRawResult, OZDeployMode, VisitedContract, NetworkDeploymentFile } from "../types"
 import { trackMatomoEvent } from "@remix-api"
 import { CompilerAbstract } from "@remix-project/remix-solidity"
@@ -322,7 +323,7 @@ async function isValidContractAddress (plugin: DeployPlugin, address: string) {
   }
 }
 
-export const isValidContractUpgrade = async (plugin: DeployPlugin, proxyAddress: string, newContractName: string, solcInput: SolcInput, solcOutput: SolcOutput, solcVersion: string) => {
+export async function isValidContractUpgrade (plugin: DeployPlugin, proxyAddress: string, newContractName: string, solcInput: SolcInput, solcOutput: SolcOutput, solcVersion: string) {
   // build current contract first to get artefacts.
   const networkStatus = await plugin.call('blockchain', 'detectNetwork')
   const networkName = networkStatus.name === 'VM' ? await plugin.call('blockchain', 'getProvider') : networkStatus.name
@@ -352,5 +353,35 @@ export const isValidContractUpgrade = async (plugin: DeployPlugin, proxyAddress:
     }
   } else {
     return { ok: false, pass: false, warning: true }
+  }
+}
+
+export async function addContractFile (filePath: string, plugin: DeployPlugin, dispatch: React.Dispatch<Actions>) {
+  if (filePath && filePath.endsWith('.sol')) {
+    const contract: string = await plugin.call('fileManager', 'readFile', filePath)
+
+    if (contract) {
+      let contractName = null
+      const match = contract.match(/contract\s+([A-Za-z_][A-Za-z0-9_]*)/)
+      if (match) {
+        contractName = match[1]
+      }
+      if (contractName) {
+        dispatch({ type: 'ADD_CONTRACT_FILE', payload: { name: contractName, filePath } })
+      }
+    }
+  } else if (filePath && filePath.endsWith('.yul')) {
+    const contract: string = await plugin.call('fileManager', 'readFile', filePath)
+
+    if (contract) {
+      let contractName = null
+      const match = contract.match(/object\s+"([^"]+)"/)
+      if (match) {
+        contractName = match[1]
+      }
+      if (contractName) {
+        dispatch({ type: 'ADD_CONTRACT_FILE', payload: { name: contractName, filePath } })
+      }
+    }
   }
 }

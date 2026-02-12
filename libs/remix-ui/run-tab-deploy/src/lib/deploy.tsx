@@ -2,7 +2,7 @@ import React, { useEffect, useReducer, useState } from 'react'
 import { DeployAppContext } from './contexts'
 import { deployInitialState, deployReducer } from './reducers'
 import DeployPortraitView from './widgets/deployPortraitView'
-import { broadcastCompilationResult } from './actions'
+import { broadcastCompilationResult, addContractFile } from './actions'
 import "./css/index.css"
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import type { DeployPlugin } from 'apps/remix-ide/src/app/udapp/udappDeploy'
@@ -35,25 +35,12 @@ function DeployWidget({ plugin }: DeployWidgetProps) {
   }, [])
 
   useEffect(() => {
-    plugin.on('fileManager', 'currentFileChanged', async (filePath: string) => {
-      if (filePath && filePath.endsWith('.sol')) {
-        const contract: string = await plugin.call('fileManager', 'readFile', filePath)
+    plugin.on('fileManager', 'currentFileChanged', async (filePath: string) => addContractFile(filePath, plugin, dispatch))
 
-        if (contract) {
-          let contractName = null
-          const match = contract.match(/contract\s+([A-Za-z_][A-Za-z0-9_]*)/)
-          if (match) {
-            contractName = match[1]
-          }
-          if (contractName) {
-            dispatch({ type: 'ADD_CONTRACT_FILE', payload: { name: contractName, filePath } })
-          }
-        }
-      }
-    })
+    plugin.on('editor', 'contentChanged', async (filePath: string) => addContractFile(filePath, plugin, dispatch))
 
     plugin.on('fileManager', 'fileClosed', (filePath: string) => {
-      if (filePath && filePath.endsWith('.sol')) {
+      if (filePath && (filePath.endsWith('.sol') || filePath.endsWith('.yul'))) {
         dispatch({ type: 'REMOVE_CONTRACT_FILE', payload: filePath })
       }
     })

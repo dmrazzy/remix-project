@@ -102,6 +102,13 @@ function DeployPortraitView() {
     checkVerificationSupport()
   }, [selectedProvider])
 
+  useEffect(() => {
+    setInputValues({})
+    setExpandedInputs(new Set())
+    setProxyInputValues({})
+    setExpandedProxyInputs(new Set())
+  }, [selectedContract])
+
   const constructorInterface = useMemo(() => {
     return selectedContract?.contractData?.getConstructorInterface() || null
   }, [widgetState.contracts.contractList, selectedContract])

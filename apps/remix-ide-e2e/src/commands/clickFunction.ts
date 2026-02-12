@@ -12,25 +12,22 @@ class ClickFunction extends EventEmitter {
     expectedInput?: NightwatchClickFunctionExpectedInput
   ): NightwatchBrowser {
     this.api
-      .waitForElementPresent(`[data-id="deployedContractItem-${instanceIndex}-input-${functionIndex}"]`)
+      .execute(function (instanceIndex, functionIndex) {
+        // Use JavaScript to click the button, avoiding sticky header issues
+        const executeButton = document.querySelector(`[data-id="deployedContractItem-${instanceIndex}-button-${functionIndex}"]`) as HTMLElement
+        if (executeButton) {
+          executeButton.scrollIntoView({ behavior: 'auto', block: 'center' })
+        }
+      }, [instanceIndex, functionIndex])
       .perform(function (client, done) {
-        client.execute(
-          function () {
-            document.querySelector('#runTabView').scrollTop =
-              document.querySelector('#runTabView').scrollHeight
-          },
-          [],
-          function () {
-            if (expectedInput) {
-              client.setValue(
-                `[data-id="deployedContractItem-${instanceIndex}-input-${functionIndex}"]`,
-                expectedInput.values,
-                (_) => _
-              )
-            }
-            done()
-          }
-        )
+        if (expectedInput) {
+          client.setValue(
+            `[data-id="deployedContractItem-${instanceIndex}-input-${functionIndex}"]`,
+            expectedInput.values,
+            (_) => _
+          )
+        }
+        done()
       })
       .click(`[data-id="deployedContractItem-${instanceIndex}-button-${functionIndex}"]`)
       .pause(2000)

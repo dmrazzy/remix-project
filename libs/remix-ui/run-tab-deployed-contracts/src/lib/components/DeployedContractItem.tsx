@@ -354,7 +354,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
         className="d-flex align-items-center rounded"
         style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', cursor: 'pointer' }}
       >
-        <div className="me-auto w-100">
+        <div id={`instance${contract.address}`} className="me-auto w-100">
           <div className="d-flex align-items-center justify-content-between w-100 p-3 text-nowrap text-truncate overflow-hidden" onClick={handleContractClick} data-id={`deployedContractItem-${index}`}>
             <div className='d-flex'>
               <CustomTooltip

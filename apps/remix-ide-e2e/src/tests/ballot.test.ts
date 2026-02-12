@@ -20,7 +20,7 @@ module.exports = {
     browser
       .addFile('Untitled.sol', sources[0]['Untitled.sol'])
   },
-  'Deploy Ballot #group1': '' + function (browser: NightwatchBrowser) {
+  'Deploy Ballot #group1': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="remixIdeIconPanel"]', 10000)
       .clickLaunchIcon('solidity')
@@ -28,10 +28,8 @@ module.exports = {
       .clickLaunchIcon('udapp')
       .selectAccount('0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c')
       .createContract('["0x48656c6c6f20576f726c64210000000000000000000000000000000000000000"]')
-      .click('*[data-id="Deploy - transact (not payable)"]')
-      .waitForElementPresent('*[data-id="universalDappUiContractActionWrapper"]', 60000)
       .clickInstance(0)
-      .clickFunction('delegate - transact (not payable)', { types: 'address to', values: '"0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db"' })
+      .clickFunction(0, 0, { types: 'address to', values: '"0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db"' })
       .testFunction('last',
         {
           status: '1 Transaction mined and execution succeed',
@@ -39,9 +37,9 @@ module.exports = {
         })
   },
 
-  'Call method from Ballot to check return value #group1': '' + function (browser: NightwatchBrowser) {
+  'Call method from Ballot to check return value #group1': function (browser: NightwatchBrowser) {
     browser
-      .clickFunction('winnerName - call')
+      .clickFunction(0, 6)
       // Test in terminal
       .testFunction('last',
         {
@@ -52,7 +50,7 @@ module.exports = {
       .assert.containsText('*[data-id="treeViewDiv0"]', 'bytes32: winnerName_ 0x48656c6c6f20576f726c64210000000000000000000000000000000000000000')
   },
 
-  'Debug Ballot / delegate #group1': '' + function (browser: NightwatchBrowser) {
+  'Debug Ballot / delegate #group1': function (browser: NightwatchBrowser) {
     browser.pause(500)
       .debugTransaction(1)
       .waitForElementVisible('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]')
@@ -65,16 +63,9 @@ module.exports = {
       .checkVariableDebug('soliditylocals', localsCheck)
   },
 
-  'Access Ballot via at address #group1': '' + function (browser: NightwatchBrowser) {
-    browser.clickLaunchIcon('udapp')
-      .click('*[data-id="universalDappUiUdappClose"]')
-      .addFile('ballot.abi', { content: ballotABI })
-      .clickLaunchIcon('udapp')
-      .click({
-        selector: '*[data-id="deployAndRunClearInstances"]',
-        abortOnFailure: false,
-        suppressNotFoundErrors: true,
-      })
+  'Access Ballot via at address #group1': function (browser: NightwatchBrowser) {
+    browser.addFile('ballot.abi', { content: ballotABI })
+      .clearDeployedContracts()
       // we are not changing the visibility for not checksummed contracts
       // .addAtAddressInstance('0x692a70D2e424a56D2C6C27aA97D1a86395877b3B', true, false)
       .clickLaunchIcon('filePanel')
@@ -84,7 +75,7 @@ module.exports = {
         selector: "//*[@id='instance0x692a70D2e424a56D2C6C27aA97D1a86395877b3A']"
       })
       .clickInstance(0)
-      .clickFunction('delegate - transact (not payable)', { types: 'address to', values: '"0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db"' })
+      .clickFunction(0, 1, { types: 'address to', values: '"0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db"' })
       .testFunction('last',
         {
           status: '0 Transaction mined but execution failed',
@@ -92,7 +83,7 @@ module.exports = {
         })
   },
 
-  'Compile with remappings set in remappings.txt file #group1': '' + function (browser: NightwatchBrowser) {
+  'Compile with remappings set in remappings.txt file #group1': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('filePanel')
       .click('*[data-id="workspacesSelect"]')
@@ -120,7 +111,7 @@ module.exports = {
       .verifyContracts(['Retriever', 'Storage'])
   },
 
-  'Deploy and use Ballot using external web3  #group2': '' + function (browser: NightwatchBrowser) {
+  'Deploy and use Ballot using external web3  #group2': function (browser: NightwatchBrowser) {
     browser
       .openFile('Untitled.sol')
       .clickLaunchIcon('udapp')
@@ -130,14 +121,14 @@ module.exports = {
       .createContract('["0x48656c6c6f20576f726c64210000000000000000000000000000000000000000"]')
       .clickInstance(0)
       .click('*[data-id="terminalClearConsole"]')
-      .clickFunction('delegate - transact (not payable)', { types: 'address to', values: '0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c' })
+      .clickFunction(0, 0, { types: 'address to', values: '0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c' })
       .journalLastChildIncludes('Ballot.delegate(address)')
       .journalLastChildIncludes('data: 0x5c1...a733c')
   },
 
-  'Call method from Ballot to check return value using external web3  #group2': '' + function (browser: NightwatchBrowser) {
+  'Call method from Ballot to check return value using external web3  #group2': function (browser: NightwatchBrowser) {
     browser
-      .clickFunction('winnerName - call')
+      .clickFunction(0, 6)
       // Test in terminal
       .journalLastChildIncludes('Ballot.winnerName()')
       .testFunction('last',
@@ -148,7 +139,7 @@ module.exports = {
       .assert.containsText('*[data-id="treeViewDiv0"]', 'bytes32: winnerName_ 0x48656c6c6f20576f726c64210000000000000000000000000000000000000000')
   },
 
-  'Compile Ballot using config file  #group2': '' + function (browser: NightwatchBrowser) {
+  'Compile Ballot using config file  #group2': function (browser: NightwatchBrowser) {
     browser
       .openFile('remix.config.json')
       .setEditorValue(configFile)
@@ -163,7 +154,7 @@ module.exports = {
       .verifyContracts(['Ballot'], { wait: 2000, runs: '300' })
   },
 
-  'Compile and deploy sample yul file  #group2': '' + function (browser: NightwatchBrowser) {
+  'Compile and deploy sample yul file  #group2': function (browser: NightwatchBrowser) {
     browser
       .addFile('sample.yul', { content: yulSample })
       .clickLaunchIcon('solidity')
@@ -174,8 +165,8 @@ module.exports = {
       .click('select[id="compilerLanguageSelector"] option[value=Yul]')
       .waitForElementContainsText('[data-id="compiledContracts"]', 'Contract', 65000)
       .clickLaunchIcon('udapp')
-      .click('*[data-id="Deploy - transact (not payable)"]')
-      .waitForElementPresent('*[data-id="universalDappUiContractActionWrapper"]', 60000)
+      .createContract('')
+      .waitForElementPresent('[data-id="deployedContractItem-1"]')
       .journalLastChildIncludes('Contract.(constructor)')
       // .journalLastChildIncludes('data: 0x602...0565b')
       .journalLastChildIncludes('data: 0x00') // This can be removed some time once YUL returns correct bytecode

@@ -16,6 +16,14 @@ class ClearDeployedContract extends EventEmitter {
 function clearContract (browser: NightwatchBrowser, index: number, callback: VoidFunction) {
   browser
     .clickLaunchIcon('udapp')
+    .waitForElementPresent(`[data-id="contractKebabIcon-${index}"]`)
+    .execute(function (index) {
+      // Use JavaScript to click the button, avoiding sticky header issues
+      const optionsMenu = document.querySelector(`[data-id="contractKebabIcon-${index}"]`) as HTMLElement
+      if (optionsMenu) {
+        optionsMenu.scrollIntoView({ behavior: 'auto', block: 'center' })
+      }
+    }, [index])
     .waitForElementVisible(`[data-id="contractKebabIcon-${index}"]`)
     .click(`[data-id="contractKebabIcon-${index}"]`) // Click kebab icon
     .waitForElementVisible('[data-id="clear"]')
