@@ -50,7 +50,7 @@ module.exports = function (st, privateKey, contractBytecode, compilationResult, 
 
               // test gas cost per line
               st.equals((await callTree.getGasCostPerLine(0, 16, '1')).gasCost, 10)
-              st.equals((await callTree.getGasCostPerLine(0, 32, '1.2.1')).gasCost, 29)
+              st.equals((await callTree.getGasCostPerLine(0, 32, '1.4')).gasCost, 30)
 
               /*
               TODO: replace by call tree unit testing
@@ -86,8 +86,8 @@ module.exports = function (st, privateKey, contractBytecode, compilationResult, 
               st.equals(scopeStarts[0], '1')
               st.equals(scopeStarts[12], '1.1')
               st.equals(scopeStarts[101], '1.2')
-              st.equals(scopeStarts[114], '1.2.1.1')
-              st.equals(scopeStarts[135], '1.2.1.2')
+              st.equals(scopeStarts[114], '1.2.1')
+              st.equals(scopeStarts[135], '1.3')
               /*
               TODO use symbolic stack to verify localsl type.
               st.equals(scopes['1.1'].locals['ui8'].type.typeName, 'uint8')
