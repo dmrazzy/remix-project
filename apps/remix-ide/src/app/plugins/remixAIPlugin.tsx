@@ -86,28 +86,8 @@ export class RemixAIPlugin extends Plugin {
       this.isInferencing = false
     })
 
-    // Load saved model preference
-    const savedModelId = await this.call('settings', 'get', 'ai/selectedModel')
-    if (savedModelId) {
-      await this.setModel(savedModelId)
-    } else {
-      // Migration: Convert old provider preference to model
-      const oldProvider = await this.call('settings', 'get', 'ai/assistantProvider')
-      if (oldProvider) {
-        const migrationMap = {
-          'openai': 'gpt-4-turbo',
-          'mistralai': 'mistral-medium-latest',
-          'anthropic': 'claude-sonnet-4-5',
-          'ollama': 'ollama'
-        }
-        const modelId = migrationMap[oldProvider] || getDefaultModel().id
-        await this.call('settings', 'set', 'ai/selectedModel', modelId)
-        await this.setModel(modelId)
-      } else {
-        // Set default model
-        await this.setModel(this.selectedModelId)
-      }
-    }
+    // Always initialize with default model on page reload
+    await this.setModel(this.selectedModelId)
 
     this.aiIsActivated = true
 
@@ -215,8 +195,9 @@ export class RemixAIPlugin extends Plugin {
     params.stream_result = false // enforce no stream result
     params.threadId = newThreadID
     params.provider = 'anthropic' // enforce all generation to be only on anthropic
+    params.model = 'claude-haiku-4-5'
     useRag = false
-    trackMatomoEvent(this, { category: 'ai', action: 'GenerateNewAIWorkspace', name: 'GenerateNewAIWorkspace', isClick: false })
+    trackMatomoEvent(this, { category: 'ai', action: 'remixAI', name: 'GenerateNewAIWorkspace', isClick: false })
     let userPrompt = ''
 
     if (useRag) {
@@ -260,7 +241,7 @@ export class RemixAIPlugin extends Plugin {
     params.threadId = newThreadID
     params.provider = this.selectedModel.provider
     useRag = false
-    trackMatomoEvent(this, { category: 'ai', action: 'GenerateNewAIWorkspace', name: 'WorkspaceAgentEdit', isClick: false })
+    trackMatomoEvent(this, { category: 'ai', action: 'remixAI', name: 'WorkspaceAgentEdit', isClick: false })
 
     await statusCallback?.('Performing workspace request...')
     if (useRag) {
@@ -327,7 +308,7 @@ export class RemixAIPlugin extends Plugin {
     else {
       console.log("chatRequestBuffer is not empty. First process the last request.", this.chatRequestBuffer)
     }
-    trackMatomoEvent(this, { category: 'ai', action: 'chatting', name: 'remixAI_chat', isClick: false })
+    trackMatomoEvent(this, { category: 'ai', action: 'remixAI', name: 'remixAI_chat', isClick: false })
   }
 
   async ProcessChatRequestBuffer(params:IParams=GenerationParams){
@@ -367,8 +348,7 @@ export class RemixAIPlugin extends Plugin {
   }
 
   async setAssistantProvider(provider: string) {
-    // Legacy method - map provider to a default model for backwards compatibility
-    const providerToModelMap = {
+    const providerToModelMap: Record<string, string> = {
       'openai': 'gpt-4-turbo',
       'mistralai': 'mistral-medium-latest',
       'anthropic': 'claude-sonnet-4-5',
@@ -470,9 +450,6 @@ export class RemixAIPlugin extends Plugin {
       })
       await this.mcpInferencer.connectAllServers();
     }
-
-    // Save preference
-    await this.call('settings', 'set', 'ai/selectedModel', modelId)
 
     // Emit event for UI updates
     this.emit('modelChanged', modelId)
