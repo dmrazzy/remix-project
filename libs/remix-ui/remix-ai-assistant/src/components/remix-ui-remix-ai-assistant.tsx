@@ -102,13 +102,13 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         if (textareaRef.current) {
           textareaRef.current.focus()
         }
-        trackMatomoEvent({ category: 'ai', action: 'SpeechToTextPrompt', name: 'SpeechToTextPrompt', isClick: true })
+        trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'SpeechToTextPrompt', isClick: true })
       } else {
         // Append transcription to the input box and execute the prompt
         setInput(prev => prev ? `${prev} ${text}`.trim() : text)
         if (trimmedText) {
           await sendPrompt(trimmedText)
-          trackMatomoEvent({ category: 'ai', action: 'SpeechToTextPrompt', name: 'SpeechToTextPrompt', isClick: true })
+          trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'SpeechToTextPrompt', isClick: true })
         }
         // Focus the textarea
         if (textareaRef.current) {
@@ -269,6 +269,26 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       props.plugin.off('theme', 'themeChanged')
     }
   })
+
+  useEffect(() => {
+    const loadSelectedModel = async () => {
+      try {
+        const modelId = await props.plugin.call('remixAI', 'getSelectedModel')
+        console.log('got selected model', modelId)
+        if (modelId) {
+          const model = AVAILABLE_MODELS.find(m => m.id === modelId)
+          if (model) {
+            setSelectedModelId(modelId)
+            setSelectedModel(model)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load selected model:', err)
+      }
+    }
+
+    loadSelectedModel()
+  }, [props.plugin])
 
   // Listen for auth state changes and refresh model access
   useEffect(() => {
@@ -883,7 +903,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const handleRecord = useCallback(async () => {
     await toggleRecording()
     if (!isRecording) {
-      trackMatomoEvent({ category: 'ai', action: 'StartAudioRecording', name: 'StartAudioRecording', isClick: true })
+      trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'StartAudioRecording', isClick: true })
     }
   }, [toggleRecording, isRecording])
 

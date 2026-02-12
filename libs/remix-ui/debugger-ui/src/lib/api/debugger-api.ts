@@ -52,6 +52,10 @@ export const DebuggerApiMixin = (Base) => class extends Base {
     return this.currentSourceLocation
   }
 
+  getStackAt (vmtraceIndex: number) {
+    return this.debuggerBackend.debugger.traceManager.getStackAt(vmtraceIndex)
+  }
+
   async highlight (lineColumnPos, path, rawLocation, stepDetail, lineGasCost, origin?, step?) {
     // Pass the main contract being debugged as the origin for proper resolution
     await this.call('editor', 'highlight', lineColumnPos, path, '', { focus: true, origin })
