@@ -354,7 +354,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
         className="d-flex align-items-center rounded"
         style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', cursor: 'pointer' }}
       >
-        <div id={`instance${contract.address}`} className="me-auto w-100">
+        <div id={`instance${contract.address}`} className="me-auto w-100" data-shared="universalDappUiInstance">
           <div className="d-flex align-items-center justify-content-between w-100 p-3 text-nowrap text-truncate overflow-hidden" onClick={handleContractClick} data-id={`deployedContractItem-${index}`}>
             <div className='d-flex'>
               <CustomTooltip
@@ -450,7 +450,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                                   color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '4.5rem', fontSize: '0.75rem',
                                   cursor: !inputNames ? 'not-allowed' : 'text'
                                 }}
-                                disabled={!inputNames}
+                                disabled={!inputNames && !inputTypes}
                                 data-id={`deployedContractItem-${index}-input-${funcIndex}`}
                               />
                               <button
