@@ -141,9 +141,12 @@ const tests = {
       .waitForElementContainsText('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 'Permission Scope', 5000)
       .waitForElementContainsText('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 'Just This File', 5000)
       .modalFooterOKClick("mcp_file_write_permission_scope") // Clicks "Just This File"
-      .pause(2000)
-      // Verify config was updated
+      .useXpath()
+      .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
+      .click('//button[contains(text(), "Accept All")]')
+      .useCss()
       .pause(1000)
+      // Verify config was updated
       .execute(function () {
         return (window as any).getRemixAIPlugin.call('fileManager', 'readFile', 'remix.config.json');
       }, [], function (result) {
@@ -208,6 +211,11 @@ const tests = {
       .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 30000)
       .modalFooterCancelClick("mcp_file_write_permission_scope") // Clicks "All Files in Project"
       .pause(2000)
+      .useXpath()
+      .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
+      .click('//button[contains(text(), "Accept All")]')
+      .useCss()
+      .pause(1000)
       .execute(function () {
         return (window as any).getRemixAIPlugin.call('fileManager', 'readFile', 'remix.config.json');
       }, [], function (result) {

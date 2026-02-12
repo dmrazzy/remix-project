@@ -153,13 +153,13 @@ export class SymbolicStackManager {
     if (stackIndex >= 0 && stackIndex < stack.length) {
       stack[stackIndex] = newVar
 
-      console.log(`[${lifecycle}] Bound variable ${variable.name} at step ${step} to stack index ${stackIndex} in scope ${functionScopeId || 'unknown'}`)
+      // console.log(`[${lifecycle}] Bound variable ${variable.name} at step ${step} to stack index ${stackIndex} in scope ${functionScopeId || 'unknown'}`)
     } else {
       // Handle out of bounds - this can happen with return parameters
       if (variable.isReturnParameter || stackIndex < 0) {
         console.log(`Return parameter or negative stack index for ${variable.name}: stackIndex=${stackIndex}`)
       } else {
-        console.warn(`Cannot bind variable ${variable.name} at step ${step}: stackIndex ${stackIndex} out of bounds (stack length: ${stack.length})`)
+        // console.warn(`Cannot bind variable ${variable.name} at step ${step}: stackIndex ${stackIndex} out of bounds (stack length: ${stack.length})`)
       }
     }
   }
