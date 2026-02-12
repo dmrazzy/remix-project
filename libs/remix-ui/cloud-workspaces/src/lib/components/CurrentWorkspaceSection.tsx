@@ -188,7 +188,9 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
       const success = await setEncryptionPassphrase(passphrase)
       if (success) {
         setShowPassphraseModal(false)
-        await plugin.call('notification', 'toast', '🔐 Encryption passphrase set')
+        // Actually enable encryption now that passphrase is set
+        await toggleEncryption(true)
+        await plugin.call('notification', 'toast', '🔐 Encryption enabled')
       }
     } catch (e) {
       setPassphraseError(e.message || 'Failed to set passphrase')
@@ -308,10 +310,12 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
                   if (e.key === 'Enter') handleSaveName()
                   if (e.key === 'Escape') handleCancelEditName()
                 }}
+                onBlur={handleCancelEditName}
                 autoFocus
               />
               <button
                 className="btn btn-sm p-0 ms-1 text-success"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleSaveName}
                 style={{ border: 'none', background: 'none' }}
               >
@@ -319,6 +323,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
               </button>
               <button
                 className="btn btn-sm p-0 ms-1 text-muted"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleCancelEditName}
                 style={{ border: 'none', background: 'none' }}
               >

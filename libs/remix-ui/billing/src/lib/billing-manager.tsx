@@ -143,7 +143,7 @@ export const BillingManager: React.FC<BillingManagerProps> = ({
 
     checkAuth()
 
-    // Listen for auth changes
+    // Listen for auth changes (login/logout only — not token refreshes)
     const handleAuthChange = (authState: { isAuthenticated: boolean; token?: string }) => {
       setIsAuthenticated(authState.isAuthenticated)
       if (authState.isAuthenticated) {
@@ -156,8 +156,14 @@ export const BillingManager: React.FC<BillingManagerProps> = ({
       }
     }
 
+    // Listen for token refreshes — just update the API client token, no data reload needed
+    const handleTokenRefreshed = (data: { token: string }) => {
+      if (data.token) billingApi.setToken(data.token)
+    }
+
     try {
       plugin?.on('auth', 'authStateChanged', handleAuthChange)
+      plugin?.on('auth', 'tokenRefreshed', handleTokenRefreshed)
     } catch {
       // Ignore if plugin not available
     }
@@ -165,6 +171,7 @@ export const BillingManager: React.FC<BillingManagerProps> = ({
     return () => {
       try {
         plugin?.off('auth', 'authStateChanged')
+        plugin?.off('auth', 'tokenRefreshed')
       } catch {
         // Ignore
       }

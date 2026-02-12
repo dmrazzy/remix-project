@@ -543,22 +543,11 @@ export class AuthPlugin extends Plugin {
         this.scheduleRefresh(newAccessToken)
 
         // Notify all listeners about the new token
+        // Only emit tokenRefreshed — NOT authStateChanged.
+        // The user hasn't changed, only the token was refreshed.
+        // Emitting authStateChanged here would cause all consumers to re-initialize
+        // (reload configs, re-read S3 data, etc.) for no reason.
         this.emit('tokenRefreshed', { token: newAccessToken })
-
-        // Also emit authStateChanged so UI state and other plugins stay in sync
-        const userStr = localStorage.getItem('remix_user')
-        if (userStr) {
-          try {
-            const user = JSON.parse(userStr)
-            this.emit('authStateChanged', {
-              isAuthenticated: true,
-              user,
-              token: newAccessToken
-            })
-          } catch (e) {
-            // Invalid stored user data, still emit token refresh
-          }
-        }
 
         return newAccessToken
       }

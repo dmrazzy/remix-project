@@ -240,13 +240,21 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     // Check auth status and load workspaces
     await this.checkAuthAndLoad()
     
-    // Listen for auth state changes
+    // Listen for auth state changes (login / logout — NOT token refreshes)
     this.on('auth', 'authStateChanged', async (state: { isAuthenticated: boolean }) => {
-      console.log('[CloudWorkspaces] authStateChanged:', state.isAuthenticated)
+      const wasAuthenticated = this.state.isAuthenticated
       this.state.isAuthenticated = state.isAuthenticated
+      
       if (state.isAuthenticated) {
+        if (wasAuthenticated) {
+          // Already authenticated — skip full workspace reload
+          console.log('[CloudWorkspaces] authStateChanged: already authenticated, skipping reload')
+          return
+        }
+        console.log('[CloudWorkspaces] authStateChanged: user logged in, loading workspaces')
         await this.loadWorkspaces()
       } else {
+        console.log('[CloudWorkspaces] authStateChanged: user logged out')
         this.state.workspaces = []
         this.state.workspaceBackups = {}
         this.state.selectedWorkspace = null
@@ -685,6 +693,8 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     try {
       await this.call('s3Storage', 'setWorkspaceRemoteId', workspaceName, remoteId)
       await this.loadCurrentWorkspaceStatus()
+      await this.updateStatus()
+      await this.loadWorkspaces()
     } catch (e) {
       this.state.error = e.message || 'Failed to rename'
       this.renderComponent()

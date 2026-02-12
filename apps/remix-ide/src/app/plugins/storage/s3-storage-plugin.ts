@@ -240,6 +240,9 @@ export class S3StoragePlugin extends Plugin {
   // Content hash cache - tracks last saved hash per workspace to avoid unnecessary uploads
   private lastSavedHashCache: Map<string, string> = new Map()
   
+  // Track auth state so we only do full init on real state changes (not token refreshes)
+  private wasAuthenticated: boolean = false
+  
   constructor() {
     super(profile)
     console.log('[S3StoragePlugin] Session ID:', this.sessionId)
@@ -251,28 +254,40 @@ export class S3StoragePlugin extends Plugin {
     // Initialize API client and provider
     await this.initializeProvider()
     
-    // Listen for auth state changes
+    // Listen for auth state changes (login / logout — NOT token refreshes)
     this.on('auth', 'authStateChanged', async (state: { isAuthenticated: boolean; token?: string }) => {
       if (state.isAuthenticated) {
-        // Update API client token if provided (e.g. after token refresh)
+        if (this.wasAuthenticated) {
+          // Already authenticated — this is a redundant emit, skip full reload
+          console.log('[S3StoragePlugin] authStateChanged: already authenticated, skipping re-init')
+          if (state.token && this.apiClient) {
+            this.apiClient.setToken(state.token)
+          }
+          return
+        }
+        // Genuine login — do full initialization
+        console.log('[S3StoragePlugin] authStateChanged: user logged in, initializing')
+        this.wasAuthenticated = true
         if (state.token && this.apiClient) {
           this.apiClient.setToken(state.token)
         }
         await this.initializeProvider()
         await this.loadConfig()
-        // Start autosave if enabled
         await this.startAutosaveIfEnabled()
       } else {
-        // Clear config on logout
+        // Logged out
+        console.log('[S3StoragePlugin] authStateChanged: user logged out')
+        this.wasAuthenticated = false
         this.config = null
         this.stopAutosave()
       }
     })
 
-    // Listen for token refresh to update API client without full re-init
+    // Listen for token refresh — just update the API client token, no re-init needed
     this.on('auth', 'tokenRefreshed', async (data: { token: string }) => {
       if (this.apiClient && data.token) {
         this.apiClient.setToken(data.token)
+        console.log('[S3StoragePlugin] Token refreshed, API client updated (no re-init)')
       }
     })
     
@@ -950,11 +965,12 @@ export class S3StoragePlugin extends Plugin {
     }
     
     const existingConfig = config['remote-workspace'] as RemoteWorkspaceConfig | undefined
+    
+    // New remote ID means a fresh cloud link — clear stale timestamps
     config['remote-workspace'] = {
-      ...existingConfig,
       remoteId: sanitizedId,
       userId,
-      createdAt: existingConfig?.createdAt || new Date().toISOString()
+      createdAt: new Date().toISOString()
     }
     
     await this.saveRemixConfig(config)
