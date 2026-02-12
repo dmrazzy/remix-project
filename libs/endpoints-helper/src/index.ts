@@ -20,6 +20,7 @@ type EndpointUrls = {
     credits: string;
     audio;
     permissions: string;
+    feedback: string;
 };
 
 const defaultUrls: EndpointUrls = {
@@ -44,6 +45,7 @@ const defaultUrls: EndpointUrls = {
   credits: 'https://auth.api.remix.live:8443/credits',
   audio: 'https://audio.api.remix.live',
   permissions: 'https://auth.api.remix.live:8443/permissions',
+  feedback: 'https://auth.api.remix.live:8443/feedback',
 };
 
 const endpointPathMap: Record<keyof EndpointUrls, string> = {
@@ -68,6 +70,7 @@ const endpointPathMap: Record<keyof EndpointUrls, string> = {
   credits: 'credits',
   audio: 'audio',
   permissions: 'permissions',
+  feedback: 'feedback',
 };
 
 const prefix = process.env.NX_ENDPOINTS_URL;
@@ -110,6 +113,9 @@ const localhostUrls: EndpointUrls = {
   
   // PERMISSIONS service
   permissions: 'https://auth.api.remix.live:8443/permissions',
+
+  // FEEDBACK service
+  feedback: 'https://auth.api.remix.live:8443/feedback',
 };
 
 const resolvedUrls: EndpointUrls = prefix
