@@ -41,6 +41,11 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
   }
 
   const getContractName = (address: string, scope?: any): string => {
+    // PRIORITY 1: Check functionDefinition.contractName first (most accurate for internal calls)
+    if (scope?.functionDefinition?.contractName) {
+      return scope.functionDefinition.contractName
+    }
+
     if (!deployments || deployments.length === 0) {
       return ''
     }
@@ -60,6 +65,7 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
       return ''
     }
 
+    // PRIORITY 2: Lookup by address in deployments
     // Normalize address for comparison (remove 0x prefix, lowercase)
     const normalizeAddr = (addr: string) => {
       return addr.toLowerCase().replace(/^0x/, '')
@@ -78,17 +84,26 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
       return contract.name
     }
 
-    // For CREATE operations, try to extract contract name from functionDefinition
-    if (scope?.functionDefinition?.contractName) {
-      return scope.functionDefinition.contractName
-    }
-
     return ''
   }
 
   const renderExecutionItem = (scope: any, depth: number = 0): JSX.Element => {
     const opcode = scope.opcodeInfo?.op || ''
-    const itemName = scope.functionDefinition?.name || scope.functionDefinition?.kind || (scope.isCreation ? 'constructor' : 'low-level')
+    // Only show 'fallback' if it's actually a fallback function (kind === 'fallback')
+    // For scopes without function definitions, show appropriate label
+    let itemName = scope.functionDefinition?.name ||
+                   (scope.functionDefinition?.kind === 'fallback' ? 'fallback' : scope.functionDefinition?.kind) ||
+                   (scope.isCreation ? 'constructor' : null)
+
+    // For external calls without function definition, show 'call'
+    // For internal calls without function definition, show 'internal'
+    if (!itemName) {
+      if (opcode === 'CALL' || opcode === 'DELEGATECALL' || opcode === 'STATICCALL') {
+        itemName = 'call'
+      } else {
+        itemName = 'internal'
+      }
+    }
 
     // Determine call type
     let callTypeLabel = 'INTERNAL'
@@ -157,27 +172,40 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
                 {isCreate ? (
                   // For CREATE operations, show contract name or address
                   contractName ? (
-                    <span className="contract-name">{contractName}</span>
+                    <>
+                      <span className="contract-name">{contractName}</span>
+                      {contractAddress && <span className="text-muted"> ({contractAddress})</span>}
+                    </>
                   ) : contractAddress ? (
-                    <span className="contract-name">{contractAddress}</span>
+                    <span className="contract-name">({contractAddress})</span>
                   ) : (
                     <span className="method-name">Contract Creation</span>
                   )
                 ) : (
                   // For other operations, show contract.method format
                   <>
+                    {/* Show contract name and/or address */}
                     {contractName ? (
                       <>
                         <span className="contract-name">{contractName}</span>
-                        <span>.</span>
+                        {contractAddress && <span className="text-muted"> ({contractAddress})</span>}
                       </>
                     ) : contractAddress ? (
-                      <>
-                        <span className="contract-name">({contractAddress})</span>
-                        <span>.</span>
-                      </>
+                      <span className="contract-name">({contractAddress})</span>
                     ) : null}
-                    <span className="method-name">{itemName}</span>
+
+                    {/* Show separator and method name if we have method info */}
+                    {itemName && (
+                      <>
+                        {(contractName || contractAddress) && <span>.</span>}
+                        <span className="method-name">{itemName}</span>
+                      </>
+                    )}
+
+                    {/* Fallback: if no contract and no method, show unknown */}
+                    {!contractName && !contractAddress && !itemName && (
+                      <span className="method-name text-muted">unknown</span>
+                    )}
                   </>
                 )}
               </span>

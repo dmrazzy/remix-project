@@ -200,6 +200,14 @@
   background-color: var(--custom-onsurface-layer-2);
 }
 
+.call-trace-item.sender-node {
+  cursor: default;
+}
+
+.call-trace-item.sender-node:hover {
+  background-color: transparent;
+}
+
 .call-trace-line {
   display: flex;
   align-items: center;

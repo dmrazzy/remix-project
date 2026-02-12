@@ -155,7 +155,7 @@ export const ButtonNavigation = ({
         <div
           className={`${state.overForwardDisabled ? 'disabled ' : ''} ${stepBtnStyle}`}
           onClick={() => {
-            stepOverForward && stepOverForward()
+            stepOverForward && stepOverForward(!showOpcodes)
           }}
           data-id="buttonNavigatorOverForward"
           id="buttonNavigatorOverForwardContainer"
@@ -164,7 +164,7 @@ export const ButtonNavigation = ({
             id="overforward"
             className="btn btn-primary btn-sm stepButton m-0 p-0"
             onClick={() => {
-              stepOverForward && stepOverForward()
+              stepOverForward && stepOverForward(!showOpcodes)
             }}
             disabled={state.overForwardDisabled}
             style={{ pointerEvents: 'none' }}
@@ -174,7 +174,7 @@ export const ButtonNavigation = ({
         </div>
       ),
       placement: 'top-end',
-      tagId: 'overbackTooltip',
+      tagId: 'overforwardTooltip',
       tooltipMsg: intl.formatMessage({ id: 'debugger.stepOverForward' })
     }
   }

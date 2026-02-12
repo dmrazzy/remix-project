@@ -88,8 +88,11 @@ export const ScopePanel = ({ data, className, stepManager }: ScopePanelProps) =>
     let title = ' - anonymous - '
     if (scope.scopeId === '1') {
       title = scope.isCreation ? 'Contract Creation' : '@' + scope.address?.slice(0, 8) + '...'
-    } else
-      title = scope.functionDefinition?.name || scope.opcodeInfo?.op
+    } else {
+      // Show function name if available, otherwise show the opcode
+      // Don't default to 'fallback' unless it's actually a fallback function
+      title = scope.functionDefinition?.name || scope.functionDefinition?.kind || scope.opcodeInfo?.op || ' - anonymous - '
+    }
     const kind = scope.functionDefinition?.kind || (scope.isCreation ? 'creation' : 'scope')
     const gasInfo = scope.gasCost ? ` (${scope.gasCost} gas)` : ''
     const stepRange = scope.lastStep !== undefined

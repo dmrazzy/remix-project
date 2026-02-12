@@ -54,6 +54,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   const [currentFunction, setCurrentFunction] = useState<string>('')
   const [functionStack, setFunctionStack] = useState<any[]>([])
   const [nestedScopes, setNestedScopes] = useState<any[]>([])
+  const [callTreeInstance, setCallTreeInstance] = useState<any>(null)
   const [solidityLocals, setSolidityLocals] = useState<any>(null)
   const [solidityState, setSolidityState] = useState<any>(null)
 
@@ -360,12 +361,87 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
 
     // Listen for callTreeReady event to get nested scopes
     if (debuggerInstance && debuggerInstance.debugger && debuggerInstance.debugger.callTree) {
+      // Store the callTree instance for later use
+      setCallTreeInstance(debuggerInstance.debugger.callTree)
+
       debuggerInstance.debugger.callTree.event.register('callTreeReady', () => {
         try {
-          const scopes = debuggerInstance.debugger.callTree.getScopesAsNestedJSON(true)
-          setNestedScopes(scopes)
+          // Get the root scope with low-level scopes merged
+          const nojumpScopes = debuggerInstance.debugger.callTree.getScopesAsNestedJSON('nojump')
+          // Also get all scopes to access the original scope tree
+          const allScopes = debuggerInstance.debugger.callTree.getScopesAsNestedJSON('all')
+
+          if (nojumpScopes && nojumpScopes.length > 0) {
+            const rootScope = nojumpScopes[0]
+
+            // Get external calls made by this transaction
+            const externalCalls = debuggerInstance.debugger.callTree.getScopesAsNestedJSON('call')
+
+            // Find the actual function entry step by looking at the scope tree
+            // The root might include dispatcher, so we look for the first meaningful child scope
+            let functionEntryStep = rootScope.firstStep
+
+            // Helper function to find first function scope in the tree
+            const findFirstFunctionScope = (scope: any): any => {
+              // If this scope has a function definition with a name, it's a function scope
+              if (scope.functionDefinition && scope.functionDefinition.name) {
+                return scope
+              }
+              // Otherwise, look at children
+              if (scope.children && scope.children.length > 0) {
+                for (const child of scope.children) {
+                  const found = findFirstFunctionScope(child)
+                  if (found) return found
+                }
+              }
+              return null
+            }
+
+            // Try to find a better entry step and function definition from the all-scopes tree
+            let actualFunctionDefinition = rootScope.functionDefinition
+            if (allScopes && allScopes.length > 0) {
+              const firstFunctionScope = findFirstFunctionScope(allScopes[0])
+              if (firstFunctionScope) {
+                if (firstFunctionScope.firstStep > rootScope.firstStep) {
+                  functionEntryStep = firstFunctionScope.firstStep
+                }
+                // Use the function definition from the actual function scope
+                if (firstFunctionScope.functionDefinition) {
+                  actualFunctionDefinition = firstFunctionScope.functionDefinition
+                }
+              }
+            }
+
+            // Create the root transaction call (CALL to the contract method)
+            const rootTransactionCall = {
+              ...rootScope,
+              functionDefinition: actualFunctionDefinition, // Use the actual function definition
+              children: externalCalls, // External calls become children of the root transaction
+              isRootTransaction: true, // Mark this as the root transaction call
+              functionEntryStep: functionEntryStep // Store the actual function entry step
+            }
+
+            // Create a synthetic SENDER node as the parent
+            const senderNode = {
+              scopeId: 'sender',
+              firstStep: rootScope.firstStep,
+              lastStep: rootScope.lastStep,
+              gasCost: rootScope.gasCost,
+              address: rootScope.address,
+              isCreation: rootScope.isCreation,
+              functionDefinition: rootScope.functionDefinition,
+              opcodeInfo: rootScope.opcodeInfo,
+              locals: {},
+              children: [rootTransactionCall], // Root transaction is a child of sender
+              isSenderNode: true // Mark this as the synthetic sender node
+            }
+
+            setNestedScopes([senderNode])
+          } else {
+            setNestedScopes([])
+          }
         } catch (error) {
-          console.error('Error loading nested scopes:', error)
+          console.error('[DebuggerUI] Error loading nested scopes:', error)
         }
       })
     }
@@ -707,6 +783,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             solidityLocals={solidityLocals}
             solidityState={solidityState}
             stepManager={stepManager}
+            callTree={callTreeInstance}
           />
         </div>
       )}

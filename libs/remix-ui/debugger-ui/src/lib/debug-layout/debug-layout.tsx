@@ -21,6 +21,7 @@ interface DebugLayoutProps {
   solidityLocals?: any
   solidityState?: any
   stepManager?: any
+  callTree?: any
 }
 
 export const DebugLayout = ({
@@ -39,7 +40,8 @@ export const DebugLayout = ({
   onScopeSelected,
   solidityLocals,
   solidityState,
-  stepManager
+  stepManager,
+  callTree
 }: DebugLayoutProps) => {
   const [activeObjectTab, setActiveObjectTab] = useState<'json' | 'raw'>('json')
   const [copyTooltips, setCopyTooltips] = useState<{ [key: string]: string }>({
@@ -49,6 +51,13 @@ export const DebugLayout = ({
   const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
   const [selectedScope, setSelectedScope] = useState<any>(null)
   const [expandedObjectPaths, setExpandedObjectPaths] = useState<Set<string>>(new Set())
+
+  // Auto-expand sender node when nestedScopes are loaded
+  React.useEffect(() => {
+    if (nestedScopes && nestedScopes.length > 0 && nestedScopes[0].isSenderNode) {
+      setExpandedScopes(new Set(['sender']))
+    }
+  }, [nestedScopes])
 
   const formatAddress = (address: string | undefined) => {
     if (!address) return ''
@@ -349,6 +358,11 @@ export const DebugLayout = ({
   }
 
   const getContractName = (address: string, scope?: any): string => {
+    // PRIORITY 1: Check functionDefinition.contractName first (most accurate for internal calls)
+    if (scope?.functionDefinition?.contractName) {
+      return scope.functionDefinition.contractName
+    }
+
     if (!deployments || deployments.length === 0) return ''
 
     // Check if address is a placeholder for contract creation
@@ -364,6 +378,7 @@ export const DebugLayout = ({
 
     if (!address || isCreationPlaceholder) return ''
 
+    // PRIORITY 2: Lookup by address in deployments
     // Normalize address for comparison (remove 0x prefix, lowercase)
     const normalizeAddr = (addr: string) => {
       return addr.toLowerCase().replace(/^0x/, '')
@@ -382,42 +397,24 @@ export const DebugLayout = ({
       return contract.name
     }
 
-    // For CREATE operations, try to extract contract name from functionDefinition
-    if (scope?.functionDefinition?.contractName) {
-      return scope.functionDefinition.contractName
-    }
-
     return ''
-  }
-
-  const isExternalCall = (opcode: string): boolean => {
-    return ['CALL', 'DELEGATECALL', 'STATICCALL', 'CREATE', 'CREATE2'].includes(opcode)
-  }
-
-  const collectExternalCalls = (scope: any): any[] => {
-    const items: any[] = []
-    const opcode = scope.opcodeInfo?.op || ''
-
-    // Check if this scope itself is an external call
-    if (isExternalCall(opcode) || scope.isCreation) {
-      items.push(scope)
-    }
-
-    // Recursively collect from children
-    if (scope.children && scope.children.length > 0) {
-      scope.children.forEach((child: any) => {
-        items.push(...collectExternalCalls(child))
-      })
-    }
-
-    return items
   }
 
   const renderScopeItem = (scope: any, depth: number = 0): JSX.Element => {
     const opcode = scope.opcodeInfo?.op || ''
     let callTypeLabel = ''
 
-    if (opcode === 'DELEGATECALL') {
+    // Check if this is the synthetic sender node
+    if (scope.isSenderNode) {
+      callTypeLabel = 'SENDER'
+    } else if (scope.isRootTransaction) {
+      // Root transaction call - use the actual opcode or default to CALL
+      if (opcode === 'CREATE' || opcode === 'CREATE2' || scope.isCreation) {
+        callTypeLabel = 'CREATE'
+      } else {
+        callTypeLabel = 'CALL'
+      }
+    } else if (opcode === 'DELEGATECALL') {
       callTypeLabel = 'DELEGATECALL'
     } else if (opcode === 'STATICCALL') {
       callTypeLabel = 'STATICCALL'
@@ -426,22 +423,27 @@ export const DebugLayout = ({
     } else if (opcode === 'CREATE' || opcode === 'CREATE2' || scope.isCreation) {
       callTypeLabel = 'CREATE'
     } else {
-      callTypeLabel = 'TRANSACTION'
+      // For scopes without specific opcodes:
+      // - Root scope (depth 0) is the initial transaction = CALL
+      // - Child scopes without opcode are internal function calls = INTERNAL
+      callTypeLabel = depth === 0 ? 'CALL' : 'INTERNAL'
     }
 
-    // Collect external calls from all descendants (including deeply nested)
-    let externalChildren: any[] = []
-    if (scope.children && scope.children.length > 0) {
-      scope.children.forEach((child: any) => {
-        externalChildren.push(...collectExternalCalls(child))
-      })
-    }
-    const hasChildren = externalChildren.length > 0
+    // Use children directly - getScopesAsNestedJSON('call') already filters properly
+    const hasChildren = scope.children && scope.children.length > 0
     const isExpanded = expandedScopes.has(scope.scopeId)
     const isSelected = selectedScope?.scopeId === scope.scopeId
 
     // Get function/method name
-    const itemName = scope.functionDefinition?.name || scope.functionDefinition?.kind || (scope.isCreation ? 'constructor' : 'fallback')
+    // Only show 'fallback' if it's actually a fallback function (kind === 'fallback')
+    let itemName = scope.functionDefinition?.name ||
+                   (scope.functionDefinition?.kind === 'fallback' ? 'fallback' : scope.functionDefinition?.kind) ||
+                   (scope.isCreation ? 'constructor' : null)
+
+    // For external calls without function definition, show a generic label
+    if (!itemName && !scope.isSenderNode && (opcode === 'CALL' || opcode === 'DELEGATECALL' || opcode === 'STATICCALL')) {
+      itemName = 'call'
+    }
 
     // Get contract name from address
     const contractName = getContractName(scope.address, scope)
@@ -460,15 +462,39 @@ export const DebugLayout = ({
     return (
       <div key={scope.scopeId}>
         <div
-          className={`call-trace-item ${isSelected ? 'selected' : ''}`}
+          className={`call-trace-item ${isSelected ? 'selected' : ''} ${scope.isSenderNode ? 'sender-node' : ''}`}
           onClick={() => {
-            setSelectedScope(scope)
-            // Jump to the first step of this scope to trigger solidity locals/state update
-            if (stepManager && stepManager.jumpTo && scope.firstStep !== undefined) {
-              stepManager.jumpTo(scope.firstStep)
+            // Don't handle clicks on synthetic sender node
+            if (scope.isSenderNode) {
+              return
             }
+
+            setSelectedScope(scope)
+            // Jump to the function entry step (for root transaction) or first step
+            // This ensures we jump to the actual function code, not the contract dispatcher
+            if (stepManager && stepManager.jumpTo) {
+              const stepToJump = scope.functionEntryStep !== undefined ? scope.functionEntryStep : scope.firstStep
+              if (stepToJump !== undefined) {
+                stepManager.jumpTo(stepToJump)
+              }
+            }
+            // Get full execution tree for this scope and emit to terminal panel
             if (onScopeSelected) {
-              onScopeSelected(scope)
+              // Get the full nested scope tree for the selected call (with all internal functions)
+              let scopeWithExecutionTree = scope
+              if (callTree && typeof callTree.getScopesAsNestedJSON === 'function') {
+                try {
+                  // Get the execution tree starting from this scope
+                  const executionTree = callTree.getScopesAsNestedJSON('nojump', scope.scopeId)
+                  if (executionTree && executionTree.length > 0) {
+                    // Use the first item which should be our scope with full children
+                    scopeWithExecutionTree = executionTree[0]
+                  }
+                } catch (e) {
+                  console.error('[DebugLayout] Error getting execution tree for scope:', e)
+                }
+              }
+              onScopeSelected(scopeWithExecutionTree)
             }
           }}
         >
@@ -498,30 +524,50 @@ export const DebugLayout = ({
                 {callTypeLabel}
               </span>
               <span className="call-trace-function">
-                {isCreate ? (
+                {scope.isSenderNode ? (
+                  // For SENDER node, show the sender address with SENDER badge
+                  <>
+                    <span className="text-muted">
+                      {currentTransaction?.from ? currentTransaction.from : 'Unknown Sender'}
+                    </span>
+                  </>
+                ) : isCreate ? (
                   // For CREATE operations, show contract name or address
                   contractName ? (
-                    <span className="contract-name">{contractName}</span>
+                    <>
+                      <span className="contract-name">{contractName}</span>
+                      {contractAddress && <span className="text-muted"> ({contractAddress})</span>}
+                    </>
                   ) : contractAddress ? (
-                    <span className="contract-name">{contractAddress}</span>
+                    <span className="contract-name">({contractAddress})</span>
                   ) : (
                     <span className="method-name">Contract Creation</span>
                   )
                 ) : (
                   // For other operations, show contract.method format
                   <>
+                    {/* Show contract name and/or address */}
                     {contractName ? (
                       <>
                         <span className="contract-name">{contractName}</span>
-                        <span>.</span>
+                        {contractAddress && <span className="text-muted"> ({contractAddress})</span>}
                       </>
                     ) : contractAddress ? (
-                      <>
-                        <span className="contract-name">({contractAddress})</span>
-                        <span>.</span>
-                      </>
+                      <span className="contract-name">({contractAddress})</span>
                     ) : null}
-                    <span className="method-name">{itemName}</span>
+
+                    {/* Show separator and method name if we have method info */}
+                    {itemName && (
+                      <>
+                        {(contractName || contractAddress) && <span>.</span>}
+                        <span className="method-name">{itemName}</span>
+                      </>
+                    )}
+
+                    {/* Fallback: if no contract and no method, show unknown */}
+                    {!contractName && !contractAddress && !itemName && (
+                      <span className="method-name text-muted">unknown</span>
+                    )}
                   </>
                 )}
               </span>
@@ -531,7 +577,7 @@ export const DebugLayout = ({
         </div>
         {hasChildren && isExpanded && (
           <>
-            {externalChildren.map((child: any) => renderScopeItem(child, depth + 1))}
+            {scope.children.map((child: any) => renderScopeItem(child, depth + 1))}
           </>
         )}
       </div>
@@ -539,12 +585,22 @@ export const DebugLayout = ({
   }
 
   const renderCallTrace = () => {
-    // Use nested scopes if available
+    // Use nested scopes if available (external calls only)
     if (nestedScopes && nestedScopes.length > 0) {
       return (
         <div className="call-trace-list">
           {nestedScopes.map((scope) => renderScopeItem(scope, 0))}
         </div>
+      )
+    }
+
+    // If nestedScopes is empty array, it means no external calls
+    // Show message in this case
+    if (nestedScopes !== null && nestedScopes !== undefined) {
+      return (
+        <p className="text-muted">
+          <FormattedMessage id="debugger.noExternalCalls" defaultMessage="No external calls in this transaction" />
+        </p>
       )
     }
 
@@ -643,9 +699,31 @@ export const DebugLayout = ({
     // msg.sender is the transaction sender
     const msgSender = tx?.from || 'N/A'
 
-    // Extract parameters from transaction input (strip function selector)
-    let parameters = 'N/A'
-    if (tx && inputData) {
+    // Extract and decode parameters
+    let parameters: any = 'N/A'
+
+    // First, try to get decoded parameters from solidityLocals
+    if (solidityLocals && typeof solidityLocals === 'object') {
+      const decodedParams: any = {}
+      let hasParams = false
+
+      // Iterate through locals to find parameters
+      for (const [key, value] of Object.entries(solidityLocals)) {
+        // Check if this is a parameter (either by checking a flag or by convention)
+        // Parameters are typically stored as local variables
+        if (key !== 'length' && key !== 'decode') {
+          decodedParams[key] = value
+          hasParams = true
+        }
+      }
+
+      if (hasParams) {
+        parameters = decodedParams
+      }
+    }
+
+    // Fallback to raw hex if no decoded params available
+    if (parameters === 'N/A' && tx && inputData) {
       if (inputData === '0x' || inputData === '') {
         parameters = !tx.to ? 'Contract Bytecode' : 'None (ETH Transfer)'
       } else if (inputData.length > 10) {
@@ -736,22 +814,6 @@ export const DebugLayout = ({
           </h6>
         </div>
         <div className="debug-section-content debug-section-scrollable">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', paddingLeft: '0.5rem' }}>
-            <span className="call-trace-type sender">SENDER</span>
-            <span className="call-trace-function">
-              {currentTransaction?.from || 'N/A'}
-              {currentTransaction?.from && (
-                <CustomTooltip tooltipText={copyTooltips.from} tooltipId="sender-address-tooltip" placement="top">
-                  <i
-                    className={`far ${copyTooltips.from === 'Copied!' ? 'fa-check' : 'fa-copy'} ms-2`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => copyToClipboard(currentTransaction.from, 'from')}
-                    onMouseLeave={() => resetTooltip('from')}
-                  />
-                </CustomTooltip>
-              )}
-            </span>
-          </div>
           {renderCallTrace()}
         </div>
       </div>
