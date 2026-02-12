@@ -59,21 +59,21 @@ export const InviteOverlay: React.FC<InviteOverlayProps> = ({
   // Get user-friendly error message
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
-      case 'NOT_FOUND':
-        return 'This invite code does not exist or is no longer valid.'
-      case 'INACTIVE':
-        return 'This invite code has been deactivated.'
-      case 'EXPIRED':
-        return 'This invite code has expired.'
-      case 'NOT_STARTED':
-        return 'This invite code is not yet active.'
-      case 'EXHAUSTED':
-      case 'MAX_USES_REACHED':
-        return 'This invite code has reached its maximum number of uses.'
-      case 'ALREADY_REDEEMED':
-        return 'You have already used this invite code.'
-      default:
-        return 'This invitation is no longer valid.'
+    case 'NOT_FOUND':
+      return 'This invite code does not exist or is no longer valid.'
+    case 'INACTIVE':
+      return 'This invite code has been deactivated.'
+    case 'EXPIRED':
+      return 'This invite code has expired.'
+    case 'NOT_STARTED':
+      return 'This invite code is not yet active.'
+    case 'EXHAUSTED':
+    case 'MAX_USES_REACHED':
+      return 'This invite code has reached its maximum number of uses.'
+    case 'ALREADY_REDEEMED':
+      return 'You have already used this invite code.'
+    default:
+      return 'This invitation is no longer valid.'
     }
   }
 
@@ -312,15 +312,15 @@ export const InviteOverlay: React.FC<InviteOverlayProps> = ({
 // Helper function to get icon for action type
 function getActionIcon(type: string): string {
   switch (type) {
-    case 'add_to_feature_group':
-      return 'star'
-    case 'grant_credits':
-      return 'coins'
-    case 'grant_product':
-      return 'gift'
-    case 'add_tag':
-      return 'tag'
-    default:
-      return 'check'
+  case 'add_to_feature_group':
+    return 'star'
+  case 'grant_credits':
+    return 'coins'
+  case 'grant_product':
+    return 'gift'
+  case 'add_tag':
+    return 'tag'
+  default:
+    return 'check'
   }
 }

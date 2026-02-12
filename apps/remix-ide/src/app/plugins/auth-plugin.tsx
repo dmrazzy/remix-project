@@ -1021,20 +1021,20 @@ Issued At: ${new Date().toISOString()}`
         error_code: 'NOT_FOUND'
       }
     }
-    
+
     const result = response.data!
-    
+
     // If redemption was successful, emit event and refresh relevant data
     if (result.success) {
       this.emit('inviteTokenRedeemed', {
         token,
         actions: result.actions_applied
       })
-      
+
       // Refresh credits and permissions as they may have changed
       this.refreshCredits().catch(console.error)
     }
-    
+
     return result
   }
 

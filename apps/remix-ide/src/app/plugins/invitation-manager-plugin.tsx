@@ -42,13 +42,13 @@ export class InvitationManagerPlugin extends Plugin {
         this.renderComponent()
       }
     })
-    
+
     // Check for pending invite on activation (handles page refresh)
     await this.checkPendingInvite()
-    
+
     // Check URL for invite token
     await this.checkUrlForInvite()
-    
+
     this.renderComponent()
   }
 
@@ -59,10 +59,10 @@ export class InvitationManagerPlugin extends Plugin {
   async showInvite(token: string): Promise<void> {
     // Validate the token first
     const validation = await this.validateToken(token)
-    
+
     // Check auth state
     const isAuthenticated = await this.checkAuthState()
-    
+
     // Update state and show modal
     this.state = {
       ...this.state,
@@ -74,11 +74,11 @@ export class InvitationManagerPlugin extends Plugin {
       redeemResult: null,
       error: null
     }
-    
+
     // Store as pending (for after login if needed)
     await this.call('auth', 'setPendingInviteToken', token)
     await this.call('auth', 'setPendingInviteValidation', token, validation)
-    
+
     this.renderComponent()
     this.emit('inviteShown', { token, validation })
   }
@@ -104,23 +104,23 @@ export class InvitationManagerPlugin extends Plugin {
   async redeemToken(token: string): Promise<InviteRedeemResponse> {
     this.state = { ...this.state, redeeming: true, error: null }
     this.renderComponent()
-    
+
     try {
       const result = await this.call('auth', 'redeemInviteToken', token)
-      
+
       this.state = {
         ...this.state,
         redeeming: false,
         redeemResult: result,
         error: result.success ? null : (result.error || 'Failed to redeem')
       }
-      
+
       if (result.success) {
         // Clear pending token
         await this.call('auth', 'clearPendingInviteToken')
         this.emit('inviteRedeemed', { token, result })
       }
-      
+
       this.renderComponent()
       return result
     } catch (e: any) {
@@ -152,14 +152,14 @@ export class InvitationManagerPlugin extends Plugin {
       redeemResult: null,
       error: null
     }
-    
+
     // Clear pending invite
     try {
       await this.call('auth', 'clearPendingInviteToken')
     } catch (e) {
       // Ignore
     }
-    
+
     this.emit('inviteClosed')
     this.renderComponent()
   }
@@ -200,7 +200,7 @@ export class InvitationManagerPlugin extends Plugin {
           validation: pending.validation,
           isAuthenticated
         }
-        
+
         this.renderComponent()
       }
     } catch (e) {
@@ -214,14 +214,14 @@ export class InvitationManagerPlugin extends Plugin {
   private async checkUrlForInvite(): Promise<void> {
     const hash = window.location.hash
     const match = hash.match(/[#&]invite=([A-Za-z0-9_-]+)/)
-    
+
     if (match) {
       const token = match[1]
       console.log('[InvitationManager] Found invite token in URL:', token)
-      
+
       // Clean URL
       this.cleanInviteFromUrl()
-      
+
       // Show the invite modal
       await this.showInvite(token)
     }
@@ -233,7 +233,7 @@ export class InvitationManagerPlugin extends Plugin {
   private cleanInviteFromUrl(): void {
     const hash = window.location.hash.substring(1)
     if (!hash) return
-    
+
     const params: Record<string, string> = {}
     hash.split('&').forEach(part => {
       const [key, value] = part.split('=')
@@ -241,7 +241,7 @@ export class InvitationManagerPlugin extends Plugin {
         params[key] = value || ''
       }
     })
-    
+
     const remainingKeys = Object.keys(params)
     if (remainingKeys.length > 0) {
       const newHash = '#' + remainingKeys.map(k => params[k] ? `${k}=${params[k]}` : k).join('&')
