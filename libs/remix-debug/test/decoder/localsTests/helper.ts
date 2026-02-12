@@ -98,27 +98,15 @@ export async function decodeLocals (st, index, traceManager, callTree, verifier)
   try {
     // Convert traceManager methods to async but keep callback compatibility
     const getStackAt = async (stepIndex) => {
-      try {
-        return traceManager.getStackAt(stepIndex)
-      } catch (error) {
-        throw error
-      }
+      return traceManager.getStackAt(stepIndex)
     }
 
     const getMemoryAt = async (stepIndex) => {
-      try {
-        return traceManager.getMemoryAt(stepIndex)
-      } catch (error) {
-        throw error
-      }
+      return traceManager.getMemoryAt(stepIndex)
     }
 
     const getCallDataAt = async (stepIndex) => {
-      try {
-        return traceManager.getCallDataAt(stepIndex)
-      } catch (error) {
-        throw error
-      }
+      return traceManager.getCallDataAt(stepIndex)
     }
 
     // Execute all operations in parallel

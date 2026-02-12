@@ -3,6 +3,28 @@ import { NestedScope } from '@remix-project/remix-debug'
 import * as helper from './helper'
 
 module.exports = async function (st, privateKey, contractBytecode, compilationResult, contractCode) {
+  // Traverse the call tree to verify call types
+  let callCount = 0
+  let staticCallCount = 0
+  let delegateCallCount = 0
+  let contractBFunctionTotalCount = 0
+  let contractCFunctionTotalCount = 0
+  function traverseScopes(scope: NestedScope, parent?: NestedScope) {
+    if (scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractBFunction')) contractBFunctionTotalCount++
+    if (scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractCFunction')) contractCFunctionTotalCount++
+
+    if (parent && parent.opcodeInfo.op === 'CALL' && scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractBFunction')) {
+      callCount++
+    } else if (parent && parent.opcodeInfo.op === 'STATICCALL' && scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractCFunction')) {
+      staticCallCount++
+    } else if (parent && parent.opcodeInfo.op === 'DELEGATECALL' && scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractBFunction')) {
+      delegateCallCount++
+    }
+
+    if (scope.children) {
+      scope.children.forEach(child => traverseScopes(child, scope))
+    }
+  }
   try {
     // Deploy the contract first (constructor deployment)
     const { traceManager: deployTraceManager, callTree: deployCallTree, waitForCallTree: waitForDeployCallTree } = await helper.setupDebugger(privateKey, contractBytecode, compilationResult, contractCode)
@@ -23,29 +45,6 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
 
     // Get the nested JSON representation of scopes
     const nestedScopes: NestedScope[] = callTree.getScopesAsNestedJSON()
-
-    // Traverse the call tree to verify call types
-    let callCount = 0
-    let staticCallCount = 0
-    let delegateCallCount = 0
-    let contractBFunctionTotalCount = 0
-    let contractCFunctionTotalCount = 0
-    function traverseScopes(scope: NestedScope, parent?: NestedScope) {
-      if (scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractBFunction')) contractBFunctionTotalCount++
-      if (scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractCFunction')) contractCFunctionTotalCount++
-
-      if (parent && parent.opcodeInfo.op === 'CALL' && scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractBFunction')) {
-        callCount++
-      } else if (parent && parent.opcodeInfo.op === 'STATICCALL' && scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractCFunction')) {
-        staticCallCount++
-      } else if (parent && parent.opcodeInfo.op === 'DELEGATECALL' && scope.functionDefinition && scope.functionDefinition.name && scope.functionDefinition.name.includes('contractBFunction')) {
-        delegateCallCount++
-      }
-
-      if (scope.children) {
-        scope.children.forEach(child => traverseScopes(child, scope))
-      }
-    }
 
     traverseScopes(nestedScopes[0])
 
