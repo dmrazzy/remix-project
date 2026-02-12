@@ -4,7 +4,7 @@ import * as helper from './helper'
 module.exports = async function (st, privateKey, contractBytecode, compilationResult, contractCode) {
   try {
     const { traceManager, callTree, waitForCallTree } = await helper.setupDebugger(privateKey, contractBytecode, compilationResult, contractCode)
-    
+
     const { scopes, scopeStarts } = await waitForCallTree()
 
     // test gas cost per line
@@ -51,25 +51,25 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
     if (symbolicStack && symbolicStack.length > 0) {
       // Check that we have symbolic representations for the integer variables
       const stackVarNames = symbolicStack.map(item => item.variableName || '').filter(name => name)
-      
+
       const locals = [
-        'p',     'ui8',  'ui16',
-        'ui32',  'ui64', 'ui128',
-        'ui256', 'ui',   'i8',
-        'i16',   'i32',  'i64',
+        'p', 'ui8', 'ui16',
+        'ui32', 'ui64', 'ui128',
+        'ui256', 'ui', 'i8',
+        'i16', 'i32', 'i64',
         'i128', 'i256', 'i', 'ishrink'
       ]
       const hasIntegerVars = stackVarNames.some(name => locals.includes(name))
-      
+
       st.ok(hasIntegerVars, 'Symbolic stack should contain integer variable representations')
       st.ok(stackVarNames.length === 16, "Symbolic stack should contain 16 integer variable representations")
       st.ok(Array.isArray(symbolicStack), 'getSymbolicStackAtStep should return an array')
-      
+
     } else {
       // If stack is empty or undefined, that's also valid for this test
       st.ok(true, 'Symbolic stack is empty or undefined at step 95')
     }
-    
+
   } catch (error) {
     st.fail(error)
   }

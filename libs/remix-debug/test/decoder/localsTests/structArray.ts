@@ -4,7 +4,7 @@ import * as helper from './helper'
 module.exports = async function (st, privateKey, contractBytecode, compilationResult, contractCode) {
   try {
     const { traceManager, callTree, waitForCallTree } = await helper.setupDebugger(privateKey, contractBytecode, compilationResult, contractCode)
-    
+
     await waitForCallTree()
 
     await helper.decodeLocals(st, 1615, traceManager, callTree, function (locals) {
@@ -91,7 +91,7 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
         st.fail(e.message)
       }
     })
-    
+
   } catch (error) {
     st.fail(error)
   }

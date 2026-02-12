@@ -4,7 +4,7 @@ import * as helper from './helper'
 module.exports = async function (st, privateKey, contractBytecode, compilationResult, contractCode) {
   try {
     const { traceManager, callTree, waitForCallTree } = await helper.setupDebugger(privateKey, contractBytecode, compilationResult, contractCode)
-    
+
     const { scopes, scopeStarts } = await waitForCallTree()
 
     // Test locals at step 49 - dynbytes and smallstring
@@ -27,7 +27,7 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
         st.fail(e.message)
       }
     })
-    
+
   } catch (error) {
     st.fail(error)
   }

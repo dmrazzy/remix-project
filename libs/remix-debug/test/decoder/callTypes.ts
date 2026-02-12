@@ -66,11 +66,11 @@ tape('call types', function (t) {
 async function test (st, privateKey) {
   let output = compiler.compile(compilerInput(callTypesContract.contract))
   output = JSON.parse(output)
-  let sources = {
+  const sources = {
     target: 'test.sol',
     sources: { 'test.sol': { content: callTypesContract.contract } }
   }
-  let compilationResults = new CompilerAbstract('json', output, sources)
+  const compilationResults = new CompilerAbstract('json', output, sources)
   console.log('callTypesTest')
   await callTypesTest(st, privateKey, output.contracts['test.sol']['ContractA'].evm.bytecode.object, compilationResults, callTypesContract.contract)
 

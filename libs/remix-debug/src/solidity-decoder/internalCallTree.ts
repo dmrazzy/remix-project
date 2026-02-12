@@ -226,7 +226,7 @@ export class InternalCallTree {
   debug: boolean
   /** get from cache */
   getCache: (key: string) => Promise<any>
-   /** fn entry location */
+  /** fn entry location */
   fnJumpDest: {
     [Key: string]: number
   }
