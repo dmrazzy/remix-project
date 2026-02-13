@@ -87,6 +87,15 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
     return ''
   }
 
+  const handleExecutionItemClick = async (scope: any) => {
+    try {
+      // Jump to the step in the debugger
+      await plugin.call('debugger', 'jumpTo', scope.firstStep)
+    } catch (error) {
+      console.error('Error jumping to step:', error)
+    }
+  }
+
   const renderExecutionItem = (scope: any, depth: number = 0): JSX.Element => {
     const opcode = scope.opcodeInfo?.op || ''
     // Only show 'fallback' if it's actually a fallback function (kind === 'fallback')
@@ -142,7 +151,10 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
 
     return (
       <div key={scope.scopeId}>
-        <div className="call-stack-item">
+        <div
+          className="call-stack-item"
+          onClick={() => handleExecutionItemClick(scope)}
+        >
           <div className="call-stack-line">
             <span className="call-stack-step">{scope.firstStep}</span>
             <div style={{

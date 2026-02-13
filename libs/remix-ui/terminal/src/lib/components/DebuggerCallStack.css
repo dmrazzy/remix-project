@@ -55,8 +55,8 @@
 }
 
 .call-stack-type.call {
-  background-color: rgba(111, 66, 193, 0.15);
-  color: #6f42c1;
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
 }
 
 .call-stack-type.delegatecall {
