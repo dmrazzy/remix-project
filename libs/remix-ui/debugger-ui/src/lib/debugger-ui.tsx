@@ -496,6 +496,12 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     // Reset solidity locals and state
     setSolidityLocals(null)
     setSolidityState(null)
+    // Reset execution trace state
+    setNestedScopes([])
+    setFunctionStack([])
+    setCallTreeInstance(null)
+    setCurrentFunction('')
+    setTraceData(null)
     // Emit debugging stopped event
     debuggerModule.emit('debuggingStopped')
   }
