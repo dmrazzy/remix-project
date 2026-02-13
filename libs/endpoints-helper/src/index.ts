@@ -20,6 +20,7 @@ type EndpointUrls = {
     credits: string;
     audio;
     permissions: string;
+    invite: string;
     feedback: string;
 };
 
@@ -45,6 +46,7 @@ const defaultUrls: EndpointUrls = {
   credits: 'https://auth.api.remix.live:8443/credits',
   audio: 'https://audio.api.remix.live',
   permissions: 'https://auth.api.remix.live:8443/permissions',
+  invite: 'https://auth.api.remix.live:8443/invite',
   feedback: 'https://auth.api.remix.live:8443/feedback',
 };
 
@@ -70,6 +72,7 @@ const endpointPathMap: Record<keyof EndpointUrls, string> = {
   credits: 'credits',
   audio: 'audio',
   permissions: 'permissions',
+  invite: 'invite',
   feedback: 'feedback',
 };
 
@@ -113,6 +116,9 @@ const localhostUrls: EndpointUrls = {
   
   // PERMISSIONS service
   permissions: 'https://auth.api.remix.live:8443/permissions',
+  
+  // INVITE service
+  invite: 'https://auth.api.remix.live:8443/invite',
 
   // FEEDBACK service
   feedback: 'https://auth.api.remix.live:8443/feedback',

@@ -55,6 +55,7 @@ import { TransactionSimulator } from './app/plugins/transaction-simulator'
 import { CodeFormat } from './app/plugins/code-format'
 import { CompilationDetailsPlugin } from './app/plugins/compile-details'
 import { AuthPlugin } from './app/plugins/auth-plugin'
+import { InvitationManagerPlugin } from './app/plugins/invitation-manager-plugin'
 import { AccountPlugin } from './app/plugins/account-plugin'
 import { RemixGuidePlugin } from './app/plugins/remixGuide'
 import { TemplatesPlugin } from './app/plugins/remix-templates'
@@ -173,6 +174,7 @@ class AppComponent {
   templateExplorerModal: TemplateExplorerModalPlugin
   settings: SettingsTab
   authPlugin: AuthPlugin
+  invitationManager: InvitationManagerPlugin
   accountPlugin: AccountPlugin
   params: any
   desktopClientMode: boolean
@@ -610,6 +612,7 @@ class AppComponent {
     )
 
     this.authPlugin = new AuthPlugin()
+    this.invitationManager = new InvitationManagerPlugin()
     const feedbackPlugin = new FeedbackPlugin()
 
     this.engine.register([
@@ -625,6 +628,7 @@ class AppComponent {
       openZeppelinProxy,
       run.recorder,
       this.authPlugin,
+      this.invitationManager,
       this.accountPlugin,
       feedbackPlugin
     ])
@@ -698,6 +702,7 @@ class AppComponent {
     ])
 
     await this.appManager.activatePlugin(['auth'])
+    await this.appManager.activatePlugin(['invitationManager'])
     await this.appManager.activatePlugin(['account'])
     await this.appManager.activatePlugin(['feedback'])
     await this.appManager.activatePlugin(['settings'])

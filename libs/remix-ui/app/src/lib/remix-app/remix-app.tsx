@@ -259,6 +259,7 @@ const RemixApp = (props: IRemixAppUi) => {
               <DialogViewPlugin></DialogViewPlugin>
               {appState.genericModalState.showModal && props.app.templateExplorerModal.render()
               }
+              {props.app.invitationManager.render()}
             </AppProvider>
           </AuthProvider>
         </onLineContext.Provider>
