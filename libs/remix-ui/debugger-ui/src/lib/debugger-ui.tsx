@@ -588,6 +588,16 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
           debuggerModule.call('menuicons', 'select', 'debugger').catch(err => {
             console.error('Failed to activate debugger:', err)
           })
+          // Close right side panel if it's open when debugging starts
+          debuggerModule.call('rightSidePanel', 'isPanelHidden').then((isHidden: boolean) => {
+            if (!isHidden) {
+              debuggerModule.call('rightSidePanel', 'togglePanel').catch(err => {
+                console.error('Failed to close right side panel:', err)
+              })
+            }
+          }).catch(err => {
+            console.error('Failed to check right side panel state:', err)
+          })
           // Emit debugging started event
           debuggerModule.emit('debuggingStarted', {
             txHash: txNumber,
