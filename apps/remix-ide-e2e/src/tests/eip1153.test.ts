@@ -8,7 +8,7 @@ module.exports = {
   before: function (browser: NightwatchBrowser, done: VoidFunction) {
     init(browser, done)
   },
-  'Should execute a contract that uses transient storage #group1': '' + function (browser: NightwatchBrowser) {
+  'Should execute a contract that uses transient storage #group1': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('udapp')
       .switchEnvironment('vm-cancun') // switch to a vm that know this eip.
@@ -22,7 +22,7 @@ module.exports = {
       .clickLaunchIcon('udapp')
       .createContract('')
       .clickInstance(0)
-      .clickFunction('useTransientStorage - transact (not payable)')
+      .clickFunction(0, 0)
       .testFunction('last',
         {
           status: '1 Transaction mined and execution succeed',
@@ -33,13 +33,13 @@ module.exports = {
         })
   },
 
-  'Should clear transient storage after tx execution #group1' : '' + function (browser: NightwatchBrowser) {
+  'Should clear transient storage after tx execution #group1' : function (browser: NightwatchBrowser) {
     browser.addFile('clear_transient.sol', { content: clearTransient })
       .verifyContracts(['ClearTransient'])
       .clickLaunchIcon('udapp')
       .createContract('')
       .clickInstance(1)
-      .clickFunction('get - call')
+      .clickFunction(1, 0)
       .testFunction('last',
         {
           'decoded output': {
