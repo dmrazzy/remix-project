@@ -8,7 +8,7 @@ module.exports = {
   before: function (browser: NightwatchBrowser, done: VoidFunction) {
     init(browser, done)
   },
-  'Should activate delegation and make a transaction to the authority address #group1': '' + function (browser: NightwatchBrowser) {
+  'Should activate delegation and make a transaction to the authority address #group1': function (browser: NightwatchBrowser) {
     let addressDelegate
     browser
       .clickLaunchIcon('udapp')
@@ -27,7 +27,8 @@ module.exports = {
           done()
         })
       })
-      .click('[data-id="deployAndRunClearInstances"]')
+      .clickLaunchIcon('udapp')
+      .clearDeployedContracts()
       .perform((done) => {
         browser
           .waitForElementVisible('[data-id="runTabSelectAccount"]')
@@ -47,11 +48,11 @@ module.exports = {
       .modalFooterOKClick('createDelegationAuthorization')
       .waitForElementContainsText('*[data-id="terminalJournal"]', 'This account will be running the code located at')
       .clickInstance(0)
-      .clickFunction('entryPoint - call')
+      .clickFunction(0, 6)
       .verifyCallReturnValue('0x5B38Da6a701c568545dCfcB03FcB875f56beddC4', ['0:address: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108'])
   },
 
-  'Should keep the delegation status after reload & switching accounts #group1': '' + function (browser: NightwatchBrowser) {
+  'Should keep the delegation status after reload & switching accounts #group1': function (browser: NightwatchBrowser) {
     browser
       .refresh()
       .clickLaunchIcon('udapp')
@@ -63,11 +64,11 @@ module.exports = {
       .waitForElementVisible('*[data-id="delete-delegation"]')
   },
 
-  'Should remove the delegation #group1': '' + function (browser: NightwatchBrowser) {
+  'Should remove the delegation #group1': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="delete-delegation"]')
       .click('*[data-id="delete-delegation"]')
-      .modalFooterOKClick('udappNotify')
+      .modalFooterOKClick('deleteDelegation')
       .waitForElementNotPresent('*[data-id="delete-delegation"]')
       .waitForElementContainsText('*[data-id="terminalJournal"]', `Delegation for 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4 removed.`)
       .refresh()

@@ -94,7 +94,13 @@ function EnvironmentPortraitView() {
       cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
       okFn: async () => {
         try {
-          await authorizeDelegation(delegationAuthorizationAddressRef.current, plugin, widgetState, dispatch)
+          await authorizeDelegation(
+            delegationAuthorizationAddressRef.current,
+            plugin,
+            selectedAccount?.account,
+            widgetState.accounts.defaultAccounts,
+            dispatch
+          )
           trackMatomoEvent({ category: 'udapp', action: 'contractDelegation', name: 'create', isClick: false })
         } catch (e) {
           plugin.call('terminal', 'log', { type: 'error', value: e.message })
@@ -276,7 +282,13 @@ function EnvironmentPortraitView() {
       cancelLabel: 'Cancel',
       okFn: async () => {
         try {
-          await authorizeDelegation('0x0000000000000000000000000000000000000000', plugin, widgetState, dispatch)
+          await authorizeDelegation(
+            '0x0000000000000000000000000000000000000000',
+            plugin,
+            selectedAccount?.account,
+            widgetState.accounts.defaultAccounts,
+            dispatch
+          )
           plugin.call('terminal', 'log', { type: 'info', value: `Delegation for ${selectedAccount?.account} removed.` })
         } catch (e) {
           plugin.call('terminal', 'log', { type: 'error', value: e.message })
@@ -467,11 +479,11 @@ function EnvironmentPortraitView() {
             </Dropdown>
           </div>)}
         {enableDelegationAuthorization && delegationAddress && (
-          <div className="px-3 pb-2">
-            <div className="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-0" style={{ fontSize: '0.85rem' }}>
-              <div className="d-flex align-items-center">
+          <div className="px-3">
+            <div className="alert alert-info d-flex align-items-center justify-content-between p-2 mt-2 mb-0 rounded" style={{ fontSize: '0.85rem' }}>
+              <div className="d-flex align-items-center small">
                 <span className="me-2">Delegation:</span>
-                <span className="text-truncate" style={{ maxWidth: '150px' }}>{delegationAddress}</span>
+                <span className="text-truncate" style={{ maxWidth: '150px' }}>{shortenAddress(delegationAddress)}</span>
                 <CopyToClipboard tip="Copy address" icon="fa-copy" direction="top" getContent={() => delegationAddress}>
                   <i className="fa-solid fa-copy small ms-1" style={{ cursor: 'pointer' }}></i>
                 </CopyToClipboard>

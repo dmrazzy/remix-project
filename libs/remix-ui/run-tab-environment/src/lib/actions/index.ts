@@ -1,6 +1,6 @@
 import React from "react"
 import { Plugin } from "@remixproject/engine"
-import { Actions, Provider, SmartAccount, WidgetState } from "../types"
+import { Actions, Provider, SmartAccount, WidgetState, Account } from "../types"
 import { trackMatomoEvent } from "@remix-api"
 import { IntlShape } from "react-intl"
 import { addFVSProvider } from "./providers"
@@ -10,6 +10,7 @@ import { custom, createWalletClient, createPublicClient, http } from "viem"
 import { BrowserProvider, BaseWallet, SigningKey, isAddress } from "ethers"
 import { toChecksumAddress, bytesToHex, isZeroAddress } from '@ethereumjs/util'
 import { isAccountDeleted, getAccountAlias, deleteAccount as deleteAccountFromStorage, setAccountAlias, clearAccountPreferences } from '../utils/accountStorage'
+import { eip7702Constants } from '@remix-project/remix-lib'
 export * from "./providers"
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
@@ -194,6 +195,36 @@ export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: Reac
   dispatch({ type: 'SET_SMART_ACCOUNTS', payload: smartAccounts })
 }
 
+export async function loadAllDelegations (plugin: EnvironmentPlugin, accounts: Account[], currentProvider: string, dispatch: React.Dispatch<Actions>) {
+  // Only load delegations for EIP-7702 compatible environments
+  if (currentProvider !== 'vm-prague' && currentProvider !== 'vm-osaka' && !currentProvider.includes('mainnet-fork')) {
+    return
+  }
+
+  try {
+    const web3 = await plugin.call('blockchain', 'web3')
+    if (!web3) {
+      return
+    }
+
+    for (const account of accounts) {
+      try {
+        const code = await web3.getCode(account.account)
+        if (code && code.startsWith(eip7702Constants.EIP7702_CODE_INDICATOR_FLAG)) {
+          const address = '0x' + code.replace(eip7702Constants.EIP7702_CODE_INDICATOR_FLAG, '')
+          if (address !== '0x0000000000000000000000000000000000000000') {
+            dispatch({ type: 'SET_DELEGATION', payload: { account: account.account, address } })
+          }
+        }
+      } catch (error) {
+        console.error(`Error loading delegation for account ${account.account}:`, error)
+      }
+    }
+  } catch (error) {
+    console.error('Error loading delegations:', error)
+  }
+}
+
 export async function createNewAccount (plugin: EnvironmentPlugin, dispatch: React.Dispatch<Actions>) {
   try {
     const address = await plugin.call('blockchain', 'newAccount')
@@ -308,7 +339,7 @@ export async function createSmartAccount (plugin: EnvironmentPlugin, widgetState
   }
 }
 
-export async function authorizeDelegation (contractAddress: string, plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch?: React.Dispatch<Actions>) {
+export async function authorizeDelegation (contractAddress: string, plugin: EnvironmentPlugin, selectedAccount: string, allAccounts: Account[], dispatch?: React.Dispatch<Actions>) {
   try {
     if (!isAddress(toChecksumAddress(contractAddress))) {
       await plugin.call('terminal', 'log', { type: 'info', value: `Please use an ethereum address of a contract deployed in the current chain.` })
@@ -328,17 +359,17 @@ export async function authorizeDelegation (contractAddress: string, plugin: Envi
   plugin.call('terminal', 'log', { type: 'info', value: !isZeroAddress(contractAddress) ? 'Signing and activating delegation...' : 'Removing delegation...' })
 
   const ethersProvider = new BrowserProvider(provider)
-  const pKey = await ethersProvider.send('eth_getPKey', [widgetState.accounts.selectedAccount])
+  const pKey = await ethersProvider.send('eth_getPKey', [selectedAccount])
   const authSignerPKey = new BaseWallet(new SigningKey(bytesToHex(pKey)), ethersProvider)
   const auth = await authSignerPKey.authorize({ address: contractAddress, chainId: 0 });
-  const signerForAuth = widgetState.accounts.defaultAccounts.find((a) => a.account !== widgetState.accounts.selectedAccount)?.account
+  const signerForAuth = allAccounts.find((a) => a.account !== selectedAccount)?.account
   const signer = await ethersProvider.getSigner(signerForAuth)
   let tx: any
 
   try {
     tx = await signer.sendTransaction({
       type: 4,
-      to: widgetState.accounts.selectedAccount,
+      to: selectedAccount,
       authorizationList: [auth]
     });
   } catch (e) {
@@ -367,25 +398,25 @@ export async function authorizeDelegation (contractAddress: string, plugin: Envi
           object: artefact.contract
         }
       }
-      await plugin.call('udappDeployedContracts', 'addInstance', widgetState.accounts.selectedAccount, artefact.contract.abi, 'Delegated ' + artefact.name, contractObject)
-      await plugin.call('compilerArtefacts', 'addResolvedContract', widgetState.accounts.selectedAccount, data)
+      await plugin.call('udappDeployedContracts', 'addInstance', selectedAccount, artefact.contract.abi, 'Delegated ' + artefact.name, contractObject)
+      await plugin.call('compilerArtefacts', 'addResolvedContract', selectedAccount, data)
       plugin.call('terminal', 'log', { type: 'info',
-        value: `Contract interation with ${widgetState.accounts.selectedAccount} has been added to the deployed contracts. Please make sure the contract is pinned.` })
+        value: `Contract interation with ${selectedAccount} has been added to the deployed contracts. Please make sure the contract is pinned.` })
     }
     plugin.call('terminal', 'log', { type: 'info',
-      value: `Delegation for ${widgetState.accounts.selectedAccount} activated. This account will be running the code located at ${contractAddress} .` })
+      value: `Delegation for ${selectedAccount} activated. This account will be running the code located at ${contractAddress} .` })
 
     // Update delegation state
     if (dispatch) {
-      dispatch({ type: 'SET_DELEGATION', payload: { account: widgetState.accounts.selectedAccount, address: contractAddress } })
+      dispatch({ type: 'SET_DELEGATION', payload: { account: selectedAccount, address: contractAddress } })
     }
   } else {
     plugin.call('terminal', 'log', { type: 'info',
-      value: `Delegation for ${widgetState.accounts.selectedAccount} removed.` })
+      value: `Delegation for ${selectedAccount} removed.` })
 
     // Remove delegation from state
     if (dispatch) {
-      dispatch({ type: 'REMOVE_DELEGATION', payload: widgetState.accounts.selectedAccount })
+      dispatch({ type: 'REMOVE_DELEGATION', payload: selectedAccount })
     }
   }
 

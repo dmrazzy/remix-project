@@ -3,7 +3,7 @@ import isElectron from 'is-electron'
 import { EnvAppContext } from './contexts'
 import { widgetInitialState, widgetReducer } from './reducers'
 import EnvironmentPortraitView from './widgets/envPortraitView'
-import { addFVSProvider, addProvider, getAccountsList, registerInjectedProvider } from './actions'
+import { addFVSProvider, addProvider, getAccountsList, loadAllDelegations, registerInjectedProvider } from './actions'
 import { ProviderDetailsEvent } from './types'
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { EnvironmentPlugin } from 'apps/remix-ide/src/app/udapp/udappEnv'
@@ -87,6 +87,14 @@ function EnvironmentWidget({ plugin }: { plugin: EnvironmentPlugin }) {
 
     plugin.on('blockchain', 'contextChanged', async (context) => {
       await getAccountsList(plugin, dispatch)
+      // Load delegations for all accounts after accounts are loaded
+      const currentProvider = await plugin.call('blockchain', 'getProvider')
+      const accounts = await plugin.call('blockchain', 'getAccounts')
+      if (accounts && accounts.length > 0) {
+        // Convert account addresses to Account objects for loadAllDelegations
+        const accountObjects = accounts.map((addr: string) => ({ account: addr } as any))
+        await loadAllDelegations(plugin, accountObjects, currentProvider, dispatch)
+      }
       dispatch({ type: 'COMPLETED_LOADING_ALL_ACCOUNTS', payload: null })
     })
 
