@@ -154,6 +154,19 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
     }
   }, [props.isDebugging, props.plugin])
 
+  // Listen for debuggingStopped event to immediately reset view
+  useEffect(() => {
+    const handleDebuggingStopped = () => {
+      setIsDebuggerActive(false)
+    }
+
+    props.plugin.on('debugger', 'debuggingStopped', handleDebuggingStopped)
+
+    return () => {
+      props.plugin.off('debugger', 'debuggingStopped', handleDebuggingStopped)
+    }
+  }, [props.plugin])
+
   // Add a polling mechanism to periodically check if debugger is active
   // This is a fallback in case event listeners don't work
   useEffect(() => {

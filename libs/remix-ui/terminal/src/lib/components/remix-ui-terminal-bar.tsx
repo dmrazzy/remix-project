@@ -75,6 +75,19 @@ export const RemixUITerminalBar = (props: RemixUiTerminalProps) => {
     }
   }, [props.isDebugging, props.plugin])
 
+  // Listen for debuggingStopped event to immediately reset view
+  useEffect(() => {
+    const handleDebuggingStopped = () => {
+      setIsDebuggerActive(false)
+    }
+
+    props.plugin.on('debugger', 'debuggingStopped', handleDebuggingStopped)
+
+    return () => {
+      props.plugin.off('debugger', 'debuggingStopped', handleDebuggingStopped)
+    }
+  }, [props.plugin])
+
   // Show "Execution trace" title when debugging
   const showExecutionTrace = props.isDebugging && isDebuggerActive
 
