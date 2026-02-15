@@ -32,7 +32,6 @@ export function callDepthChange (step, trace) {
 export function isConstructorExit (tree, step, scopeId, initialEntrystackIndex, stepDetail, isConstructor) {
   if (!isConstructor) return false // we are not in a constructor anyway
   const scope = tree.scopes[scopeId]
-  if (scope.functionDefinition && scope.functionDefinition.kind === 'constructor') return false // we are not in a constructor anyway
   if (scope.firstStep === step) {
     // we are just entering the constructor
     return false
