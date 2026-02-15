@@ -348,7 +348,6 @@ export class TxListener {
         }
       }
     } else {
-      
       let params = null
       try {
         if (inputData) {
@@ -357,7 +356,7 @@ export class TxListener {
       } catch (e) {
         console.warn(e)
       }
-      
+
       try {
         const bytecode = contract.object.evm.bytecode.object
         if (bytecode && inputData) {
@@ -366,7 +365,7 @@ export class TxListener {
       } catch (e) {
         console.warn(e)
       }
-      
+
       this._resolvedTransactions[tx.hash] = {
         contractName: contract.name,
         to: null,
