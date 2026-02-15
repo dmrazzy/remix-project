@@ -548,6 +548,16 @@ export class AuthPlugin extends Plugin {
         console.log('[AuthPlugin] Access token refreshed successfully')
         // Reschedule next proactive refresh
         this.scheduleRefresh(newAccessToken)
+
+        // Notify other plugins about the refreshed token
+        const userStr = localStorage.getItem('remix_user')
+        const user = userStr ? JSON.parse(userStr) : null
+        this.emit('authStateChanged', {
+          isAuthenticated: true,
+          user,
+          token: newAccessToken
+        })
+
         return newAccessToken
       }
 
