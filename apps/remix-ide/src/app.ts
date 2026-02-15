@@ -55,6 +55,7 @@ import { TransactionSimulator } from './app/plugins/transaction-simulator'
 import { CodeFormat } from './app/plugins/code-format'
 import { CompilationDetailsPlugin } from './app/plugins/compile-details'
 import { AuthPlugin } from './app/plugins/auth-plugin'
+import { InvitationManagerPlugin } from './app/plugins/invitation-manager-plugin'
 import { AccountPlugin } from './app/plugins/account-plugin'
 import { RemixGuidePlugin } from './app/plugins/remixGuide'
 import { TemplatesPlugin } from './app/plugins/remix-templates'
@@ -82,6 +83,7 @@ import { DesktopHost } from './app/plugins/electron/desktopHostPlugin'
 import { WalletConnect } from './app/plugins/walletconnect'
 import { AIDappGenerator } from './app/plugins/ai-dapp-generator'
 import { IndexedDbCachePlugin } from './app/plugins/IndexedDbCache'
+import { FeedbackPlugin } from './app/plugins/feedback'
 
 import { TemplatesSelectionPlugin } from './app/plugins/templates-selection/templates-selection-plugin'
 
@@ -172,6 +174,7 @@ class AppComponent {
   templateExplorerModal: TemplateExplorerModalPlugin
   settings: SettingsTab
   authPlugin: AuthPlugin
+  invitationManager: InvitationManagerPlugin
   accountPlugin: AccountPlugin
   params: any
   desktopClientMode: boolean
@@ -609,6 +612,8 @@ class AppComponent {
     )
 
     this.authPlugin = new AuthPlugin()
+    this.invitationManager = new InvitationManagerPlugin()
+    const feedbackPlugin = new FeedbackPlugin()
 
     this.engine.register([
       compileTab,
@@ -623,7 +628,9 @@ class AppComponent {
       openZeppelinProxy,
       run.recorder,
       this.authPlugin,
-      this.accountPlugin
+      this.invitationManager,
+      this.accountPlugin,
+      feedbackPlugin
     ])
     this.engine.register([templateExplorerModal, this.topBar])
 
@@ -695,7 +702,9 @@ class AppComponent {
     ])
 
     await this.appManager.activatePlugin(['auth'])
+    await this.appManager.activatePlugin(['invitationManager'])
     await this.appManager.activatePlugin(['account'])
+    await this.appManager.activatePlugin(['feedback'])
     await this.appManager.activatePlugin(['settings'])
 
     await this.appManager.activatePlugin(['walkthrough', 'storage', 'storageMonitor', 'search', 'compileAndRun', 'recorder', 'dgitApi', 'dgit'])
