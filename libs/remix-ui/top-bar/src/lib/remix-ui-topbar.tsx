@@ -21,6 +21,7 @@ import { MatomoEvent, TopbarEvent, WorkspaceEvent } from '@remix-api'
 import { LoginButton } from '@remix-ui/login'
 import { appActionTypes } from 'libs/remix-ui/app/src/lib/remix-app/actions/app'
 import { NotificationBell } from '../components/NotificationBell'
+import { FeedbackPanel } from '../components/FeedbackPanel'
 
 export function RemixUiTopbar() {
   const intl = useIntl()
@@ -54,6 +55,8 @@ export function RemixUiTopbar() {
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enableLogin, setEnableLogin] = useState<boolean>(false);
+  const [feedbackFormUrl, setFeedbackFormUrl] = useState<string | null>(null);
+  const [feedbackPanelOpen, setFeedbackPanelOpen] = useState<boolean>(false);
 
   // Use the clone repository modal hook
   const { showCloneModal } = useCloneRepositoryModal({
@@ -77,6 +80,29 @@ export function RemixUiTopbar() {
     window.addEventListener('storage', checkLoginEnabled);
     return () => window.removeEventListener('storage', checkLoginEnabled);
   }, []);
+
+  // Listen to feedback plugin for form URL
+  useEffect(() => {
+    const initFeedback = async () => {
+      try {
+        const isActive = await plugin.call('manager', 'isActive', 'feedback')
+        if (isActive) {
+          const form = await plugin.call('feedback', 'getFeedbackForm')
+          if (form && form.url) setFeedbackFormUrl(form.url)
+        }
+      } catch (e) {
+        console.debug('[Topbar] Feedback plugin not ready yet')
+      }
+    }
+    initFeedback()
+
+    plugin.on('feedback', 'feedbackFormChanged', (form: any) => {
+      setFeedbackFormUrl(form?.url || null)
+    })
+    return () => {
+      plugin.off('feedback', 'feedbackFormChanged')
+    }
+  }, [])
 
   const handleLoginSuccess = (user: GitHubUser, token: string) => {
     setUser(user);
@@ -629,6 +655,22 @@ export function RemixUiTopbar() {
             )}
           </>
           <NotificationBell className="ms-3" />
+          {feedbackFormUrl && (
+            <CustomTooltip placement="bottom" tooltipText="Send Feedback">
+              <span
+                className="btn btn-sm btn-primary d-flex align-items-center gap-1 ms-3"
+                style={{ cursor: 'pointer', padding: '0.25rem 0.6rem' }}
+                onClick={() => {
+                  setFeedbackPanelOpen(true)
+                  trackMatomoEvent({ category: 'topbar', action: 'feedback', name: 'FeedbackOpened', isClick: true })
+                }}
+                data-id="topbar-feedbackIcon"
+              >
+                <i className="fas fa-bug"></i>
+                <span>Feedback</span>
+              </span>
+            </CustomTooltip>
+          )}
           <span
             style={{ fontSize: '1.5rem', cursor: 'pointer' }}
             className="ms-3"
@@ -644,6 +686,13 @@ export function RemixUiTopbar() {
           </span>
         </div>
       </div>
+      {feedbackFormUrl && (
+        <FeedbackPanel
+          isOpen={feedbackPanelOpen}
+          onClose={() => setFeedbackPanelOpen(false)}
+          formUrl={feedbackFormUrl}
+        />
+      )}
     </section>
   )
 }
