@@ -110,7 +110,8 @@ let requiredModules = [
   'indexedDbCache',
   'notificationCenter',
   'invitationManager',
-  'feedback'
+  'feedback',
+  'cloudWorkspaces'
 ]
 
 // dependentModules shouldn't be manually activated (e.g hardhat is activated by remixd)
