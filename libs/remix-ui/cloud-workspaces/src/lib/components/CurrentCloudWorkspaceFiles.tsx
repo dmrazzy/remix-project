@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
-import { StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
+import { StorageFile } from '@remix-api'
 import { BackupItem } from './BackupItem'
 import { AutosaveItem } from './AutosaveItem'
 import { useCloudWorkspaces } from '../context'
@@ -34,7 +34,7 @@ const CurrentBackupHistory: React.FC<{
     const label = getDayLabel(b.lastModified)
     if (label !== currentLabel) {
       currentLabel = label
-      grouped.push({ label, items: [b] })
+      grouped.push({ label, items: [b]})
     } else {
       grouped[grouped.length - 1].items.push(b)
     }
@@ -131,10 +131,10 @@ export const CurrentCloudWorkspaceFiles: React.FC<CurrentCloudWorkspaceFilesProp
           <div style={{ paddingLeft: '8px' }}>
             {/* Last Save — the current autosave state */}
             {autosave && (
-              <AutosaveItem 
-                autosave={autosave} 
-                onRestore={onRestore} 
-                onDownload={onDownload} 
+              <AutosaveItem
+                autosave={autosave}
+                onRestore={onRestore}
+                onDownload={onDownload}
               />
             )}
             {/* Backup History — collapsible previous snapshots */}

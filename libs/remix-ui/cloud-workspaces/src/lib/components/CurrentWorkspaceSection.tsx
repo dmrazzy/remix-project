@@ -10,8 +10,8 @@ export interface CurrentWorkspaceSectionProps {
 
 export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = ({ plugin }) => {
   const intl = useIntl()
-  const { 
-    isAuthenticated, 
+  const {
+    isAuthenticated,
     error,
     currentWorkspaceStatus: status,
     saveToCloud,
@@ -26,12 +26,12 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     generateNewPassphrase,
     clearEncryptionPassphrase
   } = useCloudWorkspaces()
-  
+
   const [isEditingName, setIsEditingName] = useState(false)
   const [editedName, setEditedName] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
   const [, setTick] = useState(0) // Force re-render for time updates
-  
+
   // Encryption modal state
   const [showPassphraseModal, setShowPassphraseModal] = useState(false)
   const [passphraseInput, setPassphraseInput] = useState('')
@@ -67,14 +67,14 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
 
   const handleRestoreAutosave = async () => {
     if (!status.remoteId) return
-    
+
     // Show confirmation modal before restoring
     const restoreModal = {
       id: 'restoreAutosaveModal',
       title: intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosave', defaultMessage: 'Restore Autosave' }),
-      message: intl.formatMessage({ 
-        id: 'cloudWorkspaces.restoreAutosaveConfirm', 
-        defaultMessage: 'This will restore the last autosave to your current workspace. Existing files with the same name will be overwritten. Continue?' 
+      message: intl.formatMessage({
+        id: 'cloudWorkspaces.restoreAutosaveConfirm',
+        defaultMessage: 'This will restore the last autosave to your current workspace. Existing files with the same name will be overwritten. Continue?'
       }),
       modalType: 'modal',
       okLabel: intl.formatMessage({ id: 'cloudWorkspaces.restore', defaultMessage: 'Restore' }),
@@ -90,7 +90,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
       cancelFn: () => null,
       hideFn: () => null
     }
-    
+
     await plugin.call('notification', 'modal', restoreModal)
   }
 
@@ -99,9 +99,9 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     const linkModal = {
       id: 'linkToCurrentUserModal',
       title: intl.formatMessage({ id: 'cloudWorkspaces.linkToAccount', defaultMessage: 'Link to My Account' }),
-      message: intl.formatMessage({ 
-        id: 'cloudWorkspaces.linkToAccountConfirm', 
-        defaultMessage: 'This will create a new cloud link for this workspace under your account. The existing cloud link will remain with the original owner. Continue?' 
+      message: intl.formatMessage({
+        id: 'cloudWorkspaces.linkToAccountConfirm',
+        defaultMessage: 'This will create a new cloud link for this workspace under your account. The existing cloud link will remain with the original owner. Continue?'
       }),
       modalType: 'modal',
       okLabel: intl.formatMessage({ id: 'cloudWorkspaces.linkToAccount', defaultMessage: 'Link to My Account' }),
@@ -117,7 +117,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
       cancelFn: () => null,
       hideFn: () => null
     }
-    
+
     await plugin.call('notification', 'modal', linkModal)
   }
 
@@ -142,7 +142,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
 
   const handleSaveName = async () => {
     if (!editedName.trim()) return
-    
+
     setLocalError(null)
     try {
       await setWorkspaceRemoteId(status.workspaceName, editedName.trim())
@@ -153,7 +153,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
   }
 
   // ==================== Encryption Handlers ====================
-  
+
   const handleOpenPassphraseModal = async () => {
     setPassphraseInput('')
     setGeneratedPassphrase('')
@@ -176,13 +176,13 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
   const handleSavePassphrase = async () => {
     const passphrase = passphraseInput.trim()
     if (passphrase.length < 8) {
-      setPassphraseError(intl.formatMessage({ 
-        id: 'cloudWorkspaces.passphraseTooShort', 
-        defaultMessage: 'Passphrase must be at least 8 characters' 
+      setPassphraseError(intl.formatMessage({
+        id: 'cloudWorkspaces.passphraseTooShort',
+        defaultMessage: 'Passphrase must be at least 8 characters'
       }))
       return
     }
-    
+
     setPassphraseError(null)
     try {
       const success = await setEncryptionPassphrase(passphrase)
@@ -213,15 +213,15 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
       handleOpenPassphraseModal()
       return
     }
-    
+
     if (!enabled) {
       // Show warning before disabling
       const disableModal = {
         id: 'disableEncryptionModal',
         title: intl.formatMessage({ id: 'cloudWorkspaces.disableEncryption', defaultMessage: 'Disable Encryption' }),
-        message: intl.formatMessage({ 
-          id: 'cloudWorkspaces.disableEncryptionWarning', 
-          defaultMessage: 'Disabling encryption will mean future backups are stored unencrypted. Existing encrypted backups will still require your passphrase to restore. Continue?' 
+        message: intl.formatMessage({
+          id: 'cloudWorkspaces.disableEncryptionWarning',
+          defaultMessage: 'Disabling encryption will mean future backups are stored unencrypted. Existing encrypted backups will still require your passphrase to restore. Continue?'
         }),
         modalType: 'modal',
         okLabel: intl.formatMessage({ id: 'cloudWorkspaces.disable', defaultMessage: 'Disable' }),
@@ -235,13 +235,13 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
       await plugin.call('notification', 'modal', disableModal)
       return
     }
-    
+
     await toggleEncryption(enabled)
   }
 
   const formatRelativeTime = (dateStr: string | null): string => {
     if (!dateStr) return intl.formatMessage({ id: 'cloudWorkspaces.never', defaultMessage: 'Never' })
-    
+
     const date = new Date(dateStr)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
@@ -253,7 +253,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
     if (diffMins < 60) return intl.formatMessage({ id: 'cloudWorkspaces.minsAgo', defaultMessage: '{mins} min ago' }, { mins: diffMins })
     if (diffHours < 24) return intl.formatMessage({ id: 'cloudWorkspaces.hoursAgo', defaultMessage: '{hours}h ago' }, { hours: diffHours })
     if (diffDays < 7) return intl.formatMessage({ id: 'cloudWorkspaces.daysAgo', defaultMessage: '{days}d ago' }, { days: diffDays })
-    
+
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   }
 
@@ -373,9 +373,9 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         {status.linkedToAnotherUser && (
           <div className="alert alert-warning py-1 px-2 mb-2 small">
             <i className="fas fa-exclamation-triangle me-1"></i>
-            <FormattedMessage 
-              id="cloudWorkspaces.linkedToAnotherUser" 
-              defaultMessage="This workspace is linked to another user's cloud storage." 
+            <FormattedMessage
+              id="cloudWorkspaces.linkedToAnotherUser"
+              defaultMessage="This workspace is linked to another user's cloud storage."
             />
             <button
               className="btn btn-sm btn-link p-0 ms-1"
@@ -403,9 +403,9 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         {!status.remoteId && !status.linkedToAnotherUser && (
           <div className="text-center py-2">
             <p className="text-muted small mb-2">
-              <FormattedMessage 
-                id="cloudWorkspaces.enableCloudDesc" 
-                defaultMessage="Back up this workspace to the cloud" 
+              <FormattedMessage
+                id="cloudWorkspaces.enableCloudDesc"
+                defaultMessage="Back up this workspace to the cloud"
               />
             </p>
             <button
@@ -427,80 +427,80 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         {/* Action buttons - only show when linked */}
         {status.remoteId && status.ownedByCurrentUser && (
           <div className="d-flex gap-1">
-          <CustomTooltip
-            placement="top"
-            tooltipText={
-              status.linkedToAnotherUser 
-                ? intl.formatMessage({ id: 'cloudWorkspaces.linkToAccountFirst', defaultMessage: 'Link to your account first' })
-                : intl.formatMessage({ id: 'cloudWorkspaces.saveToCloudTip', defaultMessage: 'Save current state to cloud' })
-            }
-          >
-            <button
-              className="btn btn-sm btn-primary flex-grow-1"
-              onClick={handleSaveToCloud}
-              disabled={status.isSaving || status.isBackingUp || status.isRestoring || !status.canSave}
-              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-            >
-              {status.isSaving ? (
-                <i className="fas fa-spinner fa-spin me-1"></i>
-              ) : (
-                <i className="fas fa-cloud-upload-alt me-1"></i>
-              )}
-              <FormattedMessage id="cloudWorkspaces.saveToCloud" defaultMessage="Save" />
-            </button>
-          </CustomTooltip>
-          
-          <CustomTooltip
-            placement="top"
-            tooltipText={
-              status.linkedToAnotherUser 
-                ? intl.formatMessage({ id: 'cloudWorkspaces.linkToAccountFirst', defaultMessage: 'Link to your account first' })
-                : intl.formatMessage({ id: 'cloudWorkspaces.createBackupTip', defaultMessage: 'Create a timestamped backup' })
-            }
-          >
-            <button
-              className="btn btn-sm btn-secondary flex-grow-1"
-              onClick={handleCreateBackup}
-              disabled={status.isSaving || status.isBackingUp || status.isRestoring || !status.canSave}
-              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-            >
-              {status.isBackingUp ? (
-                <i className="fas fa-spinner fa-spin me-1"></i>
-              ) : (
-                <i className="fas fa-archive me-1"></i>
-              )}
-              <FormattedMessage id="cloudWorkspaces.createBackup" defaultMessage="Backup" />
-            </button>
-          </CustomTooltip>
-          
-          {/* Restore button - only show if there's a saved state and user owns workspace */}
-          {status.lastSaved && (
             <CustomTooltip
               placement="top"
-              tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosaveTip', defaultMessage: 'Restore from last cloud save' })}
+              tooltipText={
+                status.linkedToAnotherUser
+                  ? intl.formatMessage({ id: 'cloudWorkspaces.linkToAccountFirst', defaultMessage: 'Link to your account first' })
+                  : intl.formatMessage({ id: 'cloudWorkspaces.saveToCloudTip', defaultMessage: 'Save current state to cloud' })
+              }
             >
               <button
-                className="btn btn-sm btn-success flex-grow-1"
-                onClick={handleRestoreAutosave}
-                disabled={status.isSaving || status.isBackingUp || status.isRestoring}
+                className="btn btn-sm btn-primary flex-grow-1"
+                onClick={handleSaveToCloud}
+                disabled={status.isSaving || status.isBackingUp || status.isRestoring || !status.canSave}
                 style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
               >
-                {status.isRestoring ? (
+                {status.isSaving ? (
                   <i className="fas fa-spinner fa-spin me-1"></i>
                 ) : (
-                  <i className="fas fa-download me-1"></i>
+                  <i className="fas fa-cloud-upload-alt me-1"></i>
                 )}
-                <FormattedMessage id="cloudWorkspaces.restoreAutosave" defaultMessage="Restore" />
+                <FormattedMessage id="cloudWorkspaces.saveToCloud" defaultMessage="Save" />
               </button>
             </CustomTooltip>
-          )}
-        </div>
+
+            <CustomTooltip
+              placement="top"
+              tooltipText={
+                status.linkedToAnotherUser
+                  ? intl.formatMessage({ id: 'cloudWorkspaces.linkToAccountFirst', defaultMessage: 'Link to your account first' })
+                  : intl.formatMessage({ id: 'cloudWorkspaces.createBackupTip', defaultMessage: 'Create a timestamped backup' })
+              }
+            >
+              <button
+                className="btn btn-sm btn-secondary flex-grow-1"
+                onClick={handleCreateBackup}
+                disabled={status.isSaving || status.isBackingUp || status.isRestoring || !status.canSave}
+                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+              >
+                {status.isBackingUp ? (
+                  <i className="fas fa-spinner fa-spin me-1"></i>
+                ) : (
+                  <i className="fas fa-archive me-1"></i>
+                )}
+                <FormattedMessage id="cloudWorkspaces.createBackup" defaultMessage="Backup" />
+              </button>
+            </CustomTooltip>
+
+            {/* Restore button - only show if there's a saved state and user owns workspace */}
+            {status.lastSaved && (
+              <CustomTooltip
+                placement="top"
+                tooltipText={intl.formatMessage({ id: 'cloudWorkspaces.restoreAutosaveTip', defaultMessage: 'Restore from last cloud save' })}
+              >
+                <button
+                  className="btn btn-sm btn-success flex-grow-1"
+                  onClick={handleRestoreAutosave}
+                  disabled={status.isSaving || status.isBackingUp || status.isRestoring}
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                >
+                  {status.isRestoring ? (
+                    <i className="fas fa-spinner fa-spin me-1"></i>
+                  ) : (
+                    <i className="fas fa-download me-1"></i>
+                  )}
+                  <FormattedMessage id="cloudWorkspaces.restoreAutosave" defaultMessage="Restore" />
+                </button>
+              </CustomTooltip>
+            )}
+          </div>
         )}
 
         {/* Autosave toggle - only show when linked */}
         {status.remoteId && status.ownedByCurrentUser && (
           <div className="mt-2 d-flex align-items-center justify-content-between px-1">
-            <span 
+            <span
               className="small text-muted mb-0 d-flex align-items-center"
               style={{ fontSize: '0.75rem' }}
             >
@@ -521,7 +521,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         {/* Encryption toggle - only show when linked */}
         {status.remoteId && status.ownedByCurrentUser && (
           <div className="mt-2 d-flex align-items-center justify-content-between px-1">
-            <span 
+            <span
               className="small text-muted mb-0 d-flex align-items-center"
               style={{ fontSize: '0.75rem' }}
             >
@@ -540,9 +540,9 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
               {status.encryptionEnabled && (
                 <CustomTooltip
                   placement="top"
-                  tooltipText={intl.formatMessage({ 
-                    id: 'cloudWorkspaces.setPassphraseTip', 
-                    defaultMessage: status.hasEncryptionPassphrase ? 'Change passphrase' : 'Set passphrase' 
+                  tooltipText={intl.formatMessage({
+                    id: 'cloudWorkspaces.setPassphraseTip',
+                    defaultMessage: status.hasEncryptionPassphrase ? 'Change passphrase' : 'Set passphrase'
                   })}
                 >
                   <button
@@ -570,9 +570,9 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
         {status.remoteId && status.ownedByCurrentUser && status.encryptionEnabled && !status.hasEncryptionPassphrase && (
           <div className="alert alert-warning py-1 px-2 mt-2 small" style={{ fontSize: '0.7rem' }}>
             <i className="fas fa-key me-1"></i>
-            <FormattedMessage 
-              id="cloudWorkspaces.setPassphraseWarning" 
-              defaultMessage="Set a passphrase to enable encrypted backups" 
+            <FormattedMessage
+              id="cloudWorkspaces.setPassphraseWarning"
+              defaultMessage="Set a passphrase to enable encrypted backups"
             />
             <button
               className="btn btn-sm btn-link p-0 ms-1"
@@ -602,15 +602,15 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
                 <div className="alert alert-danger py-2 mb-3" style={{ fontSize: '0.8rem' }}>
                   <i className="fas fa-exclamation-triangle me-1"></i>
                   <strong><FormattedMessage id="cloudWorkspaces.warning" defaultMessage="Warning" />:</strong>{' '}
-                  <FormattedMessage 
-                    id="cloudWorkspaces.passphraseWarning" 
-                    defaultMessage="If you lose this passphrase, your encrypted data cannot be recovered. Save it securely!" 
+                  <FormattedMessage
+                    id="cloudWorkspaces.passphraseWarning"
+                    defaultMessage="If you lose this passphrase, your encrypted data cannot be recovered. Save it securely!"
                   />
                 </div>
 
                 {/* Generate button */}
                 <div className="mb-3">
-                  <button 
+                  <button
                     className="btn btn-outline-primary btn-sm w-100"
                     onClick={handleGeneratePassphrase}
                   >
@@ -624,7 +624,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
                   <div className="mb-3 p-2 bg-light rounded border">
                     <div className="d-flex justify-content-between align-items-center">
                       <code className="text-break" style={{ fontSize: '0.85rem' }}>{generatedPassphrase}</code>
-                      <button 
+                      <button
                         className="btn btn-sm btn-outline-secondary ms-2"
                         onClick={handleCopyPassphrase}
                       >
@@ -664,7 +664,7 @@ export const CurrentWorkspaceSection: React.FC<CurrentWorkspaceSectionProps> = (
                 <button className="btn btn-secondary btn-sm" onClick={() => setShowPassphraseModal(false)}>
                   <FormattedMessage id="cloudWorkspaces.cancel" defaultMessage="Cancel" />
                 </button>
-                <button 
+                <button
                   className="btn btn-primary btn-sm"
                   onClick={handleSavePassphrase}
                   disabled={passphraseInput.length < 8}

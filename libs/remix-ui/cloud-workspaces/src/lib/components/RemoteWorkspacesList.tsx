@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { CustomTooltip } from '@remix-ui/helper'
-import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
+import { WorkspaceSummary, StorageFile } from '@remix-api'
 import { WorkspaceItem } from './WorkspaceItem'
 import { DeleteConfirmModal } from './DeleteConfirmModal'
 import { WorkspaceBackupData } from '../types'
@@ -41,7 +41,7 @@ export const RemoteWorkspacesList: React.FC<RemoteWorkspacesListProps> = ({
 
   const toggleWorkspaceExpand = (workspaceId: string) => {
     const isCurrentlyExpanded = expandedWorkspaces.has(workspaceId)
-    
+
     if (isCurrentlyExpanded) {
       // Collapsing
       onCollapseWorkspace(workspaceId)
@@ -89,7 +89,7 @@ export const RemoteWorkspacesList: React.FC<RemoteWorkspacesListProps> = ({
   return (
     <div className="remote-workspaces-section flex-grow-1 d-flex flex-column mt-3" style={{ minHeight: 0 }}>
       {/* Section Header - Clickable to collapse */}
-      <div 
+      <div
         className="d-flex justify-content-between align-items-center px-2 py-1 border-top border-bottom bg-light"
         style={{ cursor: 'pointer' }}
         onClick={() => setIsCollapsed(!isCollapsed)}

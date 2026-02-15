@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { FormattedMessage } from 'react-intl'
-import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
+import { WorkspaceSummary, StorageFile } from '@remix-api'
 import { RemoteWorkspacesList, CurrentWorkspaceSection, CurrentCloudWorkspaceFiles } from './components'
 import { LoginButton } from '@remix-ui/login'
 import { CloudWorkspacesProvider, CurrentWorkspaceCloudStatus, CloudWorkspacesContextValue } from './context'

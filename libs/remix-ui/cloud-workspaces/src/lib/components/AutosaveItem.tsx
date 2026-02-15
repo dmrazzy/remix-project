@@ -11,19 +11,19 @@ import { AutosaveItemProps, formatSize, formatDate, formatRelativeDate } from '.
 const parseAutosaveFilename = (filename: string): { workspaceName: string | null; isEncrypted: boolean } => {
   // Check if encrypted
   const isEncrypted = filename.endsWith('.enc')
-  
+
   const name = filename.replace(/\.zip(\.enc)?$/i, '')
-  
+
   // Old format
   if (name === 'autosave-backup') {
     return { workspaceName: null, isEncrypted }
   }
-  
+
   // New format: "workspacename-autosave"
   if (name.endsWith('-autosave')) {
     return { workspaceName: name.replace(/-autosave$/, ''), isEncrypted }
   }
-  
+
   return { workspaceName: null, isEncrypted }
 }
 

@@ -13,25 +13,25 @@ import { BackupItemProps, formatSize, formatDate, formatRelativeDate } from '../
 const parseBackupFilename = (filename: string): { workspaceName: string; isAutosave: boolean; isEncrypted: boolean } => {
   // Check if encrypted (ends with .enc)
   const isEncrypted = filename.endsWith('.enc')
-  
+
   // Remove .zip.enc or .zip extension
   const name = filename.replace(/\.zip(\.enc)?$/i, '')
-  
+
   // Check if it's an autosave
   const isAutosave = name.endsWith('-autosave') || name === 'autosave-backup'
-  
+
   // Old format: starts with "backup-" followed by timestamp
   if (name.startsWith('backup-') || /^\d{4}-\d{2}-\d{2}T/.test(name)) {
     return { workspaceName: 'unknown', isAutosave, isEncrypted }
   }
-  
+
   // New format: "workspacename-timestamp" or "workspacename-autosave"
   // Find the last occurrence of a timestamp pattern or "-autosave"
   const timestampMatch = name.match(/^(.+?)-(?:\d{4}-\d{2}-\d{2}T|autosave$)/)
   if (timestampMatch) {
     return { workspaceName: timestampMatch[1], isAutosave, isEncrypted }
   }
-  
+
   // Couldn't parse, return the whole name
   return { workspaceName: name, isAutosave, isEncrypted }
 }

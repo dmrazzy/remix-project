@@ -460,7 +460,7 @@ export const WorkspacesDropdown: React.FC<WorkspacesDropdownProps> = ({ menuItem
                 Restore
             </span>
           </Dropdown.Item>
-          <Dropdown.Divider />          
+          <Dropdown.Divider />
           <Dropdown.Item onClick={() => {
             connectToLocalhost()
             setShowMain(false)

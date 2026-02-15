@@ -1,4 +1,4 @@
-import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
+import { WorkspaceSummary, StorageFile } from '@remix-api'
 
 // Per-workspace backup data structure
 export interface WorkspaceBackupData {

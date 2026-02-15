@@ -112,7 +112,6 @@ export function RemixUiTopbar() {
     setError(null);
   };
 
-
   async function openTemplateExplorer(): Promise<void> {
     await global.plugin.call('templateexplorermodal', 'updateTemplateExplorerInFileMode', false)
     appContext.appStateDispatch({
@@ -120,7 +119,6 @@ export function RemixUiTopbar() {
       payload: true
     })
   }
-
 
   const toggleDropdown = (isOpen: boolean) => {
     setShowDropdown(isOpen)
@@ -348,8 +346,6 @@ export function RemixUiTopbar() {
       console.error(e)
     }
   }
-
-
 
   const onFinishDeleteAllWorkspaces = async () => {
     try {
