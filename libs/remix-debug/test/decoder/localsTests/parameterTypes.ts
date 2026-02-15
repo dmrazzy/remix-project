@@ -178,7 +178,7 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
         // console.log(`Symbolic stack for ${testCase.name}:`, symbolicStack)
 
         // Decode locals at this step
-        await helper.decodeLocals(st, functionScope.firstStep + 2, traceManager, callTree, (locals) => {
+        await helper.decodeLocals(st, functionScope.firstStep + 3, traceManager, callTree, (locals) => {
           console.log(`${testCase.name} locals:`, locals)
 
           // Verify parameter decoding based on function signature
