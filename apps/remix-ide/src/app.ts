@@ -57,6 +57,7 @@ import { CompilationDetailsPlugin } from './app/plugins/compile-details'
 import { AuthPlugin } from './app/plugins/auth-plugin'
 import { S3StoragePlugin } from './app/plugins/storage/s3-storage-plugin'
 import { CloudWorkspacesPlugin } from './app/plugins/cloud-workspaces-plugin'
+import { InvitationManagerPlugin } from './app/plugins/invitation-manager-plugin'
 import { AccountPlugin } from './app/plugins/account-plugin'
 import { RemixGuidePlugin } from './app/plugins/remixGuide'
 import { TemplatesPlugin } from './app/plugins/remix-templates'
@@ -84,6 +85,7 @@ import { DesktopHost } from './app/plugins/electron/desktopHostPlugin'
 import { WalletConnect } from './app/plugins/walletconnect'
 import { AIDappGenerator } from './app/plugins/ai-dapp-generator'
 import { IndexedDbCachePlugin } from './app/plugins/IndexedDbCache'
+import { FeedbackPlugin } from './app/plugins/feedback'
 
 import { TemplatesSelectionPlugin } from './app/plugins/templates-selection/templates-selection-plugin'
 
@@ -176,6 +178,7 @@ class AppComponent {
   authPlugin: AuthPlugin
   s3StoragePlugin: S3StoragePlugin
   cloudWorkspacesPlugin: CloudWorkspacesPlugin
+  invitationManager: InvitationManagerPlugin
   accountPlugin: AccountPlugin
   params: any
   desktopClientMode: boolean
@@ -615,6 +618,8 @@ class AppComponent {
     this.authPlugin = new AuthPlugin()
     this.s3StoragePlugin = new S3StoragePlugin()
     this.cloudWorkspacesPlugin = new CloudWorkspacesPlugin()
+    this.invitationManager = new InvitationManagerPlugin()
+    const feedbackPlugin = new FeedbackPlugin()
 
     this.engine.register([
       compileTab,
@@ -631,7 +636,9 @@ class AppComponent {
       this.authPlugin,
       this.s3StoragePlugin,
       this.cloudWorkspacesPlugin,
-      this.accountPlugin
+      this.invitationManager,
+      this.accountPlugin,
+      feedbackPlugin
     ])
     this.engine.register([templateExplorerModal, this.topBar])
 
@@ -705,7 +712,9 @@ class AppComponent {
     await this.appManager.activatePlugin(['auth'])
     await this.appManager.activatePlugin(['s3Storage'])
     await this.appManager.activatePlugin(['cloudWorkspaces'])
+    await this.appManager.activatePlugin(['invitationManager'])
     await this.appManager.activatePlugin(['account'])
+    await this.appManager.activatePlugin(['feedback'])
     await this.appManager.activatePlugin(['settings'])
 
     await this.appManager.activatePlugin(['walkthrough', 'storage', 'storageMonitor', 'search', 'compileAndRun', 'recorder', 'dgitApi', 'dgit'])

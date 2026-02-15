@@ -3,15 +3,15 @@ import { ViewPlugin } from '@remixproject/engine-web'
 import { PluginViewWrapper } from '@remix-ui/helper'
 import * as packageJson from '../../../../../package.json'
 import { RemixUICloudWorkspaces } from '@remix-ui/cloud-workspaces'
-import { WorkspaceSummary, StorageFile } from 'libs/remix-api/src/lib/plugins/api-types'
+import { WorkspaceSummary, StorageFile } from '@remix-api'
 
 const profile = {
   name: 'cloudWorkspaces',
   displayName: 'Cloud Workspaces',
   methods: [
-    'getWorkspaces', 
-    'getBackups', 
-    'refresh', 
+    'getWorkspaces',
+    'getBackups',
+    'refresh',
     'updateStatus',
     'saveToCloud',
     'createBackup',
@@ -122,10 +122,10 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   /**
    * Update the sidebar badge status based on current state
    */
-  async updateStatus(): Promise<void> {    
+  async updateStatus(): Promise<void> {
     const status = await this.computeCurrentStatus()
     console.log('[CloudWorkspaces] Computed status:', status)
-    
+
     if (status.key !== this.state.currentStatus.key) {
       console.log('[CloudWorkspaces] Status changed from', this.state.currentStatus.key, 'to', status.key)
       this.state.currentStatus = status
@@ -138,45 +138,45 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
 
   private async computeCurrentStatus(): Promise<CloudStatus> {
     console.log('[CloudWorkspaces] computeCurrentStatus - isAuthenticated:', this.state.isAuthenticated)
-    
+
     // Check if there's a conflict - highest priority
     const status = this.state.currentWorkspaceStatus
     if (status.hasConflict) {
-      return { 
-        key: 'error', 
-        title: 'Sync conflict - cloud was modified elsewhere', 
-        type: 'error' 
+      return {
+        key: 'error',
+        title: 'Sync conflict - cloud was modified elsewhere',
+        type: 'error'
       }
     }
-    
+
     // Check if any remote activity is in progress
     if (status.isSaving || status.isBackingUp || status.isRestoring || status.isLinking) {
-      const activity = status.isSaving ? 'Saving' : 
-                       status.isBackingUp ? 'Backing up' : 
-                       status.isRestoring ? 'Restoring' : 'Linking'
-      return { 
-        key: 'syncing', 
-        title: `${activity} to cloud...`, 
-        type: 'info' 
+      const activity = status.isSaving ? 'Saving' :
+        status.isBackingUp ? 'Backing up' :
+          status.isRestoring ? 'Restoring' : 'Linking'
+      return {
+        key: 'syncing',
+        title: `${activity} to cloud...`,
+        type: 'info'
       }
     }
 
     // Check if there's an error
     if (this.state.error) {
-      return { 
-        key: 'error', 
-        title: this.state.error, 
-        type: 'error' 
+      return {
+        key: 'error',
+        title: this.state.error,
+        type: 'error'
       }
     }
 
     // Check if user is logged in
     if (!this.state.isAuthenticated) {
       console.log('[CloudWorkspaces] Not authenticated, returning login status')
-      return { 
-        key: 'login', 
-        title: 'Login to sync workspaces to cloud', 
-        type: 'warning' 
+      return {
+        key: 'login',
+        title: 'Login to sync workspaces to cloud',
+        type: 'warning'
       }
     }
 
@@ -192,39 +192,39 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       // Check if workspace is linked to cloud
       const ownership = await this.call('s3Storage', 'getWorkspaceOwnership')
       console.log('[CloudWorkspaces] Ownership:', ownership)
-      
+
       if (!ownership.remoteId) {
-        return { 
-          key: 'cloud-off', 
-          title: 'Enable cloud backup for this workspace', 
-          type: 'info' 
+        return {
+          key: 'cloud-off',
+          title: 'Enable cloud backup for this workspace',
+          type: 'info'
         }
       }
 
       // Check if workspace is owned by another user
       if (!ownership.ownedByCurrentUser) {
-        return { 
-          key: 'error', 
-          title: 'Workspace linked to another account', 
-          type: 'error' 
+        return {
+          key: 'error',
+          title: 'Workspace linked to another account',
+          type: 'error'
         }
       }
 
       // Check if autosave is enabled and running
       const autosaveEnabled = await this.call('s3Storage', 'isAutosaveEnabled')
       if (autosaveEnabled) {
-        return { 
-          key: 'autosave', 
-          title: 'Autosave enabled - syncing to cloud', 
-          type: 'success' 
+        return {
+          key: 'autosave',
+          title: 'Autosave enabled - syncing to cloud',
+          type: 'success'
         }
       }
 
       // Workspace is linked but autosave is off
-      return { 
-        key: 'synced', 
-        title: 'Workspace linked to cloud', 
-        type: 'success' 
+      return {
+        key: 'synced',
+        title: 'Workspace linked to cloud',
+        type: 'success'
       }
     } catch (e) {
       console.warn('[CloudWorkspacesPlugin] Could not compute status:', e)
@@ -236,15 +236,15 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
 
   async onActivation(): Promise<void> {
     console.log('[CloudWorkspaces] Plugin activated')
-    
+
     // Check auth status and load workspaces
     await this.checkAuthAndLoad()
-    
+
     // Listen for auth state changes (login / logout — NOT token refreshes)
     this.on('auth', 'authStateChanged', async (state: { isAuthenticated: boolean }) => {
       const wasAuthenticated = this.state.isAuthenticated
       this.state.isAuthenticated = state.isAuthenticated
-      
+
       if (state.isAuthenticated) {
         if (wasAuthenticated) {
           // Already authenticated — skip full workspace reload
@@ -264,14 +264,14 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
-    
+
     // Listen for workspace changes
     this.on('filePanel', 'setWorkspace', async () => {
       console.log('[CloudWorkspaces] setWorkspace event received')
       await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
-    
+
     // Listen for backup events from s3Storage
     this.on('s3Storage', 'backupCompleted', async () => {
       console.log('[CloudWorkspaces] backupCompleted event received')
@@ -279,7 +279,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
-    
+
     // Listen for save events from s3Storage
     this.on('s3Storage', 'saveCompleted', async (data) => {
       console.log('[CloudWorkspaces] saveCompleted event received!', data)
@@ -289,7 +289,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
-    
+
     // Listen for autosave starting (syncing indicator)
     this.on('s3Storage', 'autosaveStarted', async () => {
       console.log('[CloudWorkspaces] autosaveStarted event received')
@@ -297,14 +297,14 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isSaving: true }
       await this.updateStatus()
     })
-    
+
     // Listen for autosave setting changes
     this.on('s3Storage', 'autosaveChanged', async () => {
       console.log('[CloudWorkspaces] autosaveChanged event received')
       await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
     })
-    
+
     // Listen for conflict detection
     this.on('s3Storage', 'conflictDetected', async (conflictInfo: { hasConflict: boolean; lockInfo?: { sessionId: string; browser: string; platform: string; lockedAt: string } | null; source?: string }) => {
       console.warn('[CloudWorkspaces] Conflict detected!', conflictInfo)
@@ -315,7 +315,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       // Show modal
       await this.showConflictResolutionModal(conflictInfo)
     })
-    
+
     // Initial status update
     console.log('[CloudWorkspaces] Calling initial updateStatus')
     await this.loadCurrentWorkspaceStatus()
@@ -331,25 +331,25 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.off('s3Storage', 'autosaveChanged')
     this.off('s3Storage', 'conflictDetected')
   }
-  
+
   /**
    * Show conflict resolution modal when workspace is locked by another session
    */
   private async showConflictResolutionModal(conflictInfo: { lockInfo?: { sessionId: string; browser: string; platform: string; lockedAt: string } | null }): Promise<void> {
     const lockInfo = conflictInfo.lockInfo
-    const lockedAt = lockInfo?.lockedAt 
+    const lockedAt = lockInfo?.lockedAt
       ? new Date(lockInfo.lockedAt).toLocaleString()
       : 'unknown time'
-    const lockedBy = lockInfo 
-      ? `${lockInfo.browser} on ${lockInfo.platform}` 
+    const lockedBy = lockInfo
+      ? `${lockInfo.browser} on ${lockInfo.platform}`
       : 'another session'
-    
+
     const clearConflictFlag = async () => {
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, hasConflict: false }
       this.renderComponent()
       await this.updateStatus()
     }
-    
+
     const modal = {
       id: 'cloudConflictModal',
       title: '⚠️ Cloud Sync Conflict',
@@ -379,7 +379,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         console.log('[CloudWorkspaces] Conflict modal dismissed - sync paused until next action')
       }
     }
-    
+
     await this.call('notification', 'modal', modal)
   }
 
@@ -406,7 +406,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
    */
   private async loadCurrentWorkspaceStatus(): Promise<void> {
     console.log('[CloudWorkspaces] loadCurrentWorkspaceStatus called')
-    
+
     if (!this.state.isAuthenticated) {
       this.state.currentWorkspaceStatus = { ...defaultWorkspaceStatus }
       this.renderComponent()
@@ -426,11 +426,11 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
       const lastBackup = await this.call('s3Storage', 'getLastBackupTime', currentWorkspace.name)
       const autosaveEnabled = await this.call('s3Storage', 'isAutosaveEnabled')
       const ownership = await this.call('s3Storage', 'getWorkspaceOwnership')
-      
+
       // Get encryption status
       const encryptionEnabled = await this.call('s3Storage', 'isEncryptionEnabled')
       const hasEncryptionPassphrase = await this.call('s3Storage', 'hasEncryptionPassphrase')
-      
+
       console.log('[CloudWorkspaces] Ownership result:', ownership)
 
       this.state.currentWorkspaceStatus = {
@@ -453,16 +453,16 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         encryptionEnabled,
         hasEncryptionPassphrase
       }
-      
+
       console.log('[CloudWorkspaces] Current workspace status loaded:', this.state.currentWorkspaceStatus)
       console.log('[CloudWorkspaces] canSave:', this.state.currentWorkspaceStatus.canSave)
-      
+
       // Load backups for current workspace if it's connected to cloud
       if (remoteId) {
         // Fire and forget - don't block on this
         this.loadBackups(remoteId)
       }
-      
+
       this.renderComponent()
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Failed to load workspace status:', e)
@@ -479,7 +479,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.state.error = null
     this.renderComponent()
     await this.updateStatus()
-    
+
     try {
       await this.call('s3Storage', 'saveToCloud')
       await this.loadCurrentWorkspaceStatus()
@@ -501,7 +501,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.state.error = null
     this.renderComponent()
     await this.updateStatus()
-    
+
     try {
       await this.call('s3Storage', 'backupWorkspace')
       await this.loadCurrentWorkspaceStatus()
@@ -522,12 +522,12 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     const remoteId = this.state.currentWorkspaceStatus.remoteId
     const workspaceName = this.state.currentWorkspaceStatus.workspaceName
     if (!remoteId || !workspaceName) return
-    
+
     this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isRestoring: true }
     this.state.error = null
     this.renderComponent()
     await this.updateStatus()
-    
+
     try {
       // Build the autosave filename using the same sanitization as saveToCloud
       const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
@@ -552,7 +552,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.state.error = null
     this.renderComponent()
     await this.updateStatus()
-    
+
     try {
       await this.call('s3Storage', 'linkWorkspaceToCurrentUser')
       await this.loadCurrentWorkspaceStatus()
@@ -577,30 +577,30 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     this.state.error = null
     this.renderComponent()
     await this.updateStatus()
-    
+
     try {
       // Step 1: Link workspace to cloud
       await this.call('s3Storage', 'linkWorkspaceToCurrentUser')
-      
+
       // Step 2: Run first save
       this.state.currentWorkspaceStatus = { ...this.state.currentWorkspaceStatus, isLinking: false, isSaving: true }
       this.renderComponent()
       await this.updateStatus()
       await this.call('s3Storage', 'saveToCloud')
-      
+
       // Step 3: Enable autosave
       await this.call('s3Storage', 'setAutosaveEnabled', true)
-      
+
       await this.loadCurrentWorkspaceStatus()
       await this.updateStatus()
-      
+
       await this.call('notification', 'toast', '☁️ Cloud backup enabled!')
     } catch (e) {
       this.state.error = e.message || 'Failed to enable cloud'
-      this.state.currentWorkspaceStatus = { 
-        ...this.state.currentWorkspaceStatus, 
-        isLinking: false, 
-        isSaving: false 
+      this.state.currentWorkspaceStatus = {
+        ...this.state.currentWorkspaceStatus,
+        isLinking: false,
+        isSaving: false
       }
       this.renderComponent()
       await this.updateStatus()
@@ -689,7 +689,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
    */
   async updateWorkspaceRemoteId(workspaceName: string, remoteId: string): Promise<void> {
     this.state.error = null
-    
+
     try {
       await this.call('s3Storage', 'setWorkspaceRemoteId', workspaceName, remoteId)
       await this.loadCurrentWorkspaceStatus()
@@ -725,7 +725,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
   async refresh(): Promise<void> {
     // Get list of currently expanded workspaces (only reload those)
     const expandedIds = Array.from(this.state.expandedWorkspaces)
-    
+
     // Mark expanded workspaces as needing reload
     for (const workspaceId of expandedIds) {
       if (this.state.workspaceBackups[workspaceId]) {
@@ -735,9 +735,9 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         }
       }
     }
-    
+
     await this.loadWorkspaces()
-    
+
     // Reload backups for currently expanded workspaces only (fire and forget, parallel)
     for (const workspaceId of expandedIds) {
       this.loadBackups(workspaceId)
@@ -789,13 +789,13 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         this.call('s3Storage', 'listWorkspaces'),
         this.scanLocalRemoteIds()
       ])
-      
+
       // Enrich each remote workspace with local presence info
       const workspaces = (result.workspaces || []).map(ws => ({
         ...ws,
         localWorkspaceNames: localRemoteIds.get(ws.id) || []
       }))
-      
+
       this.state.workspaces = workspaces
       this.emit('workspacesLoaded', this.state.workspaces)
     } catch (e) {
@@ -818,14 +818,14 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         loaded: false
       }
     }
-    
+
     const workspaceData = this.state.workspaceBackups[workspaceId]
-    
+
     // Skip if already loading
     if (workspaceData.loading) {
       return
     }
-    
+
     // Set loading state for this specific workspace
     this.state.workspaceBackups[workspaceId] = {
       ...workspaceData,
@@ -840,16 +840,16 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         this.call('s3Storage', 'list', { folder: `${workspaceId}/backups` }),
         this.call('s3Storage', 'list', { folder: `${workspaceId}/autosave` })
       ])
-      
+
       const backups = backupsResult.files || []
       const allAutosaveFiles = autosaveResult.files || []
-      
+
       // Filter to only actual backup files (.zip or .zip.enc)
       // The autosave folder also contains content-hash.json and session.lock which are not backups
-      const autosaveFiles = allAutosaveFiles.filter(f => 
+      const autosaveFiles = allAutosaveFiles.filter(f =>
         f.filename.endsWith('.zip') || f.filename.endsWith('.zip.enc')
       )
-      
+
       // Find the latest autosave
       // Sort by lastModified descending and take the first one
       let autosave = null
@@ -861,7 +861,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         })
         autosave = sortedAutosaves[0]
       }
-      
+
       // Update this workspace's backup data
       this.state.workspaceBackups[workspaceId] = {
         backups,
@@ -870,7 +870,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         error: null,
         loaded: true
       }
-      
+
       this.emit('backupsLoaded', { workspaceId, backups, autosave })
     } catch (e) {
       console.error('[CloudWorkspacesPlugin] Failed to load backups:', e)
@@ -906,18 +906,18 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     try {
       // Construct the relative path (without users/X prefix)
       const backupPath = `${backupFolder}/${backupFilename}`
-      
+
       // Extract the remote workspace ID from the backup path (first segment)
       const backupRemoteId = backupFolder.split('/')[0]
-      
+
       // Check if current workspace has the same remote ID
       const currentRemoteId = await this.call('s3Storage', 'getWorkspaceRemoteId')
       const canRestoreToCurrent = currentRemoteId && currentRemoteId === backupRemoteId
-      
+
       // Scan all local workspaces to find any already linked to this remote ID
       const localRemoteIds = await this.scanLocalRemoteIds()
       const localWorkspacesWithSameId = localRemoteIds.get(backupRemoteId) || []
-      
+
       console.log('[CloudWorkspaces] 🔄 restoreBackup called:', {
         backupPath,
         backupRemoteId,
@@ -925,7 +925,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         canRestoreToCurrent,
         localWorkspacesWithSameId
       })
-      
+
       if (canRestoreToCurrent) {
         console.log('[CloudWorkspaces] 🔄 Path: canRestoreToCurrent — showing Restore/Copy modal')
         // Current workspace owns this remote — offer restore to current or create a separate copy
@@ -1004,7 +1004,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
    * Properly switch to a workspace and wait for the switch to complete.
    * filePanel.setWorkspace only updates metadata — it does NOT change the file provider root.
    * filePanel.switchToWorkspace emits an event that triggers the full switch asynchronously.
-   * 
+   *
    * IMPORTANT: We fire switchToWorkspace without await because the plugin engine
    * waits for ALL event listeners to complete (including our own setWorkspace handler
    * which runs loadCurrentWorkspaceStatus + updateStatus). Awaiting would block the
@@ -1012,25 +1012,25 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
    */
   private async switchToWorkspaceAndWait(workspaceName: string, timeoutMs = 10000): Promise<void> {
     console.log('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: switching to', workspaceName)
-    
+
     // Check if we're already on this workspace
     const current = await this.call('filePanel', 'getCurrentWorkspace')
     if (current?.name === workspaceName) {
       console.log('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: already on', workspaceName)
       return
     }
-    
+
     // Fire and forget — do NOT await. The plugin engine's emit waits for all listeners
     // (including our own setWorkspace handler), so awaiting would block the poll loop below.
     this.call('filePanel', 'switchToWorkspace', { name: workspaceName }).catch(e => {
       console.error('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: switchToWorkspace call failed:', e)
     })
-    
+
     // Poll until getCurrentWorkspace reflects the new workspace
     const startTime = Date.now()
     while (Date.now() - startTime < timeoutMs) {
       await new Promise(r => setTimeout(r, 200))
-      
+
       try {
         const ws = await this.call('filePanel', 'getCurrentWorkspace')
         if (ws?.name === workspaceName) {
@@ -1042,7 +1042,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
         console.log('[CloudWorkspaces] 🔄 switchToWorkspaceAndWait: still waiting... (error:', e.message, ')')
       }
     }
-    
+
     throw new Error(`Timed out waiting for workspace switch to "${workspaceName}"`)
   }
 
@@ -1153,7 +1153,7 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
             return
           }
           const trimmedName = workspaceName.trim()
-          
+
           // Check if workspace already exists
           const workspaceExists = await this.call('filePanel', 'workspaceExists', trimmedName)
           console.log('[CloudWorkspaces] 🔄 Workspace exists check:', { trimmedName, workspaceExists })
@@ -1238,9 +1238,9 @@ export class CloudWorkspacesPlugin extends ViewPlugin {
     try {
       // Extract workspace ID from the backup folder path (first segment)
       const workspaceId = backupFolder.split('/')[0]
-      
+
       await this.call('s3Storage', 'delete', backupFilename, backupFolder)
-      
+
       // Invalidate cache and reload backups for this workspace
       if (workspaceId && this.state.workspaceBackups[workspaceId]) {
         // Mark as not loaded to force reload

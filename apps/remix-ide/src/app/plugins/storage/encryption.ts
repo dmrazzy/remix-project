@@ -1,17 +1,17 @@
 /**
  * Client-Side Encryption Module for Cloud Storage
- * 
+ *
  * Provides zero-knowledge encryption using Web Crypto API.
  * The encryption key is derived from a user passphrase and NEVER leaves the browser.
- * 
+ *
  * Algorithm: AES-256-GCM with PBKDF2 key derivation
  * - PBKDF2: 100,000 iterations with SHA-256
  * - AES-GCM: 256-bit key, 96-bit IV, 128-bit auth tag
  */
 
 const PBKDF2_ITERATIONS = 100000
-const SALT_LENGTH = 16  // 128 bits
-const IV_LENGTH = 12    // 96 bits (recommended for GCM)
+const SALT_LENGTH = 16 // 128 bits
+const IV_LENGTH = 12 // 96 bits (recommended for GCM)
 const SESSION_STORAGE_KEY = 'remix-cloud-encryption-key'
 const ENCRYPTION_ENABLED_KEY = 'remix-cloud-encryption-enabled'
 
@@ -44,15 +44,15 @@ export function generatePassphrase(): string {
     'wave', 'xray', 'yield', 'zephyr', 'azure', 'brook', 'cloud', 'dusk',
     'epoch', 'flame', 'grain', 'haze', 'iris', 'jade', 'kite', 'light'
   ]
-  
+
   const randomWords: string[] = []
   const array = new Uint32Array(6)
   crypto.getRandomValues(array)
-  
+
   for (let i = 0; i < 6; i++) {
     randomWords.push(words[array[i] % words.length])
   }
-  
+
   return randomWords.join('-')
 }
 
@@ -105,7 +105,7 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
     false,
     ['deriveKey']
   )
-  
+
   // Derive AES-GCM key
   // Use ArrayBuffer slice to ensure proper buffer type
   const saltBuffer = new Uint8Array(salt).buffer as ArrayBuffer
@@ -118,14 +118,14 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
     },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
-    false,  // not extractable
+    false, // not extractable
     ['encrypt', 'decrypt']
   )
 }
 
 /**
  * Encrypt data using AES-256-GCM
- * 
+ *
  * @param data - Data to encrypt (Uint8Array)
  * @param passphrase - User's encryption passphrase
  * @returns Encrypted payload with salt, IV, and ciphertext
@@ -133,19 +133,19 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
 export async function encrypt(data: Uint8Array, passphrase: string): Promise<EncryptedPayload> {
   const salt = generateSalt()
   const iv = generateIV()
-  
+
   const key = await deriveKey(passphrase, salt)
-  
+
   // Convert to ArrayBuffer for Web Crypto API
   const ivBuffer = new Uint8Array(iv).buffer as ArrayBuffer
   const dataBuffer = new Uint8Array(data).buffer as ArrayBuffer
-  
+
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: ivBuffer },
     key,
     dataBuffer
   )
-  
+
   return {
     version: 1,
     salt: toBase64(salt),
@@ -156,7 +156,7 @@ export async function encrypt(data: Uint8Array, passphrase: string): Promise<Enc
 
 /**
  * Decrypt data using AES-256-GCM
- * 
+ *
  * @param payload - Encrypted payload from encrypt()
  * @param passphrase - User's encryption passphrase
  * @returns Decrypted data as Uint8Array
@@ -166,24 +166,24 @@ export async function decrypt(payload: EncryptedPayload, passphrase: string): Pr
   if (payload.version !== 1) {
     throw new Error(`Unsupported encryption version: ${payload.version}`)
   }
-  
+
   const salt = fromBase64(payload.salt)
   const iv = fromBase64(payload.iv)
   const ciphertext = fromBase64(payload.ciphertext)
-  
+
   const key = await deriveKey(passphrase, salt)
-  
+
   // Convert to ArrayBuffer for Web Crypto API
   const ivBuffer = new Uint8Array(iv).buffer as ArrayBuffer
   const ciphertextBuffer = new Uint8Array(ciphertext).buffer as ArrayBuffer
-  
+
   try {
     const decrypted = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: ivBuffer },
       key,
       ciphertextBuffer
     )
-    
+
     return new Uint8Array(decrypted)
   } catch (e) {
     throw new Error('Decryption failed. Wrong passphrase or corrupted data.')
@@ -196,18 +196,18 @@ export async function decrypt(payload: EncryptedPayload, passphrase: string): Pr
  */
 export async function encryptToBytes(data: Uint8Array, passphrase: string): Promise<Uint8Array> {
   const payload = await encrypt(data, passphrase)
-  
+
   const salt = fromBase64(payload.salt)
   const iv = fromBase64(payload.iv)
   const ciphertext = fromBase64(payload.ciphertext)
-  
+
   // Combine into single buffer: version + salt + iv + ciphertext
   const result = new Uint8Array(1 + SALT_LENGTH + IV_LENGTH + ciphertext.length)
   result[0] = payload.version
   result.set(salt, 1)
   result.set(iv, 1 + SALT_LENGTH)
   result.set(ciphertext, 1 + SALT_LENGTH + IV_LENGTH)
-  
+
   return result
 }
 
@@ -219,18 +219,18 @@ export async function decryptFromBytes(encryptedData: Uint8Array, passphrase: st
   if (version !== 1) {
     throw new Error(`Unsupported encryption version: ${version}`)
   }
-  
+
   const salt = encryptedData.slice(1, 1 + SALT_LENGTH)
   const iv = encryptedData.slice(1 + SALT_LENGTH, 1 + SALT_LENGTH + IV_LENGTH)
   const ciphertext = encryptedData.slice(1 + SALT_LENGTH + IV_LENGTH)
-  
+
   const payload: EncryptedPayload = {
     version: 1,
     salt: toBase64(salt),
     iv: toBase64(iv),
     ciphertext: toBase64(ciphertext)
   }
-  
+
   return decrypt(payload, passphrase)
 }
 

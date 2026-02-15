@@ -49,7 +49,12 @@ import {
   FeatureAccessPurchaseRequest,
   FeatureAccessPurchaseResponse,
   UserMembershipsResponse,
-  FeatureAccessCheckResponse
+  FeatureAccessCheckResponse,
+  InviteValidateResponse,
+  InviteRedeemRequest,
+  InviteRedeemResponse,
+  InviteRedemptionsResponse,
+  UserTagsResponse
 } from './api-types'
 
 /**
@@ -581,5 +586,107 @@ export class BillingApiService {
    */
   static filterFeatureProducts(products: FeatureAccessProduct[], recurring: boolean): FeatureAccessProduct[] {
     return products.filter(p => p.isRecurring === recurring)
+  }
+}
+
+/**
+ * Invite API Service - Invite token endpoints with full TypeScript typing
+ */
+export class InviteApiService {
+  constructor(private apiClient: IApiClient) {}
+
+  /**
+   * Set the authentication token for API requests
+   */
+  setToken(token: string): void {
+    this.apiClient.setToken(token)
+  }
+
+  // ==================== Token Validation ====================
+
+  /**
+   * Validate an invite token (no auth required)
+   * @param token - The invite token string
+   */
+  async validateToken(token: string): Promise<ApiResponse<InviteValidateResponse>> {
+    return this.apiClient.get<InviteValidateResponse>(`/validate/${token}`)
+  }
+
+  /**
+   * Helper: Check if a token is valid
+   */
+  async isTokenValid(token: string): Promise<boolean> {
+    try {
+      const response = await this.validateToken(token)
+      return response.ok && response.data?.valid === true
+    } catch {
+      return false
+    }
+  }
+
+  // ==================== Token Redemption ====================
+
+  /**
+   * Redeem an invite token (auth required)
+   * @param token - The invite token string
+   */
+  async redeemToken(token: string): Promise<ApiResponse<InviteRedeemResponse>> {
+    return this.apiClient.post<InviteRedeemResponse>('/redeem', { token })
+  }
+
+  // ==================== User Redemptions ====================
+
+  /**
+   * Get all tokens redeemed by the current user (auth required)
+   */
+  async getMyRedemptions(): Promise<ApiResponse<InviteRedemptionsResponse>> {
+    return this.apiClient.get<InviteRedemptionsResponse>('/my-redemptions')
+  }
+
+  // ==================== User Tags ====================
+
+  /**
+   * Get all tags for the current user (auth required)
+   */
+  async getMyTags(): Promise<ApiResponse<UserTagsResponse>> {
+    return this.apiClient.get<UserTagsResponse>('/my-tags')
+  }
+
+  // ==================== Helpers ====================
+
+  /**
+   * Format token action for display
+   */
+  static formatActionType(type: string): string {
+    switch (type) {
+      case 'add_to_feature_group':
+        return 'Feature Access'
+      case 'grant_credits':
+        return 'Credits'
+      case 'grant_product':
+        return 'Product'
+      case 'add_tag':
+        return 'Badge/Tag'
+      default:
+        return type
+    }
+  }
+
+  /**
+   * Get icon for action type
+   */
+  static getActionIcon(type: string): string {
+    switch (type) {
+      case 'add_to_feature_group':
+        return 'fa-star'
+      case 'grant_credits':
+        return 'fa-coins'
+      case 'grant_product':
+        return 'fa-gift'
+      case 'add_tag':
+        return 'fa-tag'
+      default:
+        return 'fa-check'
+    }
   }
 }

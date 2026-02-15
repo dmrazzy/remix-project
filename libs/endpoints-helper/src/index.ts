@@ -21,6 +21,8 @@ type EndpointUrls = {
     audio: string;
     storage: string;
     permissions: string;
+    invite: string;
+    feedback: string;
 };
 
 const defaultUrls: EndpointUrls = {
@@ -46,6 +48,8 @@ const defaultUrls: EndpointUrls = {
   audio: 'https://audio.api.remix.live',
   storage: 'https://auth.api.remix.live:8443/storage',
   permissions: 'https://auth.api.remix.live:8443/permissions',
+  invite: 'https://auth.api.remix.live:8443/invite',
+  feedback: 'https://auth.api.remix.live:8443/feedback',
 };
 
 const endpointPathMap: Record<keyof EndpointUrls, string> = {
@@ -71,6 +75,8 @@ const endpointPathMap: Record<keyof EndpointUrls, string> = {
   audio: 'audio',
   storage: 'storage',
   permissions: 'permissions',
+  invite: 'invite',
+  feedback: 'feedback',
 };
 
 const prefix = process.env.NX_ENDPOINTS_URL;
@@ -115,6 +121,12 @@ const localhostUrls: EndpointUrls = {
   storage: 'http://localhost:3002/storage',
   // PERMISSIONS service
   permissions: 'https://auth.api.remix.live:8443/permissions',
+  
+  // INVITE service
+  invite: 'https://auth.api.remix.live:8443/invite',
+
+  // FEEDBACK service
+  feedback: 'https://auth.api.remix.live:8443/feedback',
 };
 
 const resolvedUrls: EndpointUrls = prefix

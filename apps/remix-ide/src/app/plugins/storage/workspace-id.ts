@@ -64,7 +64,7 @@ export function generateWorkspaceId(): string {
   const adjective = randomPick(adjectives)
   const noun = randomPick(nouns)
   const suffix = generateSuffix(4)
-  
+
   return `${adjective}-${noun}-${suffix}`
 }
 

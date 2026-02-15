@@ -1,7 +1,7 @@
 /**
  * S3 Storage Plugin for Remix IDE
  * Provides cloud storage functionality using S3-compatible storage via presigned URLs
- * 
+ *
  * This plugin:
  * - Uses the auth plugin to get access tokens
  * - Talks to the storage API to get presigned URLs
@@ -10,7 +10,7 @@
  */
 
 import { Plugin } from '@remixproject/engine'
-import { 
+import {
   ApiClient,
   StorageConfig,
   StorageFile,
@@ -20,20 +20,20 @@ import {
 } from '@remix-api'
 import { endpointUrls } from '@remix-endpoints-helper'
 
-import { 
-  IStorageProvider, 
-  UploadOptions, 
+import {
+  IStorageProvider,
+  UploadOptions,
   DownloadOptions,
   StorageEvents,
   getMimeType,
   joinPath
 } from './types'
 import { S3StorageProvider } from './s3-provider'
-import { 
-  generateWorkspaceId, 
-  isValidWorkspaceId, 
-  RemixConfig, 
-  RemoteWorkspaceConfig 
+import {
+  generateWorkspaceId,
+  isValidWorkspaceId,
+  RemixConfig,
+  RemoteWorkspaceConfig
 } from './workspace-id'
 import JSZip from 'jszip'
 import {
@@ -64,22 +64,22 @@ async function computeWorkspaceHash(files: Array<{ path: string; content: string
   // Filter out remix.config.json - it changes on every save (lastSaveTime, lastBackupTime)
   // We still want to back it up, but it shouldn't affect the "has content changed" check
   const hashableFiles = files.filter(f => !f.path.endsWith('remix.config.json'))
-  
+
   // Sort files by path for consistent ordering
   const sortedFiles = [...hashableFiles].sort((a, b) => a.path.localeCompare(b.path))
-  
+
   // Create a concatenated string of path:content pairs
   const contentStr = sortedFiles.map(f => `${f.path}:${f.content}`).join('\n')
-  
+
   // Compute SHA-256 hash using Web Crypto API
   const encoder = new TextEncoder()
   const data = encoder.encode(contentStr)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  
+
   // Convert to hex string
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-  
+
   return hashHex
 }
 
@@ -118,14 +118,14 @@ function getOrCreateSessionId(): string {
 function getBrowserInfo(): { browser: string; platform: string } {
   const ua = navigator.userAgent
   let browser = 'Unknown'
-  
+
   if (ua.includes('Firefox')) browser = 'Firefox'
   else if (ua.includes('Edg')) browser = 'Edge'
   else if (ua.includes('Chrome')) browser = 'Chrome'
   else if (ua.includes('Safari')) browser = 'Safari'
-  
+
   const platform = navigator.platform || 'Unknown'
-  
+
   return { browser, platform }
 }
 
@@ -134,7 +134,7 @@ function getBrowserInfo(): { browser: string; platform: string } {
  */
 interface LockFile {
   sessionId: string
-  lockedAt: string  // ISO timestamp (UTC)
+  lockedAt: string // ISO timestamp (UTC)
   browser: string
   platform: string
 }
@@ -151,10 +151,10 @@ interface LockCheckResult {
 
 // Folders/patterns to exclude from workspace backup
 const EXCLUDED_PATTERNS = [
-  '.deps',           // npm dependencies cached by Remix
-  'artifacts',       // compiled contract artifacts
-  'node_modules',    // node modules (shouldn't exist but just in case)
-  '.cache',          // cache folders
+  '.deps', // npm dependencies cached by Remix
+  'artifacts', // compiled contract artifacts
+  'node_modules', // node modules (shouldn't exist but just in case)
+  '.cache', // cache folders
 ]
 
 // .git is handled separately with a size cap rather than blanket exclusion
@@ -231,29 +231,29 @@ export class S3StoragePlugin extends Plugin {
   private apiClient: ApiClient | null = null
   private storageApi: StorageApiService | null = null
   private config: StorageConfig | null = null
-  
+
   // Session ID for lock-based conflict detection
   // Persisted in sessionStorage - survives page refresh but unique per tab
   private readonly sessionId: string = getOrCreateSessionId()
   private readonly browserInfo = getBrowserInfo()
-  
+
   // Content hash cache - tracks last saved hash per workspace to avoid unnecessary uploads
   private lastSavedHashCache: Map<string, string> = new Map()
-  
+
   // Track auth state so we only do full init on real state changes (not token refreshes)
   private wasAuthenticated: boolean = false
-  
+
   constructor() {
     super(profile)
     console.log('[S3StoragePlugin] Session ID:', this.sessionId)
   }
-  
+
   async onActivation(): Promise<void> {
     console.log('[S3StoragePlugin] Activated')
-    
+
     // Initialize API client and provider
     await this.initializeProvider()
-    
+
     // Listen for auth state changes (login / logout — NOT token refreshes)
     this.on('auth', 'authStateChanged', async (state: { isAuthenticated: boolean; token?: string }) => {
       if (state.isAuthenticated) {
@@ -290,26 +290,26 @@ export class S3StoragePlugin extends Plugin {
         console.log('[S3StoragePlugin] Token refreshed, API client updated (no re-init)')
       }
     })
-    
+
     // Start autosave on activation if user is already logged in and setting is enabled
     await this.startAutosaveIfEnabled()
-    
+
     // Track file save activity for idle detection
     this.on('fileManager', 'fileSaved', () => {
       this.lastFileActivityTime = Date.now()
     })
   }
-  
+
   // ==================== Autosave Functionality ====================
-  
+
   private autosaveIntervalId: ReturnType<typeof setInterval> | null = null
   private static readonly AUTOSAVE_BACKUP_NAME = 'autosave-backup.zip'
   private static readonly DEFAULT_AUTOSAVE_INTERVAL = 1 * 60 * 1000 // 1 minute
   private static readonly IDLE_TIME_BEFORE_AUTOSAVE = 30 * 1000 // 30 seconds of inactivity required
-  
+
   /** Timestamp of last file save activity - used for idle detection */
   private lastFileActivityTime: number = 0
-  
+
   /**
    * Check if autosave is enabled in settings
    */
@@ -321,7 +321,7 @@ export class S3StoragePlugin extends Plugin {
       return false
     }
   }
-  
+
   /**
    * Set autosave enabled/disabled
    */
@@ -334,7 +334,7 @@ export class S3StoragePlugin extends Plugin {
     }
     this.emit('autosaveChanged', { enabled })
   }
-  
+
   /**
    * Start autosave if enabled and user is authenticated
    */
@@ -344,7 +344,7 @@ export class S3StoragePlugin extends Plugin {
       if (!isAuth) {
         return
       }
-      
+
       const enabled = await this.isAutosaveEnabled()
       if (enabled) {
         await this.startAutosave()
@@ -353,23 +353,23 @@ export class S3StoragePlugin extends Plugin {
       console.error('[S3StoragePlugin] Failed to check autosave settings:', e)
     }
   }
-  
+
   /**
    * Start the autosave interval
    */
   async startAutosave(): Promise<void> {
     // Stop any existing interval
     this.stopAutosave()
-    
+
     console.log('[S3StoragePlugin] 🔄 Starting autosave (every 5 minutes)')
-    
+
     // Don't run immediately - wait for the first interval
     // This avoids triggering conflict detection right when user enables autosave
     this.autosaveIntervalId = setInterval(async () => {
       await this.runAutosave()
     }, S3StoragePlugin.DEFAULT_AUTOSAVE_INTERVAL)
   }
-  
+
   /**
    * Stop the autosave interval and release the lock
    */
@@ -378,7 +378,7 @@ export class S3StoragePlugin extends Plugin {
       clearInterval(this.autosaveIntervalId)
       this.autosaveIntervalId = null
       console.log('[S3StoragePlugin] ⏹️ Autosave stopped')
-      
+
       // Release lock when autosave is disabled
       try {
         const workspaceRemoteId = await this.getWorkspaceRemoteId()
@@ -390,16 +390,16 @@ export class S3StoragePlugin extends Plugin {
       }
     }
   }
-  
+
   // ==================== Encryption ====================
-  
+
   /**
    * Check if encryption is enabled for cloud storage
    */
   isEncryptionEnabled(): boolean {
     return isEncryptionEnabled()
   }
-  
+
   /**
    * Enable encryption for cloud storage
    * User must set a passphrase after enabling
@@ -409,7 +409,7 @@ export class S3StoragePlugin extends Plugin {
     this.emit('encryptionChanged', { enabled: true })
     console.log('[S3StoragePlugin] 🔐 Encryption enabled')
   }
-  
+
   /**
    * Disable encryption for cloud storage
    * WARNING: Future uploads will be unencrypted
@@ -420,11 +420,11 @@ export class S3StoragePlugin extends Plugin {
     this.emit('encryptionChanged', { enabled: false })
     console.log('[S3StoragePlugin] 🔓 Encryption disabled')
   }
-  
+
   /**
    * Set the encryption passphrase for this session
    * The passphrase is stored in sessionStorage (survives refresh, cleared on tab close)
-   * 
+   *
    * @param passphrase - The user's encryption passphrase
    */
   setEncryptionPassphrase(passphrase: string): void {
@@ -434,24 +434,24 @@ export class S3StoragePlugin extends Plugin {
     storePassphraseInSession(passphrase)
     console.log('[S3StoragePlugin] 🔑 Encryption passphrase set')
   }
-  
+
   /**
    * Check if a passphrase is available in the current session
    */
   hasEncryptionPassphrase(): boolean {
     return hasPassphraseAvailable()
   }
-  
+
   /**
    * Generate a random passphrase that users can save
    * Format: 6 random words separated by dashes (e.g., "alpha-coral-frost-lunar-storm-yacht")
-   * 
+   *
    * @returns A randomly generated passphrase
    */
   generateEncryptionPassphrase(): string {
     return generatePassphrase()
   }
-  
+
   /**
    * Clear the passphrase from session storage
    * User will need to re-enter it to access encrypted data
@@ -460,7 +460,7 @@ export class S3StoragePlugin extends Plugin {
     clearPassphraseFromSession()
     console.log('[S3StoragePlugin] 🔑 Encryption passphrase cleared')
   }
-  
+
   /**
    * Get the passphrase from session, or emit event if not available
    * @returns The passphrase or null if not available
@@ -472,9 +472,9 @@ export class S3StoragePlugin extends Plugin {
     }
     return passphrase
   }
-  
+
   // ==================== Content Hash (Deduplication) ====================
-  
+
   /**
    * Get the content hash for a workspace from S3
    * @param workspaceRemoteId - The workspace remote ID
@@ -484,7 +484,7 @@ export class S3StoragePlugin extends Plugin {
     try {
       const provider = this.ensureProvider()
       const hashPath = joinPath(`${workspaceRemoteId}/autosave`, CONTENT_HASH_FILE_NAME)
-      
+
       const content = await provider.download(hashPath)
       return JSON.parse(content) as ContentHashInfo
     } catch (e) {
@@ -492,7 +492,7 @@ export class S3StoragePlugin extends Plugin {
       return null
     }
   }
-  
+
   /**
    * Save the content hash for a workspace to S3
    * @param workspaceRemoteId - The workspace remote ID
@@ -509,35 +509,35 @@ export class S3StoragePlugin extends Plugin {
       }
       const hashPath = joinPath(`${workspaceRemoteId}/autosave`, CONTENT_HASH_FILE_NAME)
       await provider.upload(hashPath, JSON.stringify(hashInfo, null, 2), 'application/json')
-      
+
       // Update local cache
       this.lastSavedHashCache.set(workspaceRemoteId, hash)
     } catch (e) {
       console.warn('[S3StoragePlugin] Could not save content hash:', e)
     }
   }
-  
+
   /**
    * Check if workspace content has changed since last save
    * Uses both memory cache (fast) and S3 hash file (for cross-tab/refresh scenarios)
-   * 
+   *
    * @param workspaceRemoteId - The workspace remote ID
    * @param files - The current workspace files
    * @returns true if content has changed or hash is unknown, false if unchanged
    */
   private async hasContentChanged(
-    workspaceRemoteId: string, 
+    workspaceRemoteId: string,
     files: Array<{ path: string; content: string }>
   ): Promise<{ changed: boolean; currentHash: string }> {
     const currentHash = await computeWorkspaceHash(files)
-    
+
     // First check memory cache (fastest)
     const cachedHash = this.lastSavedHashCache.get(workspaceRemoteId)
     if (cachedHash === currentHash) {
       console.log('[S3StoragePlugin] 📋 Content unchanged (memory cache hit)')
       return { changed: false, currentHash }
     }
-    
+
     // If not in memory cache, check S3 (for cross-tab or after refresh)
     const remoteHashInfo = await this.getRemoteContentHash(workspaceRemoteId)
     if (remoteHashInfo?.hash === currentHash) {
@@ -546,7 +546,7 @@ export class S3StoragePlugin extends Plugin {
       console.log('[S3StoragePlugin] 📋 Content unchanged (S3 hash match)')
       return { changed: false, currentHash }
     }
-    
+
     console.log('[S3StoragePlugin] 📝 Content has changed, will upload')
     return { changed: true, currentHash }
   }
@@ -563,30 +563,30 @@ export class S3StoragePlugin extends Plugin {
         console.log(`[S3StoragePlugin] ⏳ User active (${Math.round(timeSinceLastActivity / 1000)}s ago), deferring autosave`)
         return
       }
-      
+
       // Check if user is still authenticated
       const isAuth = await this.call('auth', 'isAuthenticated')
       if (!isAuth) {
         this.stopAutosave()
         return
       }
-      
+
       const workspaceRemoteId = await this.getWorkspaceRemoteId()
       if (!workspaceRemoteId) {
         console.log('[S3StoragePlugin] No workspace remote ID, skipping autosave')
         return
       }
-      
+
       // Collect files first to check if content has changed
       const files = await this.collectWorkspaceFiles()
-      
+
       // Check if content has actually changed since last save
       const { changed, currentHash } = await this.hasContentChanged(workspaceRemoteId, files)
       if (!changed) {
         console.log('[S3StoragePlugin] ⏭️ Skipping autosave - no content changes')
         return
       }
-      
+
       // Check for lock conflicts before autosave
       const lockCheck = await this.checkLock(workspaceRemoteId)
       if (lockCheck.isLocked && !lockCheck.ownedByUs && !lockCheck.expired) {
@@ -598,7 +598,7 @@ export class S3StoragePlugin extends Plugin {
         })
         return
       }
-      
+
       // Get workspace name for filename
       let workspaceName = 'workspace'
       try {
@@ -607,13 +607,13 @@ export class S3StoragePlugin extends Plugin {
       } catch (e) {
         console.warn('[S3StoragePlugin] Could not get workspace name:', e)
       }
-      
+
       console.log('[S3StoragePlugin] 💾 Running autosave backup...')
       this.emit('autosaveStarted', { workspaceRemoteId })
-      
+
       // Acquire/refresh the lock
       await this.acquireLock(workspaceRemoteId)
-      
+
       // Create backup with workspace name in filename (overwrites previous autosave)
       const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
       const backupKey = await this.createBackupFromFiles(
@@ -621,22 +621,22 @@ export class S3StoragePlugin extends Plugin {
         `${sanitizedName}-autosave.zip`,
         `${workspaceRemoteId}/autosave`
       )
-      
+
       // Save the content hash to S3 (for cross-tab deduplication)
       await this.saveRemoteContentHash(workspaceRemoteId, currentHash, files.length)
-      
+
       // Update last save time
       await this.updateLastSaveTime()
       this.emit('saveCompleted', { workspaceRemoteId })
-      
+
       console.log(`[S3StoragePlugin] ✅ Autosave completed: ${backupKey}`)
-      
+
     } catch (error) {
       console.error('[S3StoragePlugin] Autosave failed:', error)
       // Don't show error to user - autosave is background task
     }
   }
-  
+
   /**
    * Create a backup with a specific filename
    * This is a helper used by both backupWorkspace and autosave
@@ -688,7 +688,7 @@ export class S3StoragePlugin extends Plugin {
 
     return result // true if OK, false/undefined if cancelled
   }
-  
+
   /**
    * Collect git metadata (remotes, branch, commit hash) if workspace is a git repo.
    * Returns null if the workspace is not a git repo.
@@ -747,11 +747,11 @@ export class S3StoragePlugin extends Plugin {
    */
   private async createBackupFromFiles(
     files: Array<{ path: string; content: string }>,
-    filename: string, 
+    filename: string,
     folder: string
   ): Promise<string> {
     const provider = this.ensureProvider()
-    
+
     // Get current workspace name for metadata
     let workspaceName = 'unknown'
     try {
@@ -760,22 +760,22 @@ export class S3StoragePlugin extends Plugin {
     } catch (e) {
       console.warn('[S3StoragePlugin] Could not get workspace name:', e)
     }
-    
+
     // Create zip with compression
     const zip = new JSZip()
-    
+
     const workspaceRemoteId = await this.getWorkspaceRemoteId()
-    
+
     // Collect git metadata if this is a git repo
     const gitInfo = await this.collectGitMetadata()
     console.log('[S3StoragePlugin] 🔍 createBackupFromFiles: gitInfo =', gitInfo)
-    
+
     // Check if .git was included in the files (collected by collectWorkspaceFiles)
     const filesWithGitInfo = files as Array<{ path: string; content: string }> & { gitIncluded?: boolean; gitExcludedReason?: string }
     const gitIncluded = filesWithGitInfo.gitIncluded === true
     const gitExcludedReason = filesWithGitInfo.gitExcludedReason
     console.log('[S3StoragePlugin] 🔍 createBackupFromFiles: gitIncluded =', gitIncluded, ', gitExcludedReason =', gitExcludedReason, ', filesWithGitInfo.gitIncluded =', filesWithGitInfo.gitIncluded)
-    
+
     // Add metadata inside the zip (for when zip is downloaded/inspected)
     const zipMetadata = {
       createdAt: new Date().toISOString(),
@@ -786,17 +786,17 @@ export class S3StoragePlugin extends Plugin {
       isGitRepo: !!gitInfo,
       gitIncluded
     }
-    
+
     // Add all files to zip
     for (const file of files) {
       // Remove leading slash for zip path
       const zipPath = file.path.replace(/^\//, '')
       zip.file(zipPath, file.content)
     }
-    
+
     // Add metadata file inside zip
     zip.file('_backup_metadata.json', JSON.stringify(zipMetadata, null, 2))
-    
+
     // Add git metadata file only if .git was NOT included (as fallback info for restore)
     if (gitInfo && !gitIncluded) {
       const gitBackupInfo = {
@@ -807,24 +807,24 @@ export class S3StoragePlugin extends Plugin {
       }
       zip.file(GIT_BACKUP_INFO_FILE, JSON.stringify(gitBackupInfo, null, 2))
       console.log('[S3StoragePlugin] 📋 Git metadata captured (git folder excluded due to size):', gitBackupInfo)
-      
+
       // Note: for manual saves/backups, the user was already prompted via promptIfGitExcluded()
       // For autosaves, we silently continue — the git metadata file preserves the info for restore
     } else if (gitInfo && gitIncluded) {
       console.log('[S3StoragePlugin] ✅ Git folder included in backup — no metadata fallback needed')
     }
-    
+
     // Generate compressed zip
     let zipContent = await zip.generateAsync({
       type: 'uint8array',
       compression: 'DEFLATE',
       compressionOptions: { level: 6 }
     })
-    
+
     // Check if encryption is enabled
     let finalFilename = filename
     let contentType = 'application/zip'
-    
+
     if (isEncryptionEnabled()) {
       const passphrase = this.getPassphraseOrPrompt()
       if (passphrase) {
@@ -840,7 +840,7 @@ export class S3StoragePlugin extends Plugin {
         throw new Error('Encryption is enabled but no passphrase is set. Please enter your passphrase.')
       }
     }
-    
+
     // Upload to S3 with metadata
     const fullPath = joinPath(folder, finalFilename)
     const s3Metadata: Record<string, string> = {
@@ -849,12 +849,12 @@ export class S3StoragePlugin extends Plugin {
       'is-encrypted': String(isEncryptionEnabled() && !!this.getPassphraseOrPrompt())
     }
     const key = await provider.upload(fullPath, zipContent, contentType, s3Metadata)
-    
+
     return key
   }
-  
+
   // ==================== Workspace Remote ID Management ====================
-  
+
   /**
    * Get the current remix.config.json content
    */
@@ -864,7 +864,7 @@ export class S3StoragePlugin extends Plugin {
       if (!exists) {
         return null
       }
-      
+
       const content = await this.call('fileManager', 'readFile', REMIX_CONFIG_FILE)
       return JSON.parse(content)
     } catch (error) {
@@ -872,14 +872,14 @@ export class S3StoragePlugin extends Plugin {
       return null
     }
   }
-  
+
   /**
    * Save remix.config.json
    */
   private async saveRemixConfig(config: RemixConfig): Promise<void> {
     await this.call('fileManager', 'writeFile', REMIX_CONFIG_FILE, JSON.stringify(config, null, 2))
   }
-  
+
   /**
    * Get the workspace remote ID from remix.config.json
    * Returns null if not configured
@@ -888,7 +888,7 @@ export class S3StoragePlugin extends Plugin {
     const config = await this.getRemixConfig()
     return config?.['remote-workspace']?.remoteId || null
   }
-  
+
   /**
    * Ensure the workspace has a remote ID, creating one if needed
    * @returns The workspace remote ID
@@ -896,7 +896,7 @@ export class S3StoragePlugin extends Plugin {
   async ensureWorkspaceRemoteId(): Promise<string> {
     // Check if we already have a remote ID
     let config = await this.getRemixConfig()
-    
+
     if (config?.['remote-workspace']?.remoteId) {
       const existingId = config['remote-workspace'].remoteId
       // Accept any existing ID (don't validate format - user might have set their own)
@@ -905,11 +905,11 @@ export class S3StoragePlugin extends Plugin {
         return existingId
       }
     }
-    
+
     // Generate a new remote ID
     const newRemoteId = generateWorkspaceId()
     console.log('[S3StoragePlugin] Generated new workspace remote ID:', newRemoteId)
-    
+
     // Get current user ID to associate with this workspace
     let userId: string | undefined
     try {
@@ -918,23 +918,23 @@ export class S3StoragePlugin extends Plugin {
     } catch (e) {
       console.warn('[S3StoragePlugin] Could not get user ID:', e)
     }
-    
+
     // Create or update config
     if (!config) {
       config = {}
     }
-    
+
     config['remote-workspace'] = {
       remoteId: newRemoteId,
       userId,
       createdAt: new Date().toISOString()
     }
-    
+
     // Save the config
     await this.saveRemixConfig(config)
-    
+
     await this.call('notification', 'toast', `🔗 Workspace linked to cloud: ${newRemoteId}`)
-    
+
     return newRemoteId
   }
 
@@ -947,9 +947,9 @@ export class S3StoragePlugin extends Plugin {
     if (!remoteId || typeof remoteId !== 'string' || !remoteId.trim()) {
       throw new Error('Invalid remote ID')
     }
-    
+
     const sanitizedId = remoteId.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-')
-    
+
     // Get current user ID
     let userId: string | undefined
     try {
@@ -958,21 +958,21 @@ export class S3StoragePlugin extends Plugin {
     } catch (e) {
       console.warn('[S3StoragePlugin] Could not get user ID:', e)
     }
-    
+
     let config = await this.getRemixConfig()
     if (!config) {
       config = {}
     }
-    
+
     const existingConfig = config['remote-workspace'] as RemoteWorkspaceConfig | undefined
-    
+
     // New remote ID means a fresh cloud link — clear stale timestamps
     config['remote-workspace'] = {
       remoteId: sanitizedId,
       userId,
       createdAt: new Date().toISOString()
     }
-    
+
     await this.saveRemixConfig(config)
     console.log('[S3StoragePlugin] Updated workspace remote ID to:', sanitizedId)
   }
@@ -984,26 +984,26 @@ export class S3StoragePlugin extends Plugin {
   async checkWorkspaceOwnership(): Promise<{ isOwner: boolean; hasRemoteId: boolean; userId?: string }> {
     const config = await this.getRemixConfig()
     const remoteConfig = config?.['remote-workspace']
-    
+
     if (!remoteConfig?.remoteId) {
       return { isOwner: true, hasRemoteId: false } // No remote ID = user can link it
     }
-    
+
     // If no userId stored (legacy), consider it owned by current user
     if (!remoteConfig.userId) {
       return { isOwner: true, hasRemoteId: true }
     }
-    
+
     // Check if current user matches
     try {
       const user = await this.call('auth', 'getUser')
       const currentUserId = user?.sub
-      
+
       if (!currentUserId) {
         // Not logged in - can't determine ownership
         return { isOwner: false, hasRemoteId: true, userId: remoteConfig.userId }
       }
-      
+
       const isOwner = currentUserId === remoteConfig.userId
       return { isOwner, hasRemoteId: true, userId: remoteConfig.userId }
     } catch (e) {
@@ -1015,14 +1015,14 @@ export class S3StoragePlugin extends Plugin {
   /**
    * Get workspace ownership details for UI display
    */
-  async getWorkspaceOwnership(): Promise<{ 
+  async getWorkspaceOwnership(): Promise<{
     remoteId: string | null
     ownedByCurrentUser: boolean
     linkedToAnotherUser: boolean
     canSave: boolean
   }> {
     const ownership = await this.checkWorkspaceOwnership()
-    
+
     return {
       remoteId: ownership.hasRemoteId ? (await this.getWorkspaceRemoteId()) : null,
       ownedByCurrentUser: ownership.isOwner && ownership.hasRemoteId,
@@ -1041,27 +1041,27 @@ export class S3StoragePlugin extends Plugin {
     if (!user?.sub) {
       throw new Error('You must be logged in to link a workspace')
     }
-    
+
     // Generate a new remote ID
     const newRemoteId = generateWorkspaceId()
     console.log('[S3StoragePlugin] Linking workspace to current user with new ID:', newRemoteId)
-    
+
     let config = await this.getRemixConfig()
     if (!config) {
       config = {}
     }
-    
+
     // Create fresh config for this user (don't carry over old timestamps)
     config['remote-workspace'] = {
       remoteId: newRemoteId,
       userId: user.sub,
       createdAt: new Date().toISOString()
     }
-    
+
     await this.saveRemixConfig(config)
-    
+
     await this.call('notification', 'toast', `🔗 Workspace linked to your cloud: ${newRemoteId}`)
-    
+
     return newRemoteId
   }
 
@@ -1085,9 +1085,9 @@ export class S3StoragePlugin extends Plugin {
    * Update the last save time in config
    */
   private async updateLastSaveTime(): Promise<void> {
-    let config = await this.getRemixConfig()
+    const config = await this.getRemixConfig()
     if (!config || !config['remote-workspace']) return
-    
+
     config['remote-workspace'].lastSaveAt = new Date().toISOString()
     await this.saveRemixConfig(config)
   }
@@ -1096,9 +1096,9 @@ export class S3StoragePlugin extends Plugin {
    * Update the last backup time in config
    */
   private async updateLastBackupTime(): Promise<void> {
-    let config = await this.getRemixConfig()
+    const config = await this.getRemixConfig()
     if (!config || !config['remote-workspace']) return
-    
+
     config['remote-workspace'].lastBackupAt = new Date().toISOString()
     await this.saveRemixConfig(config)
   }
@@ -1111,14 +1111,14 @@ export class S3StoragePlugin extends Plugin {
    */
   private async acquireLock(workspaceRemoteId: string): Promise<void> {
     const provider = this.ensureProvider()
-    
+
     const lockData: LockFile = {
       sessionId: this.sessionId,
       lockedAt: new Date().toISOString(),
       browser: this.browserInfo.browser,
       platform: this.browserInfo.platform
     }
-    
+
     const lockPath = `${workspaceRemoteId}/${LOCK_FILE_NAME}`
     await provider.upload(lockPath, JSON.stringify(lockData, null, 2), 'application/json')
     console.log('[S3StoragePlugin] 🔒 Lock acquired/refreshed:', lockPath)
@@ -1133,37 +1133,37 @@ export class S3StoragePlugin extends Plugin {
       const folder = workspaceRemoteId
       const result = await this.list({ folder })
       const lockFile = result.files.find(f => f.filename === LOCK_FILE_NAME)
-      
+
       if (!lockFile) {
         // No lock file exists
         return { isLocked: false, ownedByUs: false, lockInfo: null, expired: false }
       }
-      
+
       // Check if lock is expired using S3's lastModified (server time)
       const lockTime = new Date(lockFile.lastModified || lockFile.uploadedAt).getTime()
       const now = Date.now()
       const expired = (now - lockTime) > LOCK_EXPIRY_MS
-      
+
       // Download lock file to check session ID
       const provider = this.ensureProvider()
       const lockContent = await provider.download(`${workspaceRemoteId}/${LOCK_FILE_NAME}`)
       const lockInfo: LockFile = JSON.parse(lockContent)
-      
+
       const ownedByUs = lockInfo.sessionId === this.sessionId
-      
-      console.log('[S3StoragePlugin] 🔍 Lock check:', { 
-        ownedByUs, 
-        expired, 
-        lockSessionId: lockInfo.sessionId, 
+
+      console.log('[S3StoragePlugin] 🔍 Lock check:', {
+        ownedByUs,
+        expired,
+        lockSessionId: lockInfo.sessionId,
         ourSessionId: this.sessionId,
         lockAge: Math.round((now - lockTime) / 1000) + 's'
       })
-      
-      return { 
-        isLocked: true, 
-        ownedByUs, 
-        lockInfo, 
-        expired 
+
+      return {
+        isLocked: true,
+        ownedByUs,
+        lockInfo,
+        expired
       }
     } catch (e) {
       // Error reading lock - treat as no lock
@@ -1197,10 +1197,10 @@ export class S3StoragePlugin extends Plugin {
     }
 
     const lockCheck = await this.checkLock(workspaceRemoteId)
-    
+
     // Conflict if locked by another session and not expired
     const hasConflict = lockCheck.isLocked && !lockCheck.ownedByUs && !lockCheck.expired
-    
+
     if (hasConflict) {
       console.warn('[S3StoragePlugin] ⚠️ Conflict detected! Workspace locked by:', lockCheck.lockInfo)
     }
@@ -1215,18 +1215,18 @@ export class S3StoragePlugin extends Plugin {
    */
   async saveToCloud(): Promise<void> {
     console.log('[S3StoragePlugin] Manual save to cloud triggered')
-    
+
     // Check ownership first
     const ownership = await this.checkWorkspaceOwnership()
     if (!ownership.isOwner && ownership.hasRemoteId) {
       throw new Error("This workspace is linked to another user's cloud storage. Use 'Link to my account' to create your own cloud link.")
     }
-    
+
     const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
     if (!workspaceRemoteId) {
       throw new Error('No workspace remote ID configured')
     }
-    
+
     // Check for lock conflicts before saving
     const conflictInfo = await this.checkForConflict()
     if (conflictInfo.hasConflict) {
@@ -1237,7 +1237,7 @@ export class S3StoragePlugin extends Plugin {
       })
       return // Don't save - let user resolve via modal
     }
-    
+
     // Get workspace name for filename
     let workspaceName = 'workspace'
     try {
@@ -1249,49 +1249,49 @@ export class S3StoragePlugin extends Plugin {
 
     // Collect files for backup and hash
     const files = await this.collectWorkspaceFiles()
-    
+
     // Prompt user if .git was excluded due to size
     const proceed = await this.promptIfGitExcluded(files)
     if (!proceed) {
       console.log('[S3StoragePlugin] Save cancelled by user (git exclusion dialog)')
       return
     }
-    
+
     await this.call('notification', 'toast', '☁️ Saving to cloud...')
-    
+
     const currentHash = await computeWorkspaceHash(files)
-    
+
     // Acquire lock and save
     await this.acquireLock(workspaceRemoteId)
-    
+
     const folder = `${workspaceRemoteId}/autosave`
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const filename = `${sanitizedName}-autosave.zip`
-    
+
     await this.createBackupFromFiles(files, filename, folder)
-    
+
     // Save content hash for future deduplication
     await this.saveRemoteContentHash(workspaceRemoteId, currentHash, files.length)
-    
+
     await this.updateLastSaveTime()
-    
+
     console.log('[S3Storage] Emitting saveCompleted event', { workspaceRemoteId })
     this.emit('saveCompleted', { workspaceRemoteId })
     await this.call('notification', 'toast', '✅ Saved to cloud')
   }
-  
+
   /**
    * Force save to cloud, bypassing conflict detection
    * Used when user explicitly chooses to overwrite remote (takes over the lock)
    */
   async forceSaveToCloud(): Promise<void> {
     console.log('[S3StoragePlugin] Force save to cloud (taking over lock)')
-    
+
     const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
     if (!workspaceRemoteId) {
       throw new Error('No workspace remote ID configured')
     }
-    
+
     let workspaceName = 'workspace'
     try {
       const currentWorkspace = await this.call('filePanel', 'getCurrentWorkspace')
@@ -1302,36 +1302,36 @@ export class S3StoragePlugin extends Plugin {
 
     // Collect files for backup and hash
     const files = await this.collectWorkspaceFiles()
-    
+
     // Prompt user if .git was excluded due to size
     const proceed = await this.promptIfGitExcluded(files)
     if (!proceed) {
       console.log('[S3StoragePlugin] Force save cancelled by user (git exclusion dialog)')
       return
     }
-    
+
     await this.call('notification', 'toast', '☁️ Saving to cloud...')
-    
+
     const currentHash = await computeWorkspaceHash(files)
-    
+
     // Force acquire lock (takes over from other session)
     await this.acquireLock(workspaceRemoteId)
-    
+
     const folder = `${workspaceRemoteId}/autosave`
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const filename = `${sanitizedName}-autosave.zip`
-    
+
     await this.createBackupFromFiles(files, filename, folder)
-    
+
     // Save content hash for future deduplication
     await this.saveRemoteContentHash(workspaceRemoteId, currentHash, files.length)
-    
+
     await this.updateLastSaveTime()
-    
+
     this.emit('saveCompleted', { workspaceRemoteId })
     await this.call('notification', 'toast', '✅ Saved to cloud')
   }
-  
+
   /**
    * Save to cloud with conflict detection
    * Returns true if saved successfully, false if conflict detected
@@ -1339,40 +1339,40 @@ export class S3StoragePlugin extends Plugin {
   async saveToCloudWithConflictCheck(): Promise<{ saved: boolean; conflict?: { lockInfo: LockFile | null } }> {
     // Check for conflicts first
     const conflictInfo = await this.checkForConflict()
-    
+
     if (conflictInfo.hasConflict) {
       console.warn('[S3StoragePlugin] ⚠️ Conflict detected, not saving automatically')
       this.emit('conflictDetected', conflictInfo)
-      return { 
-        saved: false, 
-        conflict: { 
+      return {
+        saved: false,
+        conflict: {
           lockInfo: conflictInfo.lockInfo
-        } 
+        }
       }
     }
-    
+
     // No conflict, proceed with save
     await this.saveToCloud()
     return { saved: true }
   }
-  
+
   onDeactivation(): void {
     console.log('[S3StoragePlugin] Deactivated')
     this.off('auth', 'authStateChanged')
     this.off('auth', 'tokenRefreshed')
     this.stopAutosave()
   }
-  
+
   /**
    * Initialize the storage provider
    */
   private async initializeProvider(): Promise<void> {
     // Create API client for storage endpoint
     this.apiClient = new ApiClient(endpointUrls.storage)
-    
+
     // Create storage API service
     this.storageApi = new StorageApiService(this.apiClient)
-    
+
     // Set up token refresh callback via auth plugin
     this.apiClient.setTokenRefreshCallback(async () => {
       try {
@@ -1384,7 +1384,7 @@ export class S3StoragePlugin extends Plugin {
         return null
       }
     })
-    
+
     // Create S3 provider with token getter
     this.provider = new S3StorageProvider(
       this.apiClient,
@@ -1396,10 +1396,10 @@ export class S3StoragePlugin extends Plugin {
         }
       }
     )
-    
+
     console.log('[S3StoragePlugin] Provider initialized:', this.provider.name)
   }
-  
+
   /**
    * Load storage configuration
    */
@@ -1408,7 +1408,7 @@ export class S3StoragePlugin extends Plugin {
       console.warn('[S3StoragePlugin] Provider not initialized')
       return
     }
-    
+
     try {
       this.config = await this.provider.getConfig()
       if (this.config) {
@@ -1419,7 +1419,7 @@ export class S3StoragePlugin extends Plugin {
       console.error('[S3StoragePlugin] Failed to load config:', error)
     }
   }
-  
+
   /**
    * Ensure provider is initialized
    */
@@ -1429,14 +1429,14 @@ export class S3StoragePlugin extends Plugin {
     }
     return this.provider
   }
-  
+
   /**
    * Get the current storage provider name
    */
   async getProviderName(): Promise<string> {
     return this.provider?.name || 'none'
   }
-  
+
   /**
    * Check if the storage service is healthy
    */
@@ -1448,7 +1448,7 @@ export class S3StoragePlugin extends Plugin {
       return false
     }
   }
-  
+
   /**
    * Get storage configuration (limits, allowed types)
    */
@@ -1457,7 +1457,7 @@ export class S3StoragePlugin extends Plugin {
     if (this.config) {
       return this.config
     }
-    
+
     try {
       const provider = this.ensureProvider()
       this.config = await provider.getConfig()
@@ -1467,87 +1467,87 @@ export class S3StoragePlugin extends Plugin {
       return null
     }
   }
-  
+
   /**
    * Upload a file to cloud storage
-   * 
+   *
    * @param filename - Name of the file
    * @param content - File content as string or Uint8Array
    * @param options - Upload options (folder, contentType, onProgress)
    * @returns The storage key/path of the uploaded file
-   * 
+   *
    * @example
    * // Upload a Solidity file to contracts folder
    * const key = await s3Storage.upload('MyContract.sol', sourceCode, { folder: 'contracts' })
-   * 
+   *
    * @example
    * // Upload with explicit content type
-   * const key = await s3Storage.upload('data.json', jsonString, { 
+   * const key = await s3Storage.upload('data.json', jsonString, {
    *   folder: 'artifacts',
-   *   contentType: 'application/json' 
+   *   contentType: 'application/json'
    * })
    */
   async upload(
-    filename: string, 
-    content: string | Uint8Array, 
+    filename: string,
+    content: string | Uint8Array,
     options: UploadOptions = {}
   ): Promise<string> {
     const provider = this.ensureProvider()
     const fullPath = joinPath(options.folder, filename)
     const contentType = options.contentType || getMimeType(filename)
-    
+
     try {
       console.log(`[S3StoragePlugin] Uploading: ${fullPath}`)
-      
+
       const key = await provider.upload(fullPath, content, contentType)
-      
+
       // Calculate size for event
-      const size = typeof content === 'string' 
-        ? new Blob([content]).size 
+      const size = typeof content === 'string'
+        ? new Blob([content]).size
         : content.length
-      
+
       this.emit('fileUploaded', { path: fullPath, size })
       console.log(`[S3StoragePlugin] Upload complete: ${key}`)
-      
+
       return key
     } catch (error) {
       this.emitError('upload', fullPath, error as Error)
       throw error
     }
   }
-  
+
   /**
    * Download a file from cloud storage as text
-   * 
+   *
    * @param filename - Name of the file
    * @param folder - Optional folder path
    * @returns File content as string
-   * 
+   *
    * @example
    * const content = await s3Storage.download('MyContract.sol', 'contracts')
    */
   async download(filename: string, folder?: string): Promise<string> {
     const provider = this.ensureProvider()
     const fullPath = joinPath(folder, filename)
-    
+
     try {
       console.log(`[S3StoragePlugin] Downloading: ${fullPath}`)
-      
+
       const content = await provider.download(fullPath)
-      
+
       this.emit('fileDownloaded', { path: fullPath })
       console.log(`[S3StoragePlugin] Download complete: ${fullPath}`)
-      
+
       return content
     } catch (error) {
       this.emitError('download', fullPath, error as Error)
       throw error
     }
   }
-  
+
   /**
    * Download a file from cloud storage as binary
-   * 
+   *
    * @param filename - Name of the file
    * @param folder - Optional folder path
    * @returns File content as Uint8Array
@@ -1555,14 +1555,14 @@ export class S3StoragePlugin extends Plugin {
   async downloadBinary(filename: string, folder?: string): Promise<Uint8Array> {
     const provider = this.ensureProvider()
     const fullPath = joinPath(folder, filename)
-    
+
     try {
       console.log(`[S3StoragePlugin] Downloading binary: ${fullPath}`)
-      
+
       const content = await provider.downloadBinary(fullPath)
-      
+
       this.emit('fileDownloaded', { path: fullPath })
-      
+
       return content
     } catch (error) {
       this.emitError('downloadBinary', fullPath, error as Error)
@@ -1574,26 +1574,26 @@ export class S3StoragePlugin extends Plugin {
    * Download a file from cloud storage to user's computer
    * Triggers browser download
    * If the file is encrypted (.enc), it will be decrypted before download
-   * 
+   *
    * @param filename - Name of the file
    * @param folder - Folder path
    */
   async downloadToComputer(filename: string, folder: string): Promise<void> {
     try {
       console.log(`[S3StoragePlugin] Downloading to computer: ${folder}/${filename}`)
-      
+
       let content = await this.downloadBinary(filename, folder)
       let downloadFilename = filename
-      
+
       // Check if file is encrypted
       if (filename.endsWith('.enc')) {
         console.log('[S3StoragePlugin] 🔐 File is encrypted, decrypting...')
-        
+
         const passphrase = this.getPassphraseOrPrompt()
         if (!passphrase) {
           throw new Error('Passphrase required to download encrypted file. Please set your encryption passphrase.')
         }
-        
+
         try {
           content = await decryptFromBytes(content, passphrase)
           // Remove .enc from filename for download
@@ -1604,45 +1604,45 @@ export class S3StoragePlugin extends Plugin {
           throw new Error('Failed to decrypt file. Please check your passphrase.')
         }
       }
-      
+
       // Create blob and trigger download
       const blob = new Blob([content.buffer as ArrayBuffer], { type: 'application/zip' })
       const url = URL.createObjectURL(blob)
-      
+
       const a = document.createElement('a')
       a.href = url
       a.download = downloadFilename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      
+
       URL.revokeObjectURL(url)
-      
+
       await this.call('notification', 'toast', `📥 Downloaded ${downloadFilename}`)
     } catch (error) {
       console.error('[S3StoragePlugin] Download to computer failed:', error)
       throw error
     }
   }
-  
+
   /**
    * Delete a file from cloud storage
-   * 
+   *
    * @param filename - Name of the file
    * @param folder - Optional folder path
-   * 
+   *
    * @example
    * await s3Storage.delete('MyContract.sol', 'contracts')
    */
   async delete(filename: string, folder?: string): Promise<void> {
     const provider = this.ensureProvider()
     const fullPath = joinPath(folder, filename)
-    
+
     try {
       console.log(`[S3StoragePlugin] Deleting: ${fullPath}`)
-      
+
       await provider.delete(fullPath)
-      
+
       this.emit('fileDeleted', { path: fullPath })
       console.log(`[S3StoragePlugin] Delete complete: ${fullPath}`)
     } catch (error) {
@@ -1650,21 +1650,21 @@ export class S3StoragePlugin extends Plugin {
       throw error
     }
   }
-  
+
   /**
    * List files in cloud storage
-   * 
+   *
    * @param options - List options (folder, limit, cursor)
    * @returns List of files with metadata
-   * 
+   *
    * @example
    * // List all files
    * const { files, totalCount } = await s3Storage.list()
-   * 
+   *
    * @example
    * // List files in a specific folder
    * const { files } = await s3Storage.list({ folder: 'contracts' })
-   * 
+   *
    * @example
    * // Paginated list
    * const { files, nextCursor } = await s3Storage.list({ limit: 10 })
@@ -1674,7 +1674,7 @@ export class S3StoragePlugin extends Plugin {
    */
   async list(options?: StorageListOptions): Promise<StorageFilesResponse> {
     const provider = this.ensureProvider()
-    
+
     try {
       return await provider.list(options)
     } catch (error) {
@@ -1682,47 +1682,47 @@ export class S3StoragePlugin extends Plugin {
       throw error
     }
   }
-  
+
   /**
    * List all remote workspaces for the current user with backup info
-   * 
+   *
    * @returns List of workspaces with their backup counts and last backup dates
-   * 
+   *
    * @example
    * const result = await s3Storage.listWorkspaces()
    * // { workspaces: [{ id: 'sage-lotus-uq4m', backupCount: 3, lastBackup: '2025-12-26...', totalSize: 26652 }] }
    */
   async listWorkspaces(): Promise<{ workspaces: { id: string; backupCount: number; lastBackup: string | null; totalSize: number }[] }> {
     this.ensureProvider()
-    
+
     // Ensure storageApi is initialized
     if (!this.storageApi) {
       throw new Error('Storage API not initialized. Please log in first.')
     }
-    
+
     // Check if user is authenticated
     const user = await this.call('auth', 'getUser')
     if (!user) {
       throw new Error('You must be logged in to list workspaces')
     }
-    
+
     try {
       const response = await this.storageApi.getWorkspaces()
-      
+
       if (!response.ok || !response.data) {
         throw new Error(response.error || 'Failed to list workspaces')
       }
-      
+
       return response.data
     } catch (error) {
       this.emitError('listWorkspaces', '', error as Error)
       throw error
     }
   }
-  
+
   /**
    * Check if a file exists in cloud storage
-   * 
+   *
    * @param filename - Name of the file
    * @param folder - Optional folder path
    * @returns true if file exists
@@ -1730,7 +1730,7 @@ export class S3StoragePlugin extends Plugin {
   async exists(filename: string, folder?: string): Promise<boolean> {
     const provider = this.ensureProvider()
     const fullPath = joinPath(folder, filename)
-    
+
     try {
       return await provider.exists(fullPath)
     } catch (error) {
@@ -1738,10 +1738,10 @@ export class S3StoragePlugin extends Plugin {
       return false
     }
   }
-  
+
   /**
    * Get metadata for a specific file
-   * 
+   *
    * @param filename - Name of the file
    * @param folder - Optional folder path
    * @returns File metadata or null if not found
@@ -1749,7 +1749,7 @@ export class S3StoragePlugin extends Plugin {
   async getMetadata(filename: string, folder?: string): Promise<StorageFile | null> {
     const provider = this.ensureProvider()
     const fullPath = joinPath(folder, filename)
-    
+
     try {
       return await provider.getMetadata(fullPath)
     } catch (error) {
@@ -1757,22 +1757,22 @@ export class S3StoragePlugin extends Plugin {
       return null
     }
   }
-  
+
   // ==================== Workspace Backup & Restore ====================
-  
+
   /**
    * Check if a path should be excluded from backup
    */
   private shouldExclude(path: string): boolean {
     const normalizedPath = path.replace(/^\//, '').toLowerCase()
-    
+
     for (const pattern of EXCLUDED_PATTERNS) {
-      if (normalizedPath.startsWith(pattern.toLowerCase()) || 
+      if (normalizedPath.startsWith(pattern.toLowerCase()) ||
           normalizedPath.includes('/' + pattern.toLowerCase())) {
         return true
       }
     }
-    
+
     return false
   }
 
@@ -1804,7 +1804,7 @@ export class S3StoragePlugin extends Plugin {
       console.error('[S3StoragePlugin] Error wiping workspace files:', e)
     }
   }
-  
+
   /**
    * Recursively collect all files in the workspace.
    * .git folder is included if its total size is under MAX_GIT_FOLDER_SIZE,
@@ -1817,13 +1817,13 @@ export class S3StoragePlugin extends Plugin {
     const isRoot = basePath === '' || basePath === '/'
     const context = _context || { gitFiles: [], gitSize: 0 }
     const files: Array<{ path: string; content: string }> = []
-    
+
     try {
       const entries = await this.call('fileManager', 'readdir', basePath || '/')
       if (isRoot) {
         console.log('[S3StoragePlugin] 🔍 collectWorkspaceFiles: root entries =', Object.keys(entries))
       }
-      
+
       for (const [entryPath, info] of Object.entries(entries)) {
         // Skip standard excluded patterns (not .git — that's handled separately)
         if (this.shouldExclude(entryPath)) {
@@ -1833,9 +1833,9 @@ export class S3StoragePlugin extends Plugin {
 
         const normalizedPath = entryPath.replace(/^\//, '').toLowerCase()
         const isGitPath = normalizedPath === '.git' || normalizedPath.startsWith('.git/')
-        
+
         const entryInfo = info as { isDirectory: boolean }
-        
+
         if (entryInfo.isDirectory) {
           // Recursively collect files from subdirectory
           const subFiles = await this.collectWorkspaceFiles(entryPath, context)
@@ -1867,7 +1867,7 @@ export class S3StoragePlugin extends Plugin {
     } catch (err) {
       console.error(`[S3StoragePlugin] Error reading directory: ${basePath}`, err)
     }
-    
+
     // At the root level, decide whether to include .git
     if (isRoot) {
       console.log('[S3StoragePlugin] 🔍 collectWorkspaceFiles root decision: gitFiles.length =', context.gitFiles.length, ', gitSize =', context.gitSize, 'bytes, MAX_GIT_FOLDER_SIZE =', MAX_GIT_FOLDER_SIZE, 'bytes')
@@ -1890,15 +1890,15 @@ export class S3StoragePlugin extends Plugin {
       }
       return result
     }
-    
+
     return files
   }
-  
+
   /**
    * Backup the entire workspace to S3 as a compressed zip
-   * 
+   *
    * @returns The S3 key of the uploaded backup
-   * 
+   *
    * @example
    * const backupKey = await s3Storage.backupWorkspace()
    * console.log('Backup saved to:', backupKey)
@@ -1909,16 +1909,16 @@ export class S3StoragePlugin extends Plugin {
     if (!user) {
       throw new Error('You must be logged in to backup your workspace')
     }
-    
+
     // Check ownership first
     const ownership = await this.checkWorkspaceOwnership()
     if (!ownership.isOwner && ownership.hasRemoteId) {
       throw new Error("This workspace is linked to another user's cloud storage. Use 'Link to my account' to create your own cloud link.")
     }
-    
+
     // Get or create workspace remote ID
     const workspaceRemoteId = await this.ensureWorkspaceRemoteId()
-    
+
     // Get workspace name for filename
     let workspaceName = 'workspace'
     try {
@@ -1927,84 +1927,84 @@ export class S3StoragePlugin extends Plugin {
     } catch (e) {
       console.warn('[S3StoragePlugin] Could not get workspace name:', e)
     }
-    
+
     console.log(`[S3StoragePlugin] 📦 Starting workspace backup for: ${workspaceRemoteId}`)
-    
+
     // Collect files first so we can check git exclusion before uploading
     const files = await this.collectWorkspaceFiles()
-    
+
     // Prompt user if .git was excluded due to size
     const proceed = await this.promptIfGitExcluded(files)
     if (!proceed) {
       console.log('[S3StoragePlugin] Backup cancelled by user (git exclusion dialog)')
       throw new Error('Backup cancelled')
     }
-    
+
     // Use the createBackup helper which handles encryption
     const sanitizedName = workspaceName.replace(/[^a-zA-Z0-9-_]/g, '-')
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const backupFilename = `${sanitizedName}-${timestamp}.zip`
     const folder = `${workspaceRemoteId}/backups`
-    
+
     const key = await this.createBackupFromFiles(files, backupFilename, folder)
-    
+
     console.log(`[S3StoragePlugin] ✅ Backup complete: ${key}`)
-    
+
     // Update the last backup time in config
     await this.updateLastBackupTime()
-    
-    this.emit('backupCompleted', { 
-      key, 
-      fileCount: files.length, 
-      workspaceRemoteId 
+
+    this.emit('backupCompleted', {
+      key,
+      fileCount: files.length,
+      workspaceRemoteId
     })
-    
+
     await this.call('notification', 'toast', `☁️ Workspace backed up (${files.length} files)`)
-    
+
     return key
   }
-  
+
   /**
    * Restore workspace from a backup zip
-   * 
+   *
    * @param backupKey - The S3 key of the backup to restore (optional, uses latest if not provided)
    * @param options - Optional settings
    * @param options.cleanRestore - If true, wipe existing files before restoring (except excluded/regeneratable folders)
-   * 
+   *
    * @example
    * await s3Storage.restoreWorkspace()  // Restores latest backup
    * await s3Storage.restoreWorkspace('backups/backup-2025-12-26.zip', { cleanRestore: true })
    */
   async restoreWorkspace(backupKey?: string, options?: { cleanRestore?: boolean }): Promise<void> {
     const provider = this.ensureProvider()
-    
+
     // Check if user is authenticated
     const user = await this.call('auth', 'getUser')
     if (!user) {
       throw new Error('You must be logged in to restore your workspace')
     }
-    
+
     const workspaceRemoteId = await this.getWorkspaceRemoteId()
     if (!workspaceRemoteId) {
       throw new Error('No workspace remote ID found. This workspace has no cloud backups.')
     }
-    
+
     // Variables to track the backup path
     let backupFolder: string
     let backupFilename: string
-    
+
     // If no backup key provided, list backups and get the latest
     if (!backupKey) {
       const backups = await this.list({ folder: `${workspaceRemoteId}/backups` })
       if (!backups.files || backups.files.length === 0) {
         throw new Error('No backups found for this workspace')
       }
-      
+
       // Sort by date (newest first) and get the latest
-      const sortedBackups = backups.files.sort((a, b) => 
+      const sortedBackups = backups.files.sort((a, b) =>
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
       )
-      
+
       // Use folder and filename from the API response, not the key
       const latestBackup = sortedBackups[0]
       backupFolder = latestBackup.folder
@@ -2020,14 +2020,14 @@ export class S3StoragePlugin extends Plugin {
         backupFilename = backupKey.substring(lastSlashIndex + 1)
       }
     }
-    
+
     console.log(`[S3StoragePlugin] 📥 Downloading backup: ${backupFolder}/${backupFilename}`)
-    
+
     // Download the backup using folder and filename
     let content = await this.downloadBinary(backupFilename, backupFolder)
-    
+
     console.log(`[S3StoragePlugin] Downloaded ${(content.length / 1024).toFixed(2)} KB`)
-    
+
     // Check if the file is encrypted (ends with .enc)
     if (backupFilename.endsWith('.enc')) {
       console.log('[S3StoragePlugin] 🔐 Backup is encrypted, decrypting...')
@@ -2042,10 +2042,10 @@ export class S3StoragePlugin extends Plugin {
         throw new Error('Failed to decrypt backup. Wrong passphrase or corrupted data.')
       }
     }
-    
+
     // Unzip
     const zip = await JSZip.loadAsync(content)
-    
+
     // Read metadata
     let backupMetadata: any = null
     const metadataFile = zip.file('_backup_metadata.json')
@@ -2054,7 +2054,7 @@ export class S3StoragePlugin extends Plugin {
       backupMetadata = JSON.parse(metadataStr)
       console.log('[S3StoragePlugin] Backup metadata:', backupMetadata)
     }
-    
+
     // Check for git metadata
     let gitBackupInfo: any = null
     const gitInfoFile = zip.file(GIT_BACKUP_INFO_FILE)
@@ -2067,14 +2067,14 @@ export class S3StoragePlugin extends Plugin {
         console.warn('[S3StoragePlugin] Could not parse git backup info:', e)
       }
     }
-    
+
     // Extract and write files
     let restoredCount = 0
     const filePromises: Promise<void>[] = []
-    
+
     // Check if backup contains .git files
-    const backupHasGit = zip.file(/^\.git[\/]/).length > 0 || zip.file('.git') !== null
-    
+    const backupHasGit = zip.file(/^\.git[/]/).length > 0 || zip.file('.git') !== null
+
     // Clean restore: wipe existing files first
     if (options?.cleanRestore) {
       console.log('[S3StoragePlugin] 🧹 Clean restore: wiping existing workspace files')
@@ -2091,13 +2091,13 @@ export class S3StoragePlugin extends Plugin {
         console.warn('[S3StoragePlugin] Could not wipe local .git folder:', e)
       }
     }
-    
+
     zip.forEach((relativePath, zipEntry) => {
       // Skip metadata, directories, git backup info, and remix.config.json (preserve local cloud settings)
       if (relativePath === '_backup_metadata.json' || relativePath === GIT_BACKUP_INFO_FILE || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
         return
       }
-      
+
       filePromises.push((async () => {
         try {
           const content = await zipEntry.async('string')
@@ -2108,16 +2108,16 @@ export class S3StoragePlugin extends Plugin {
         }
       })())
     })
-    
+
     await Promise.all(filePromises)
-    
+
     console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files`)
-    
+
     // Update last save/backup timestamp in remix.config.json based on what was restored
     try {
       const backupTimestamp = backupMetadata?.createdAt || new Date().toISOString()
       const isAutosaveRestore = `${backupFolder}/${backupFilename}`.includes('/autosave/')
-      let config = await this.getRemixConfig()
+      const config = await this.getRemixConfig()
       if (config && config['remote-workspace']) {
         if (isAutosaveRestore) {
           config['remote-workspace'].lastSaveAt = backupTimestamp
@@ -2130,7 +2130,7 @@ export class S3StoragePlugin extends Plugin {
     } catch (e) {
       console.warn('[S3StoragePlugin] Could not update restore timestamp:', e)
     }
-    
+
     // Notify user about git repo info if present
     if (gitBackupInfo?.isGitRepo) {
       const remoteUrl = gitBackupInfo.remotes?.find((r: any) => r.name === 'origin')?.url
@@ -2151,14 +2151,14 @@ export class S3StoragePlugin extends Plugin {
         })
       }
     }
-    
-    this.emit('restoreCompleted', { 
-      backupPath: `${backupFolder}/${backupFilename}`, 
+
+    this.emit('restoreCompleted', {
+      backupPath: `${backupFolder}/${backupFilename}`,
       fileCount: restoredCount,
       workspaceRemoteId,
       gitBackupInfo
     })
-    
+
     await this.call('notification', 'toast', `☁️ Workspace restored (${restoredCount} files)`)
   }
 
@@ -2178,18 +2178,18 @@ export class S3StoragePlugin extends Plugin {
     gitInfo: { remotes: Array<{ name: string; url: string }>; branch: string | null; commitHash: string | null } | null;
   }> {
     const provider = this.ensureProvider()
-    
+
     // Parse the backup path into folder and filename
     const lastSlashIndex = backupPath.lastIndexOf('/')
     if (lastSlashIndex === -1) {
       throw new Error('Invalid backup path format')
     }
-    
+
     const backupFolder = backupPath.substring(0, lastSlashIndex)
     const backupFilename = backupPath.substring(lastSlashIndex + 1)
     const remoteWorkspaceId = backupPath.split('/')[0]
     const isEncrypted = backupFilename.endsWith('.enc')
-    
+
     // Try to get S3 metadata first (faster, doesn't require download)
     try {
       const s3Metadata = await provider.getMetadata(backupPath)
@@ -2207,10 +2207,10 @@ export class S3StoragePlugin extends Plugin {
     } catch (e) {
       console.warn('[S3StoragePlugin] Could not get S3 metadata, will download backup:', e)
     }
-    
+
     // Fallback: Download and extract metadata from zip
     let content = await this.downloadBinary(backupFilename, backupFolder)
-    
+
     if (isEncrypted) {
       const passphrase = this.getPassphraseOrPrompt()
       if (!passphrase) {
@@ -2218,14 +2218,14 @@ export class S3StoragePlugin extends Plugin {
       }
       content = await decryptFromBytes(content, passphrase)
     }
-    
+
     const zip = await JSZip.loadAsync(content)
     const metadataFile = zip.file('_backup_metadata.json')
-    
+
     let workspaceName = 'restored-workspace'
     let createdAt: string | null = null
     let fileCount = 0
-    
+
     if (metadataFile) {
       try {
         const metadataStr = await metadataFile.async('string')
@@ -2237,7 +2237,7 @@ export class S3StoragePlugin extends Plugin {
         console.warn('[S3StoragePlugin] Could not parse backup metadata:', e)
       }
     }
-    
+
     // Check for git backup info (only exists when .git was excluded due to size)
     let isGitRepo = false
     let gitInfo: { remotes: Array<{ name: string; url: string }>; branch: string | null; commitHash: string | null } | null = null
@@ -2256,7 +2256,7 @@ export class S3StoragePlugin extends Plugin {
         console.warn('[S3StoragePlugin] Could not parse git backup info:', e)
       }
     }
-    
+
     // Also check if .git folder is directly in the zip (included because it was under size limit)
     if (!isGitRepo) {
       const gitFilesInZip = zip.file(/^\\.git[\\/]/)
@@ -2264,7 +2264,7 @@ export class S3StoragePlugin extends Plugin {
         isGitRepo = true
       }
     }
-    
+
     return {
       workspaceName,
       createdAt,
@@ -2289,32 +2289,32 @@ export class S3StoragePlugin extends Plugin {
     options?: { targetWorkspaceName?: string; overwriteIfExists?: boolean; keepRemoteId?: boolean; cleanRestore?: boolean }
   ): Promise<void> {
     const provider = this.ensureProvider()
-    
+
     // Check if user is authenticated
     const user = await this.call('auth', 'getUser')
     if (!user) {
       throw new Error('You must be logged in to restore a backup')
     }
-    
+
     // Parse the backup path into folder and filename
     const lastSlashIndex = backupPath.lastIndexOf('/')
     if (lastSlashIndex === -1) {
       throw new Error('Invalid backup path format')
     }
-    
+
     const backupFolder = backupPath.substring(0, lastSlashIndex)
     const backupFilename = backupPath.substring(lastSlashIndex + 1)
-    
+
     // Extract the remote workspace ID from the path (first segment)
     const remoteWorkspaceId = backupPath.split('/')[0]
-    
+
     console.log(`[S3StoragePlugin] 📥 Downloading backup for new workspace: ${backupPath}`)
-    
+
     // Download the backup using folder and filename
     let content = await this.downloadBinary(backupFilename, backupFolder)
-    
+
     console.log(`[S3StoragePlugin] Downloaded ${(content.length / 1024).toFixed(2)} KB`)
-    
+
     // Check if the file is encrypted (ends with .enc)
     if (backupFilename.endsWith('.enc')) {
       console.log('[S3StoragePlugin] 🔐 Backup is encrypted, decrypting...')
@@ -2329,10 +2329,10 @@ export class S3StoragePlugin extends Plugin {
         throw new Error('Failed to decrypt backup. Wrong passphrase or corrupted data.')
       }
     }
-    
+
     // Unzip to get metadata for workspace name
     const zip = await JSZip.loadAsync(content)
-    
+
     // Read metadata to get original workspace name
     let originalWorkspaceName = 'restored-workspace'
     let backupMetadata: any = null
@@ -2348,10 +2348,10 @@ export class S3StoragePlugin extends Plugin {
         console.warn('[S3StoragePlugin] Could not parse backup metadata:', e)
       }
     }
-    
+
     // Determine the target workspace name
     let newWorkspaceName: string
-    
+
     if (options?.targetWorkspaceName) {
       // Use the provided target name
       newWorkspaceName = options.targetWorkspaceName
@@ -2359,10 +2359,10 @@ export class S3StoragePlugin extends Plugin {
       // Default: use original name if available
       newWorkspaceName = originalWorkspaceName
     }
-    
+
     // Check if workspace already exists
     const workspaceExists = await this.call('filePanel', 'workspaceExists', newWorkspaceName)
-    
+
     if (workspaceExists) {
       if (options?.overwriteIfExists) {
         // Delete the existing workspace first
@@ -2376,12 +2376,12 @@ export class S3StoragePlugin extends Plugin {
         throw new Error(`Workspace "${newWorkspaceName}" already exists. Use overwriteIfExists option or choose a different name.`)
       }
     }
-    
+
     // Create the new workspace (blank template, no need for git)
     await this.call('filePanel', 'createWorkspace', newWorkspaceName, 'blank')
-    
+
     console.log(`[S3StoragePlugin] Created new workspace: ${newWorkspaceName}`)
-    
+
     // Check for git metadata
     let gitBackupInfo: any = null
     const gitInfoFile = zip.file(GIT_BACKUP_INFO_FILE)
@@ -2394,14 +2394,14 @@ export class S3StoragePlugin extends Plugin {
         console.warn('[S3StoragePlugin] Could not parse git backup info:', e)
       }
     }
-    
+
     // Extract and write files to the new workspace
     let restoredCount = 0
     const filePromises: Promise<void>[] = []
-    
+
     // Check if backup contains .git files
-    const backupHasGit = zip.file(/^\.git[\/]/).length > 0 || zip.file('.git') !== null
-    
+    const backupHasGit = zip.file(/^\.git[/]/).length > 0 || zip.file('.git') !== null
+
     // Clean restore: wipe existing files first (relevant when overwriting an existing workspace)
     if (options?.cleanRestore) {
       console.log('[S3StoragePlugin] 🧹 Clean restore: wiping existing workspace files')
@@ -2418,13 +2418,13 @@ export class S3StoragePlugin extends Plugin {
         console.warn('[S3StoragePlugin] Could not wipe local .git folder:', e)
       }
     }
-    
+
     zip.forEach((relativePath, zipEntry) => {
       // Skip metadata, directories, git backup info, and remix.config.json (to avoid inheriting remoteId)
       if (relativePath === '_backup_metadata.json' || relativePath === GIT_BACKUP_INFO_FILE || relativePath === REMIX_CONFIG_FILE || zipEntry.dir) {
         return
       }
-      
+
       filePromises.push((async () => {
         try {
           const content = await zipEntry.async('string')
@@ -2435,33 +2435,33 @@ export class S3StoragePlugin extends Plugin {
         }
       })())
     })
-    
+
     await Promise.all(filePromises)
-    
+
     // Decide whether to keep the original remoteId or assign a fresh one
     const keepRemoteId = options?.keepRemoteId !== false // Default to true for backward compatibility
     const assignedRemoteId = keepRemoteId ? remoteWorkspaceId : generateWorkspaceId()
-    
+
     const remixConfig: RemixConfig = {
       'remote-workspace': {
         remoteId: assignedRemoteId,
         userId: user?.sub,
         createdAt: new Date().toISOString(),
         // Carry over the backup's timestamp so "Saved" / "Backup" shows correctly
-        ...(backupPath.includes('/autosave/') 
+        ...(backupPath.includes('/autosave/')
           ? { lastSaveAt: backupMetadata?.createdAt || new Date().toISOString() }
           : { lastBackupAt: backupMetadata?.createdAt || new Date().toISOString() }
         )
       }
     }
     await this.call('fileManager', 'writeFile', REMIX_CONFIG_FILE, JSON.stringify(remixConfig, null, 2))
-    
+
     if (keepRemoteId) {
       console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (linked to ${remoteWorkspaceId})`)
     } else {
-      console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (fresh ID: ${assignedRemoteId}, original was ${remoteWorkspaceId})`)  
+      console.log(`[S3StoragePlugin] ✅ Restored ${restoredCount} files to new workspace: ${newWorkspaceName} (fresh ID: ${assignedRemoteId}, original was ${remoteWorkspaceId})`)
     }
-    
+
     // Notify user about git repo info if present
     if (gitBackupInfo?.isGitRepo) {
       const remoteUrl = gitBackupInfo.remotes?.find((r: any) => r.name === 'origin')?.url
@@ -2482,9 +2482,9 @@ export class S3StoragePlugin extends Plugin {
         })
       }
     }
-    
-    this.emit('restoreCompleted', { 
-      backupPath, 
+
+    this.emit('restoreCompleted', {
+      backupPath,
       fileCount: restoredCount,
       workspaceRemoteId: assignedRemoteId,
       originalRemoteId: remoteWorkspaceId,
@@ -2492,11 +2492,11 @@ export class S3StoragePlugin extends Plugin {
       newWorkspaceName,
       gitBackupInfo
     })
-    
+
     const idNote = keepRemoteId ? '' : ' (separate copy)'
     await this.call('notification', 'toast', `☁️ Restored to new workspace: ${newWorkspaceName} (${restoredCount} files)${idNote}`)
   }
-  
+
   /**
    * Emit an error event
    */
