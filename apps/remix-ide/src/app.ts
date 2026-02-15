@@ -85,6 +85,7 @@ import { DesktopHost } from './app/plugins/electron/desktopHostPlugin'
 import { WalletConnect } from './app/plugins/walletconnect'
 import { AIDappGenerator } from './app/plugins/ai-dapp-generator'
 import { IndexedDbCachePlugin } from './app/plugins/IndexedDbCache'
+import { NotificationCenterPlugin } from './app/plugins/notification-center'
 import { FeedbackPlugin } from './app/plugins/feedback'
 
 import { TemplatesSelectionPlugin } from './app/plugins/templates-selection/templates-selection-plugin'
@@ -437,6 +438,7 @@ class AppComponent {
     const solidityScript = new SolidityScript()
 
     this.notification = new NotificationPlugin()
+    const notificationCenter = new NotificationCenterPlugin()
 
     const configPlugin = new ConfigPlugin()
     this.layout = new Layout()
@@ -455,6 +457,7 @@ class AppComponent {
       permissionHandler,
       this.layout,
       this.notification,
+      notificationCenter,
       this.gistHandler,
       configPlugin,
       blockchain,
@@ -714,6 +717,7 @@ class AppComponent {
     await this.appManager.activatePlugin(['cloudWorkspaces'])
     await this.appManager.activatePlugin(['invitationManager'])
     await this.appManager.activatePlugin(['account'])
+    await this.appManager.activatePlugin(['notificationCenter'])
     await this.appManager.activatePlugin(['feedback'])
     await this.appManager.activatePlugin(['settings'])
 

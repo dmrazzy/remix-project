@@ -108,6 +108,7 @@ let requiredModules = [
   'chartjs',
   'storageMonitor',
   'indexedDbCache',
+  'notificationCenter',
   'invitationManager',
   'feedback'
 ]
