@@ -25,7 +25,7 @@ export class MCPConfigManager {
             // Handle empty or whitespace-only files
             if (!configContent || configContent.trim() === '') {
               console.log('[MCPConfigManager] Config file saved as empty, writing default config');
-              await this.saveConfig(minimalMCPConfig);
+              await this.saveConfigWithWorkspaceCheck(minimalMCPConfig);
               return;
             }
 
@@ -36,13 +36,13 @@ export class MCPConfigManager {
               console.log('[MCPConfigManager] Config reloaded from file save');
             } else {
               console.log('[MCPConfigManager] No mcp config in saved file, writing default');
-              await this.saveConfig(minimalMCPConfig);
+              await this.saveConfigWithWorkspaceCheck(minimalMCPConfig);
             }
           } catch (error) {
             console.error('[MCPConfigManager] Error reloading config on file save:', error);
             // If there's an error, write the default config
             try {
-              await this.saveConfig(minimalMCPConfig);
+              await this.saveConfigWithWorkspaceCheck(minimalMCPConfig);
             } catch (saveError) {
               console.error('[MCPConfigManager] Error writing default config:', saveError);
             }
@@ -63,7 +63,7 @@ export class MCPConfigManager {
         if (!configContent || configContent.trim() === '') {
           console.log('[MCPConfigManager] Config file is empty, creating default');
           this.config = minimalMCPConfig;
-          await this.saveConfig(this.config);
+          await this.saveConfigWithWorkspaceCheck(this.config);
           return this.config;
         }
 
@@ -86,17 +86,17 @@ export class MCPConfigManager {
           } else {
             console.log('[MCPConfigManager] No mcp config in file, creating default');
             this.config = minimalMCPConfig;
-            await this.saveConfig(this.config);
+            await this.saveConfigWithWorkspaceCheck(this.config);
           }
         } catch (parseError) {
           console.error('[MCPConfigManager] Error parsing config file, creating default:', parseError);
           this.config = minimalMCPConfig;
-          await this.saveConfig(this.config);
+          await this.saveConfigWithWorkspaceCheck(this.config);
         }
       } else {
         console.log('[MCPConfigManager] Config file does not exist, creating default');
         this.config = minimalMCPConfig;
-        await this.saveConfig(this.config);
+        await this.saveConfigWithWorkspaceCheck(this.config);
       }
 
       return this.config;
@@ -105,6 +105,39 @@ export class MCPConfigManager {
       this.config = defaultMCPConfig;
       return this.config;
     }
+  }
+
+  private async isWorkspaceReady(): Promise<boolean> {
+    try {
+      const workspace = await this.plugin.call('filePanel', 'getCurrentWorkspace');
+      return workspace && workspace.name.trim() !== '';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private async waitForWorkspace(timeout: number = 10000, interval: number = 200): Promise<boolean> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      if (await this.isWorkspaceReady()) {
+        console.log('[MCPConfigManager] Workspace is ready');
+        return true;
+      }
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    return false;
+  }
+
+  async saveConfigWithWorkspaceCheck(config: MCPConfig): Promise<void> {
+    const workspaceReady = await this.waitForWorkspace();
+
+    if (!workspaceReady) {
+      this.config = config;
+      return;
+    }
+
+    await this.saveConfig(config);
   }
 
   async saveConfig(config: MCPConfig): Promise<void> {
@@ -151,7 +184,7 @@ export class MCPConfigManager {
         return;
       }
 
-      await this.saveConfig(defaultMCPConfig);
+      await this.saveConfigWithWorkspaceCheck(defaultMCPConfig);
       console.log('[MCPConfigManager] Default config file created');
     } catch (error) {
       console.error(`[MCPConfigManager] Error creating default config: ${error.message}`);
