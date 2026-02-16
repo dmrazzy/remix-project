@@ -698,7 +698,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     </span>
   )
   return (
-    <div>
+    <div style={{ height: '100%' }}>
       <Toaster message={state.toastMessage} />
       {!state.debugging && (
         <div className="px-2 pb-3 pt-3" ref={debuggerTopRef}>

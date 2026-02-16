@@ -31,7 +31,7 @@
 
 .debug-section-object {
   flex: 1;
-  min-height: 300px;
+  min-height: 200px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -71,11 +71,13 @@
 
 .debug-section-content {
   padding: 1rem;
+  padding-bottom: 0;
 }
 
 .debug-section-trace .debug-section-content {
   padding-left: 0;
   padding-right: 0.5rem;
+  padding-bottom: 0;
 }
 
 .debug-section-scrollable {
@@ -120,6 +122,7 @@
   color: var(--bs-body-color);
   background-color: var(--custom-onsurface-layer-1);
   padding: 0.75rem;
+  padding-bottom: 0;
   border-radius: 0.25rem;
   margin: 0;
   white-space: pre-wrap;
@@ -349,6 +352,7 @@
   font-family: 'Courier New', monospace;
   line-height: 1.6;
   padding: 0.75rem;
+  padding-bottom: 0;
   word-wrap: break-word;
   word-break: break-word;
   overflow-wrap: break-word;
