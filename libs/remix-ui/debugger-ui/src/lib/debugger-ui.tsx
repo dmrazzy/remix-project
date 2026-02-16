@@ -496,12 +496,6 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     // Reset solidity locals and state
     setSolidityLocals(null)
     setSolidityState(null)
-    // Reset execution trace state
-    setNestedScopes([])
-    setFunctionStack([])
-    setCallTreeInstance(null)
-    setCurrentFunction('')
-    setTraceData(null)
     // Emit debugging stopped event
     debuggerModule.emit('debuggingStopped')
   }
@@ -594,40 +588,15 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
           debuggerModule.call('menuicons', 'select', 'debugger').catch(err => {
             console.error('Failed to activate debugger:', err)
           })
-
-          // Check if debugger is on right side panel
-          debuggerModule.call('rightSidePanel', 'currentFocus').then(async (currentPlugin: string) => {
-            const isDebuggerOnRightPanel = currentPlugin === 'debugger'
-
-            if (isDebuggerOnRightPanel) {
-              // Debugger is on right side panel - close left side panel and ensure terminal is visible
-              try {
-                const isLeftPanelHidden = await debuggerModule.call('sidePanel', 'isPanelHidden')
-                if (!isLeftPanelHidden) {
-                  await debuggerModule.call('sidePanel', 'togglePanel')
-                }
-
-                // Ensure terminal panel is visible for execution trace
-                const isTerminalHidden = await debuggerModule.call('terminal', 'isPanelHidden')
-                if (isTerminalHidden) {
-                  await debuggerModule.call('terminal', 'togglePanel')
-                }
-              } catch (err) {
-                console.error('Failed to adjust panels for right-side debugger:', err)
-              }
-            } else {
-              // Debugger is on left side panel - close right side panel if open
-              try {
-                const isRightPanelHidden = await debuggerModule.call('rightSidePanel', 'isPanelHidden')
-                if (!isRightPanelHidden) {
-                  await debuggerModule.call('rightSidePanel', 'togglePanel')
-                }
-              } catch (err) {
+          // Close right side panel if it's open when debugging starts
+          debuggerModule.call('rightSidePanel', 'isPanelHidden').then((isHidden: boolean) => {
+            if (!isHidden) {
+              debuggerModule.call('rightSidePanel', 'togglePanel').catch(err => {
                 console.error('Failed to close right side panel:', err)
-              }
+              })
             }
           }).catch(err => {
-            console.error('Failed to check debugger location:', err)
+            console.error('Failed to check right side panel state:', err)
           })
           // Emit debugging started event
           debuggerModule.emit('debuggingStarted', {

@@ -54,12 +54,11 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
       handleExtChange('')
     })
 
-    // Check if debugger is currently active on either left or right panel
+    // Check if debugger is currently active
     const checkDebuggerActive = async () => {
       try {
-        const leftPanelActive = await plugin.call('sidePanel', 'currentFocus')
-        const rightPanelActive = await plugin.call('rightSidePanel', 'currentFocus')
-        const isDebugger = leftPanelActive === 'debugger' || rightPanelActive === 'debugger'
+        const active = await plugin.call('sidePanel', 'currentFocus')
+        const isDebugger = active === 'debugger'
         setIsDebuggerActive(isDebugger)
       } catch (err) {
         console.error('Failed to check debugger active state', err)
@@ -68,7 +67,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
 
     checkDebuggerActive()
 
-    // Listen for plugin activation/deactivation on both panels
+    // Listen for plugin activation/deactivation
     const onPluginActivated = (name: string) => {
       const isDebugger = name === 'debugger'
       setIsDebuggerActive(isDebugger)
@@ -83,10 +82,8 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
       try {
         // Add a small delay to allow the debugger to activate
         await new Promise(resolve => setTimeout(resolve, 100))
-        const leftPanelActive = await plugin.call('sidePanel', 'currentFocus')
-        const rightPanelActive = await plugin.call('rightSidePanel', 'currentFocus')
-        const isDebugger = leftPanelActive === 'debugger' || rightPanelActive === 'debugger'
-        setIsDebuggerActive(isDebugger)
+        const active = await plugin.call('sidePanel', 'currentFocus')
+        setIsDebuggerActive(active === 'debugger')
       } catch (err) {
         console.error('Failed to check debugger active state on debugging start', err)
       }
@@ -120,8 +117,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
 
     plugin.on('sidePanel', 'pluginDisabled', onPluginActivated)
     plugin.on('sidePanel', 'focusChanged', onPluginActivated)
-    plugin.on('rightSidePanel', 'pinnedPlugin', onPluginActivated)
-    plugin.on('rightSidePanel', 'unPinnedPlugin', onPluginActivated)
     plugin.on('debugger', 'debuggingStarted', onDebuggingStarted)
     plugin.on('debugger', 'debuggingStopped', onDebuggingStopped)
 
@@ -131,8 +126,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
       plugin.off('settings', 'copilotChoiceUpdated')
       plugin.off('sidePanel', 'pluginDisabled')
       plugin.off('sidePanel', 'focusChanged')
-      plugin.off('rightSidePanel', 'pinnedPlugin')
-      plugin.off('rightSidePanel', 'unPinnedPlugin')
       plugin.off('debugger', 'debuggingStarted')
       plugin.off('debugger', 'debuggingStopped')
     }

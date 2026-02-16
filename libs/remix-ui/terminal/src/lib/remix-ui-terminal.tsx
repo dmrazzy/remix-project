@@ -98,12 +98,11 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
   }, [terminalState])
 
   useEffect(() => {
-    // Check if debugger is active on either left or right panel
+    // Check if debugger is active
     const checkDebuggerActive = async () => {
       try {
-        const leftPanelActive = await props.plugin.call('sidePanel', 'currentFocus')
-        const rightPanelActive = await props.plugin.call('rightSidePanel', 'currentFocus')
-        const isDebuggerFocused = leftPanelActive === 'debugger' || rightPanelActive === 'debugger'
+        const active = await props.plugin.call('sidePanel', 'currentFocus')
+        const isDebuggerFocused = active === 'debugger'
         setIsDebuggerActive(isDebuggerFocused)
       } catch (err) {
         console.error('Failed to check debugger active state', err)
@@ -112,7 +111,7 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
 
     checkDebuggerActive()
 
-    // Listen for plugin activation/deactivation on both panels
+    // Listen for plugin activation/deactivation
     const onPluginActivated = (name: string) => {
       const isDebugger = name === 'debugger'
       setIsDebuggerActive(isDebugger)
@@ -121,14 +120,10 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
     // Listen to focusChanged which fires when user switches plugins
     props.plugin.on('sidePanel', 'focusChanged', onPluginActivated)
     props.plugin.on('sidePanel', 'pluginDisabled', onPluginActivated)
-    props.plugin.on('rightSidePanel', 'pinnedPlugin', onPluginActivated)
-    props.plugin.on('rightSidePanel', 'unPinnedPlugin', onPluginActivated)
 
     return () => {
       props.plugin.off('sidePanel', 'focusChanged', onPluginActivated)
       props.plugin.off('sidePanel', 'pluginDisabled', onPluginActivated)
-      props.plugin.off('rightSidePanel', 'pinnedPlugin', onPluginActivated)
-      props.plugin.off('rightSidePanel', 'unPinnedPlugin', onPluginActivated)
     }
   }, [props.plugin])
 
@@ -139,9 +134,8 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
         try {
           // Add a small delay to allow the debugger to activate
           await new Promise(resolve => setTimeout(resolve, 100))
-          const leftPanelActive = await props.plugin.call('sidePanel', 'currentFocus')
-          const rightPanelActive = await props.plugin.call('rightSidePanel', 'currentFocus')
-          const isDebugger = leftPanelActive === 'debugger' || rightPanelActive === 'debugger'
+          const active = await props.plugin.call('sidePanel', 'currentFocus')
+          const isDebugger = active === 'debugger'
           setIsDebuggerActive(isDebugger)
         } catch (err) {
           console.error('Failed to check debugger active state on debugging change', err)
@@ -154,19 +148,6 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
     }
   }, [props.isDebugging, props.plugin])
 
-  // Listen for debuggingStopped event to immediately reset view
-  useEffect(() => {
-    const handleDebuggingStopped = () => {
-      setIsDebuggerActive(false)
-    }
-
-    props.plugin.on('debugger', 'debuggingStopped', handleDebuggingStopped)
-
-    return () => {
-      props.plugin.off('debugger', 'debuggingStopped', handleDebuggingStopped)
-    }
-  }, [props.plugin])
-
   // Add a polling mechanism to periodically check if debugger is active
   // This is a fallback in case event listeners don't work
   useEffect(() => {
@@ -174,9 +155,8 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
 
     const pollInterval = setInterval(async () => {
       try {
-        const leftPanelActive = await props.plugin.call('sidePanel', 'currentFocus')
-        const rightPanelActive = await props.plugin.call('rightSidePanel', 'currentFocus')
-        const isDebugger = leftPanelActive === 'debugger' || rightPanelActive === 'debugger'
+        const active = await props.plugin.call('sidePanel', 'currentFocus')
+        const isDebugger = active === 'debugger'
         if (isDebugger !== isDebuggerActive) {
           setIsDebuggerActive(isDebugger)
         }

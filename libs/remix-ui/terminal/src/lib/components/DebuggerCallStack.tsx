@@ -21,19 +21,10 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
       }
     }
 
-    // Reset state when debugging stops
-    const handleDebuggingStopped = () => {
-      setSelectedScope(null)
-      setDeployments([])
-      setExpandedScopes(new Set())
-    }
-
     plugin.on('debugger', 'scopeSelected', handleScopeSelected)
-    plugin.on('debugger', 'debuggingStopped', handleDebuggingStopped)
 
     return () => {
       plugin.off('debugger', 'scopeSelected', handleScopeSelected)
-      plugin.off('debugger', 'debuggingStopped', handleDebuggingStopped)
     }
   }, [plugin])
 

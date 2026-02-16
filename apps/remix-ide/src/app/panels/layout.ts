@@ -6,7 +6,7 @@ import { QueryParams } from '@remix-project/remix-lib'
 const profile: Profile = {
   name: 'layout',
   description: 'layout',
-  methods: ['minimize', 'minimizeSidePanel', 'maximiseSidePanel', 'resetSidePanel', 'maximizeTerminal', 'maximiseRightSidePanel', 'resetRightSidePanel', 'triggerChange']
+  methods: ['minimize', 'minimizeSidePanel', 'maximiseSidePanel', 'resetSidePanel', 'maximizeTerminal', 'maximiseRightSidePanel', 'resetRightSidePanel']
 }
 
 interface panelState {
@@ -174,7 +174,7 @@ export class Layout extends Plugin {
   async maximiseRightSidePanel () {
     const current = await this.call('rightSidePanel', 'currentFocus')
     this.maximized[current] = true
-    this.event.emit('maximiseRightSidePanel', current)
+    this.event.emit('maximiseRightSidePanel')
   }
 
   async maximizeTerminal() {
@@ -193,10 +193,5 @@ export class Layout extends Plugin {
     const current = await this.call('rightSidePanel', 'currentFocus')
     this.enhanced[current] = false
     this.event.emit('resetRightSidePanel')
-  }
-
-  triggerChange () {
-    this.event.emit('change', this.panels)
-    this.emit('change', this.panels)
   }
 }
