@@ -676,10 +676,12 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
   let previousValidSourceLocation = validSourceLocation || currentSourceLocation
   let compilationResult: CompilerAbstract
   let currentAddress = ''
+  let firstExecutionStep = true
   while (step < tree.traceManager.trace.length) {
     let sourceLocation
     let validSourceLocation
     let address
+    let isInvalidSource = false
 
     try {
       address = tree.traceManager.getCurrentCalledAddressAt(step)
@@ -696,7 +698,8 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
         }
       }
       const amountOfSources = tree.sourceLocationTracker.getTotalAmountOfSources(address, compilationResult.data.contracts)
-      if (tree.sourceLocationTracker.isInvalidSourceLocation(currentSourceLocation, amountOfSources)) { // file is -1 or greater than amount of sources
+      isInvalidSource = tree.sourceLocationTracker.isInvalidSourceLocation(currentSourceLocation, amountOfSources)
+      if (isInvalidSource) { // file is -1 or greater than amount of sources
         validSourceLocation = previousValidSourceLocation
       } else
         validSourceLocation = currentSourceLocation
@@ -763,14 +766,17 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
     // check if there is a function at destination - but only for AST node resolution
     const contractObj = await tree.solidityProxy.contractObjectAtAddress(address)
     const generatedSources = getGeneratedSources(tree, scopeId, contractObj)
-    const { nodes, blocksDefinition } = await resolveNodesAtSourceLocation(tree, sourceLocation, generatedSources, address)
-
-    functionDefinition = await resolveFunctionDefinition(tree, sourceLocation, generatedSources, address)
+    const { nodes, blocksDefinition, functionDefinition } = await resolveNodesAtSourceLocation(tree, sourceLocation, generatedSources, address)
 
     if (!tree.scopes[scopeId].functionDefinition && stepDetail.op === 'JUMPDEST' && functionDefinition && (tree.scopes[scopeId].firstStep === step - 1 || tree.scopes[scopeId].firstStep === step - 2)) {
       tree.scopes[scopeId].functionDefinition = functionDefinition
       tree.scopes[scopeId].lowLevelScope = false
       await registerFunctionParameters(tree, functionDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
+    }
+
+    // if the first step of the execution leads to invalid source (generated code), we consider it a low level scope.
+    if (firstExecutionStep && isInvalidSource) {
+      tree.scopes[scopeId].lowLevelScope = true
     }
 
     // Update symbolic stack based on opcode execution
@@ -888,6 +894,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
       previousValidSourceLocation = validSourceLocation
       step++
     }
+    if (firstExecutionStep) firstExecutionStep = false
   }
   return { outStep: step }
 }
