@@ -127,12 +127,16 @@ export default class Terminal extends Plugin {
     this.on('debugger', 'debuggingStarted', (data: any) => {
       this.isDebugging = true
       this.renderComponent()
+      // Trigger layout change to update terminal height
+      this.call('layout', 'triggerChange')
     })
 
     this.on('debugger', 'debuggingStopped', () => {
       this.isDebugging = false
       this.debuggerCallStack = []
       this.renderComponent()
+      // Trigger layout change to reset terminal height
+      this.call('layout', 'triggerChange')
     })
 
     // Listen for file changes - auto-restore terminal panel if maximized when main panel is used

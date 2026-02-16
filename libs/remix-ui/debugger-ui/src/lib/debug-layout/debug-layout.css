@@ -19,7 +19,7 @@
 .debug-section-trace {
   flex-shrink: 0;
   max-height: 33.33%;
-  min-height: 200px;
+  min-height: 300px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -27,7 +27,7 @@
 
 .debug-section-object {
   flex: 1;
-  min-height: 400px;
+  min-height: 300px;
   display: flex;
   flex-direction: column;
   overflow: hidden;

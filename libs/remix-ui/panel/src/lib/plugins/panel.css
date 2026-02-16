@@ -131,6 +131,10 @@ iframe {
     height: 20%;
 }
 
+.terminal-wrap.debugging {
+    height: 31%;
+}
+
 .terminal-wrap.maximized {
     height: 100% !important;
     flex: 1;

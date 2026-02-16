@@ -27,11 +27,13 @@ const RemixUIMainPanel = (props: RemixUIMainPanelProps) => {
     if (layout.panels) {
       const pluginPanels: PluginRecord[] = []
       Object.values(layout.panels).map((panel: any) => {
+        // Check if terminal is debugging by accessing the plugin's isDebugging property
+        const isTerminalDebugging = panel.plugin.profile.name === 'terminal' && panel.plugin.isDebugging
         pluginPanels.push({
           profile: panel.plugin.profile,
           active: panel.active,
           view: panel.plugin.profile.name === 'tabs' ? panel.plugin.renderTabsbar() : panel.plugin.render(),
-          class: panel.plugin.profile.name + '-wrap ' + (panel.minimized ? 'minimized ' : ' ') + ((platform === appPlatformTypes.desktop)? 'desktop' : ''),
+          class: panel.plugin.profile.name + '-wrap ' + (panel.minimized ? 'minimized ' : ' ') + ((platform === appPlatformTypes.desktop)? 'desktop' : '') + (isTerminalDebugging ? ' debugging' : ''),
           minimized: panel.minimized,
           pinned: panel.pinned
         })
