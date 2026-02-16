@@ -12,7 +12,8 @@ interface DeployWidgetProps {
 }
 
 function DeployWidget({ plugin }: DeployWidgetProps) {
-  const [widgetState, dispatch] = useReducer(deployReducer, deployInitialState)
+  const widgetInitializer = plugin.getWidgetState ? plugin.getWidgetState() : null
+  const [widgetState, dispatch] = useReducer(deployReducer, widgetInitializer || deployInitialState)
   const [themeQuality, setThemeQuality] = useState<string>('dark')
 
   useEffect(() => {
@@ -112,6 +113,21 @@ function DeployWidget({ plugin }: DeployWidgetProps) {
     //     dispatch(setRemixDActivated(false))
     //   }
     // })
+
+    // Cleanup function to remove event listeners when component unmounts
+    return () => {
+      plugin.off('fileManager', 'currentFileChanged')
+      plugin.off('editor', 'contentChanged')
+      plugin.off('fileManager', 'fileClosed')
+      plugin.off('solidity', 'compilationFinished')
+      plugin.off('vyper', 'compilationFinished')
+      plugin.off('lexon', 'compilationFinished')
+      plugin.off('yulp', 'compilationFinished')
+      plugin.off('nahmii-compiler', 'compilationFinished')
+      plugin.off('hardhat', 'compilationFinished')
+      plugin.off('foundry', 'compilationFinished')
+      plugin.off('truffle', 'compilationFinished')
+    }
   }, [])
 
   return (

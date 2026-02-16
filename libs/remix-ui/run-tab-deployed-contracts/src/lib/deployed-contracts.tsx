@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer, useRef, useState } from 'react'
+import React, { useEffect, useReducer, useState } from 'react'
 import { DeployedContractsAppContext } from './contexts'
 import { deployedContractsInitialState, deployedContractsReducer } from './reducers'
 import DeployedContractsPortraitView from './widgets/deployedContractsPortraitView'
@@ -12,9 +12,9 @@ interface DeployedContractsWidgetProps {
 }
 
 function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
-  const [widgetState, dispatch] = useReducer(deployedContractsReducer, deployedContractsInitialState)
+  const widgetInitializer = plugin.getWidgetState ? plugin.getWidgetState() : null
+  const [widgetState, dispatch] = useReducer(deployedContractsReducer, widgetInitializer || deployedContractsInitialState)
   const [themeQuality, setThemeQuality] = useState<string>('dark')
-  const lastLoadedChainIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (plugin.setStateGetter) {
@@ -56,8 +56,8 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
         chainId = network?.id
       }
 
-      if (chainId && lastLoadedChainIdRef.current !== chainId) {
-        lastLoadedChainIdRef.current = chainId
+      if (chainId && widgetState.lastLoadedChainId !== chainId) {
+        dispatch({ type: 'SET_LAST_LOADED_CHAIN_ID', payload: chainId })
         await loadPinnedContracts(plugin, dispatch, chainId)
       }
     })
@@ -70,7 +70,15 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
         if (balance) dispatch({ type: 'UPDATE_CONTRACT_BALANCE', payload: { address: to, balance } })
       }
     })
-  }, [])
+
+    // Cleanup function to remove event listeners when component unmounts
+    return () => {
+      plugin.off('theme', 'themeChanged')
+      plugin.off('fileManager', 'currentFileChanged')
+      plugin.off('blockchain', 'networkStatus')
+      plugin.off('blockchain', 'transactionExecuted')
+    }
+  }, [widgetState.lastLoadedChainId])
 
   useEffect(() => {
     plugin.emit('deployedInstanceUpdated', widgetState.deployedContracts)

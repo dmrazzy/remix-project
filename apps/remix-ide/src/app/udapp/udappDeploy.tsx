@@ -16,7 +16,7 @@ const profile = {
 export class DeployPlugin extends Plugin {
   editor: any
   fileManager: any
-  private getWidgetState: (() => DeployWidgetState) | null = null
+  getWidgetState: (() => DeployWidgetState) | null = null
   private getDispatch: (() => React.Dispatch<Actions>) | null = null
   constructor () {
     super(profile)

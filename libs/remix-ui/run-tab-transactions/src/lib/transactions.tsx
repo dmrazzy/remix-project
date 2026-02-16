@@ -7,12 +7,16 @@ import TransactionsPortraitView from './widgets/TransactionsPortraitView'
 import "./css/transaction-recorder.css"
 
 function TransactionsWidget({ plugin }: { plugin: TransactionsPlugin }) {
-  const [widgetState, dispatch] = useReducer(transactionsReducer, transactionsInitialState)
+  const widgetInitializer = plugin.getWidgetState ? plugin.getWidgetState() : null
+  const [widgetState, dispatch] = useReducer(transactionsReducer, widgetInitializer || transactionsInitialState)
   const [themeQuality, setThemeQuality] = useState<string>('dark')
 
   useEffect(() => {
     if (plugin.setStateGetter) {
       plugin.setStateGetter(() => widgetState)
+    }
+    if (plugin.setDispatchGetter) {
+      plugin.setDispatchGetter(() => dispatch)
     }
   }, [widgetState])
 

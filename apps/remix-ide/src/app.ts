@@ -613,13 +613,6 @@ class AppComponent {
     const compileTab = new CompileTab(Registry.getInstance().get('config').api, Registry.getInstance().get('filemanager').api)
     const run = new RunTab(
       blockchain,
-      Registry.getInstance().get('config').api,
-      Registry.getInstance().get('filemanager').api,
-      Registry.getInstance().get('editor').api,
-      filePanel,
-      Registry.getInstance().get('compilersartefacts').api,
-      networkModule,
-      Registry.getInstance().get('fileproviders/browser').api,
       this.engine
     )
     const analysis = new AnalysisTab()
@@ -640,9 +633,9 @@ class AppComponent {
     const feedbackPlugin = new FeedbackPlugin()
 
     this.engine.register([
-      compileTab,
+      compileTab as any,
       run,
-      debug,
+      debug as any,
       analysis,
       test,
       filePanel.remixdHandle,
@@ -650,7 +643,6 @@ class AppComponent {
       linkLibraries,
       deployLibraries,
       openZeppelinProxy,
-      run.recorder,
       this.authPlugin,
       this.s3StoragePlugin,
       this.cloudWorkspacesPlugin,
@@ -745,7 +737,7 @@ class AppComponent {
     await this.appManager.activatePlugin(['feedback'])
     await this.appManager.activatePlugin(['settings'])
 
-    await this.appManager.activatePlugin(['walkthrough', 'storage', 'storageMonitor', 'search', 'compileAndRun', 'recorder', 'dgitApi', 'dgit'])
+    await this.appManager.activatePlugin(['walkthrough', 'storage', 'storageMonitor', 'search', 'compileAndRun', 'dgitApi', 'dgit'])
     await this.appManager.activatePlugin(['solidity-script', 'remix-templates'])
 
     if (isElectron()) {

@@ -82,7 +82,8 @@ export async function loadPinnedContracts (plugin: DeployedContractsPlugin, disp
       for (const file of filePaths) {
         const pinnedContract = await plugin.call('fileManager', 'readFile', file)
         const pinnedContractObj = JSON.parse(pinnedContract)
-        const code = await plugin.call('blockchain', 'getCode', pinnedContractObj.address)
+        const web3 = await plugin.call('blockchain', 'web3')
+        const code = await web3.getCode(pinnedContractObj.address)
 
         if (code === '0x') {
           codeError = true

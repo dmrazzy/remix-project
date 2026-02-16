@@ -14,7 +14,7 @@ const profile = {
   * Record transaction as long as the user create them.
   */
 export class TransactionsPlugin extends Plugin {
-  private getWidgetState: (() => TransactionsWidgetState) | null = null
+  getWidgetState: (() => TransactionsWidgetState) | null = null
   private getDispatch: (() => React.Dispatch<Actions>) | null = null
 
   constructor () {

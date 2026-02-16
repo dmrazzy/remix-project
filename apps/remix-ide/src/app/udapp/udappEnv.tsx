@@ -15,11 +15,20 @@ const profile = {
 export class EnvironmentPlugin extends Plugin {
   engine: Engine
   blockchain: Blockchain
-  private getWidgetState: (() => WidgetState) | null = null
+  getWidgetState: (() => WidgetState) | null = null
   private getDispatch: (() => React.Dispatch<Actions>) | null = null
+  private isInitialized: boolean = false
 
   constructor () {
     super(profile)
+  }
+
+  markAsInitialized() {
+    this.isInitialized = true
+  }
+
+  isAlreadyInitialized() {
+    return this.isInitialized
   }
 
   setStateGetter(getter: () => WidgetState) {

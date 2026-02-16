@@ -14,7 +14,7 @@ const profile = {
 
 export class DeployedContractsPlugin extends Plugin {
   instanceAddresses: string[] = []
-  private getWidgetState: (() => DeployedContractsWidgetState) | null = null
+  getWidgetState: (() => DeployedContractsWidgetState) | null = null
   private getDispatch: (() => React.Dispatch<Actions>) | null = null
 
   constructor() {

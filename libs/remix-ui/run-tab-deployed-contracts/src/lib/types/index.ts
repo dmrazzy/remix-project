@@ -25,6 +25,7 @@ export interface DeployedContractsWidgetState {
   showClearAllDialog: boolean
   loadType: 'abi' | 'sol' | 'vyper' | 'lexon' | 'contract' | 'other',
   currentFile: string
+  lastLoadedChainId: string | null
 }
 
 export interface DeployedContractsAppContextType {
@@ -49,3 +50,4 @@ export type Actions =
   | { type: 'SET_CURRENT_FILE'; payload: string }
   | { type: 'SET_DECODED_RESPONSE'; payload: { instanceIndex: number; funcIndex: number; response: any } }
   | { type: 'UPDATE_CONTRACT_BALANCE'; payload: { address: string; balance: string } }
+  | { type: 'SET_LAST_LOADED_CHAIN_ID'; payload: string | null }

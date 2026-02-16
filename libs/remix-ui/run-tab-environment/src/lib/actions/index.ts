@@ -190,7 +190,6 @@ export async function getAccountsList (plugin: EnvironmentPlugin, dispatch: Reac
     })
     index++
   }
-
   dispatch({ type: 'SET_ACCOUNTS', payload: defaultAccounts })
   dispatch({ type: 'SET_SMART_ACCOUNTS', payload: smartAccounts })
 }

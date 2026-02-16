@@ -63,6 +63,7 @@ export class Blockchain extends Plugin {
   registeredPluginEvents: string[]
   defaultPinnedProviders: string[]
   pinnedProviders: string[]
+  isWorkspaceLoaded: boolean
 
   // NOTE: the config object will need to be refactored out in remix-lib
   constructor(config: Config) {
@@ -105,13 +106,6 @@ export class Blockchain extends Plugin {
       }
     })
 
-    // this.on('environmentExplorer', 'providerPinned', (name, provider) => {
-    //   this.emit('shouldAddProvidertoUdapp', name, provider)
-    //   this.pinnedProviders.push(name)
-    //   this.call('config', 'setAppParameter', 'settings/pinned-providers', JSON.stringify(this.pinnedProviders))
-    //   trackMatomoEvent(this, { category: 'blockchain', action: 'providerPinned', name: name, isClick: false })
-    //  // this.emit('providersChanged')
-    // })
     // used to pin and select newly created forked state provider
     this.on('udapp', 'forkStateProviderAdded', async (providerName) => {
       const name = `vm-fs-${providerName}`
@@ -120,15 +114,6 @@ export class Blockchain extends Plugin {
       await this.changeExecutionContext({ context: name })
       this.call('notification', 'toast', `New environment '${providerName}' created with forked state.`)
     })
-
-    // this.on('environmentExplorer', 'providerUnpinned', (name, provider) => {
-    //   this.emit('shouldRemoveProviderFromUdapp', name, provider)
-    //   const index = this.pinnedProviders.indexOf(name)
-    //   this.pinnedProviders.splice(index, 1)
-    //   this.call('config', 'setAppParameter', 'settings/pinned-providers', JSON.stringify(this.pinnedProviders))
-    //   trackMatomoEvent(this, { category: 'blockchain', action: 'providerUnpinned', name: name, isClick: false })
-    //  // this.emit('providersChanged')
-    // })
 
     this.setupEvents()
 
@@ -155,7 +140,15 @@ export class Blockchain extends Plugin {
   }
 
   setupEvents() {
+    this.on('filePanel', 'workspaceInitializationCompleted', async () => {
+      this.isWorkspaceLoaded = true
+      const context = this.getProvider()
+
+      this.executionContext.event.trigger('contextChanged', [context])
+    })
+
     this.executionContext.event.register('contextChanged', async (context) => {
+      if (!this.isWorkspaceLoaded) return
       // reset environment to last known state of the context
       await this.loadContext(context)
       this._triggerEvent('contextChanged', [context])

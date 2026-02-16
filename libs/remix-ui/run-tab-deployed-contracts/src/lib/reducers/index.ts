@@ -7,7 +7,8 @@ export const deployedContractsInitialState: DeployedContractsWidgetState = {
   addressInput: '',
   showClearAllDialog: false,
   loadType: 'other',
-  currentFile: ''
+  currentFile: '',
+  lastLoadedChainId: null
 }
 
 export const deployedContractsReducer = (state: DeployedContractsWidgetState, action: Actions): DeployedContractsWidgetState => {
@@ -110,6 +111,12 @@ export const deployedContractsReducer = (state: DeployedContractsWidgetState, ac
           ? { ...contract, balance: action.payload.balance }
           : contract
       )
+    }
+
+  case 'SET_LAST_LOADED_CHAIN_ID':
+    return {
+      ...state,
+      lastLoadedChainId: action.payload
     }
 
   default:
