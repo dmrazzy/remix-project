@@ -140,7 +140,8 @@ export const invariants = {
 3. **ALWAYS import React from 'react'** in any file using JSX (especially \`src/main.jsx\` and \`src/App.jsx\`).
    - Example: \`import React from 'react';\` must be at the top, even if you use \`createRoot\`.
 4. **ETHERS.JS PROVIDER RULES (CRITICAL):**
-   - **MUST USE:** Always use \`new ethers.BrowserProvider(window.ethereum)\` for both reading and writing.
+   - **MUST USE:** Always use \`ethers.BrowserProvider\` with a wallet provider for both reading and writing.
+   - **PROVIDER ACQUISITION:** Use \`window.__qdapp_getProvider ? await window.__qdapp_getProvider() : window.ethereum\` to get the provider. Store this raw provider in a ref/variable for reuse (e.g. network switching).
    - **FORBIDDEN:** NEVER use \`new ethers.JsonRpcProvider\`, \`InfuraProvider\`, or \`AlchemyProvider\`.
    - **FORBIDDEN:** NEVER generate code containing placeholders like 'YOUR_INFURA_KEY' or ask for API keys.
 4. Use React with JSX syntax (not "text/babel" scripts).
@@ -196,7 +197,9 @@ ${functionNames}
   },
 
   /** Wallet connection and network switching patterns */
-  wallet: (): string => `
+  wallet: (isLocalVM: boolean = false): string => {
+    if (isLocalVM) {
+      return `
 **WALLET CONNECTION RULES:**
 1. **Connect Wallet** button must be visible when disconnected.
 2. Check \`window.ethereum\` existence before any wallet operations.
@@ -222,7 +225,86 @@ const switchNetwork = async (targetChainHex) => {
   }
 };
 \`\`\`
-`,
+`
+    }
+
+    // Real network: full wallet selection rules with disconnect/switch/localStorage
+    return `
+**WALLET CONNECTION RULES:**
+1. **Connect Wallet** button must be visible in the header/navbar when disconnected.
+2. **Disconnect Wallet** button must be visible in the header/navbar when connected (next to the account address).
+3. **Switch Network** button must appear **only when** the connected wallet's chain ID differs from the DApp's target chain ID. Hide it when on the correct network.
+4. Use loading spinners for async actions.
+5. Handle "User rejected request" errors gracefully.
+6. Show truncated wallet address (e.g. \`0x1234...5678\`) when connected.
+
+**WALLET PROVIDER ACQUISITION (CRITICAL):**
+The deployed DApp uses \`window.__qdapp_getProvider()\` to discover and select wallets via EIP-6963.
+Always get the raw provider like this:
+\`\`\`javascript
+const rawProvider = window.__qdapp_getProvider
+  ? await window.__qdapp_getProvider()
+  : window.ethereum;
+if (!rawProvider) {
+  alert('Please install a Web3 wallet (e.g. MetaMask).');
+  return;
+}
+const provider = new ethers.BrowserProvider(rawProvider);
+\`\`\`
+**Store \`rawProvider\` in a React ref** (e.g. \`rawProviderRef.current = rawProvider\`) so you can reuse it for network switching without calling \`__qdapp_getProvider\` again.
+
+**🚨 CHAIN ID COMPARISON (CRITICAL — prevents wrong-network false positive):**
+- ethers.js v6 returns \`network.chainId\` as a **BigInt** (e.g. \`11155111n\`).
+- **NEVER compare hex strings directly** (e.g. \`"0xaa36a7" !== "aa36a7"\` — prefix mismatch!).
+- **ALWAYS compare as decimal numbers:**
+\`\`\`javascript
+const TARGET_CHAIN_ID = 11155111; // Sepolia — use DECIMAL number
+// After connecting:
+const network = await provider.getNetwork();
+const currentChainId = Number(network.chainId);
+setChainId(currentChainId);
+// Wrong network check:
+const isWrongNetwork = account && chainId !== null && chainId !== TARGET_CHAIN_ID;
+\`\`\`
+- For \`wallet_switchEthereumChain\`, convert to hex: \`'0x' + TARGET_CHAIN_ID.toString(16)\`
+
+**Disconnect Pattern (mandatory — MUST implement this):**
+\`\`\`javascript
+const disconnectWallet = () => {
+  setAccount(null);
+  setProvider(null);
+  setSigner(null);
+  rawProviderRef.current = null;
+  // Clear saved wallet preference for wallet selection
+  try { localStorage.removeItem('__qdapp_wallet_rdns'); } catch(e) {}
+};
+\`\`\`
+The Disconnect button should be placed in the navbar/header, visible when connected.
+When disconnected, the DApp should return to the initial "Connect Wallet" state.
+
+**Network Switch Pattern (mandatory — MUST be a visible button):**
+Use the stored \`rawProviderRef.current\` for network operations:
+\`\`\`javascript
+const switchNetwork = async (targetChainHex) => {
+  const rp = rawProviderRef.current;
+  if (!rp) return;
+  try {
+    await rp.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: targetChainHex }],
+    });
+  } catch (switchError) {
+    if (switchError.code === 4902) {
+      await rp.request({ method: 'wallet_addEthereumChain', params: [...] });
+    } else {
+      throw switchError;
+    }
+  }
+};
+\`\`\`
+Show a **"Switch to [Network Name]"** button when the user is on the wrong chain.
+`
+  },
 
   /** Ethers.js v6 specific rules */
   ethersRules: (): string => `
@@ -230,7 +312,10 @@ const switchNetwork = async (targetChainHex) => {
 - **Read-Only:** For 'view'/'pure' functions, use \`new ethers.Contract(addr, abi, provider)\`.
 - **Write (Transaction):** For 'nonpayable'/'payable' functions, YOU MUST USE A SIGNER:
   \`\`\`javascript
-  const provider = new ethers.BrowserProvider(window.ethereum);
+  const rawProvider = window.__qdapp_getProvider
+    ? await window.__qdapp_getProvider()
+    : window.ethereum;
+  const provider = new ethers.BrowserProvider(rawProvider);
   const signer = await provider.getSigner();
   const contractWithSigner = new ethers.Contract(address, abi, signer);
   const tx = await contractWithSigner.functionName(args);
@@ -533,7 +618,7 @@ export const buildSystemPrompt = (ctx: PromptContext): string => {
     invariants.truncationPrevention(),
     // Layer 1
     blockchain.ethersRules(),
-    blockchain.wallet(),
+    blockchain.wallet(!!ctx.isLocalVM),
     blockchain.networkContext(ctx.contract.chainId, !!ctx.isLocalVM),
     // Layer 2
     ctx.isBaseMiniApp ? platform.baseMiniApp() : '',

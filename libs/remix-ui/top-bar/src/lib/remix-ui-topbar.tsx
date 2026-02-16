@@ -20,6 +20,7 @@ import { TrackingContext } from '@remix-ide/tracking'
 import { MatomoEvent, TopbarEvent, WorkspaceEvent } from '@remix-api'
 import { LoginButton } from '@remix-ui/login'
 import { appActionTypes } from 'libs/remix-ui/app/src/lib/remix-app/actions/app'
+import { NotificationBell } from '../components/NotificationBell'
 import { FeedbackPanel } from '../components/FeedbackPanel'
 
 export function RemixUiTopbar() {
@@ -638,21 +639,26 @@ export function RemixUiTopbar() {
           style={{ minWidth: '33%' }}
         >
           <>
-            <GitHubLogin
-              cloneGitRepository={showCloneModal}
-              logOutOfGithub={logOutOfGithub}
-              publishToGist={publishToGist}
-              loginWithGitHub={loginWithGitHub}
-            />
+            {!enableLogin && (
+              <GitHubLogin
+                cloneGitRepository={showCloneModal}
+                logOutOfGithub={logOutOfGithub}
+                publishToGist={publishToGist}
+                loginWithGitHub={loginWithGitHub}
+              />
+            )}
             {enableLogin && (
               <LoginButton
                 plugin={plugin}
                 variant="compact"
                 showCredits={true}
                 className="ms-3"
+                cloneGitRepository={showCloneModal}
+                publishToGist={publishToGist}
               />
             )}
           </>
+          <NotificationBell className="ms-3" />
           {feedbackFormUrl && (
             <CustomTooltip placement="bottom" tooltipText="Send Feedback">
               <span
