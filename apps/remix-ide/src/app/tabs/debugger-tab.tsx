@@ -70,7 +70,7 @@ export default class DebuggerTab extends DebuggerApiMixin(ViewPlugin) {
       this.call('notification', 'toast', sourceVerificationNotAvailableToastMsg())
     })
     const onReady = (api) => { this.api = api }
-    return <div className="overflow-hidden px-1" id='debugView'><DebuggerUI debuggerAPI={this} onReady={onReady} /></div>
+    return <div className="overflow-hidden" id='debugView'><DebuggerUI debuggerAPI={this} onReady={onReady} /></div>
   }
 
   showMessage (title, message) {

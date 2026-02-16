@@ -771,7 +771,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
       )}
 
       {state.debugging && (
-        <div className="px-2 pb-3 pt-3" ref={debuggerTopRef} style={{ height: '100%' }}>
+        <div ref={debuggerTopRef} style={{ height: '100%' }}>
           <DebugLayout
             onSearch={handleSearch}
             debugging={state.debugging}

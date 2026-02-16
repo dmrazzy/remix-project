@@ -173,7 +173,6 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
   if (isDebugging && isDebuggerActive) {
     return (
       <div className="bottom-bar border-top border-bottom" data-id="bottomBarPanel">
-        <span className="debug-bar-label">Debugger Controls:</span>
         <div className="debug-controls">
           <button
             className="btn btn-sm btn-secondary debug-btn"
