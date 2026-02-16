@@ -4,7 +4,6 @@ import * as helper from './helper'
 const { ethers } = require('ethers')
 
 module.exports = async function (st, privateKey, contractBytecode, compilationResult, contractCode) {
-  st.plan(26)
   const enableCtorTest = false
   // Test scenarios with expected parameter values
   const testCases = [
@@ -53,10 +52,12 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
     {
       name: 'create2Test',
       signature: 'create2Test(uint256,string,bytes32)',
-      params: [555, 'Create2Test', '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'],
+      params: [555, 'Create2Test', '0x1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF'],
       description: 'CREATE2 operation parameters'
     }
   ]
+
+  st.plan((testCases.length * 3) + 2 + 2 + 1) // 2 Additional tests for internalCallTest + 2 Additional tests for thisCallTest + 1 Additional test for create2Test (salt param)
 
   // Helper function to encode parameters
   function encodeParams(signature: string, params: any[]): string {
@@ -68,7 +69,6 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
 
   // Helper function to find scope by function name and get its firstStep
   function findFunctionScope(nestedScopes: NestedScope[], functionName: string): { scope: NestedScope, firstStep: number } | null {
-    let foundDuplicate = false // TODO this needs to be fixed, there are always 2 nodes for a single function call
     function traverse(scope: NestedScope, parentFirstStep?: number): { scope: NestedScope, firstStep: number } | null {
       // Check if this scope matches our function
       if (scope.functionDefinition?.name === functionName || scope.functionDefinition?.kind === functionName) {
@@ -80,8 +80,7 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
       if (scope.children) {
         for (const child of scope.children) {
           const result = traverse(child, scope.firstStep || parentFirstStep)
-          if (result && foundDuplicate) return result
-          if (result) foundDuplicate = true
+          if (result) return result
         }
       }
 
@@ -108,7 +107,7 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
         await helper.setupDebugger(privateKey, deployBytecode, compilationResult, contractCode)
 
       const { scopes: deployScopes, scopeStarts: deployScopeStarts } = await waitForDeployCallTree()
-      const deployNestedScopes: NestedScope[] = deployCallTree.getScopesAsNestedJSON()
+      const deployNestedScopes: NestedScope[] = deployCallTree.getScopesAsNestedJSON('nojump')
 
       console.log(deployNestedScopes)
 
@@ -165,7 +164,7 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
       )
 
       const { scopes, scopeStarts } = await waitForCallTree()
-      const nestedScopes: NestedScope[] = callTree.getScopesAsNestedJSON()
+      const nestedScopes: NestedScope[] = callTree.getScopesAsNestedJSON('nojump')
 
       // Find the target function scope
       const functionScope = findFunctionScope(nestedScopes, testCase.name)
@@ -217,6 +216,16 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
               } else {
                 st.fail(`${testCase.name}: Could not find string parameter in locals`)
               }
+            }
+          }
+
+          if (testCase.signature.includes('bytes32')) {
+            const stringParamNames = ['_salt']
+            const expectedBytes32Param = stringParamNames.find(name => locals[name])
+
+            if (expectedBytes32Param) {
+              st.equals(locals[expectedBytes32Param].value, testCase.params[2],
+                `${testCase.name}: bytes32 parameter should be decoded correctly`)
             }
           }
 
