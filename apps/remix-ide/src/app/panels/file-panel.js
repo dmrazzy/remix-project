@@ -314,6 +314,7 @@ export default class Filepanel extends ViewPlugin {
     if (workspace.name !== ' - connect to localhost - ') {
       localStorage.setItem('currentWorkspace', workspace.name)
     }
+    console.log('setting workspace', workspace)
     this.emit('setWorkspace', workspace)
   }
 

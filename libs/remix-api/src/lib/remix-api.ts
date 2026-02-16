@@ -46,6 +46,7 @@ export interface ICustomRemixApi extends IRemixApi {
   desktopClient: IDesktopClient
   githubAuthHandler: IGitHubAuthHandlerApi
   sso: ISSOApi
+  auth: ISSOApi
   notificationCenter: INotificationCenterApi
 }
 

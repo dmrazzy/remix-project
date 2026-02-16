@@ -348,11 +348,24 @@ export class TxListener {
         }
       }
     } else {
-      const bytecode = contract.object.evm.bytecode.object
       let params = null
-      if (bytecode && bytecode.length) {
-        params = this._decodeInputParams(getinputParameters(inputData), getConstructorInterface(abi))
+      try {
+        if (inputData) {
+          params = this._decodeInputParams(getinputParameters(inputData), getConstructorInterface(abi))
+        }
+      } catch (e) {
+        console.warn(e)
       }
+
+      try {
+        const bytecode = contract.object.evm.bytecode.object
+        if (bytecode && inputData) {
+          params = this._decodeInputParams('0x' + inputData.replace(bytecode, ''), getConstructorInterface(abi))
+        }
+      } catch (e) {
+        console.warn(e)
+      }
+
       this._resolvedTransactions[tx.hash] = {
         contractName: contract.name,
         to: null,
