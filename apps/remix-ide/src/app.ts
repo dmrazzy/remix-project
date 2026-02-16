@@ -713,8 +713,16 @@ class AppComponent {
     ])
 
     await this.appManager.activatePlugin(['auth'])
-    await this.appManager.activatePlugin(['s3Storage'])
-    await this.appManager.activatePlugin(['cloudWorkspaces'])
+    // Activate/deactivate cloud plugins based on auth state
+    this.appManager.on('auth', 'authStateChanged', async (state: any) => {
+      if (state.isAuthenticated) {
+        await this.appManager.activatePlugin(['s3Storage'])
+        await this.appManager.activatePlugin(['cloudWorkspaces'])
+      } else {
+        await this.appManager.deactivatePlugin('cloudWorkspaces')
+        await this.appManager.deactivatePlugin('s3Storage')
+      }
+    })
     await this.appManager.activatePlugin(['invitationManager'])
     await this.appManager.activatePlugin(['account'])
     await this.appManager.activatePlugin(['notificationCenter'])

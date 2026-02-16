@@ -472,7 +472,9 @@ class PluginLoader {
       'remixGuide',
       'doc-viewer',
       'UIScriptRunner',
-      'quick-dapp-v2'
+      'quick-dapp-v2',
+      'cloudWorkspaces',
+      's3Storage'
     ]
     this.loaders = {}
     this.loaders.localStorage = {
