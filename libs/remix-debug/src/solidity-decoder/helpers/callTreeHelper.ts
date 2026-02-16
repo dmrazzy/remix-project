@@ -115,13 +115,14 @@ export function getGeneratedSources (tree, scopeId, contractObj) {
  *
  * @param {InternalCallTree} tree - The call tree instance
  * @param {Object} functionDefinition - AST function definition node
+ * @param {Object} contractDefinition - AST function definition node
  * @param {number} step - VM trace step index at function entry
  * @param {string} scopeId - Scope identifier for this function
  * @param {Object} contractObj - Contract object with ABI
  * @param {Object} sourceLocation - Source location of the function
  * @param {string} address - Contract address
  */
-export async function registerFunctionParameters (tree, functionDefinition, step, scopeId, contractObj, sourceLocation, address) {
+export async function registerFunctionParameters (tree, functionDefinition, contractDefinition, step, scopeId, contractObj, sourceLocation, address) {
   if (!sourceLocation) return
   if (sourceLocation.jump !== 'i') return
   tree.functionCallStack.push(step)
@@ -147,6 +148,11 @@ export async function registerFunctionParameters (tree, functionDefinition, step
         functionDefinitionAndInputs.inputs = addInputParams(step, functionDefinition, inputs, tree, scopeId, states, contractObj, sourceLocation, stack.length)
       }
 
+      // For constructors, also register inherited constructor parameters
+      if (functionDefinition.kind === 'constructor') {
+        await registerInheritedConstructorParams(step, functionDefinition, contractDefinition, tree, scopeId, states, contractObj, sourceLocation, address, stack.length)
+      }
+
       // return params - register them but they're not yet on the stack
       if (outputs && outputs.parameters && outputs.parameters.length > 0) {
         addReturnParams(step + 1, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation)
@@ -162,6 +168,120 @@ export async function registerFunctionParameters (tree, functionDefinition, step
   }
 
   tree.functionDefinitionsByScope[scopeId] = functionDefinitionAndInputs
+}
+
+/**
+ * Registers inherited constructor parameters for a constructor function.
+ * The layout follows: main constructor params start at stack index 0, then inherited constructors 
+ * in reverse order (last inherited constructor first, then the one at length-2, etc.)
+ *
+ * @param {number} step - current step
+ * @param {Object} functionDefinition - Constructor function definition
+ * @param {InternalCallTree} tree - The call tree instance
+ * @param {string} scopeId - Current scope identifier
+ * @param {Object} states - State variable definitions
+ * @param {Object} contractObj - Contract object with name and ABI
+ * @param {Object} sourceLocation - Source location of the constructor
+ * @param {string} address - Contract address
+ * @param {number} stackLength - Current stack depth at constructor entry
+ */
+export async function registerInheritedConstructorParams(step, functionDefinition, contractDefinition, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, address, stackLength) {
+  try {
+    if (!contractDefinition) {
+      if (tree.debug) console.log(`[registerInheritedConstructorParams] No contract definition or linearized base contracts found`)
+      return
+    }
+
+    // Get linearized base contracts (excluding the current contract which is first)
+    const baseContracts = await tree.solidityProxy.getLinearizedBaseContracts(address, contractDefinition.id)
+
+    // Find constructors in inherited contracts
+    const inheritedConstructors = []
+    for (const baseContract of baseContracts) {
+      if (baseContract.nodes) {
+        const constructor = baseContract.nodes.find(node => 
+          node.nodeType === 'FunctionDefinition' && node.kind === 'constructor'
+        )
+        if (constructor && constructor.parameters && constructor.parameters.parameters && constructor.parameters.parameters.length > 0) {
+          inheritedConstructors.push(constructor)
+        }
+      }
+    }
+
+    if (inheritedConstructors.length === 0) {
+      if (tree.debug) console.log(`[registerInheritedConstructorParams] No inherited constructors with parameters found`)
+      return
+    }
+
+    if (tree.debug) {
+      console.log(`[registerInheritedConstructorParams] Found ${inheritedConstructors.length} inherited constructors with parameters`)
+    }
+
+    // Calculate starting stack index for inherited constructor parameters
+    // Main constructor params start at index 0, inherited constructor params follow
+    const mainConstructorParamCount = functionDefinition.parameters?.parameters?.length || 0
+    let currentStackIndex = mainConstructorParamCount
+
+    // Process inherited constructors in reverse order (last inherited first)
+    for (let i = 0; i < inheritedConstructors.length; i++) {
+      const inheritedConstructor = inheritedConstructors[i]
+      const parameterList = inheritedConstructor.parameters
+      const paramCount = parameterList.parameters.length
+
+      if (tree.debug) {
+        console.log(`[registerInheritedConstructorParams] Processing inherited constructor from contract ${contractsById[inheritedConstructor.parent]?.name || 'unknown'}`)
+        console.log(`  - Parameter count: ${paramCount}`)
+        console.log(`  - Starting stack index: ${currentStackIndex}`)
+      }
+
+      // Register parameters for this inherited constructor
+      for (let j = 0; j < paramCount; j++) {
+        const param = parameterList.parameters[j]
+        const stackIndex = currentStackIndex + j
+
+        // Ensure stack index is valid
+        if (stackIndex < 0 || stackIndex >= stackLength) {
+          if (tree.debug) console.warn(`[registerInheritedConstructorParams] Invalid stack index ${stackIndex} for inherited parameter ${param.name}`)
+          continue
+        }
+
+        let location = extractLocationFromAstVariable(param)
+        location = location === 'default' ? 'memory' : location
+        const attributesName = param.name === '' ? `$inherited_${i}_${j}` : `inherited_${param.name}`
+
+        const newParam = {
+          name: attributesName,
+          type: parseType(param.typeDescriptions.typeString, states, contractObj.name, location),
+          stackIndex: stackIndex,
+          sourceLocation: sourceLocation,
+          abi: contractObj.contract.abi,
+          isParameter: true,
+          isReturnParameter: false,
+          isInheritedConstructorParam: true,
+          declarationStep: step,
+          safeToDecodeAtStep: step,
+          scope: inheritedConstructor.body?.id,
+          id: param.id,
+          inheritedFrom: contractsById[inheritedConstructor.parent]?.name || 'unknown'
+        }
+
+        tree.scopes[scopeId].locals[attributesName] = newParam
+        if (!tree.variables[param.id]) tree.variables[param.id] = newParam
+
+        // Bind parameter to symbolic stack with lifecycle tracking
+        tree.symbolicStackManager.bindVariableWithLifecycle(step + 1, newParam, stackIndex, 'assigned', scopeId)
+
+        if (tree.debug) {
+          console.log(`[registerInheritedConstructorParams] Bound inherited parameter: ${attributesName} at stack index ${stackIndex} from ${newParam.inheritedFrom}`)
+        }
+      }
+
+      currentStackIndex += paramCount
+    }
+
+  } catch (error) {
+    console.error('Error in registerInheritedConstructorParams:', error)
+  }
 }
 
 /**
@@ -675,6 +795,7 @@ export function debugVariableTracking(tree: InternalCallTree, step: number, scop
 export async function resolveNodesAtSourceLocation (tree, sourceLocation, generatedSources, address) {
   const ast = await tree.solidityProxy.ast(sourceLocation, generatedSources, address)
   let funcDef
+  let contractDef
   const blocksDef = []
   if (ast) {
     const nodes = nodesAtPosition(null, sourceLocation.start, { ast })
@@ -690,12 +811,15 @@ export async function resolveNodesAtSourceLocation (tree, sourceLocation, genera
           funcDef = node
           blocksDef.push(node)
         }
+        if (node && node.nodeType === 'ContractDefinition') {
+          contractDef = node
+        }
       }
     }
 
-    return { nodes, functionDefinition: funcDef, blocksDefinition: blocksDef }
+    return { nodes, functionDefinition: funcDef, contractDefinition: contractDef, blocksDefinition: blocksDef }
   } else {
-    return { nodes: [], functionDefinition: null, blocksDefinition: []}
+    return { nodes: [], functionDefinition: null, contractDefinition: null, blocksDefinition: []}
   }
 }
 

@@ -203,16 +203,6 @@ export class InternalCallTree {
   gasCostPerLine
   /** Converter for transforming source offsets to line/column positions */
   offsetToLineColumnConverter
-  /** VM trace index where pending constructor execution is expected to start */
-  pendingConstructorExecutionAt: number
-  /** AST node ID of the pending constructor */
-  pendingConstructorId: number
-  /** Pending constructor function definition waiting for execution */
-  pendingConstructor
-  /** Pending constructor entry stack index */
-  pendingConstructorEntryStackIndex
-  /** Map tracking which constructors have started execution and at what source location offset */
-  constructorsStartExecution
   /** Map of variable IDs to their metadata (name, type, stackIndex, sourceLocation, declarationStep, safeToDecodeAtStep) */
   variables: {
     [Key: number]: any
@@ -241,7 +231,7 @@ export class InternalCallTree {
     * @param {Object} opts  - { includeLocalVariables, debugWithGeneratedSources }
     */
   constructor (debuggerEvent, traceManager, solidityProxy, codeManager, opts, offsetToLineColumnConverter?) {
-    this.debug = opts.debug || false
+    this.debug = opts.debug || true
     this.getCache = opts.getCache
     this.includeLocalVariables = opts.includeLocalVariables
     this.debugWithGeneratedSources = opts.debugWithGeneratedSources
@@ -312,11 +302,6 @@ export class InternalCallTree {
     this.astWalker = new AstWalker()
     this.reducedTrace = []
     this.locationAndOpcodePerVMTraceIndex = {}
-    this.pendingConstructorExecutionAt = -1
-    this.pendingConstructorId = -1
-    this.constructorsStartExecution = {}
-    this.pendingConstructorEntryStackIndex = -1
-    this.pendingConstructor = null
     this.variables = {}
     this.symbolicStackManager.reset()
     this.mergedScope = {}
@@ -766,12 +751,12 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
     // check if there is a function at destination - but only for AST node resolution
     const contractObj = await tree.solidityProxy.contractObjectAtAddress(address)
     const generatedSources = getGeneratedSources(tree, scopeId, contractObj)
-    const { nodes, blocksDefinition, functionDefinition } = await resolveNodesAtSourceLocation(tree, sourceLocation, generatedSources, address)
+    const { nodes, blocksDefinition, functionDefinition, contractDefinition } = await resolveNodesAtSourceLocation(tree, validSourceLocation || sourceLocation, generatedSources, address)
 
     if (!tree.scopes[scopeId].functionDefinition && stepDetail.op === 'JUMPDEST' && functionDefinition && (tree.scopes[scopeId].firstStep === step - 1 || tree.scopes[scopeId].firstStep === step - 2)) {
       tree.scopes[scopeId].functionDefinition = functionDefinition
       tree.scopes[scopeId].lowLevelScope = false
-      await registerFunctionParameters(tree, functionDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
+      await registerFunctionParameters(tree, functionDefinition, contractDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
     }
 
     // if the first step of the execution leads to invalid source (generated code), we consider it a low level scope.
@@ -829,7 +814,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
           tree.scopes[newScopeId].functionDefinition = functionDefinition
           tree.scopes[newScopeId].lowLevelScope = false
           // Register function parameters when entering new function scope (internal calls or external calls)
-          await registerFunctionParameters(tree, functionDefinition, step, newScopeId, contractObj, sourceLocation, address)
+          await registerFunctionParameters(tree, functionDefinition, contractDefinition, step, newScopeId, contractObj, sourceLocation, address)
         }
         let externalCallResult
         try {
@@ -857,7 +842,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, fun
         console.error(e)
         return { outStep: step, error: 'InternalCallTree - ' + e.message }
       }
-    } else if (callDepthChange(step, tree.traceManager.trace) || isStopInstruction(stepDetail) || isReturnInstruction(stepDetail) || (isJumpOutOfFunction && !originIsCall) || isRevert || isConstructorExit(tree, step, scopeId, tree.pendingConstructorEntryStackIndex, stepDetail, isConstructor)) {
+    } else if (callDepthChange(step, tree.traceManager.trace) || isStopInstruction(stepDetail) || isReturnInstruction(stepDetail) || (isJumpOutOfFunction && !originIsCall) || isRevert) {
       const popCount = countConsecutivePopOpcodes(tree.traceManager.trace, step)
       // if not, we might be returning from a CALL or internal function. This is what is checked here.
       // For constructors in inheritance chains, we also check if stack depth has returned to entry level
