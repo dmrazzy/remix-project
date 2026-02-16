@@ -43,7 +43,7 @@ class EmitSoljsonPlugin {
             })
             if (RawSource) {
               // Match previous public path: assets/js/soljson.js
-              // compilation.emitAsset('assets/js/soljson.js', new RawSource(data))
+              compilation.emitAsset('assets/js/soljson.js', new RawSource(data))
             }
           } catch (e) {
             console.warn('EmitSoljsonPlugin: skipping emit due to error:', e.message)
