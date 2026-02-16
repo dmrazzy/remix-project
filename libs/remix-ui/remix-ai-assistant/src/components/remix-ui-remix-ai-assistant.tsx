@@ -68,6 +68,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     'none'
   )
   const [showArchivedConversations, setShowArchivedConversations] = useState(false)
+  const [showButton, setShowButton] = useState(true);
+
   const [aiAssistantHeight, setAiAssistantHeight] = useState(window.innerHeight < 750 ? 87 : window.innerHeight < 1000 ? 89.6 : 92)
 
   // Check if MCP is enabled via query parameter
@@ -1001,6 +1003,45 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     await props.plugin.call('layout', 'maximiseRightSidePanel')
   }
 
+  const [modelOpt, setModelOpt] = useState({ top: 0, left: 0 })
+  const menuRef = useRef<any>()
+
+  useEffect(() => {
+    if (showAssistantOptions && modelBtnRef.current && menuRef.current) {
+      // Use requestAnimationFrame to ensure menu is rendered and has dimensions
+      requestAnimationFrame(() => {
+        const modelBtn = modelBtnRef.current
+        const menu = menuRef.current
+
+        if (modelBtn && menu) {
+          const modelBtnRect = modelBtn.getBoundingClientRect()
+          const menuHeight = menu.offsetHeight
+
+          // Position menu above the button using fixed positioning (viewport coordinates)
+          // Align menu's right edge with button's right edge
+          setModelOpt({
+            top: modelBtnRect.top - menuHeight - 8,
+            left: modelBtnRect.right - 80 // Small gap from the right edge
+          })
+        }
+      })
+    }
+  }, [showAssistantOptions])
+
+  useEffect(() => {
+    props.plugin.on('rightSidePanel', 'rightSidePanelMaximized', () => {
+      setShowButton(false);
+    })
+    props.plugin.on('rightSidePanel', 'rightSidePanelRestored', () => {
+      setShowButton(true);
+    })
+
+    return () => {
+      props.plugin.off('rightSidePanel', 'rightSidePanelMaximized');
+      props.plugin.off('rightSidePanel', 'rightSidePanelRestored');
+    }
+  }, [])
+
   return (
     <div
       className="d-flex flex-column w-100 h-100"
@@ -1036,6 +1077,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               showHistorySidebar={props.showHistorySidebar || false}
               archiveChat={props.onArchiveConversation || (() => {})}
               currentConversationId={props.currentConversationId}
+              showButton={showButton}
+              setShowButton={setShowButton}
             />
             <section id="remix-ai-chat-history" className="d-flex flex-column p-2" style={{ flex: 1, overflow: 'auto', minHeight: 0 }} ref={chatHistoryRef}>
               <div data-id="remix-ai-assistant-ready"></div>
@@ -1101,6 +1144,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                 showHistorySidebar={props.showHistorySidebar || false}
                 archiveChat={props.onArchiveConversation || (() => {})}
                 currentConversationId={props.currentConversationId}
+                showButton={showButton}
+                setShowButton={setShowButton}
               />
               <section id="remix-ai-chat-history" className="d-flex flex-column p-2" style={{ flex: 1, overflow: 'auto', minHeight: 0 }} ref={chatHistoryRef}>
                 <div data-id="remix-ai-assistant-ready"></div>
