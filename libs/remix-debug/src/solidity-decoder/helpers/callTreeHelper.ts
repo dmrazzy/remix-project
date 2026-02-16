@@ -40,7 +40,7 @@ export function isConstructorExit (tree, step, scopeId, initialEntrystackIndex, 
     return false
   }
   // Check if stack has returned to entry depth (or below, in case of cleanup)
-  if (initialEntrystackIndex !== undefined && stepDetail.stack.length <= initialEntrystackIndex) {
+  if (initialEntrystackIndex && stepDetail.stack.length <= initialEntrystackIndex) {
     console.log('Exiting constructor scope ', scopeId, ' at step ', step)
     return true
   }
