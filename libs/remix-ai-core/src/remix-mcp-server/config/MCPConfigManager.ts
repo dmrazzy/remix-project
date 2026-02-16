@@ -54,6 +54,7 @@ export class MCPConfigManager {
 
   async loadConfig(): Promise<MCPConfig> {
     try {
+      await this.waitForWorkspace();
       const exists = await this.plugin.call('fileManager', 'exists', this.configPath);
 
       if (exists) {
@@ -63,7 +64,7 @@ export class MCPConfigManager {
         if (!configContent || configContent.trim() === '') {
           console.log('[MCPConfigManager] Config file is empty, creating default');
           this.config = minimalMCPConfig;
-          await this.saveConfigWithWorkspaceCheck(this.config);
+          await this.saveConfig(this.config);
           return this.config;
         }
 
@@ -86,17 +87,17 @@ export class MCPConfigManager {
           } else {
             console.log('[MCPConfigManager] No mcp config in file, creating default');
             this.config = minimalMCPConfig;
-            await this.saveConfigWithWorkspaceCheck(this.config);
+            await this.saveConfig(this.config);
           }
         } catch (parseError) {
           console.error('[MCPConfigManager] Error parsing config file, creating default:', parseError);
           this.config = minimalMCPConfig;
-          await this.saveConfigWithWorkspaceCheck(this.config);
+          await this.saveConfig(this.config);
         }
       } else {
         console.log('[MCPConfigManager] Config file does not exist, creating default');
         this.config = minimalMCPConfig;
-        await this.saveConfigWithWorkspaceCheck(this.config);
+        await this.saveConfig(this.config);
       }
 
       return this.config;
@@ -116,17 +117,22 @@ export class MCPConfigManager {
     }
   }
 
-  private async waitForWorkspace(timeout: number = 10000, interval: number = 200): Promise<boolean> {
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeout) {
-      if (await this.isWorkspaceReady()) {
-        console.log('[MCPConfigManager] Workspace is ready');
-        return true;
-      }
-      await new Promise(resolve => setTimeout(resolve, interval));
+  private async waitForWorkspace(): Promise<boolean> {
+    if (await this.isWorkspaceReady()) {
+      console.log('[MCPConfigManager] Workspace is already ready');
+      return true;
     }
-    return false;
+
+    return new Promise<boolean>((resolve) => {
+      const checkAndResolve = async () => {
+        if (await this.isWorkspaceReady()) {
+          console.log('[MCPConfigManager] Workspace is ready');
+          resolve(true);
+        }
+      };
+
+      this.plugin.once('filePanel', 'setWorkspace', checkAndResolve);
+    });
   }
 
   async saveConfigWithWorkspaceCheck(config: MCPConfig): Promise<void> {
@@ -212,7 +218,7 @@ export class MCPConfigManager {
     const permissions = this.config.security.fileWritePermissions || {
       mode: 'ask' as const,
       allowedFiles: [],
-      lastPrompted: null
+      lastPrompted: undefined
     };
     return permissions;
   }
@@ -232,7 +238,7 @@ export class MCPConfigManager {
       config.security.fileWritePermissions = {
         mode: 'ask',
         allowedFiles: [],
-        lastPrompted: null
+        lastPrompted: undefined
       };
     }
 
@@ -240,7 +246,7 @@ export class MCPConfigManager {
     perms.mode = mode;
     perms.lastPrompted = new Date().toISOString();
 
-    if (mode === 'allow-specific' && filePath) {
+    if (mode === 'allow-specific' && filePath && perms.allowedFiles) {
       if (!perms.allowedFiles.includes(filePath)) {
         perms.allowedFiles.push(filePath);
       }
