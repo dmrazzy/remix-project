@@ -11,6 +11,7 @@ interface IRemixDragBarUi {
   enhanceTrigger: number
   resetTrigger: number
   layoutPosition: 'left' | 'right'
+  maximiseCoeff?: number
 }
 
 const DragBar = (props: IRemixDragBarUi) => {
@@ -51,8 +52,8 @@ const DragBar = (props: IRemixDragBarUi) => {
           setDragBarPosX(offset + width)
         }, 300)
       } else if (layoutPosition === 'right') {
-        // Use a smaller coefficient for the right panel
-        const rightCoeff = 0.25
+        // Use coefficient from props if provided, otherwise default to 0.25
+        const rightCoeff = props.maximiseCoeff !== undefined ? props.maximiseCoeff : 0.25
         const width = rightCoeff * window.innerWidth
 
         refObject.current.style.width = width + 'px'
@@ -66,7 +67,7 @@ const DragBar = (props: IRemixDragBarUi) => {
   useEffect(() => {
     // Only use 0.4 for left, right will use its own value in triggerWidth
     triggerWidth(props.maximiseTrigger, props.layoutPosition, props.refObject, 0.4)
-  }, [props.maximiseTrigger])
+  }, [props.maximiseTrigger, props.maximiseCoeff])
 
   useEffect(() => {
     triggerWidth(props.enhanceTrigger, props.layoutPosition, props.refObject, 0.25)

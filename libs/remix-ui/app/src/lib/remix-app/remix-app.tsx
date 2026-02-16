@@ -34,6 +34,7 @@ const RemixApp = (props: IRemixAppUi) => {
   const [maximiseRightTrigger, setMaximiseRightTrigger] = useState<number>(0)
   const [enhanceRightTrigger, setEnhanceRightTrigger] = useState<number>(0)
   const [resetRightTrigger, setResetRightTrigger] = useState<number>(0)
+  const [rightPanelCoeff, setRightPanelCoeff] = useState<number>(0.25)
   const [online, setOnline] = useState<boolean>(true)
   const [locale, setLocale] = useState<{ code: string; messages: any }>({
     code: 'en',
@@ -131,7 +132,9 @@ const RemixApp = (props: IRemixAppUi) => {
       })
     })
 
-    props.app.layout.event.on('maximiseRightSidePanel', () => {
+    props.app.layout.event.on('maximiseRightSidePanel', (pluginName) => {
+      // Set coefficient to 0.4 for debugger to match left panel width, 0.25 for others
+      setRightPanelCoeff(pluginName === 'debugger' ? 0.4 : 0.25)
       setMaximiseRightTrigger((prev) => {
         return prev + 1
       })
@@ -239,6 +242,7 @@ const RemixApp = (props: IRemixAppUi) => {
                       enhanceTrigger={enhanceRightTrigger}
                       resetTrigger={resetRightTrigger}
                       maximiseTrigger={maximiseRightTrigger}
+                      maximiseCoeff={rightPanelCoeff}
                       minWidth={331}
                       refObject={pinnedPanelRef}
                       hidden={hidePinnedPanel}
