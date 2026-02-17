@@ -15,7 +15,7 @@ module.exports = {
   'Should open submenu and close both menus on selection #group1': function (browser: NightwatchBrowser) {
    browser
       .clickLaunchIcon('udapp')
-      .switchEnvironment('vm-cancun')
+      .switchEnvironment('vm-cancun', 'Remix_VM')
       .assert.containsText('[data-id="selected-provider-vm-cancun"]', 'Remix VM')
   },
 

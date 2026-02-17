@@ -424,7 +424,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                         const inputTypes = funcABI.inputs.map(input => input.type).join(', ')
 
                         return (
-                          <div key={funcIndex} className="mb-1 px-0 py-2 rounded">
+                          <div key={funcIndex} className="mb-1 px-0 py-2 rounded" data-id={`contractItem-${funcIndex}`}>
                             <div className="d-flex align-items-center mb-2" key={funcIndex}>
                               {
                                 funcABI.stateMutability === 'view' || funcABI.stateMutability === 'pure' ?

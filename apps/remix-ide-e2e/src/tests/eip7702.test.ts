@@ -12,7 +12,7 @@ module.exports = {
     let addressDelegate
     browser
       .clickLaunchIcon('udapp')
-      .switchEnvironment('vm-prague')
+      .switchEnvironment('vm-prague', 'Remix_VM')
       .addFile('delegate.sol', { content: delegate })
       .clickLaunchIcon('solidity')
       .setSolidityCompilerVersion('soljson-v0.8.28+commit.7893614a.js')
@@ -56,7 +56,7 @@ module.exports = {
     browser
       .refresh()
       .clickLaunchIcon('udapp')
-      .switchEnvironment('vm-prague')
+      .switchEnvironment('vm-prague', 'Remix_VM')
       .waitForElementVisible('*[data-id="delete-delegation"]')
       .selectAccount('0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2')
       .waitForElementNotPresent('*[data-id="delete-delegation"]')
@@ -73,7 +73,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="terminalJournal"]', `Delegation for 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4 removed.`)
       .refresh()
       .clickLaunchIcon('udapp')
-      .switchEnvironment('vm-prague')
+      .switchEnvironment('vm-prague', 'Remix_VM')
       .waitForElementNotPresent('*[data-id="delete-delegation"]')
   }
 }

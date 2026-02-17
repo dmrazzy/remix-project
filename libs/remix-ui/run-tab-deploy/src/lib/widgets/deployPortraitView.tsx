@@ -25,7 +25,7 @@ function DeployPortraitView() {
   const [inputValues, setInputValues] = useState<{[key: number]: string}>({})
   const [expandedProxyInputs, setExpandedProxyInputs] = useState<Set<number>>(new Set())
   const [proxyInputValues, setProxyInputValues] = useState<{[key: number]: string}>({})
-  const [deployWithProxy, setDeployWithProxy] = useState<boolean>(true)
+  const [deployWithProxy, setDeployWithProxy] = useState<boolean>(false)
   const [upgradeWithProxy, setUpgradeWithProxy] = useState<boolean>(false)
   const [isContractMenuOpen, setIsContractMenuOpen] = useState(false)
   const [proxyDeployments, setProxyDeployments] = useState<Array<{ address: string, date: Date, contractName: string }>>([])
@@ -423,11 +423,11 @@ function DeployPortraitView() {
               <>
                 <div className="d-flex align-items-center justify-content-between">
                   <div className='d-flex align-items-center'>
-                    <span className="fw-light">Deploy with Proxy</span>
+                    <span className="fw-light" data-id="contractGUIDeployWithProxyLabel">Deploy with Proxy</span>
                   </div>
                   <div className="toggle-container">
                     <div
-                      data-id={`deployWithProxyToggle`}
+                      data-id="contractGUIDeployWithProxy"
                       aria-label={`Deploy with Proxy`}>
                       <ToggleSwitch
                         id={`deployWithProxyToggle`}
@@ -444,11 +444,11 @@ function DeployPortraitView() {
                 </div>
                 <div className="d-flex align-items-center justify-content-between pb-2">
                   <div className='d-flex align-items-center'>
-                    <span className="fw-light">Upgrade with Proxy</span>
+                    <span className="fw-light" data-id="contractGUIUpgradeImplementationLabel">Upgrade with Proxy</span>
                   </div>
                   <div className="toggle-container">
                     <div
-                      data-id={`upgradeWithProxyToggle`}
+                      data-id="contractGUIUpgradeImplementation"
                       aria-label={`Upgrade with Proxy`}>
                       <ToggleSwitch
                         id={`upgradeWithProxyToggle`}
@@ -537,6 +537,7 @@ function DeployPortraitView() {
                             {!isExpanded && (
                               <div className="position-relative flex-fill input-with-copy-hover">
                                 <input
+                                  data-id={`proxyInput-${index}`}
                                   type="text"
                                   className="form-control form-control-sm border-0"
                                   placeholder={input.type}

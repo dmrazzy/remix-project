@@ -32,9 +32,9 @@ class TestConstantFunction extends EventEmitter {
       })
       .click(`[data-id="deployedContractItem-${instanceIndex}-button-${functionIndex}"]`)
       .pause(2000)
-      .waitForElementPresent(`[data-id="udapp_value"]`)
+      .waitForElementPresent(`[data-id="contractItem-${functionIndex}"] > [data-id="udapp_value"]`)
       .assert.containsText(
-        `[data-id="udapp_value"]`,
+        `[data-id="contractItem-${functionIndex}"] > [data-id="udapp_value"]`,
         expectedOutput
       )
       .perform(() => {
