@@ -4,7 +4,7 @@ import * as helper from './helper'
 const { ethers } = require('ethers')
 
 module.exports = async function (st, privateKey, contractBytecode, compilationResult, contractCode) {
-  const enableCtorTest = false
+  const enableCtorTest = true
   // Test scenarios with expected parameter values
   const testCases = [
     {
@@ -57,7 +57,8 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
     }
   ]
 
-  st.plan((testCases.length * 3) + 2 + 2 + 1) // 2 Additional tests for internalCallTest + 2 Additional tests for thisCallTest + 1 Additional test for create2Test (salt param)
+  const nbCtorTests = 6
+  st.plan(nbCtorTests + (testCases.length * 3) + 2 + 2 + 1) // 2 Additional tests for internalCallTest + 2 Additional tests for thisCallTest + 1 Additional test for create2Test (salt param)
 
   // Helper function to encode parameters
   function encodeParams(signature: string, params: any[]): string {
@@ -107,40 +108,39 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
         await helper.setupDebugger(privateKey, deployBytecode, compilationResult, contractCode)
 
       const { scopes: deployScopes, scopeStarts: deployScopeStarts } = await waitForDeployCallTree()
-      const deployNestedScopes: NestedScope[] = deployCallTree.getScopesAsNestedJSON('nojump')
 
       // Test inherited constructor parameters
-      const baseConstructorScope = findFunctionScope(deployNestedScopes, 'constructor')
-      if (baseConstructorScope) {
-        console.log(`Testing constructor parameters at step ${baseConstructorScope.firstStep}`)
+      console.log(`Testing constructor parameters at step 730`)
 
-        const symbolicStack = deployCallTree.getSymbolicStackAtStep(baseConstructorScope.firstStep)
-        console.log('Constructor symbolic stack:', symbolicStack)
+      await helper.decodeLocals(st, 730, deployTraceManager, deployCallTree, (locals) => {
+        console.log('Constructor locals:', Object.keys(locals))
 
-        await helper.decodeLocals(st, baseConstructorScope.firstStep + 1, deployTraceManager, deployCallTree, (locals) => {
-          console.log('Constructor locals:', Object.keys(locals))
+        // Look for constructor parameters
+        if (locals['_constructorValue']) {
+          st.equals(locals['_constructorValue'].value, '42', 'Constructor uint parameter should be decoded correctly')
+        }
+        if (locals['_constructorMessage']) {
+          st.equals(locals['_constructorMessage'].value, 'ConstructorTest', 'Constructor string parameter should be decoded correctly')
+        }
 
-          // Look for constructor parameters
-          if (locals['_constructorValue']) {
-            st.equals(locals['_constructorValue'].value, '42', 'Constructor uint parameter should be decoded correctly')
-          }
-          if (locals['_constructorMessage']) {
-            st.equals(locals['_constructorMessage'].value, 'ConstructorTest', 'Constructor string parameter should be decoded correctly')
-          }
+        st.ok(Object.keys(locals).length === 2, 'Constructor should have decoded local variables')
+      })
 
-          // Also check inherited constructor parameters
-          if (locals['_baseValue']) {
-            st.equals(locals['_baseValue'].value, '52', 'Base constructor uint parameter should be decoded correctly (42 + 10)')
-          }
-          if (locals['_baseMessage']) {
-            st.equals(locals['_baseMessage'].value, 'Base: ConstructorTest', 'Base constructor string parameter should be decoded correctly')
-          }
+      console.log(`Testing inherit constructor parameters at step 536`)
 
-          st.ok(Object.keys(locals).length > 0, 'Constructor should have decoded local variables')
-        })
-      } else {
-        st.fail('Could not find constructor scope for parameter testing')
-      }
+      await helper.decodeLocals(st, 536, deployTraceManager, deployCallTree, (locals) => {
+        console.log('Constructor locals:', Object.keys(locals))
+
+        // Also check inherited constructor parameters
+        if (locals['_baseValue']) {
+          st.equals(locals['_baseValue'].value, '52', 'Base constructor uint parameter should be decoded correctly (42 + 10)')
+        }
+        if (locals['_baseMessage']) {
+          st.equals(locals['_baseMessage'].value, 'Base: ConstructorTest', 'Base constructor string parameter should be decoded correctly')
+        }
+
+        st.ok(Object.keys(locals).length === 2, 'Constructor should have decoded local variables')
+      })
     }
 
     // Now test each function call scenario
