@@ -204,7 +204,8 @@ const tests = {
       }, [])
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
-      // Trigger file write via AI plugin's MCP server
+      .pause(1000)
+      // Trigger file write via AI plugin's MCP server (fire-and-forget, modal blocks resolution)
       .execute(function () {
         const aiPlugin = (window as any).getRemixAIPlugin;
         if (aiPlugin && aiPlugin.remixMCPServer) {
@@ -216,14 +217,19 @@ const tests = {
       })
       // First modal - Click Allow
       .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 30000)
+      .pause(500)
       .modalFooterOKClick("mcp_file_write_permission_initial")
       // Second modal - Click "All Files in Project" (Cancel button)
       .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 30000)
+      .pause(500)
       .modalFooterCancelClick("mcp_file_write_permission_scope") // Clicks "All Files in Project"
       .useXpath()
       .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
+      .pause(500)
       .click('//button[contains(text(), "Accept All")]')
       .useCss()
+      .pause(1000)
+      // Verify config has allow-all mode
       .executeAsyncScript(function (done: (result: any) => void) {
         (window as any).getRemixAIPlugin.call('fileManager', 'readFile', 'remix.config.json')
           .then((result: any) => done(result))
@@ -250,6 +256,7 @@ const tests = {
           done({ error: 'AI plugin not available' });
         }
       }, [])
+      .pause(1000)
       // Verify no modal appeared (modal should not be visible)
       .elements('css selector', '*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', function (result) {
         const elements = Array.isArray(result.value) ? result.value : [];
