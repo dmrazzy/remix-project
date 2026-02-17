@@ -115,7 +115,8 @@ let requiredModules = [
   'udappEnv',
   'udappDeploy',
   'udappDeployedContracts',
-  'udappTransactions'
+  'udappTransactions',
+  'txRunner'
 ]
 
 // dependentModules shouldn't be manually activated (e.g hardhat is activated by remixd)
@@ -190,7 +191,8 @@ export function isNative(name) {
     'udappEnv',
     'udappDeploy',
     'udappDeployedContracts',
-    'udappTransactions'
+    'udappTransactions',
+    'txRunner'
   ]
   return nativePlugins.includes(name) || requiredModules.includes(name) || isInjectedProvider(name) || isVM(name) || isScriptRunner(name)
 }
