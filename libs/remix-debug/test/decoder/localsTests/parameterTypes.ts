@@ -109,8 +109,6 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
       const { scopes: deployScopes, scopeStarts: deployScopeStarts } = await waitForDeployCallTree()
       const deployNestedScopes: NestedScope[] = deployCallTree.getScopesAsNestedJSON('nojump')
 
-      console.log(deployNestedScopes)
-
       // Test inherited constructor parameters
       const baseConstructorScope = findFunctionScope(deployNestedScopes, 'constructor')
       if (baseConstructorScope) {
@@ -165,7 +163,7 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
 
       const { scopes, scopeStarts } = await waitForCallTree()
       const nestedScopes: NestedScope[] = callTree.getScopesAsNestedJSON('nojump')
-
+      console.log(nestedScopes)
       // Find the target function scope
       const functionScope = findFunctionScope(nestedScopes, testCase.name)
 
