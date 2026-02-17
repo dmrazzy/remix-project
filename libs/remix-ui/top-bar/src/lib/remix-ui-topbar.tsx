@@ -6,6 +6,7 @@ import { Button, Dropdown } from 'react-bootstrap'
 import { CustomToggle, CustomTopbarMenu } from 'libs/remix-ui/helper/src/lib/components/custom-dropdown'
 import { WorkspaceMetadata } from 'libs/remix-ui/workspace/src/lib/types'
 import { AppContext, platformContext } from 'libs/remix-ui/app/src/lib/remix-app/context/context'
+import { useAuth } from 'libs/remix-ui/app/src/lib/remix-app/context/auth-context'
 import { FormattedMessage, useIntl } from 'react-intl'
 import { TopbarContext } from '../context/topbarContext'
 import { WorkspacesDropdown } from '../components/WorkspaceDropdown'
@@ -58,6 +59,9 @@ export function RemixUiTopbar() {
   const [feedbackFormUrl, setFeedbackFormUrl] = useState<string | null>(null);
   const [feedbackPanelOpen, setFeedbackPanelOpen] = useState<boolean>(false);
 
+  // Auth state for cloud backup/restore
+  const { isAuthenticated } = useAuth()
+
   // Use the clone repository modal hook
   const { showCloneModal } = useCloneRepositoryModal({
     intl,
@@ -109,10 +113,6 @@ export function RemixUiTopbar() {
     setError(null);
   };
 
-  const handleLoginError = (error: string) => {
-    setError(error);
-  };
-
   async function openTemplateExplorer(): Promise<void> {
     await global.plugin.call('templateexplorermodal', 'updateTemplateExplorerInFileMode', false)
     appContext.appStateDispatch({
@@ -120,11 +120,6 @@ export function RemixUiTopbar() {
       payload: true
     })
   }
-
-  const handleLogout = () => {
-    localStorage.removeItem('github_token');
-    setUser(null);
-  };
 
   const toggleDropdown = (isOpen: boolean) => {
     setShowDropdown(isOpen)
@@ -273,6 +268,7 @@ export function RemixUiTopbar() {
       branches: workspace.branches,
       currentBranch: workspace.currentBranch,
       hasGitSubmodules: workspace.hasGitSubmodules,
+      remoteId: workspace.remoteId,
       submenu: subItems
     }))
     setMenuItems(menuItems)
@@ -351,6 +347,7 @@ export function RemixUiTopbar() {
       console.error(e)
     }
   }
+
   const onFinishDeleteAllWorkspaces = async () => {
     try {
       await deleteAllWorkspacesAction()

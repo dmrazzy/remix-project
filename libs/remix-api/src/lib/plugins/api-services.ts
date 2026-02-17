@@ -20,6 +20,16 @@ import {
   GenericSuccessResponse,
   CreditTransaction,
   RefreshTokenResponse,
+  StorageHealthResponse,
+  StorageConfig,
+  PresignUploadRequest,
+  PresignUploadResponse,
+  PresignDownloadRequest,
+  PresignDownloadResponse,
+  StorageFile,
+  StorageFilesResponse,
+  StorageListOptions,
+  WorkspacesResponse,
   PermissionsResponse,
   FeatureCheckResponse,
   MultiFeatureCheckResponse,
@@ -182,6 +192,96 @@ export class CreditsApiService {
     
     const query = params.toString()
     return this.apiClient.get(`/transactions${query ? '?' + query : ''}`)
+  }
+}
+
+/**
+ * Storage API Service - All storage-related endpoints with full TypeScript typing
+ * Provides an abstraction layer for cloud storage operations (S3, etc.)
+ */
+export class StorageApiService {
+  constructor(private apiClient: IApiClient) {}
+  
+  /**
+   * Get the underlying API client
+   */
+  getApiClient(): IApiClient {
+    return this.apiClient
+  }
+  
+  // ==================== Health & Config ====================
+  
+  /**
+   * Check storage service health
+   */
+  async health(): Promise<ApiResponse<StorageHealthResponse>> {
+    return this.apiClient.get<StorageHealthResponse>('/health')
+  }
+  
+  /**
+   * Get storage configuration (limits, allowed types)
+   */
+  async getConfig(): Promise<ApiResponse<StorageConfig>> {
+    return this.apiClient.get<StorageConfig>('/config')
+  }
+  
+  // ==================== Presigned URLs ====================
+  
+  /**
+   * Get a presigned URL for uploading a file
+   * @param request - Upload request with filename, folder, and content type
+   * @returns Presigned URL and headers to use for direct S3 upload
+   */
+  async getUploadUrl(request: PresignUploadRequest): Promise<ApiResponse<PresignUploadResponse>> {
+    return this.apiClient.post<PresignUploadResponse>('/presign/upload', request)
+  }
+  
+  /**
+   * Get a presigned URL for downloading a file
+   * @param request - Download request with filename and optional folder
+   * @returns Presigned URL for direct S3 download
+   */
+  async getDownloadUrl(request: PresignDownloadRequest): Promise<ApiResponse<PresignDownloadResponse>> {
+    return this.apiClient.post<PresignDownloadResponse>('/presign/download', request)
+  }
+  
+  // ==================== File Management ====================
+  
+  /**
+   * List user's files
+   * @param options - Optional filtering and pagination
+   */
+  async listFiles(options?: StorageListOptions): Promise<ApiResponse<StorageFilesResponse>> {
+    const params = new URLSearchParams()
+    if (options?.folder) params.set('folder', options.folder)
+    if (options?.limit !== undefined) params.set('limit', options.limit.toString())
+    if (options?.cursor) params.set('cursor', options.cursor)
+    
+    const query = params.toString()
+    return this.apiClient.get<StorageFilesResponse>(`/files${query ? '?' + query : ''}`)
+  }
+  
+  /**
+   * Get metadata for a specific file
+   * @param filename - The filename (can include folder path)
+   */
+  async getFileMetadata(filename: string): Promise<ApiResponse<StorageFile>> {
+    return this.apiClient.get<StorageFile>(`/files/${encodeURIComponent(filename)}`)
+  }
+  
+  /**
+   * Delete a file
+   * @param filename - The filename to delete (can include folder path)
+   */
+  async deleteFile(filename: string): Promise<ApiResponse<GenericSuccessResponse>> {
+    return this.apiClient.delete<GenericSuccessResponse>(`/files/${encodeURIComponent(filename)}`)
+  }
+
+  /**
+   * Get list of user's remote workspaces with backup info
+   */
+  async getWorkspaces(): Promise<ApiResponse<WorkspacesResponse>> {
+    return this.apiClient.get<WorkspacesResponse>('/workspaces')
   }
 }
 

@@ -584,6 +584,7 @@ export class AuthPlugin extends Plugin {
       // Update other API services too
       this.creditsApi.setToken(token)
       this.permissionsApi.setToken(token)
+      this.billingApi.setToken(token)
       this.inviteApi.setToken(token)
     }
 
@@ -621,20 +622,19 @@ export class AuthPlugin extends Plugin {
         this.apiClient.setToken(newAccessToken)
         this.creditsApi.setToken(newAccessToken)
         this.permissionsApi.setToken(newAccessToken)
+        this.billingApi.setToken(newAccessToken)
         this.inviteApi.setToken(newAccessToken)
 
         console.log('[AuthPlugin] Access token refreshed successfully')
         // Reschedule next proactive refresh
         this.scheduleRefresh(newAccessToken)
 
-        // Notify other plugins about the refreshed token
-        const userStr = localStorage.getItem('remix_user')
-        const user = userStr ? JSON.parse(userStr) : null
-        this.emit('authStateChanged', {
-          isAuthenticated: true,
-          user,
-          token: newAccessToken
-        })
+        // Notify all listeners about the new token
+        // Only emit tokenRefreshed — NOT authStateChanged.
+        // The user hasn't changed, only the token was refreshed.
+        // Emitting authStateChanged here would cause all consumers to re-initialize
+        // (reload configs, re-read S3 data, etc.) for no reason.
+        this.emit('tokenRefreshed', { token: newAccessToken })
 
         return newAccessToken
       }

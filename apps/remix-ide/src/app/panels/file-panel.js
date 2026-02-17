@@ -168,7 +168,8 @@ export default class Filepanel extends ViewPlugin {
         name: ws.name,
         isGitRepo: ws.isGitRepo || false,
         hasGitSubmodules: ws.hasGitSubmodules || false,
-        isGist: typeof ws.isGist === 'string' ? ws.isGist : null
+        isGist: typeof ws.isGist === 'string' ? ws.isGist : null,
+        remoteId: ws.remoteId || null
       }))
   }
 
