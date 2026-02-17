@@ -55,6 +55,8 @@ import { TransactionSimulator } from './app/plugins/transaction-simulator'
 import { CodeFormat } from './app/plugins/code-format'
 import { CompilationDetailsPlugin } from './app/plugins/compile-details'
 import { AuthPlugin } from './app/plugins/auth-plugin'
+import { S3StoragePlugin } from './app/plugins/storage/s3-storage-plugin'
+import { CloudWorkspacesPlugin } from './app/plugins/cloud-workspaces-plugin'
 import { InvitationManagerPlugin } from './app/plugins/invitation-manager-plugin'
 import { AccountPlugin } from './app/plugins/account-plugin'
 import { RemixGuidePlugin } from './app/plugins/remixGuide'
@@ -175,6 +177,8 @@ class AppComponent {
   templateExplorerModal: TemplateExplorerModalPlugin
   settings: SettingsTab
   authPlugin: AuthPlugin
+  s3StoragePlugin: S3StoragePlugin
+  cloudWorkspacesPlugin: CloudWorkspacesPlugin
   invitationManager: InvitationManagerPlugin
   accountPlugin: AccountPlugin
   params: any
@@ -615,6 +619,8 @@ class AppComponent {
     )
 
     this.authPlugin = new AuthPlugin()
+    this.s3StoragePlugin = new S3StoragePlugin()
+    this.cloudWorkspacesPlugin = new CloudWorkspacesPlugin()
     this.invitationManager = new InvitationManagerPlugin()
     const feedbackPlugin = new FeedbackPlugin()
 
@@ -631,6 +637,8 @@ class AppComponent {
       openZeppelinProxy,
       run.recorder,
       this.authPlugin,
+      this.s3StoragePlugin,
+      this.cloudWorkspacesPlugin,
       this.invitationManager,
       this.accountPlugin,
       feedbackPlugin
@@ -705,6 +713,16 @@ class AppComponent {
     ])
 
     await this.appManager.activatePlugin(['auth'])
+    // Activate/deactivate cloud plugins based on auth state
+    this.appManager.on('auth', 'authStateChanged', async (state: any) => {
+      if (state.isAuthenticated) {
+        await this.appManager.activatePlugin(['s3Storage'])
+        await this.appManager.activatePlugin(['cloudWorkspaces'])
+      } else {
+        await this.appManager.deactivatePlugin('cloudWorkspaces')
+        await this.appManager.deactivatePlugin('s3Storage')
+      }
+    })
     await this.appManager.activatePlugin(['invitationManager'])
     await this.appManager.activatePlugin(['account'])
     await this.appManager.activatePlugin(['notificationCenter'])

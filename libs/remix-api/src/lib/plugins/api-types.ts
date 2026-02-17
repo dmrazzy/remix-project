@@ -126,6 +126,122 @@ export interface RefreshTokenResponse {
   refresh_token?: string
 }
 
+// ==================== Storage ====================
+
+/**
+ * Storage health check response
+ */
+export interface StorageHealthResponse {
+  ok: boolean
+  provider: string
+  message?: string
+}
+
+/**
+ * Storage configuration (limits and allowed types)
+ */
+export interface StorageConfig {
+  maxFileSize: number
+  maxTotalStorage: number
+  allowedMimeTypes: string[]
+  allowedExtensions: string[]
+}
+
+/**
+ * Request for presigned upload URL
+ */
+export interface PresignUploadRequest {
+  filename: string
+  folder?: string
+  contentType: string
+  fileSize?: number
+  /** Optional metadata to store with the file (e.g., workspaceName, userId) */
+  metadata?: Record<string, string>
+}
+
+/**
+ * Response with presigned upload URL
+ */
+export interface PresignUploadResponse {
+  url: string
+  headers: Record<string, string>
+  expiresAt: string
+  key: string
+}
+
+/**
+ * Request for presigned download URL
+ */
+export interface PresignDownloadRequest {
+  filename: string
+  folder?: string
+}
+
+/**
+ * Response with presigned download URL
+ */
+export interface PresignDownloadResponse {
+  url: string
+  expiresAt: string
+}
+
+/**
+ * File metadata stored in the system
+ */
+export interface StorageFile {
+  filename: string
+  folder: string
+  key: string
+  contentType: string
+  size: number
+  uploadedAt: string
+  lastModified: string
+  etag?: string
+  /** S3 object metadata (workspaceName, userId, etc.) */
+  metadata?: Record<string, string>
+}
+
+/**
+ * List of user's files
+ */
+export interface StorageFilesResponse {
+  files: StorageFile[]
+  totalSize: number
+  totalCount: number
+  nextCursor?: string
+}
+
+/**
+ * File list request options
+ */
+export interface StorageListOptions {
+  folder?: string
+  limit?: number
+  cursor?: string
+}
+
+/**
+ * Summary of a remote workspace
+ */
+export interface WorkspaceSummary {
+  id: string
+  backupCount: number
+  lastBackup: string | null
+  totalSize: number
+  /** Original workspace name from the most recent backup metadata */
+  workspaceName?: string
+  /** User ID who owns this remote workspace */
+  userId?: string
+  /** Names of local workspaces on this device that are linked to this remote ID */
+  localWorkspaceNames?: string[]
+}
+
+/**
+ * List of user's remote workspaces
+ */
+export interface WorkspacesResponse {
+  workspaces: WorkspaceSummary[]
+}
 // ==================== Permissions ====================
 
 export interface Permission {
