@@ -74,6 +74,7 @@ const tests = {
   'Should show permission modal on first file write #group1': function (browser: NightwatchBrowser) {
     browser
       // Clear any existing config to ensure fresh state
+      .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
       .execute(function () {
         localStorage.removeItem('remix.config.json');
         (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
@@ -112,7 +113,7 @@ const tests = {
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
       .pause(1000)
-      // Clear config
+      .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
       .execute(function () {
         localStorage.removeItem('remix.config.json');
         (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
@@ -182,7 +183,7 @@ const tests = {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
-      .pause(1000)
+      .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
       // Clear config
       .execute(function () {
         localStorage.removeItem('remix.config.json');
@@ -191,7 +192,6 @@ const tests = {
       })
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
-      .pause(1000)
       // Trigger file write via AI plugin's MCP server
       .execute(function () {
         const aiPlugin = (window as any).getRemixAIPlugin;
@@ -202,24 +202,22 @@ const tests = {
           });
         }
       })
-      .pause(1000)
       // First modal - Click Allow
       .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 30000)
       .modalFooterOKClick("mcp_file_write_permission_initial")
-      .pause(1000)
       // Second modal - Click "All Files in Project" (Cancel button)
       .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 30000)
       .modalFooterCancelClick("mcp_file_write_permission_scope") // Clicks "All Files in Project"
-      .pause(2000)
       .useXpath()
       .waitForElementVisible('//button[contains(text(), "Accept All")]', 10000)
       .click('//button[contains(text(), "Accept All")]')
       .useCss()
-      .pause(1000)
-      .execute(function () {
-        return (window as any).getRemixAIPlugin.call('fileManager', 'readFile', 'remix.config.json');
+      .executeAsyncScript(function (done: (result: any) => void) {
+        (window as any).getRemixAIPlugin.call('fileManager', 'readFile', 'remix.config.json')
+          .then((result: any) => done(result))
+          .catch((err: any) => done({ error: err.message }));
       }, [], function (result) {
-        const configStr = result.value as string;
+        const configStr = (result as any).value as string;
         if (configStr) {
           const config = JSON.parse(configStr);
           browser.assert.equal(config.mcp.security.fileWritePermissions.mode, 'allow-all');
@@ -228,16 +226,18 @@ const tests = {
         }
       })
       // Test that subsequent write does NOT trigger modal
-      .execute(function () {
+      .executeAsyncScript(function (done: (result: any) => void) {
         const aiPlugin = (window as any).getRemixAIPlugin;
         if (aiPlugin && aiPlugin.remixMCPServer) {
-          return aiPlugin.remixMCPServer.executeTool({
+          aiPlugin.remixMCPServer.executeTool({
             name: 'file_write',
             arguments: { path: 'file2.txt', content: 'Content 2' }
-          });
+          }).then((result: any) => done(result))
+            .catch((err: any) => done({ error: err.message }));
+        } else {
+          done({ error: 'AI plugin not available' });
         }
-      })
-      .pause(2000)
+      }, [])
       // Verify no modal appeared (modal should not be visible)
       .elements('css selector', '*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', function (result) {
         const elements = Array.isArray(result.value) ? result.value : [];
@@ -253,8 +253,7 @@ const tests = {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
-      .pause(1000)
-      // Clear config
+      .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
       .execute(function () {
         localStorage.removeItem('remix.config.json');
         (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
@@ -262,7 +261,6 @@ const tests = {
       })
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
-      .pause(1000)
       // Trigger file write via AI plugin's MCP server
       .execute(function () {
         const aiPlugin = (window as any).getRemixAIPlugin;
@@ -275,7 +273,6 @@ const tests = {
         console.log("Wrote the denied file")
       })
       // First modal - Click Deny (Cancel button)
-      .pause(1000)
       .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 30000)
       .modalFooterCancelClick("mcp_file_write_permission_initial") // Clicks "Deny"
       .pause(2000)
@@ -295,7 +292,7 @@ const tests = {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
-      .pause(1000)
+      .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
       // Set allow-all mode
       .execute(function () {
         const config = {
@@ -317,11 +314,8 @@ const tests = {
           JSON.stringify(config, null, 2)
         );
       })
-      .pause(1000)
-      // Reload page
       .refresh()
-      .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 2000)
-      .pause(3000)
+      .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 5000)
       // Trigger file write - should NOT show modal
       .execute(function () {
         const aiPlugin = (window as any).getRemixAIPlugin;
@@ -348,8 +342,7 @@ const tests = {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
-      .pause(1000)
-      // Clear config
+      .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
       .execute(function () {
         localStorage.removeItem('remix.config.json');
         (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
