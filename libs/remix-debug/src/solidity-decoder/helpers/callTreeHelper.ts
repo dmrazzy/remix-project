@@ -172,7 +172,7 @@ export async function registerFunctionParameters (tree: InternalCallTree, functi
 
       // return params - register them but they're not yet on the stack
       if (outputs && outputs.parameters && outputs.parameters.length > 0) {
-        addReturnParams(step + 1, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation)
+        addReturnParams(step + 1, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, inputs && inputs.parameters && inputs.parameters.length)
       }
     }
 
@@ -495,7 +495,7 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
  * @param {Object} contractObj - Contract object with name and ABI
  * @param {Object} sourceLocation - Source location of the parameter
  */
-export function addReturnParams (step, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation) {
+export function addReturnParams (step, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, stackLength, inputParamCount) {
   if (!contractObj) {
     console.warn('No contract object found while adding return params')
     return
@@ -509,6 +509,15 @@ export function addReturnParams (step, functionDefinition, parameterList, tree: 
   for (let i = 0; i < paramCount; i++) {
     const param = parameterList.parameters[i]
 
+    // Calculate stack index based on call type
+    let stackIndex = stackLength - inputParamCount + paramCount + i + 1
+
+    // Ensure stack index is valid
+    if (stackIndex < 0 || stackIndex >= stackLength) {
+      if (tree.debug) console.warn(`[addInputParams] Invalid stack index ${stackIndex} for parameter ${param.name} (stackLength: ${stackLength}), using fallback positioning`)
+      stackIndex = Math.max(0, Math.min(i, stackLength - 1))
+    }
+
     let location = extractLocationFromAstVariable(param)
     location = location === 'default' ? 'memory' : location
     const attributesName = param.name === '' ? `$return_${i}` : param.name
@@ -516,7 +525,7 @@ export function addReturnParams (step, functionDefinition, parameterList, tree: 
     const newReturnParam = {
       name: attributesName,
       type: parseType(param.typeDescriptions.typeString, states, contractName, location),
-      stackIndex: -1, // Not yet on stack
+      stackIndex,
       sourceLocation: sourceLocation,
       abi: contractObj.contract.abi,
       isParameter: false,
