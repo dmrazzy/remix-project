@@ -82,7 +82,7 @@ export class SolidityProxy {
     const compilationResult = await this.compilationResult(address)
     if (!compilationResult || !compilationResult.data) return null
     this.extractStatesDefinitions(address)
-    return getLinearizedBaseContracts(id, this.cache.contractDeclarations[address].contractById)    
+    return getLinearizedBaseContracts(id, this.cache.contractDeclarations[address].contractsById)    
   }
 
   /**
