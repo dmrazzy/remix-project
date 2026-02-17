@@ -337,6 +337,24 @@ export default class Terminal extends Plugin {
       plugin: this,
       onReady: onReady
     })
+
+    // Update terminal height based on debugging state
+    setTimeout(() => {
+      // Try to find terminal-wrap first, fall back to terminal-view
+      const terminalWrap = document.querySelector('.terminal-wrap') as HTMLElement
+      const terminalPanel = document.getElementById('terminal-view')
+      const element = terminalWrap || terminalPanel
+
+      if (element) {
+        if (this.isDebugging) {
+          element.style.height = '32.8vh'
+          element.style.minHeight = '32.8vh'
+        } else {
+          element.style.height = ''
+          element.style.minHeight = ''
+        }
+      }
+    }, 0)
   }
 
   scroll2bottom() {
