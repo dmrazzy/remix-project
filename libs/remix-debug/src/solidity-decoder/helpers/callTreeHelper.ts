@@ -141,25 +141,25 @@ export async function registerFunctionParameters (tree: InternalCallTree, functi
 
     let stackPosOnCtor = 0
     if (functionDefinition.kind === 'constructor') {
-       if (!tree.ctorLayout[functionDefinition.id]) {
-        let baseContracts = await tree.solidityProxy.getLinearizedBaseContracts(address, contractDefinition.id)
-         // baseContracts = baseContracts.filter((contract => contract.id !== contractDefinition.id))
+      if (!tree.ctorLayout[functionDefinition.id]) {
+        const baseContracts = await tree.solidityProxy.getLinearizedBaseContracts(address, contractDefinition.id)
+        // baseContracts = baseContracts.filter((contract => contract.id !== contractDefinition.id))
         // Find constructors in inherited contracts
         for (const baseContract of baseContracts) {
           if (baseContract.nodes) {
-            const constructor = baseContract.nodes.find(node => 
+            const constructor = baseContract.nodes.find(node =>
               node.nodeType === 'FunctionDefinition' && node.kind === 'constructor'
             )
             if (constructor && constructor.parameters && constructor.parameters.parameters.length) {
               stackPosOnCtor += constructor.parameters.parameters.length
               if (!tree.ctorLayout[constructor.id]) tree.ctorLayout[constructor.id] = stackPosOnCtor
-            }            
+            }
           }
         }
       }
       stackPosOnCtor = tree.ctorLayout[functionDefinition.id]
     }
-   
+
     if (functionDefinition.parameters) {
       const inputs = functionDefinition.parameters
       const outputs = functionDefinition.returnParameters
@@ -168,7 +168,6 @@ export async function registerFunctionParameters (tree: InternalCallTree, functi
       if (inputs && inputs.parameters && inputs.parameters.length > 0) {
         functionDefinitionAndInputs.inputs = addInputParams(step, functionDefinition, inputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, stackPosOnCtor)
       }
-
 
       // return params - register them but they're not yet on the stack
       if (outputs && outputs.parameters && outputs.parameters.length > 0) {

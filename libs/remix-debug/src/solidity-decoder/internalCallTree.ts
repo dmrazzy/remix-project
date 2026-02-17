@@ -769,7 +769,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
 
     // registering constructors
     const executionInFunctionBody = functionDefinition && nodes && nodes.length && nodes[nodes.length - 1].id !== functionDefinition.id
-    if (executionInFunctionBody && functionDefinition && functionDefinition.kind === 'constructor'  && !tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id]) {
+    if (executionInFunctionBody && functionDefinition && functionDefinition.kind === 'constructor' && !tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id]) {
       tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id] = nextStepDetail && nextStepDetail.pc
       tree.scopes[scopeId].functionDefinition = functionDefinition
       tree.scopes[scopeId].lowLevelScope = false
@@ -833,7 +833,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
         const nextStep = step + 1
 
         /*
-          try to associate a solidity function when: 
+          try to associate a solidity function when:
           - not a CALL, CREATE, DELEGATECALL, STATICCALL, CREATE2
           - entire function is selected in the source map (functionisLeaf)
           - not a low level scope.
