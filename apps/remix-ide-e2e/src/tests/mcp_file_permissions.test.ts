@@ -219,6 +219,8 @@ const tests = {
       .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 30000)
       .pause(500)
       .modalFooterOKClick("mcp_file_write_permission_initial")
+      // Wait for first modal to close
+      .waitForElementNotPresent('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 10000)
       // Second modal - Click "All Files in Project" (Cancel button)
       .waitForElementVisible('*[data-id="mcp_file_write_permission_scopeModalDialogContainer-react"]', 30000)
       .pause(500)
@@ -228,7 +230,7 @@ const tests = {
       .pause(500)
       .click('//button[contains(text(), "Accept All")]')
       .useCss()
-      .pause(1000)
+      .pause(2000)
       // Verify config has allow-all mode
       .executeAsyncScript(function (done: (result: any) => void) {
         (window as any).getRemixAIPlugin.call('fileManager', 'readFile', 'remix.config.json')
