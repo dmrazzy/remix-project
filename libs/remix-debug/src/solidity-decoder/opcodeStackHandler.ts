@@ -318,7 +318,7 @@ function handlePop(
     if (topSlot.kind === 'variable' || topSlot.kind === 'parameter') {
       // This should not happen in normal code generation, but if it does,
       // we should preserve the variable information somehow
-      console.warn(`POP at step ${step} is removing a variable declaration: ${topSlot.variableName}`)
+      // console.warn(`POP at step ${step} is removing a variable declaration: ${topSlot.variableName}`)
 
       // If this is a reference to a variable (created by SWAP), it's safe to remove
       if (topSlot.referencesVariable && topSlot.originOp?.startsWith('SWAP')) {
@@ -326,7 +326,7 @@ function handlePop(
       } else {
         // This is an actual variable declaration being removed - very unusual
         // Remove it but log for debugging
-        console.warn(`Removing actual variable declaration ${topSlot.variableName} at step ${step}`)
+        // console.warn(`Removing actual variable declaration ${topSlot.variableName} at step ${step}`)
         newStack.pop()
       }
     } else {
