@@ -75,11 +75,15 @@ const tests = {
     browser
       // Clear any existing config to ensure fresh state
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
-      .execute(function () {
+      .executeAsyncScript(function (done: (result: any) => void) {
         localStorage.removeItem('remix.config.json');
-        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
-        (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
-      })
+        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json')
+          .then(function () {
+            (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
+            done({ success: true });
+          })
+          .catch(function (err: any) { done({ error: err.message }); });
+      }, [])
       .refresh()
       // Wait for IDE to be ready
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
@@ -114,11 +118,15 @@ const tests = {
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
       .pause(1000)
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
-      .execute(function () {
+      .executeAsyncScript(function (done: (result: any) => void) {
         localStorage.removeItem('remix.config.json');
-        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
-        (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
-      })
+        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json')
+          .then(function () {
+            (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
+            done({ success: true });
+          })
+          .catch(function (err: any) { done({ error: err.message }); });
+      }, [])
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
       .pause(1000)
@@ -185,11 +193,15 @@ const tests = {
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
       // Clear config
-      .execute(function () {
+      .executeAsyncScript(function (done: (result: any) => void) {
         localStorage.removeItem('remix.config.json');
-        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
-        (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
-      })
+        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json')
+          .then(function () {
+            (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
+            done({ success: true });
+          })
+          .catch(function (err: any) { done({ error: err.message }); });
+      }, [])
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
       // Trigger file write via AI plugin's MCP server
@@ -254,14 +266,19 @@ const tests = {
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
-      .execute(function () {
+      .executeAsyncScript(function (done: (result: any) => void) {
         localStorage.removeItem('remix.config.json');
-        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
-        (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
-      })
+        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json')
+          .then(function () {
+            (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
+            done({ success: true });
+          })
+          .catch(function (err: any) { done({ error: err.message }); });
+      }, [])
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
-      // Trigger file write via AI plugin's MCP server
+      .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
+      // Trigger file write via AI plugin's MCP server (fire-and-forget, modal blocks resolution)
       .execute(function () {
         const aiPlugin = (window as any).getRemixAIPlugin;
         if (aiPlugin && aiPlugin.remixMCPServer) {
@@ -270,12 +287,10 @@ const tests = {
             arguments: { path: 'denied.txt', content: 'Should not write' }
           });
         }
-        console.log("Wrote the denied file")
       })
       // First modal - Click Deny (Cancel button)
       .waitForElementVisible('*[data-id="mcp_file_write_permission_initialModalDialogContainer-react"]', 30000)
       .modalFooterCancelClick("mcp_file_write_permission_initial") // Clicks "Deny"
-      .pause(2000)
       // Verify file was NOT created
       .execute(function () {
         return (window as any).getRemixAIPlugin.call('fileManager', 'exists', 'denied.txt');
@@ -343,11 +358,15 @@ const tests = {
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
-      .execute(function () {
+      .executeAsyncScript(function (done: (result: any) => void) {
         localStorage.removeItem('remix.config.json');
-        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json');
-        (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
-      })
+        (window as any).getRemixAIPlugin.call('fileManager', 'remove', 'remix.config.json')
+          .then(function () {
+            (window as any).getRemixAIPlugin.remixMCPServer.reloadConfig();
+            done({ success: true });
+          })
+          .catch(function (err: any) { done({ error: err.message }); });
+      }, [])
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 1000)
       .execute(function () {
