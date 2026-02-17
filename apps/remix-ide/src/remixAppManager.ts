@@ -101,15 +101,17 @@ let requiredModules = [
   'auth',
   'account',
   'transactionSimulator',
-  'resolutionIndex',
   'amp',
+  's3Storage',
+  'resolutionIndex',
   'vega',
   'chartjs',
   'storageMonitor',
   'indexedDbCache',
   'notificationCenter',
   'invitationManager',
-  'feedback'
+  'feedback',
+  'cloudWorkspaces'
 ]
 
 // dependentModules shouldn't be manually activated (e.g hardhat is activated by remixd)
@@ -470,7 +472,9 @@ class PluginLoader {
       'remixGuide',
       'doc-viewer',
       'UIScriptRunner',
-      'quick-dapp-v2'
+      'quick-dapp-v2',
+      'cloudWorkspaces',
+      's3Storage'
     ]
     this.loaders = {}
     this.loaders.localStorage = {

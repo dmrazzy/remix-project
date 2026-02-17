@@ -33,6 +33,7 @@ export class RemixEngine extends Engine {
     if (name === 'resolutionIndex') return { queueTimeout: 60000 * 2 }
     if (name === 'circom') return { queueTimeout: 60000 * 4 }
     if (name === 'noir-compiler') return { queueTimeout: 60000 * 4 }
+    if (name === 'cloudWorkspaces') return { queueTimeout: 60000 * 4 }
     //if (name === 'sso') return { queueTimeout: 60000 * 4 }
     return { queueTimeout: 10000 }
   }

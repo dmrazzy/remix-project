@@ -18,7 +18,8 @@ type EndpointUrls = {
     sso: string;
     billing: string;
     credits: string;
-    audio;
+    audio: string;
+    storage: string;
     permissions: string;
     notifications: string;
     invite: string;
@@ -46,6 +47,7 @@ const defaultUrls: EndpointUrls = {
   billing: 'https://auth.api.remix.live:8443/billing',
   credits: 'https://auth.api.remix.live:8443/credits',
   audio: 'https://audio.api.remix.live',
+  storage: 'https://auth.api.remix.live:8443/storage',
   permissions: 'https://auth.api.remix.live:8443/permissions',
   notifications: 'https://auth.api.remix.live:8443/notifications',
   invite: 'https://auth.api.remix.live:8443/invite',
@@ -73,6 +75,7 @@ const endpointPathMap: Record<keyof EndpointUrls, string> = {
   billing: 'billing',
   credits: 'credits',
   audio: 'audio',
+  storage: 'storage',
   permissions: 'permissions',
   notifications: 'notifications',
   invite: 'invite',
@@ -117,6 +120,8 @@ const localhostUrls: EndpointUrls = {
   // AUDIO service (port 3004)
   audio: 'http://localhost:3004/audio',
   
+  // STORAGE service (port 3002 - same as billing)
+  storage: 'http://localhost:3002/storage',
   // PERMISSIONS service
   permissions: 'https://auth.api.remix.live:8443/permissions',
   

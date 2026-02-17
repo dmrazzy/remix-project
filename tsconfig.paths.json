@@ -218,6 +218,9 @@
             "@remix-ui/login": [
               "libs/remix-ui/login/src/index.ts"
             ],
+            "@remix-ui/cloud-workspaces": [
+              "libs/remix-ui/cloud-workspaces/src/index.ts"
+            ],
             "@remix-ui/billing": [
               "libs/remix-ui/billing/src/index.ts"
             ],
