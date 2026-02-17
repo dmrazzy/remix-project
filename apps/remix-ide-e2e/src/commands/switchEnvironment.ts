@@ -102,85 +102,66 @@ class switchEnvironment extends EventEmitter {
     const attemptSelect = (
       browser: NightwatchBrowser,
       providerName: string,
-      categoryName?: string,
       shouldWait?: boolean,
       onComplete?: VoidFunction
     ) => {
-      if (!categoryName) {
-        // No category provided - provider should be in main dropdown
-        browser
-          .isPresent({ selector: `[data-id="dropdown-item-${providerName}"]`, suppressNotFoundErrors: true, timeout: 1500 }, (topLevel) => {
-            if (topLevel.value) {
-              clickAndMaybeWait(browser, `[data-id="dropdown-item-${providerName}"]`, providerName, shouldWait)
+      browser
+        .isPresent({ selector: `[data-id="dropdown-item-${providerName}"]`, suppressNotFoundErrors: true, timeout: 1500 }, (topLevel) => {
+          console.log('attemptSelect result: ', topLevel)
+          if (topLevel.value) {
+            clickAndMaybeWait(browser, `[data-id="dropdown-item-${providerName}"]`, providerName, shouldWait)
+            onComplete && browser.perform(() => onComplete())
+          } else {
+            tryOpenSubmenusAndClick(browser, submenuLabels, providerName, !!shouldWait, () => {
               onComplete && browser.perform(() => onComplete())
-            } else {
-              tryOpenSubmenusAndClick(browser, submenuLabels, providerName, !!shouldWait, () => {
-                onComplete && browser.perform(() => onComplete())
-              })
-            }
-          })
-      } else {
-        // Category provided - first select the category, then look in its submenu
-        browser
-          .isPresent({ selector: `[data-id="dropdown-item-${categoryName}"]`, suppressNotFoundErrors: true, timeout: 1500 }, (categoryPresent) => {
-            if (!categoryPresent.value) {
-              // Category not found
-              console.log(`Category "${categoryName}" not found in dropdown`)
-              onComplete && browser.perform(() => onComplete())
-              return
-            }
-
-            // Select the category provider
-            browser
-              .click(`[data-id="dropdown-item-${categoryName}"]`)
-              .pause(500)
-              .perform(() => {
-                // Reopen dropdown to access the submenu
-                browser
-                  .click('[data-id="settingsSelectEnvOptions"] button')
-                  .pause(500)
-                  .waitForElementVisible('[data-id="settingsSelectEnvCategoryOptions"]', 3000)
-                  .click('[data-id="settingsSelectEnvCategoryOptions"]')
-                  .pause(300)
-                  .isPresent({ selector: `[data-id="dropdown-item-${providerName}"]`, suppressNotFoundErrors: true, timeout: 1500 }, (submenuPresent) => {
-                    if (submenuPresent.value) {
-                      clickAndMaybeWait(browser, `[data-id="dropdown-item-${providerName}"]`, providerName, shouldWait)
-                      onComplete && browser.perform(() => onComplete())
-                    } else {
-                      console.log(`Provider "${providerName}" not found in category "${categoryName}" submenu`)
-                      onComplete && browser.perform(() => onComplete())
-                    }
-                  })
-              })
-          })
-      }
+            })
+          }
+        })
     }
 
     this.api
       .useCss()
       .waitForElementVisible('[data-id="settingsSelectEnvOptions"]', 10000)
-      .click('[data-id="settingsSelectEnvOptions"]')
+      .execute(function() {
+        // Use JavaScript to click the button element directly, avoiding any overlapping elements
+        const button = document.querySelector('[data-id="settingsSelectEnvOptions"]') as HTMLElement
+        if (button) {
+          button.click()
+        }
+      }, [])
       .perform((done) => {
-        this.api.isPresent({ selector: `[data-id="dropdown-item-${provider}"]`, suppressNotFoundErrors: true, timeout: 1000 }, (result) => {
-          console.log('result: ', result)
+        this.api.isVisible({ selector: `[data-id="dropdown-item-${provider}"]`, suppressNotFoundErrors: true, timeout: 1000 }, (result) => {
+          console.log('provider result: ', result)
           if (result.value) {
             this.api.click(`[data-id="dropdown-item-${provider}"]`)
             return done()
-          }
-          this.api.click('[data-id="settingsSelectEnvOptions"] button')
-            .waitForElementVisible('body .dropdown-menu.show', 3000)
-            .perform(() => {
-              attemptSelect(this.api, provider, category, returnWhenInitialized, () => {
-                waitForSelectedOrModal(this.api, provider, 10000, (ok) => {
-                  if (ok) {
-                    return done()
-                  } else {
-                    this.api.assert.fail(`Environment "${provider}" could not be selected or found in the dropdown.`)
-                    done()
-                  }
-                })
-              })
+          } else {
+            this.api.isVisible({ selector: `[data-id="dropdown-item-${category}"]`, suppressNotFoundErrors: true, timeout: 1000 }, (result) => {
+              console.log('category result: ', result)
+              if (result.value) {
+                this.api
+                  .click(`[data-id="dropdown-item-${category}"]`)
+                  .click('[data-id="settingsSelectEnvOptions"] button')
+                  .waitForElementVisible('body .dropdown-menu.show', 3000)
+                  .perform(() => {
+                    attemptSelect(this.api, provider, returnWhenInitialized, () => {
+                      waitForSelectedOrModal(this.api, provider, 10000, (ok) => {
+                        if (ok) {
+                          return done()
+                        } else {
+                          this.api.assert.fail(`Environment "${provider}" could not be selected or found in the dropdown.`)
+                          return done()
+                        }
+                      })
+                    })
+                  })
+                return done()
+              } {
+                this.api.assert.fail(`Environment "${provider}" could not be selected or found in the dropdown.`)
+                done()
+              }
             })
+          }
         })
       })
       .perform(() => this.emit('complete'))

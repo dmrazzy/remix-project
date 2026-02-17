@@ -7,39 +7,41 @@ module.exports = {
   before: function (browser: NightwatchBrowser, done: VoidFunction) {
     init(browser, done)
   },
-  'Should show badge in deployed contracts section #group1': '' + function (browser: NightwatchBrowser) {
+  'Should show badge in deployed contracts section #group1': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('udapp')
-      .assert.elementPresent('*[data-id="deployedContracts"]')
+      .assert.elementPresent('*[data-id="deployedContractsContainer"]')
       .assert.textContains('*[data-id="deployedContractsBadge"]', '0')
   },
-  'Deploy & pin contract #group1': '' + function (browser: NightwatchBrowser) {
+  'Deploy & pin contract #group1': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('filePanel')
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemcontracts"]')
       .click('*[data-id="treeViewLitreeViewItemcontracts"]')
       .click('*[data-id="treeViewLitreeViewItemcontracts/1_Storage.sol"]')
-      .waitForElementVisible('*[data-id="compile-action"]')
-      .pause(3000)
-      .click('[data-id="compile-action"]')
+      .pause(1000)
+      .click('*[data-id="compile-action"]')
       .clickLaunchIcon('udapp')
-      .click('*[data-id="Deploy - transact (not payable)"]')
+      .createContract('')
       .assert.elementPresent('*[data-id="unpinnedInstance0xd9145CCE52D386f254917e481eB44e9943F39138"]')
       .assert.textContains('*[data-id="deployedContractsBadge"]', '1')
-      .click('*[data-id="universalDappUiUdappPin"]')
-      .assert.elementPresent('*[data-id="universalDappUiUdappUnpin"]')
+      .assert.attributeContains('*[data-id="pinDeployedContract"]', 'class', 'fa-regular')
+      .click('*[data-id="pinDeployedContract"]')
+      .pause(500)
+      .assert.attributeContains('*[data-id="pinDeployedContract"]', 'class', 'fa-solid')
       .assert.elementPresent('*[data-id="pinnedInstance0xd9145CCE52D386f254917e481eB44e9943F39138"]')
   },
-  'Test pinned contracts loading on environment change #group1': '' + function (browser: NightwatchBrowser) {
+  'Test pinned contracts loading on environment change #group1': function (browser: NightwatchBrowser) {
     browser
-      .switchEnvironment('vm-cancun')
-      .assert.elementPresent('*[data-id="deployedContracts"]')
+      .switchEnvironment('vm-cancun', 'Remix_VM')
+      .assert.elementPresent('*[data-id="deployedContractsContainer"]')
       .assert.textContains('*[data-id="deployedContractsBadge"]', '0')
-      .switchEnvironment('vm-osaka')
+      .pause(1000)
+      .switchEnvironment('vm-osaka', 'Remix_VM')
       .assert.textContains('*[data-id="deployedContractsBadge"]', '1')
       .assert.elementPresent('*[data-id="pinnedInstance0xd9145CCE52D386f254917e481eB44e9943F39138"]')
   },
-  'Test pinned contracts loading on workspace change #group1': '' + function (browser: NightwatchBrowser) {
+  'Test pinned contracts loading on workspace change #group1': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('filePanel')
       .click('*[data-id="workspacesSelect"]')
@@ -61,7 +63,7 @@ module.exports = {
       .pause(1000)
       .click('*[data-id="validateWorkspaceButton"]')
       .clickLaunchIcon('udapp')
-      .assert.elementPresent('*[data-id="deployedContracts"]')
+      .assert.elementPresent('*[data-id="deployedContractsContainer"]')
       .assert.textContains('*[data-id="deployedContractsBadge"]', '0')
       .clickLaunchIcon('filePanel')
       .switchWorkspace('default_workspace')
@@ -70,61 +72,75 @@ module.exports = {
       .assert.textContains('*[data-id="deployedContractsBadge"]', '1')
       .assert.elementPresent('*[data-id="pinnedInstance0xd9145CCE52D386f254917e481eB44e9943F39138"]')
   },
-  'Interact with pinned contract #group1': '' + function (browser: NightwatchBrowser) {
+  'Interact with pinned contract #group1': function (browser: NightwatchBrowser) {
     browser
-      .click('*[data-id="universalDappUiTitleExpander0"]')
-      .assert.elementPresent('*[data-id="instanceContractBal"]')
-      .assert.elementPresent('*[data-id="instanceContractPinnedAt"]')
-      .assert.elementPresent('*[data-id="instanceContractFilePath"]')
-      .assert.textContains('*[data-id="instanceContractFilePath"]', 'default_workspace/contracts/1_Storage.sol')
-      .clickFunction('retrieve - call')
+      .clickInstance(0)
+      .assert.elementPresent('*[data-id="deployedContractBal"]')
+      .clickFunction(0, 1)
       .testFunction('last',
         {
           to: 'Storage.retrieve() 0xd9145CCE52D386f254917e481eB44e9943F39138',
           'decoded output': { "0": "uint256: 0" }
         })
-      .clickFunction('store - transact (not payable)', { types: 'uint256 num', values: '35' })
+      .clickFunction(0, 0, { types: 'uint256 num', values: '35' })
       .testFunction('last',
         {
           status: '1 Transaction mined and execution succeed',
           'decoded input': { "uint256 num": "35" }
         })
-      .clickFunction('retrieve - call')
+      .clickFunction(0, 1)
       .testFunction('last',
         {
           to: 'Storage.retrieve() 0xd9145CCE52D386f254917e481eB44e9943F39138',
           'decoded output': { "0": "uint256: 35" }
         })
   },
-  'Unpin & interact #group1': '' + function (browser: NightwatchBrowser) {
+  'Unpin & interact #group1': function (browser: NightwatchBrowser) {
     browser
-      .click('*[data-id="universalDappUiUdappUnpin"]')
-      .assert.not.elementPresent('*[data-id="instanceContractPinnedAt"]')
-      .assert.not.elementPresent('*[data-id="instanceContractFilePath"]')
-      .clickFunction('retrieve - call')
+      .assert.attributeContains('*[data-id="pinDeployedContract"]', 'class', 'fa-solid')
+      .execute(function () {
+        const pinIcon = document.querySelector(`[data-id="pinDeployedContract"]`) as HTMLElement
+        if (pinIcon) {
+          pinIcon.scrollIntoView({ behavior: 'auto', block: 'center' })
+        }
+      })
+      .click('*[data-id="pinDeployedContract"]')
+      .pause(500)
+      .assert.attributeContains('*[data-id="pinDeployedContract"]', 'class', 'fa-regular')
+      .clickFunction(0, 1)
       .testFunction('last',
         {
           to: 'Storage.retrieve() 0xd9145CCE52D386f254917e481eB44e9943F39138',
           'decoded output': { "0": "uint256: 35" }
         })
-      .clickFunction('store - transact (not payable)', { types: 'uint256 num', values: '55' })
+      .clickFunction(0, 0, { types: 'uint256 num', values: '55' })
       .testFunction('last',
         {
           status: '1 Transaction mined and execution succeed',
           'decoded input': { "uint256 num": "55" }
         })
-      .clickFunction('retrieve - call')
+      .clickFunction(0, 1)
       .testFunction('last',
         {
           to: 'Storage.retrieve() 0xd9145CCE52D386f254917e481eB44e9943F39138',
           'decoded output': { "0": "uint256: 55" }
         })
   },
-  'Re-pin & remove from list #group1': '' + function (browser: NightwatchBrowser) {
+  'Re-pin & remove from list #group1': function (browser: NightwatchBrowser) {
     browser
-      .click('*[data-id="universalDappUiUdappPin"]')
+      .assert.attributeContains('*[data-id="pinDeployedContract"]', 'class', 'fa-regular')
+      .execute(function () {
+        const pinIcon = document.querySelector(`[data-id="pinDeployedContract"]`) as HTMLElement
+        if (pinIcon) {
+          pinIcon.scrollIntoView({ behavior: 'auto', block: 'center' })
+        }
+      })
+      .click('*[data-id="pinDeployedContract"]')
+      .pause(500)
+      .assert.attributeContains('*[data-id="pinDeployedContract"]', 'class', 'fa-solid')
       .assert.textContains('*[data-id="deployedContractsBadge"]', '1')
-      .click('*[data-id="universalDappUiUdappClose"]')
+      .clickLaunchIcon('udapp')
+      .clearDeployedContract(0)
       .assert.textContains('*[data-id="deployedContractsBadge"]', '0')
   },
 }

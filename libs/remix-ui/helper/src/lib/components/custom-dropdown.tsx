@@ -244,6 +244,7 @@ export const EnvironmentToggle = React.forwardRef(
       ref={ref}
       onClick={(e) => {
         e.preventDefault()
+        e.stopPropagation()
         onClick(e)
       }}
       className={className.replace('dropdown-toggle', '')}

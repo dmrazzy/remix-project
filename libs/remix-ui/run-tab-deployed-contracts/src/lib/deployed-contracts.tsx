@@ -62,6 +62,14 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
       }
     })
 
+    plugin.on('filePanel', 'setWorkspace', async () => {
+      const network = await plugin.call('udappEnv', 'getNetwork')
+      const chainId = network?.chainId
+      const providerName = network?.name === 'VM' ? await plugin.call('udappEnv', 'getSelectedProvider') : chainId
+
+      await loadPinnedContracts(plugin, dispatch, providerName)
+    })
+
     plugin.on('blockchain', 'transactionExecuted', async (error, _, to) => {
       if (error) return
       if (to) {
@@ -77,6 +85,7 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
       plugin.off('fileManager', 'currentFileChanged')
       plugin.off('blockchain', 'networkStatus')
       plugin.off('blockchain', 'transactionExecuted')
+      plugin.off('filePanel', 'setWorkspace')
     }
   }, [widgetState.lastLoadedChainId])
 
