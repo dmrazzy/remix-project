@@ -5,7 +5,7 @@ import { CompilerAbstract } from "@remix-project/remix-solidity"
 import type { ContractData, SolcBuildFile } from "@remix-project/core-plugin"
 import { execution } from '@remix-project/remix-lib'
 import { IntlShape } from "react-intl"
-import { deployWithProxyMsg, isOverSizePrompt, unavailableProxyLayoutMsg, upgradeReportMsg, upgradeWithProxyMsg } from "@remix-ui/helper"
+import { deployWithProxyMsg, isOverSizePrompt, logBuilder, unavailableProxyLayoutMsg, upgradeReportMsg, upgradeWithProxyMsg } from "@remix-ui/helper"
 import { SolcInput, SolcOutput } from "@openzeppelin/upgrades-core"
 import { isAddress } from "ethers"
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
@@ -124,6 +124,7 @@ export async function deployContract(selectedContract: ContractData, args: strin
             await plugin.call('openzeppelin-proxy', 'executeUUPSProxy', contract.address, deployMode.deployArgs, initABI, contract.selectedContract)
           } catch (error) {
             console.error(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error}`)
+            plugin.call('terminal', 'logHtml', logBuilder(`creation of ${selectedContract.name} errored: ${error.message ? error.message : error}`))
           }
         },
         cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
@@ -173,7 +174,11 @@ export async function deployContract(selectedContract: ContractData, args: strin
         }
       }
     } else {
-      createInstance(selectedContract, args, deployMode, isVerifyChecked, plugin)
+      try {
+        await createInstance(selectedContract, args, deployMode, isVerifyChecked, plugin)
+      } catch (error) {
+        plugin.call('terminal', 'logHtml', logBuilder(error.message))
+      }
     }
   }
 }
@@ -281,8 +286,12 @@ function showUpgradeModal(selectedContract: ContractData, args: string, deployMo
     message: upgradeWithProxyMsg(),
     okLabel: intl.formatMessage({ id: 'udapp.proceed' }),
     okFn: async () => {
-      const contract = await createInstance(selectedContract, args, deployMode, false, plugin)
-      await plugin.call('openzeppelin-proxy', 'executeUUPSContractUpgrade', deployMode.deployArgs, contract.address, contract.selectedContract)
+      try {
+        const contract = await createInstance(selectedContract, args, deployMode, false, plugin)
+        await plugin.call('openzeppelin-proxy', 'executeUUPSContractUpgrade', deployMode.deployArgs, contract.address, contract.selectedContract)
+      } catch (error) {
+        plugin.call('terminal', 'logHtml', logBuilder(error.message))
+      }
     },
     cancelLabel: intl.formatMessage({ id: 'udapp.cancel' }),
     cancelFn: () => {}

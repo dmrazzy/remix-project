@@ -45,6 +45,7 @@ declare module 'nightwatch' {
     createContract(inputParams: string): NightwatchBrowser
     getAddressAtPosition(index: number, cb: (pos: string) => void): NightwatchBrowser
     testConstantFunction(address: string, fnFullName: string, expectedInput: NightwatchTestConstantFunctionExpectedInput | null, expectedOutput: string): NightwatchBrowser
+    testConstantFunction(instanceIndex: number, functionIndex: number, expectedInput: NightwatchTestConstantFunctionExpectedInput | null, expectedOutput: string): NightwatchBrowser
     getEditorValue(callback: (content: string) => void): NightwatchBrowser
     getInstalledPlugins(cb: (plugins: string[]) => void): NightwatchBrowser
     verifyCallReturnValue(address: string, checks: string[] | callbackCheckVerifyCallReturnValue): NightwatchBrowser
