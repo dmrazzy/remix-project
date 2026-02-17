@@ -103,7 +103,7 @@ export default function DeployedContractsPortraitView() {
           <h6 className="my-auto" style={{ color: themeQuality === 'dark' ? 'white' : 'black', margin: 0 }}>
             <FormattedMessage id="udapp.deployedContracts" defaultMessage="Deployed Contracts" />
           </h6>
-          <span className="text-secondary">{deployedContracts.length}</span>
+          <span className="text-secondary" data-id="deployedContractsBadge">{deployedContracts.length}</span>
         </div>
         <div>
           <button className='btn btn-primary btn-sm small' style={{ fontSize: '0.7rem' }} onClick={handleAddClick} data-id="addDeployedContract">

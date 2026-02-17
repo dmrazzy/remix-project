@@ -46,7 +46,15 @@ function EnvironmentPortraitView() {
   }
 
   const handleProviderSelection = (provider: Provider) => {
-    setExecutionContext(provider, plugin, widgetState, dispatch)
+    if (provider.category && selectedProvider?.category === provider.category) {
+      return
+    }
+    if (provider.category === 'Dev') {
+      // select category to show sub-categories
+      dispatch({ type: 'SET_CURRENT_PROVIDER', payload: provider.name })
+    } else {
+      setExecutionContext(provider, plugin, widgetState, dispatch)
+    }
   }
 
   const handleAccountSelection = (account: Account) => {
@@ -340,7 +348,7 @@ function EnvironmentPortraitView() {
                 {
                   uniqueDropdownItems.map((provider, index) => {
                     return (
-                      <Dropdown.Item key={index} onClick={() => handleProviderSelection(provider)} data-id={`dropdown-item-${provider.name}`} className="environment-item-hover">
+                      <Dropdown.Item key={index} onClick={() => handleProviderSelection(provider)} data-id={`dropdown-item-${provider.category ? provider.category?.split(' ')?.join('_') : provider.name}`} className="environment-item-hover">
                         {provider.category ? provider.category : provider.displayName}
                       </Dropdown.Item>
                     )})

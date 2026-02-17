@@ -93,31 +93,29 @@ export async function forkState (plugin: EnvironmentPlugin, dispatch: React.Disp
 }
 
 export async function setExecutionContext (provider: Provider, plugin: EnvironmentPlugin, widgetState: WidgetState, dispatch: React.Dispatch<Actions>) {
-  if (provider.name !== widgetState.providers.selectedProvider) {
-    if (provider.name === 'walletconnect') {
-      await plugin.call('walletconnect', 'openModal')
-      plugin.on('walletconnect', 'connectionSuccessful', async () => {
-        await plugin.call('blockchain', 'changeExecutionContext', { context: provider.name, fork: provider.config.fork })
-        dispatch({ type: 'SET_CURRENT_PROVIDER', payload: provider.name })
-        plugin.emit('providersChanged', provider)
-      })
-      plugin.on('walletconnect', 'connectionFailed', (msg) => {
-        plugin.call('notification', 'toast', msg)
-        cleanupWalletConnectEvents(plugin)
-      })
-      plugin.on('walletconnect', 'connectionDisconnected', (msg) => {
-        plugin.call('notification', 'toast', msg)
-        cleanupWalletConnectEvents(plugin)
-      })
-    } else {
+  if (provider.name === 'walletconnect') {
+    await plugin.call('walletconnect', 'openModal')
+    plugin.on('walletconnect', 'connectionSuccessful', async () => {
       await plugin.call('blockchain', 'changeExecutionContext', { context: provider.name, fork: provider.config.fork })
       dispatch({ type: 'SET_CURRENT_PROVIDER', payload: provider.name })
       plugin.emit('providersChanged', provider)
-      if (provider.category === 'Browser Extension') {
-        await plugin.call('layout', 'maximiseSidePanel', 0.25)
-      } else {
-        await plugin.call('layout', 'resetSidePanel')
-      }
+    })
+    plugin.on('walletconnect', 'connectionFailed', (msg) => {
+      plugin.call('notification', 'toast', msg)
+      cleanupWalletConnectEvents(plugin)
+    })
+    plugin.on('walletconnect', 'connectionDisconnected', (msg) => {
+      plugin.call('notification', 'toast', msg)
+      cleanupWalletConnectEvents(plugin)
+    })
+  } else {
+    await plugin.call('blockchain', 'changeExecutionContext', { context: provider.name, fork: provider.config.fork })
+    dispatch({ type: 'SET_CURRENT_PROVIDER', payload: provider.name })
+    plugin.emit('providersChanged', provider)
+    if (provider.category === 'Browser Extension') {
+      await plugin.call('layout', 'maximiseSidePanel', 0.25)
+    } else {
+      await plugin.call('layout', 'resetSidePanel')
     }
   }
 }

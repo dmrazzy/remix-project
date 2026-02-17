@@ -354,7 +354,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
         className="d-flex align-items-center rounded"
         style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', cursor: 'pointer' }}
       >
-        <div id={`instance${contract.address}`} className="me-auto w-100" data-shared="universalDappUiInstance">
+        <div id={`instance${contract.address}`} data-id={contract?.isPinned ? `pinnedInstance${contract?.address}` : `unpinnedInstance${contract?.address}`} className="me-auto w-100" data-shared="universalDappUiInstance">
           <div className="d-flex align-items-center justify-content-between w-100 p-3 text-nowrap text-truncate overflow-hidden" onClick={handleContractClick} data-id={`deployedContractItem-${index}`}>
             <div className='d-flex'>
               <CustomTooltip
@@ -364,6 +364,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                 tooltipText={contract.isPinned ? `Pinned at: ${new Date(contract.pinnedAt).toLocaleString()}` : 'Pin contract'}
               >
                 <i
+                  data-id="pinDeployedContract"
                   className={`${contract.isPinned ? 'fa-solid' : 'fa-regular'} fa-thumbtack align-self-center pe-2`}
                   style={{ cursor: 'pointer' }}
                   onClick={handlePinContract}
@@ -608,7 +609,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                       )}
                     </div>
                   </div>
-                  <div className='d-flex justify-content-between pt-3 border-top'>
+                  <div className='d-flex justify-content-between pt-3 border-top' data-id="deployedContractBal">
                     <div>Balance</div>
                     <div>{contract.balance || 0} ETH</div>
                   </div>
