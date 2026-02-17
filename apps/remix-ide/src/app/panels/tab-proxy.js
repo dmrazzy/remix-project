@@ -23,12 +23,24 @@ export default class TabProxy extends Plugin {
     this.dispatch = null
     this.themeQuality = 'dark'
     this.maximize = false
+    this.isDebugging = false
   }
 
   async onActivation () {
     this.on('theme', 'themeChanged', (theme) => {
       this.themeQuality = theme.quality
       // update invert for all icons
+      this.renderComponent()
+    })
+
+    // Listen for debugger events to update isDebugging state
+    this.on('debugger', 'debuggingStarted', () => {
+      this.isDebugging = true
+      this.renderComponent()
+    })
+
+    this.on('debugger', 'debuggingStopped', () => {
+      this.isDebugging = false
       this.renderComponent()
     })
 
@@ -379,6 +391,7 @@ export default class TabProxy extends Plugin {
       onReady={state.onReady}
       themeQuality={state.themeQuality}
       maximize={this.maximize}
+      isDebugging={state.isDebugging}
     />
   }
 
@@ -414,7 +427,8 @@ export default class TabProxy extends Plugin {
       onZoomIn,
       onZoomOut,
       onReady,
-      themeQuality: this.themeQuality
+      themeQuality: this.themeQuality,
+      isDebugging: this.isDebugging
     })
   }
 

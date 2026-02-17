@@ -27,6 +27,7 @@ export interface TabsUIProps {
   onReady: (api: any) => void
   themeQuality: string
   maximize: boolean
+  isDebugging?: boolean
 }
 
 export interface Tab {
@@ -808,6 +809,26 @@ export const TabsUI = (props: TabsUIProps) => {
   if (isVegaVisualization) {
     btnDisabled = false
   }
+
+  const handleAskRemixAI = async () => {
+    try {
+      // Show right side panel if it's hidden
+      const isPanelHidden = await props.plugin.call('rightSidePanel', 'isPanelHidden')
+      if (isPanelHidden) {
+        await props.plugin.call('rightSidePanel', 'togglePanel')
+      }
+      await props.plugin.call('menuicons', 'select', 'remixaiassistant')
+
+      // Wait a bit for the panel to open and then send the debugging prompt
+      setTimeout(async () => {
+        const message = 'Give me more info about current debugging session in Remix IDE'
+        await props.plugin.call('remixAI', 'chatPipe', 'code_explaining', '', '', message)
+      }, 500)
+    } catch (err) {
+      console.error('Failed to open RemixAI:', err)
+    }
+  }
+
   return (
     <>
       <div
@@ -819,52 +840,81 @@ export const TabsUI = (props: TabsUIProps) => {
         <div className="d-flex flex-row" style={{ maxWidth: 'fit-content', width: '99%' }}>
           <div className="d-flex flex-row justify-content-center align-items-center m-1 mt-1">
             <div className="d-flex align-items-center m-1">
-              <div className="btn-group" role="group" data-id="compile_group" aria-label="compile group">
+              {props.isDebugging ? (
                 <CustomTooltip
                   placement="bottom"
-                  tooltipId="overlay-tooltip-run-script"
-                  tooltipText={
-                    <span>
-                      {tabsState.currentExt === 'js' || tabsState.currentExt === 'ts' ? (
-                        <FormattedMessage id="remixUiTabs.tooltipText1" />
-                      ) : tabsState.currentExt === 'sol' || tabsState.currentExt === 'yul' || tabsState.currentExt === 'circom' || tabsState.currentExt === 'vy' ? (
-                        <FormattedMessage id="remixUiTabs.tooltipText2" />
-                      ) : (
-                        <FormattedMessage id="remixUiTabs.tooltipText3" />
-                      )}
-                    </span>
-                  }
+                  tooltipId="overlay-tooltip-ask-remixai"
+                  tooltipText={<span>Ask RemixAI about debugging</span>}
                 >
                   <button
-                    className="btn btn-primary d-flex align-items-center justify-content-center"
-                    data-id="compile-action"
+                    className="btn btn-ai d-flex align-items-center justify-content-center border-0 px-3 py-1"
+                    data-id="ask-remixai-action"
                     style={{
-                      padding: "4px 8px",
-                      height: "28px",
                       fontFamily: "Nunito Sans, sans-serif",
                       fontSize: "11px",
                       fontWeight: 700,
                       lineHeight: "14px",
                       whiteSpace: "nowrap",
-                      borderRadius: "4px 0 0 4px"
+                      height: "28px"
                     }}
-                    disabled={btnDisabled}
-                    onClick={handleCompileClick}
+                    onClick={handleAskRemixAI}
                   >
-                    <i className={
-                      compileState === 'compiled' ? "fas fa-check"
-                        : "fas fa-play"
-                    }></i>
-                    <span className="ms-2" style={{ lineHeight: "12px", position: "relative", top: "1px" }}>
-                      {mainLabel}
+                    <img src="assets/img/remixAI_small.svg" alt="Remix AI" style={{ width: "16px", height: "16px"}} />
+                    <span style={{ lineHeight: "12px", position: "relative", top: "1px" }}>
+                      Ask RemixAI
                     </span>
                   </button>
                 </CustomTooltip>
-              </div>
-              {dropDown}
+              ) : (
+                <>
+                  <div className="btn-group" role="group" data-id="compile_group" aria-label="compile group">
+                    <CustomTooltip
+                      placement="bottom"
+                      tooltipId="overlay-tooltip-run-script"
+                      tooltipText={
+                        <span>
+                          {tabsState.currentExt === 'js' || tabsState.currentExt === 'ts' ? (
+                            <FormattedMessage id="remixUiTabs.tooltipText1" />
+                          ) : tabsState.currentExt === 'sol' || tabsState.currentExt === 'yul' || tabsState.currentExt === 'circom' || tabsState.currentExt === 'vy' ? (
+                            <FormattedMessage id="remixUiTabs.tooltipText2" />
+                          ) : (
+                            <FormattedMessage id="remixUiTabs.tooltipText3" />
+                          )}
+                        </span>
+                      }
+                    >
+                      <button
+                        className="btn btn-primary d-flex align-items-center justify-content-center"
+                        data-id="compile-action"
+                        style={{
+                          padding: "4px 8px",
+                          height: "28px",
+                          fontFamily: "Nunito Sans, sans-serif",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          lineHeight: "14px",
+                          whiteSpace: "nowrap",
+                          borderRadius: "4px 0 0 4px"
+                        }}
+                        disabled={btnDisabled}
+                        onClick={handleCompileClick}
+                      >
+                        <i className={
+                          compileState === 'compiled' ? "fas fa-check"
+                            : "fas fa-play"
+                        }></i>
+                        <span className="ms-2" style={{ lineHeight: "12px", position: "relative", top: "1px" }}>
+                          {mainLabel}
+                        </span>
+                      </button>
+                    </CustomTooltip>
+                  </div>
+                  {dropDown}
+                </>
+              )}
             </div>
 
-            <div className="d-flex border-start ms-2 align-items-center" style={{ height: "3em" }}>
+            <div className="d-flex border-start ms-1 align-items-center" style={{ height: "3em" }}>
               <CustomTooltip placement="bottom" tooltipId="overlay-tooltip-zoom-out" tooltipText={<FormattedMessage id="remixUiTabs.zoomOut" />}>
                 <span data-id="tabProxyZoomOut" className="btn fas fa-search-minus text-dark ps-2 pe-0 py-0 d-flex" onClick={() => props.onZoomOut()}></span>
               </CustomTooltip>
