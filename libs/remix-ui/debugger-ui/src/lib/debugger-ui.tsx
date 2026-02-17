@@ -794,6 +794,15 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             solidityState={solidityState}
             stepManager={stepManager}
             callTree={callTreeInstance}
+            debugWithGeneratedSources={state.opt.debugWithGeneratedSources}
+            onDebugWithGeneratedSourcesChange={(checked) => {
+              setState((prevState) => {
+                return {
+                  ...prevState,
+                  opt: { ...prevState.opt, debugWithGeneratedSources: checked }
+                }
+              })
+            }}
           />
         </div>
       )}

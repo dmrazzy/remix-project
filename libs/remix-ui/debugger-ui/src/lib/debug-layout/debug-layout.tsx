@@ -22,6 +22,8 @@ interface DebugLayoutProps {
   solidityState?: any
   stepManager?: any
   callTree?: any
+  debugWithGeneratedSources?: boolean
+  onDebugWithGeneratedSourcesChange?: (checked: boolean) => void
 }
 
 export const DebugLayout = ({
@@ -41,7 +43,9 @@ export const DebugLayout = ({
   solidityLocals,
   solidityState,
   stepManager,
-  callTree
+  callTree,
+  debugWithGeneratedSources,
+  onDebugWithGeneratedSourcesChange
 }: DebugLayoutProps) => {
   const [activeObjectTab, setActiveObjectTab] = useState<'json' | 'raw'>('json')
   const [copyTooltips, setCopyTooltips] = useState<{ [key: string]: string }>({
@@ -801,7 +805,31 @@ export const DebugLayout = ({
           currentTxHash={currentTxHash}
           onStopDebugging={onStopDebugging}
         />
-        <div className="mt-3 ms-3">
+
+        {/* Use generated sources checkbox */}
+        <div className="mt-2 mb-2 ms-3 debuggerConfig form-check">
+          <CustomTooltip tooltipId="debuggerGenSourceCheckbox" tooltipText={<FormattedMessage id="debugger.debugWithGeneratedSources" />} placement="bottom-start">
+            <span className="p-0 m-0">
+              <input
+                className="form-check-input"
+                id="debugGeneratedSourcesInput"
+                onChange={({ target: { checked } }) => {
+                  if (onDebugWithGeneratedSourcesChange) {
+                    onDebugWithGeneratedSourcesChange(checked)
+                  }
+                }}
+                checked={debugWithGeneratedSources || false}
+                type="checkbox"
+              />
+              <label data-id="debugGeneratedSourcesLabel" className="form-check-label" htmlFor="debugGeneratedSourcesInput">
+                <FormattedMessage id="debugger.useGeneratedSources" />
+                (Solidity {'>='} v0.7.2)
+              </label>
+            </span>
+          </CustomTooltip>
+        </div>
+
+        <div className="mt-2 ms-3">
           {renderGlobalVariables()}
         </div>
       </div>
