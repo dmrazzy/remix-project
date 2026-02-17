@@ -682,27 +682,6 @@ export const DebugLayout = ({
     // Get input data (can be either 'data' or 'input' property)
     const inputData = tx?.data || tx?.input
 
-    // Extract function name
-    let functionName = 'N/A'
-
-    // Check if it's a contract creation first (no 'to' address or has contractAddress)
-    if (!tx?.to || receipt?.contractAddress) {
-      functionName = 'Contract Creation'
-    } else if (currentFunction) {
-      // Use currentFunction prop if available (decoded function name from debugger)
-      functionName = currentFunction
-    } else if (tx && inputData) {
-      if (inputData === '0x' || inputData === '') {
-        functionName = 'Transfer'
-      } else if (inputData.length >= 10) {
-        const methodId = inputData.substring(0, 10)
-        functionName = methodId
-      }
-    }
-
-    // msg.sender is the transaction sender
-    const msgSender = tx?.from || 'N/A'
-
     // Extract and decode parameters
     let parameters: any = 'N/A'
 
@@ -744,8 +723,6 @@ export const DebugLayout = ({
       : 'No events emitted'
 
     const objectData: any = {
-      'msg.sender': msgSender,
-      function: functionName,
       parameters: parameters,
       returnValues: returnValues
     }
@@ -754,10 +731,10 @@ export const DebugLayout = ({
     console.log('[DebugLayout] solidityLocals:', solidityLocals)
     console.log('[DebugLayout] solidityState:', solidityState)
 
-    // Always add solidityLocals and solidityState sections
+    // Always add locals and state sections
     // Show empty object if no data, or the actual data
-    objectData.solidityLocals = solidityLocals || 'No local variables at current step'
-    objectData.solidityState = solidityState || 'No state variables at current step'
+    objectData.locals = solidityLocals || 'No local variables at current step'
+    objectData.state = solidityState || 'No state variables at current step'
 
     if (activeObjectTab === 'json') {
       return (
@@ -807,7 +784,7 @@ export const DebugLayout = ({
         />
 
         {/* Use generated sources checkbox */}
-        <div className="mt-2 mb-2 ms-3 debuggerConfig form-check">
+        <div className="mt-1 mb-2 ms-1 debuggerConfig form-check">
           <CustomTooltip tooltipId="debuggerGenSourceCheckbox" tooltipText={<FormattedMessage id="debugger.debugWithGeneratedSources" />} placement="bottom-start">
             <span className="p-0 m-0">
               <input
@@ -829,7 +806,7 @@ export const DebugLayout = ({
           </CustomTooltip>
         </div>
 
-        <div className="mt-2 ms-3">
+        <div className="mt-1 ms-3">
           {renderGlobalVariables()}
         </div>
       </div>

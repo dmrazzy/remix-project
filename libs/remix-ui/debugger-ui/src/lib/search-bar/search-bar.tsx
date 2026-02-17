@@ -76,7 +76,7 @@ export const SearchBar = ({ onSearch, debugging, currentTxHash = '', onStopDebug
             onClick={onStopDebugging}
             aria-label="Stop debugging"
           >
-            <i className="fas fa-stop"></i> <FormattedMessage id="debugger.stopDebugging" defaultMessage="Stop Debugging" />
+            <i className="fas fa-stop"></i> <FormattedMessage id="debugger.stopDebugging" defaultMessage="Stop" />
           </button>
         )}
       </div>

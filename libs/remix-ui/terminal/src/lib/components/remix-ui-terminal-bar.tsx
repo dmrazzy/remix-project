@@ -81,7 +81,7 @@ export const RemixUITerminalBar = (props: RemixUiTerminalProps) => {
         {showExecutionTrace ? (
           // Only show "Execution trace" title when debugging
           <div className="d-flex align-items-center ps-3">
-            <span className="fw-bold text-dark">Execution trace</span>
+            <h6 className="m-0" style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--bs-body-color)', lineHeight: '1.5rem' }}>Execution trace</h6>
           </div>
         ) : (
           // Show regular terminal menu when not debugging
