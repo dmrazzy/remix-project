@@ -3,7 +3,7 @@ import { AstWalker } from '@remix-project/remix-astwalker'
 import { util } from '@remix-project/remix-lib'
 import { SourceLocationTracker } from '../source/sourceLocationTracker'
 import { EventManager } from '../eventManager'
-import { isContractCreation, isCallInstruction, isStaticCallInstruction, isCreateInstruction, isRevertInstruction, isStopInstruction, isReturnInstruction } from '../trace/traceHelper'
+import { isContractCreation, isCallInstruction, isCreateInstruction, isRevertInstruction, isStopInstruction, isReturnInstruction } from '../trace/traceHelper'
 import { SymbolicStackManager, SymbolicStackSlot } from './symbolicStack'
 import { updateSymbolicStack } from './opcodeStackHandler'
 import { includedSource, callDepthChange, addReducedTrace, getGeneratedSources, resolveNodesAtSourceLocation, registerFunctionParameters, countConsecutivePopOpcodes, includeVariableDeclaration } from './helpers/callTreeHelper'
@@ -224,6 +224,8 @@ export class InternalCallTree {
   ctorLayout: {
     [id: number]: number
   }
+  /** last valid BlocksDefinition */
+  lastValidBlocksDefinition: any
 
   /**
     * constructor
@@ -311,6 +313,7 @@ export class InternalCallTree {
     this.mergedScope = {}
     this.fnJumpDest = {}
     this.ctorLayout = {}
+    this.lastValidBlocksDefinition
   }
 
   /**
@@ -754,8 +757,11 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
     // check if there is a function at destination - but only for AST node resolution
     const contractObj = await tree.solidityProxy.contractObjectAtAddress(address)
     const generatedSources = getGeneratedSources(tree, scopeId, contractObj)
-    const { nodes, blocksDefinition, functionDefinition, contractDefinition } = await resolveNodesAtSourceLocation(tree, sourceLocation, generatedSources, address)
-    const functionisLeaf = functionDefinition && nodes && nodes.length && nodes[nodes.length - 1] && nodes[nodes.length - 1].id === functionDefinition.id
+    const { nodes, blocksDefinition, functionDefinitionInScope, contractDefinition } = await resolveNodesAtSourceLocation(tree, sourceLocation, generatedSources, address)
+    if (blocksDefinition && blocksDefinition.length) tree.lastValidBlocksDefinition = blocksDefinition
+    const functionisLeaf = functionDefinitionInScope && nodes && nodes.length && nodes[nodes.length - 1] && nodes[nodes.length - 1].id === functionDefinitionInScope.id
+
+    const functionDefinition = functionDefinitionInScope // await resolveFunctionDefinition(tree, sourceLocation, generatedSources, address)
 
     // registering function definition whose src location is available when hitting JUMPDEST
     if (!tree.scopes[scopeId].functionDefinition && stepDetail.op === 'JUMPDEST' && functionDefinition && functionisLeaf && functionDefinition.kind !== 'constructor' && tree.scopes[scopeId].firstStep === step - 1) {
@@ -765,18 +771,18 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
       await registerFunctionParameters(tree, functionDefinition, contractDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
     }
 
+    // if the first step of the execution leads to invalid source (generated code), we consider it a low level scope.
+    if (firstExecutionStep && isInvalidSource) {
+      tree.scopes[scopeId].lowLevelScope = true
+    }
+
     // registering constructors
     const executionInFunctionBody = functionDefinition && nodes && nodes.length && nodes[nodes.length - 1].id !== functionDefinition.id
-    if (executionInFunctionBody && functionDefinition && functionDefinition.kind === 'constructor' && !tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id]) {
+    if (executionInFunctionBody && functionDefinition && functionDefinition.kind === 'constructor' && !tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id] && !isInvalidSource) {
       tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id] = nextStepDetail && nextStepDetail.pc
       tree.scopes[scopeId].functionDefinition = functionDefinition
       tree.scopes[scopeId].lowLevelScope = false
       await registerFunctionParameters(tree, functionDefinition, contractDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
-    }
-
-    // if the first step of the execution leads to invalid source (generated code), we consider it a low level scope.
-    if (firstExecutionStep && isInvalidSource) {
-      tree.scopes[scopeId].lowLevelScope = true
     }
 
     // Update symbolic stack based on opcode execution
@@ -791,8 +797,10 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
     // step + 1 because the symbolic stack represents the state AFTER the opcode execution
     const zeroTheStack = (isInternalTxInstrn || isCreateInstrn) //  && !isStaticCallInstruction(stepDetail)
     tree.symbolicStackManager.setStackAtStep(step + 1, zeroTheStack ? [] : newSymbolicStack)
+    // verify that some registered variable are now present on stack
+    tree.symbolicStackManager.checkRegisteredVariables(step + 1, newSymbolicStack.length)
 
-    tree.locationAndOpcodePerVMTraceIndex[step].blocksDefinition = blocksDefinition
+    tree.locationAndOpcodePerVMTraceIndex[step].blocksDefinition = tree.lastValidBlocksDefinition
 
     const isRevert = isRevertInstruction(stepDetail)
 
@@ -836,11 +844,14 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
           - entire function is selected in the source map (functionisLeaf)
           - not a low level scope.
         */
-        if (!lowLevelScope && functionDefinition && !isInternalTxInstrn && functionisLeaf) {
+        if (!lowLevelScope && functionDefinition && internalfunctionCall && !isInternalTxInstrn && functionisLeaf) {
+          /*
+          Not used anymore. see line 767. keeping this code anyway for the record
           tree.scopes[newScopeId].functionDefinition = functionDefinition
           tree.scopes[newScopeId].lowLevelScope = false
           // Register function parameters when entering new function scope (internal calls or external calls)
           await registerFunctionParameters(tree, functionDefinition, contractDefinition, step, newScopeId, contractObj, sourceLocation, address)
+          */
         }
         let externalCallResult
         try {

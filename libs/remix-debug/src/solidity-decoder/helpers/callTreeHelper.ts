@@ -19,35 +19,6 @@ export function callDepthChange (step, trace) {
 }
 
 /**
-   * Checks if we're exiting a constructor based on stack depth.
-   * For constructors (especially in inheritance), the stack depth returning to entry level
-   * indicates the end of that constructor's execution.
-   *
-   * @param {InternalCallTree} tree - The call tree instance
-   * @param {string} scopeId - Current scope identifier
-   * @param {number} initialEntrystackIndex - Stack depth at constructor entry
-   * @param {StepDetail} stepDetail - Current step details with stack info
-   * @returns {boolean} True if exiting a constructor scope
-   */
-export function isConstructorExit (tree, step, scopeId, initialEntrystackIndex, stepDetail, isConstructor) {
-  if (!isConstructor) return false // we are not in a constructor anyway
-  const scope = tree.scopes[scopeId]
-  if (scope.firstStep === step) {
-    // we are just entering the constructor
-    return false
-  }
-  if (!scope || !scope.functionDefinition || scope.functionDefinition.kind !== 'constructor') {
-    return false
-  }
-  // Check if stack has returned to entry depth (or below, in case of cleanup)
-  if (initialEntrystackIndex && stepDetail.stack.length <= initialEntrystackIndex) {
-    console.log('Exiting constructor scope ', scopeId, ' at step ', step)
-    return true
-  }
-  return false
-}
-
-/**
    * Checks if one source location is completely included within another.
    *
    * @param {Object} source - Outer source location to check against
@@ -508,13 +479,7 @@ export function addReturnParams (step, functionDefinition, parameterList, tree: 
     const param = parameterList.parameters[i]
 
     // Calculate stack index based on call type
-    let stackIndex = stackLength + inputParamCount - paramCount + i
-
-    // Ensure stack index is valid
-    if (stackIndex < 0 || stackIndex >= stackLength) {
-      if (tree.debug) console.warn(`[addInputParams] Invalid stack index ${stackIndex} for parameter ${param.name} (stackLength: ${stackLength}), using fallback positioning`)
-      stackIndex = Math.max(0, Math.min(i, stackLength - 1))
-    }
+    const stackIndex = stackLength + inputParamCount - paramCount + i
 
     let location = extractLocationFromAstVariable(param)
     location = location === 'default' ? 'memory' : location
@@ -731,9 +696,9 @@ export async function resolveNodesAtSourceLocation (tree, sourceLocation, genera
       }
     }
 
-    return { nodes, functionDefinition: funcDef, contractDefinition: contractDef, blocksDefinition: blocksDef }
+    return { nodes, functionDefinitionInScope: funcDef, contractDefinition: contractDef, blocksDefinition: blocksDef }
   } else {
-    return { nodes: [], functionDefinition: null, contractDefinition: null, blocksDefinition: []}
+    return { nodes: [], functionDefinitionInScope: null, contractDefinition: null, blocksDefinition: []}
   }
 }
 
