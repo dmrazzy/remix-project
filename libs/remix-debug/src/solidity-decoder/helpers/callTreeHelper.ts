@@ -248,7 +248,7 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
 
             addReducedTrace(tree, safeStep)
 
-            let stackIndex = stack.length
+            const stackIndex = stack.length
 
             /*
               For older solidity version 0.8.26, we have seen this sequence:
@@ -256,7 +256,7 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
               Without the fix below the second PUSH will register the var at index 4.
               That isn't a really good way of fixing this, need to find a better solution.
             */
-           /*
+            /*
             try {
               const symbolicStack = tree.symbolicStackManager.getStackAtStep(step)
               if (symbolicStack && symbolicStack.length && symbolicStack[symbolicStack.length - 1] &&
