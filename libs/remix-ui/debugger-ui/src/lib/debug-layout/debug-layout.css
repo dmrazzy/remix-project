@@ -253,7 +253,7 @@
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  min-width: 6rem;
+  min-width: 4rem;
   justify-content: center;
 }
 
@@ -322,6 +322,34 @@
 
 .call-trace-expand-icon:hover {
   color: var(--bs-primary);
+}
+
+.call-trace-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.call-trace-item:hover .call-trace-actions,
+.call-trace-item.selected .call-trace-actions {
+  opacity: 1;
+}
+
+.jump-debug-btn {
+    display: flex;
+    align-items: center;
+    padding: 2px 5px;
+    height: 24px;
+    font-size: 11px;
+    border: none;
+    border-radius: 10px;
+    transition: all 0.2s;
+    cursor: pointer;
+    font-family: var(--bs-body-font-family);
 }
 
 .debug-section .call-trace-type.transaction {

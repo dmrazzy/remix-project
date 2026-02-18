@@ -505,13 +505,13 @@ export const DebugLayout = ({
           <div className="call-trace-line">
             <span className="call-trace-step">{scope.firstStep}</span>
             <div style={{
-              paddingLeft: `${0.5 + depth * 20}px`,
+              paddingLeft: `${0.5 + depth * 8}px`,
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.25rem',
               flex: 1,
               borderLeft: depth > 0 ? '2px solid var(--bs-border-color)' : 'none',
-              marginLeft: depth > 0 ? '0.5rem' : '0'
+              marginLeft: depth > 0 ? '0.25rem' : '0'
             }}>
               {hasChildren && (
                 <i
@@ -575,7 +575,65 @@ export const DebugLayout = ({
                   </>
                 )}
               </span>
-              <span className="call-trace-gas"><i className="fas fa-gas-pump"></i> {scope.gasCost}</span>
+              {/* Navigation action buttons */}
+              {!scope.isSenderNode && (opcode === 'CALL' || opcode === 'DELEGATECALL' || opcode === 'STATICCALL' ||
+                opcode === 'CREATE' || opcode === 'CREATE2' || callTypeLabel === 'INTERNAL') && (
+                <div className="call-trace-actions">
+                  {scope.firstStep !== undefined && (
+                    <button
+                      className="btn btn-primary btn-sm jump-debug-btn fw-bold"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (stepManager && stepManager.jumpTo) {
+                          stepManager.jumpTo(scope.firstStep + 2) // After the JUMPDEST
+                        }
+                      }}
+                    >
+                      Jump Into
+                    </button>
+                  )}
+                  {scope.lastStep !== undefined && (
+                    <>
+                      <button
+                        className="btn btn-primary btn-sm jump-debug-btn fw-bold"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (stepManager && stepManager.jumpTo) {
+                            stepManager.jumpTo(scope.lastStep)
+                          }
+                        }}
+                      >
+                        Jump End
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm jump-debug-btn fw-bold"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (stepManager && stepManager.jumpTo) {
+                            stepManager.jumpTo(scope.lastStep + 1)
+                          }
+                        }}
+                      >
+                        Jump Over
+                      </button>
+                    </>
+                  )}
+                  {isSelected && stepManager && stepManager.jumpOut && (
+                    <button
+                      className="btn btn-primary btn-sm jump-debug-btn fw-bold"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (stepManager && stepManager.jumpOut) {
+                          stepManager.jumpOut(true) // true for solidity mode
+                        }
+                      }}
+                    >
+                      Jump Out
+                    </button>
+                  )}
+                </div>
+              )}
+              <span className="call-trace-gas ms-1"><i className="fas fa-gas-pump"></i> {scope.gasCost}</span>
             </div>
           </div>
         </div>
@@ -645,13 +703,13 @@ export const DebugLayout = ({
               <div className="call-trace-line">
                 <span className="call-trace-step">{step}</span>
                 <div style={{
-                  paddingLeft: `${0.5 + index * 12}px`,
+                  paddingLeft: `${0.5 + index * 8}px`,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: '0.25rem',
                   flex: 1,
                   borderLeft: index > 0 ? '2px solid var(--bs-border-color)' : 'none',
-                  marginLeft: index > 0 ? '0.5rem' : '0'
+                  marginLeft: index > 0 ? '0.25rem' : '0'
                 }}>
                   <span className={`call-trace-type ${callTypeLabel.toLowerCase()}`}>
                     {callTypeLabel}
@@ -665,7 +723,7 @@ export const DebugLayout = ({
                       </>
                     )}
                   </span>
-                  <span className="call-trace-gas"><i className="fas fa-gas-pump"></i> {gasCost}</span>
+                  <span className="call-trace-gas ms-1"><i className="fas fa-gas-pump"></i> {gasCost}</span>
                 </div>
               </div>
             </div>
