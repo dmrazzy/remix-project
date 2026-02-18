@@ -330,7 +330,6 @@ export class InternalCallTree {
     * @returns {Object|null} Scope object containing firstStep, lastStep, locals, isCreation, and gasCost, or null if not found
     */
   findScope (vmtraceIndex) {
-    console.log(this.scopes, this.scopeStarts)
     let scopeId = this.findScopeId(vmtraceIndex)
     if (scopeId !== '' && !scopeId) return null
     let scope = this.scopes[scopeId]
@@ -338,7 +337,6 @@ export class InternalCallTree {
       scopeId = this.parentScope(scopeId)
       scope = this.scopes[scopeId]
     }
-    console.log(scope)
     return scope
   }
 
