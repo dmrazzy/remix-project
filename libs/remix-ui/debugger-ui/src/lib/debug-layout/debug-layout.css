@@ -185,11 +185,11 @@
 }
 
 .tx-status.success {
-  color: #28a745;
+  color: var(--bs-success);
 }
 
 .tx-status.failed {
-  color: #dc3545;
+  color: var(--bs-danger);
 }
 
 /* Call Trace Styles */
@@ -262,26 +262,26 @@
 }
 
 .debug-section .call-trace-type.call {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+  background-color: rgba(var(--bs-info-rgb), 0.15);
+  color: var(--bs-info);
   font-size: 0.75rem;
 }
 
 .debug-section .call-trace-type.delegatecall {
-  background-color: rgba(253, 126, 20, 0.15);
-  color: #fd7e14;
+  background-color: rgba(var(--bs-warning-rgb), 0.15);
+  color: var(--bs-warning);
   font-size: 0.75rem;
 }
 
 .debug-section .call-trace-type.staticcall {
-  background-color: rgba(13, 202, 240, 0.15);
-  color: #0dcaf0;
+  background-color: rgba(var(--bs-cyan-rgb), 0.15);
+  color: var(--bs-cyan);
   font-size: 0.75rem;
 }
 
 .debug-section .call-trace-type.create {
-  background-color: rgba(25, 135, 84, 0.15);
-  color: #198754;
+  background-color: rgba(var(--bs-success-rgb), 0.15);
+  color: var(--bs-success);
   font-size: 0.75rem;
 }
 
@@ -298,7 +298,7 @@
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  color: #17a2b8;
+  color: var(--bs-info);
   font-size: 0.8rem;
   font-weight: 700;
   white-space: nowrap;
@@ -306,7 +306,7 @@
 
 .call-trace-gas i {
   font-size: 0.8rem;
-  color: #17a2b8;
+  color: var(--bs-info);
 }
 
 .call-trace-expand-icon {
@@ -353,24 +353,24 @@
 }
 
 .debug-section .call-trace-type.transaction {
-  background-color: rgba(32, 201, 151, 0.15);
-  color: #20c997;
+  background-color: rgba(var(--bs-teal-rgb), 0.15);
+  color: var(--bs-teal);
   font-size: 0.75rem;
 }
 
 .debug-section .call-trace-type.sender {
-  background-color: rgba(255, 140, 0, 0.15);
-  color: #ff8c00;
+  background-color: rgba(var(--bs-warning-rgb), 0.15);
+  color: var(--bs-warning);
   font-size: 0.75rem;
 }
 
 .contract-name {
-  color: #17a2b8;
+  color: var(--bs-info);
   font-weight: 600;
 }
 
 .method-name {
-  color: #e83e8c;
+  color: var(--bs-pink);
   font-weight: 600;
 }
 
