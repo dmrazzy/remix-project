@@ -194,6 +194,9 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
     for (const variableDeclaration of variableDeclarations) {
       if (variableDeclaration) {
         try {
+          // check if already processed
+          if (tree.scopes[scopeId] && tree.scopes[scopeId].locals && tree.scopes[scopeId].locals[variableDeclaration.name]) continue
+
           const stack = tree.traceManager.getStackAt(step)
           // the stack length at this point is where the value of the new local variable will be stored.
           // so, either this is the direct value, or the offset in memory. That depends on the type.
@@ -253,6 +256,7 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
               Without the fix below the second PUSH will register the var at index 4.
               That isn't a really good way of fixing this, need to find a better solution.
             */
+           /*
             try {
               const symbolicStack = tree.symbolicStackManager.getStackAtStep(step)
               if (symbolicStack && symbolicStack.length && symbolicStack[symbolicStack.length - 1] &&
@@ -260,14 +264,14 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
                 const testDup = symbolicStack[symbolicStack.length - 1]
                 const testPush = symbolicStack[symbolicStack.length - 2]
                 if (testDup.originOp && testDup.kind && testDup.kind === 'intermediate' && testDup.originOp.startsWith('DUP') &&
-                      testPush.kind && testPush.kind === 'variable' && testPush.originStep === step - 2) {
+                      testPush.kind && (testPush.kind === 'variable' || testPush.kind === 'return_value')) {
                   console.warn('applying stack fix', step, symbolicStack)
                   stackIndex = stack.length - 1
                 }
               }
             } catch (e) {
               console.warn(e)
-            }
+            }*/
 
             // Bind variable to symbolic stack with appropriate lifecycle
             const variable = isReturnParamDeclaration ? existingReturnParam : newVar
