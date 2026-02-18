@@ -157,7 +157,7 @@ export class SymbolicStackManager {
     } else {
       // Handle out of bounds - this can happen with return parameters
       if (variable.isReturnParameter || stackIndex < 0) {
-        console.log(`Return parameter or negative stack index for ${variable.name}: stackIndex=${stackIndex}`)
+        console.log(`Return parameter or negative stack index for ${variable.name}: stackIndex=${stackIndex}, stackLengthx=${stack.length}, step=${step} `)
       } else {
         // console.warn(`Cannot bind variable ${variable.name} at step ${step}: stackIndex ${stackIndex} out of bounds (stack length: ${stack.length})`)
       }
