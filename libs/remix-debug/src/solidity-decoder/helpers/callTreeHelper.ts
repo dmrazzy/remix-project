@@ -136,13 +136,16 @@ export async function registerFunctionParameters (tree: InternalCallTree, functi
       const outputs = functionDefinition.returnParameters
 
       // input params - they are at the bottom of the stack at function entry
+      let availableSlot
       if (inputs && inputs.parameters && inputs.parameters.length > 0) {
-        functionDefinitionAndInputs.inputs = addInputParams(step, functionDefinition, inputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, stackPosOnCtor)
+        const { params, freeStackIndex } = addInputParams(step, functionDefinition, inputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, stackPosOnCtor)
+        availableSlot = freeStackIndex
+        functionDefinitionAndInputs.inputs = params
       }
 
       // return params - register them but they're not yet on the stack
       if (outputs && outputs.parameters && outputs.parameters.length > 0) {
-        addReturnParams(step, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, inputs && inputs.parameters && inputs.parameters.length)
+        addReturnParams(step, availableSlot, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, inputs && inputs.parameters && inputs.parameters.length)
       }
     }
 
@@ -395,7 +398,7 @@ export function extractFunctionDefinitions (ast, astWalker) {
 export function addInputParams (step, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, stackLength, forceFreeSlot) {
   if (!contractObj) {
     console.warn('No contract object found while adding input params')
-    return []
+    return { params: []}
   }
 
   const contractName = contractObj.name
@@ -408,6 +411,7 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
   }
 
   const stackLengthAtStart = functionDefinition.kind === 'constructor' ? forceFreeSlot : stackLength
+  let lastStackIndex = stackLengthAtStart
   for (let i = 0; i < paramCount; i++) {
     const param = parameterList.parameters[i]
 
@@ -444,11 +448,10 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
     // Bind parameter to symbolic stack with lifecycle tracking
     // Use step + 1 because the symbolic stack represents the state AFTER the opcode execution
     tree.symbolicStackManager.bindVariableWithLifecycle(step + 1, newParam, stackIndex, 'assigned', scopeId)
-
+    lastStackIndex = stackIndex
     if (tree.debug) console.log(`[addInputParams] Bound parameter: ${attributesName} at stack index ${stackIndex}`)
   }
-
-  return params
+  return { params, freeStackIndex: lastStackIndex + 1 }
 }
 
 /**
@@ -464,7 +467,7 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
  * @param {Object} contractObj - Contract object with name and ABI
  * @param {Object} sourceLocation - Source location of the parameter
  */
-export function addReturnParams (step, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, stackLength, inputParamCount) {
+export function addReturnParams (step, availableSlot, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, stackLength, inputParamCount) {
   if (!contractObj) {
     console.warn('No contract object found while adding return params')
     return
@@ -479,7 +482,7 @@ export function addReturnParams (step, functionDefinition, parameterList, tree: 
     const param = parameterList.parameters[i]
 
     // Calculate stack index based on call type
-    const stackIndex = stackLength + inputParamCount - paramCount + i
+    const stackIndex = availableSlot + i
 
     let location = extractLocationFromAstVariable(param)
     location = location === 'default' ? 'memory' : location
