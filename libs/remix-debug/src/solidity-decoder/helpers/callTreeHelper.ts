@@ -257,13 +257,13 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
               const symbolicStack = tree.symbolicStackManager.getStackAtStep(step)
               if (symbolicStack && symbolicStack.length && symbolicStack[symbolicStack.length - 1] &&
                 symbolicStack && symbolicStack.length && symbolicStack[symbolicStack.length - 2]) {
-                  const testDup = symbolicStack[symbolicStack.length - 1]
-                  const testPush = symbolicStack[symbolicStack.length - 2]
-                  if (testDup.originOp && testDup.kind && testDup.kind === 'intermediate' && testDup.originOp.startsWith('DUP') &&
+                const testDup = symbolicStack[symbolicStack.length - 1]
+                const testPush = symbolicStack[symbolicStack.length - 2]
+                if (testDup.originOp && testDup.kind && testDup.kind === 'intermediate' && testDup.originOp.startsWith('DUP') &&
                       testPush.kind && testPush.kind === 'variable' && testPush.originStep === step - 2) {
-                        console.warn('applying stack fix', step, symbolicStack)
-                        stackIndex = stack.length - 1
-                  }
+                  console.warn('applying stack fix', step, symbolicStack)
+                  stackIndex = stack.length - 1
+                }
               }
             } catch (e) {
               console.warn(e)
