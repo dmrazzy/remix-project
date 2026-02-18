@@ -575,8 +575,8 @@ export const DebugLayout = ({
                   </>
                 )}
               </span>
-              {/* Navigation action buttons */}
-              {!scope.isSenderNode && (opcode === 'CALL' || opcode === 'DELEGATECALL' || opcode === 'STATICCALL' ||
+              {/* Navigation action buttons - show for external calls and parent calls with children */}
+              {!scope.isSenderNode && (hasChildren || opcode === 'CALL' || opcode === 'DELEGATECALL' || opcode === 'STATICCALL' ||
                 opcode === 'CREATE' || opcode === 'CREATE2' || callTypeLabel === 'INTERNAL') && (
                 <div className="call-trace-actions">
                   {scope.firstStep !== undefined && (
@@ -585,7 +585,9 @@ export const DebugLayout = ({
                       onClick={(e) => {
                         e.stopPropagation()
                         if (stepManager && stepManager.jumpTo) {
-                          stepManager.jumpTo(scope.firstStep + 2) // After the JUMPDEST
+                          // Use functionEntryStep if available (skips dispatcher), otherwise use firstStep
+                          const stepToJump = scope.functionEntryStep !== undefined ? scope.functionEntryStep : scope.firstStep
+                          stepManager.jumpTo(stepToJump)
                         }
                       }}
                     >
@@ -780,19 +782,17 @@ export const DebugLayout = ({
       ? receipt.logs
       : 'No events emitted'
 
-    const objectData: any = {
-      parameters: parameters,
-      returnValues: returnValues
-    }
-
     // Debug logging
     console.log('[DebugLayout] solidityLocals:', solidityLocals)
     console.log('[DebugLayout] solidityState:', solidityState)
 
-    // Always add locals and state sections
-    // Show empty object if no data, or the actual data
-    objectData.locals = solidityLocals || 'No local variables at current step'
-    objectData.state = solidityState || 'No state variables at current step'
+    // Build objectData with returnValues at the end
+    const objectData: any = {
+      parameters: parameters,
+      locals: solidityLocals || 'No local variables at current step',
+      state: solidityState || 'No state variables at current step',
+      returnValues: returnValues
+    }
 
     if (activeObjectTab === 'json') {
       return (

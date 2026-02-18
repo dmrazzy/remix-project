@@ -343,7 +343,7 @@
     display: flex;
     align-items: center;
     padding: 2px 5px;
-    height: 24px;
+    height: 22px;
     font-size: 11px;
     border: none;
     border-radius: 10px;
@@ -377,7 +377,6 @@
 /* JSON Renderer Styles */
 .json-renderer {
   font-size: 0.75rem;
-  font-family: 'Courier New', monospace;
   line-height: 1.6;
   padding: 0.75rem;
   padding-bottom: 0;
@@ -421,8 +420,7 @@
 }
 
 .json-key {
-  color: #20c997;
-  font-weight: 600;
+  color: rgba(var(--bs-secondary-rgb), var(1)) !important;
   word-wrap: break-word;
   word-break: break-word;
   overflow-wrap: break-word;
@@ -435,7 +433,7 @@
 }
 
 .json-value {
-  color: #ffc107;
+  color: var(--bs-warning);
   font-weight: 500;
   word-wrap: break-word;
   word-break: break-word;
