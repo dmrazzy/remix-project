@@ -856,7 +856,7 @@ export class Blockchain extends Plugin {
     }
   }
 
-  async runTx(args): Promise<{ txResult: any, address: string, returnValue: string }> {
+  async runTx(args, silenceError = false): Promise<{ txResult: any, address: string, returnValue: string }> {
     try {
       const transaction = await this.runTransaction(args)
       const txResult = (transaction as any).result
@@ -914,7 +914,7 @@ export class Blockchain extends Plugin {
             : toBytes(addHexPrefix(txResult.result) || '0x0000000000000000000000000000000000000000000000000000000000000000')
           const compiledContracts = await this.call('compilerArtefacts', 'getAllContractDatas')
           const vmError = txExecution.checkError({ errorMessage: execResult.exceptionError ? execResult.exceptionError.error : '', errorData: execResult.returnValue }, compiledContracts)
-          if (vmError.error) {
+          if (vmError.error && !silenceError) {
             throw new Error(vmError.message)
           }
         }
