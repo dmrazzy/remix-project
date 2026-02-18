@@ -171,7 +171,7 @@ export async function registerFunctionParameters (tree: InternalCallTree, functi
 
       // return params - register them but they're not yet on the stack
       if (outputs && outputs.parameters && outputs.parameters.length > 0) {
-        addReturnParams(step + 1, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, inputs && inputs.parameters && inputs.parameters.length)
+        addReturnParams(step, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, inputs && inputs.parameters && inputs.parameters.length)
       }
     }
 
@@ -442,7 +442,6 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
 
     // Calculate stack index based on call type
     let stackIndex = stackLengthAtStart - paramCount + i
-
     // Ensure stack index is valid
     if (stackIndex < 0 || stackIndex >= stackLength) {
       if (tree.debug) console.warn(`[addInputParams] Invalid stack index ${stackIndex} for parameter ${param.name} (stackLength: ${stackLength}), using fallback positioning`)
@@ -509,7 +508,7 @@ export function addReturnParams (step, functionDefinition, parameterList, tree: 
     const param = parameterList.parameters[i]
 
     // Calculate stack index based on call type
-    let stackIndex = stackLength - inputParamCount + paramCount + i + 1
+    let stackIndex = stackLength + inputParamCount - paramCount + i
 
     // Ensure stack index is valid
     if (stackIndex < 0 || stackIndex >= stackLength) {
@@ -538,7 +537,11 @@ export function addReturnParams (step, functionDefinition, parameterList, tree: 
     // Don't add to locals yet - will be added when actually declared in the function body
     if (!tree.variables[param.id]) tree.variables[param.id] = newReturnParam
 
-    if (tree.debug) console.log(`[addReturnParams] Registered return parameter: ${attributesName} (not yet on stack)`)
+    // Bind parameter to symbolic stack with lifecycle tracking
+    // Use step + 1 because the symbolic stack represents the state AFTER the opcode execution
+    tree.symbolicStackManager.bindVariableWithLifecycle(step + 1, newReturnParam, stackIndex, 'assigned', scopeId)
+
+    if (tree.debug) console.log(`[addReturnParams] Registered return parameter: ${attributesName}`)
   }
 }
 
