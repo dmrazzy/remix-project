@@ -913,7 +913,7 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
       tree.scopes[scopeId].endExecutionLine = lineColumnPos && lineColumnPos.end ? lineColumnPos.end.line + 1 : undefined
       return { outStep: step + 1 }
     } else {
-      if (tree.includeLocalVariables) {
+      if (tree.includeLocalVariables && stepDetail.op && stepDetail.op.startsWith('PUSH')) {
         try {
           await includeVariableDeclaration(tree, step, sourceLocation, scopeId, contractObj, generatedSources, address, blocksDefinition)
         } catch (e) {

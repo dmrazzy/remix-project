@@ -179,7 +179,7 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
   }
   let states = null
   // Use enhanced variable discovery with scope filtering
-  const variableDeclarations = await resolveVariableDeclarationEnhanced(tree, sourceLocation, generatedSources, address, scopeId)
+  const variableDeclarations = await resolveVariableDeclaration(tree, sourceLocation, generatedSources, address)
 
   if (variableDeclarations && variableDeclarations.length > 0) {
     if (tree.debug) {
@@ -245,12 +245,36 @@ export async function includeVariableDeclaration (tree: InternalCallTree, step, 
 
             addReducedTrace(tree, safeStep)
 
+            let stackIndex = stack.length
+
+            /*
+              For older solidity version 0.8.26, we have seen this sequence:
+              PUSH (a var, at stack 2), DUP, PUSH (another var, at stack 3)
+              Without the fix below the second PUSH will register the var at index 4.
+              That isn't a really good way of fixing this, need to find a better solution.
+            */
+            try {
+              const symbolicStack = tree.symbolicStackManager.getStackAtStep(step)
+              if (symbolicStack && symbolicStack.length && symbolicStack[symbolicStack.length - 1] &&
+                symbolicStack && symbolicStack.length && symbolicStack[symbolicStack.length - 2]) {
+                  const testDup = symbolicStack[symbolicStack.length - 1]
+                  const testPush = symbolicStack[symbolicStack.length - 2]
+                  if (testDup.originOp && testDup.kind && testDup.kind === 'intermediate' && testDup.originOp.startsWith('DUP') &&
+                      testPush.kind && testPush.kind === 'variable' && testPush.originStep === step - 2) {
+                        console.warn('applying stack fix', step, symbolicStack)
+                        stackIndex = stack.length - 1
+                  }
+              }
+            } catch (e) {
+              console.warn(e)
+            }
+
             // Bind variable to symbolic stack with appropriate lifecycle
             const variable = isReturnParamDeclaration ? existingReturnParam : newVar
             tree.symbolicStackManager.bindVariableWithLifecycle(
               step + 1,
               variable,
-              stack.length,
+              stackIndex,
               isReturnParamDeclaration ? 'assigned' : 'declared',
               scopeId
             )
