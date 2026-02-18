@@ -54,11 +54,28 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
       signature: 'create2Test(uint256,string,bytes32)',
       params: [555, 'Create2Test', '0x1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF'],
       description: 'CREATE2 operation parameters'
+    },
+    {
+      name: 'returnValueTest',
+      signature: 'returnValueTest(uint256,string)',
+      params: [666, 'ReturnTest'],
+      description: 'Function with return values (uint, string)',
+      expectedReturns: [1666, 'Return: ReturnTest'], // 666 + 1000, "Return: ReturnTest"
+      expectedReturnsName: ['returnUint', 'returnString']
+    },
+    {
+      name: 'pureReturnTest',
+      signature: 'pureReturnTest(uint256,string)',
+      params: [777, 'PureTest'],
+      description: 'Pure function with return values (uint, string)',
+      expectedReturns: [2777, 'Pure: PureTest'], // 777 + 2000, "Pure: PureTest"
+      expectedReturnsName: ['<1>', '<2>']
     }
   ]
 
   const nbCtorTests = 6
-  st.plan(nbCtorTests + (testCases.length * 3) + 2 + 2 + 1) // 2 Additional tests for internalCallTest + 2 Additional tests for thisCallTest + 1 Additional test for create2Test (salt param)
+  const returnValueTests = testCases.filter(tc => tc.expectedReturns).length * 1 // 1 test per return value function (uint + string)
+  st.plan(nbCtorTests + (testCases.length * 3) + 2 + 2 + 1 + returnValueTests) // 2 Additional tests for internalCallTest + 2 Additional tests for thisCallTest + 1 Additional test for create2Test (salt param) + return value tests
 
   // Helper function to encode parameters
   function encodeParams(signature: string, params: any[]): string {
@@ -66,6 +83,52 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
     const iface = new ethers.Interface([`function ${signature}`])
     const functionName = signature.split('(')[0]
     return iface.encodeFunctionData(functionName, params)
+  }
+
+  // Helper function to verify parameters across a range of steps
+  // Iterates through steps until all expected parameters are found with correct values
+  async function verifyParametersInRange(
+    startStep: number,
+    lastStep: number,
+    expectedParams: { [paramName: string]: any },
+    traceManager: any,
+    callTree: any,
+    testName: string
+  ): Promise<void> {
+    console.log(`Verifying parameters from step ${startStep} to ${lastStep} for ${testName}`)
+
+    const foundParams = new Set<string>()
+    const paramsToFind = Object.keys(expectedParams)
+
+    for (let step = startStep; step <= lastStep; step++) {
+      await helper.decodeLocals(st, step, traceManager, callTree, (locals: any) => {
+        // Check each expected parameter
+        for (const [paramName, expectedValue] of Object.entries(expectedParams)) {
+          // Skip if already found
+          if (foundParams.has(paramName)) {
+            continue
+          }
+
+          // Check if parameter exists with correct value
+          if (locals[paramName] &&
+              locals[paramName].value &&
+              locals[paramName].value === expectedValue.toString()) {
+            foundParams.add(paramName)
+            console.log(`Found ${paramName} = ${expectedValue} at step ${step}`)
+          }
+        }
+      })
+
+      // Stop if all parameters found
+      if (foundParams.size === paramsToFind.length) {
+        st.pass(`${testName}: All parameters found with correct values`)
+        return
+      }
+    }
+
+    // If we reached here, not all parameters were found
+    const missingParams = paramsToFind.filter(p => !foundParams.has(p))
+    st.fail(`${testName}: Parameters not found with correct values: ${missingParams.join(', ')}`)
   }
 
   // Helper function to find scope by function name and get its firstStep
@@ -163,19 +226,14 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
 
       const { scopes, scopeStarts } = await waitForCallTree()
       const nestedScopes: NestedScope[] = callTree.getScopesAsNestedJSON('nojump')
-      console.log(nestedScopes)
       // Find the target function scope
       const functionScope = findFunctionScope(nestedScopes, testCase.name)
 
       if (functionScope) {
         console.log(`Found ${testCase.name} scope with firstStep: ${functionScope.firstStep}`)
 
-        // Get symbolic stack at the first step of this function
-        const symbolicStack = callTree.getSymbolicStackAtStep(functionScope.firstStep)
-        // console.log(`Symbolic stack for ${testCase.name}:`, symbolicStack)
-
         // Decode locals at this step
-        await helper.decodeLocals(st, functionScope.firstStep + 3, traceManager, callTree, (locals) => {
+        await helper.decodeLocals(st, functionScope.firstStep + 5, traceManager, callTree, (locals) => {
           console.log(`${testCase.name} locals:`, locals)
 
           // Verify parameter decoding based on function signature
@@ -267,6 +325,33 @@ module.exports = async function (st, privateKey, contractBytecode, compilationRe
           }
         }
 
+        // Test return values for functions that have them
+        if (testCase.expectedReturns) {
+          console.log(`Testing return values for ${testCase.name}`)
+
+          // Find the return step - typically near the end of the function
+          const returnStep = functionScope.scope.lastStep
+
+          // Look for RETURN opcode in the function scope
+          /*for (let i = functionScope.firstStep; i < trace.length; i++) {
+            if (trace[i] && trace[i].op === 'RETURN') {
+              returnStep = i
+              break
+            }
+          }*/
+
+          if (returnStep !== -1) {
+            const tests = {}
+            tests[testCase.expectedReturnsName[0]] = testCase.expectedReturns[0].toString()
+            tests[testCase.expectedReturnsName[1]] = testCase.expectedReturns[1].toString()
+            console.log(`Found return step at: ${returnStep}`)
+            await verifyParametersInRange(
+              functionScope.firstStep,
+              returnStep,
+              tests,
+              traceManager, callTree, testCase.name)
+          }
+        }
       } else {
         st.fail(`Could not find scope for function ${testCase.name}`)
       }
