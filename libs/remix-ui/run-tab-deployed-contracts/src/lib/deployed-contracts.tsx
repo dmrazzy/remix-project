@@ -63,13 +63,16 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
     })
 
     plugin.on('filePanel', 'setWorkspace', async (workspace) => {
-      if (workspace.name && widgetState.lastLoadedWorkspace !== workspace.name) {
+      const workspaceName = workspace.name
+      const lastLoadedWorkspaceName = plugin?.getWidgetState()?.lastLoadedWorkspace
+
+      if (workspaceName && lastLoadedWorkspaceName !== workspaceName) {
         const network = await plugin.call('udappEnv', 'getNetwork')
         const chainId = network?.chainId
         const providerName = network?.name === 'VM' ? await plugin.call('udappEnv', 'getSelectedProvider') : chainId
 
-        dispatch({ type: 'SET_LAST_LOADED_WORKSPACE', payload: workspace.name })
         await loadPinnedContracts(plugin, dispatch, providerName)
+        dispatch({ type: 'SET_LAST_LOADED_WORKSPACE', payload: workspaceName })
       }
     })
 
