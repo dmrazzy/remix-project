@@ -101,9 +101,9 @@ export const mcpDefaultServersConfig: MCPDefaultServersConfig = {
     },
     {
       name: 'ethskills',
-      description: 'eth skills',
+      description: 'ethereum dev skills',
       transport: 'http',
-      url: 'http://localhost:9005/mcp',
+      url: endpointUrls.mcpCorsProxy8443 + '/ethskills/mcp',
       autoStart: true,
       enabled: true,
       timeout: 30000
