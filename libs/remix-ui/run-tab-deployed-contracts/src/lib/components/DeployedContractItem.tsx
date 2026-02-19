@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState, useRef } from 'react'
 import { FormattedMessage, useIntl } from 'react-intl'
-import { CustomToggle, CustomTooltip, extractDataDefault, getTimeAgo, shortenAddress, isNumeric, is0XPrefixed, isHexadecimal } from '@remix-ui/helper'
+import { CustomToggle, CustomTooltip, extractDataDefault, getTimeAgo, shortenAddress, isNumeric, is0XPrefixed, isHexadecimal, logBuilder } from '@remix-ui/helper'
 import { CopyToClipboard } from '@remix-ui/clipboard'
 import * as remixLib from '@remix-project/remix-lib'
 import { Dropdown } from 'react-bootstrap'
@@ -215,7 +215,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
       )
     } catch (error) {
       console.error('Error executing low level transaction:', error)
-      await plugin.call('notification', 'toast', `Error: ${error.message}`)
+      await plugin.call('terminal', 'logHtml', logBuilder(error.message))
     }
   }
 
