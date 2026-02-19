@@ -803,6 +803,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
                 }
               })
             }}
+            registerEvent={vmDebugger.registerEvent}
           />
         </div>
       )}

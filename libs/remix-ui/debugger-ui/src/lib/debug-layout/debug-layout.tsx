@@ -24,6 +24,7 @@ interface DebugLayoutProps {
   callTree?: any
   debugWithGeneratedSources?: boolean
   onDebugWithGeneratedSourcesChange?: (checked: boolean) => void
+  registerEvent?: any
 }
 
 export const DebugLayout = ({
@@ -45,9 +46,10 @@ export const DebugLayout = ({
   stepManager,
   callTree,
   debugWithGeneratedSources,
-  onDebugWithGeneratedSourcesChange
+  onDebugWithGeneratedSourcesChange,
+  registerEvent
 }: DebugLayoutProps) => {
-  const [activeObjectTab, setActiveObjectTab] = useState<'json' | 'raw'>('json')
+  const [activeObjectTab, setActiveObjectTab] = useState<'stateLocals' | 'stackMemory'>('stateLocals')
   const [copyTooltips, setCopyTooltips] = useState<{ [key: string]: string }>({
     from: 'Copy address',
     to: 'Copy address'
@@ -60,6 +62,10 @@ export const DebugLayout = ({
     callTrace: true,
     parametersReturnValues: true
   })
+  const [stackData, setStackData] = useState<any>(null)
+  const [memoryData, setMemoryData] = useState<any>(null)
+  const [callStackData, setCallStackData] = useState<any>(null)
+  const [opcodeData, setOpcodeData] = useState<any>(null)
 
   // Auto-expand sender node when nestedScopes are loaded
   React.useEffect(() => {
@@ -67,6 +73,27 @@ export const DebugLayout = ({
       setExpandedScopes(new Set(['sender']))
     }
   }, [nestedScopes])
+
+  // Register event listeners for stack, memory, call stack, and opcodes
+  React.useEffect(() => {
+    if (registerEvent) {
+      registerEvent('traceManagerStackUpdate', (stack: any) => {
+        setStackData(stack)
+      })
+
+      registerEvent('traceManagerMemoryUpdate', (memory: any) => {
+        setMemoryData(memory)
+      })
+
+      registerEvent('traceManagerCallStackUpdate', (callStack: any) => {
+        setCallStackData(callStack)
+      })
+
+      registerEvent('codeManagerChanged', (code: any) => {
+        setOpcodeData(code)
+      })
+    }
+  }, [registerEvent])
 
   const toggleSection = (section: 'transactionDetails' | 'callTrace' | 'parametersReturnValues') => {
     setExpandedSections(prev => ({
@@ -748,58 +775,49 @@ export const DebugLayout = ({
   }
 
   const renderObjectContent = () => {
-    const tx = currentTransaction
+    if (activeObjectTab === 'stateLocals') {
+      // State & Locals tab - show parameters, locals, state
+      const tx = currentTransaction
+      const inputData = tx?.data || tx?.input
 
-    // Get input data (can be either 'data' or 'input' property)
-    const inputData = tx?.data || tx?.input
+      // Extract and decode parameters
+      let parameters: any = 'N/A'
 
-    // Extract and decode parameters
-    let parameters: any = 'N/A'
+      // First, try to get decoded parameters from solidityLocals
+      if (solidityLocals && typeof solidityLocals === 'object') {
+        const decodedParams: any = {}
+        let hasParams = false
 
-    // First, try to get decoded parameters from solidityLocals
-    if (solidityLocals && typeof solidityLocals === 'object') {
-      const decodedParams: any = {}
-      let hasParams = false
+        // Iterate through locals to find parameters
+        for (const [key, value] of Object.entries(solidityLocals)) {
+          if (key !== 'length' && key !== 'decode') {
+            decodedParams[key] = value
+            hasParams = true
+          }
+        }
 
-      // Iterate through locals to find parameters
-      for (const [key, value] of Object.entries(solidityLocals)) {
-        // Check if this is a parameter (either by checking a flag or by convention)
-        // Parameters are typically stored as local variables
-        if (key !== 'length' && key !== 'decode') {
-          decodedParams[key] = value
-          hasParams = true
+        if (hasParams) {
+          parameters = decodedParams
         }
       }
 
-      if (hasParams) {
-        parameters = decodedParams
+      // Fallback to raw hex if no decoded params available
+      if (parameters === 'N/A' && tx && inputData) {
+        if (inputData === '0x' || inputData === '') {
+          parameters = !tx.to ? 'Contract Bytecode' : 'None (ETH Transfer)'
+        } else if (inputData.length > 10) {
+          parameters = '0x' + inputData.substring(10)
+        } else {
+          parameters = inputData
+        }
       }
-    }
 
-    // Fallback to raw hex if no decoded params available
-    if (parameters === 'N/A' && tx && inputData) {
-      if (inputData === '0x' || inputData === '') {
-        parameters = !tx.to ? 'Contract Bytecode' : 'None (ETH Transfer)'
-      } else if (inputData.length > 10) {
-        // Strip the function selector (first 10 chars including '0x')
-        parameters = '0x' + inputData.substring(10)
-      } else {
-        parameters = inputData
+      const objectData: any = {
+        parameters: parameters,
+        locals: solidityLocals || 'No local variables at current step',
+        state: solidityState || 'No state variables at current step'
       }
-    }
 
-    // Debug logging
-    console.log('[DebugLayout] solidityLocals:', solidityLocals)
-    console.log('[DebugLayout] solidityState:', solidityState)
-
-    // Build objectData
-    const objectData: any = {
-      parameters: parameters,
-      locals: solidityLocals || 'No local variables at current step',
-      state: solidityState || 'No state variables at current step'
-    }
-
-    if (activeObjectTab === 'json') {
       return (
         <div className="debug-object-content json-renderer">
           <div className="json-line">
@@ -827,10 +845,39 @@ export const DebugLayout = ({
         </div>
       )
     } else {
+      // Stack & Memory tab - show opcode, call stack, memory
+      const stackMemoryData: any = {
+        opcode: opcodeData || 'No opcode data at current step',
+        callStack: callStackData || 'No call stack at current step',
+        memory: memoryData || 'No memory data at current step',
+        stack: stackData || 'No stack data at current step'
+      }
+
       return (
-        <pre className="debug-object-content">
-          {JSON.stringify(objectData)}
-        </pre>
+        <div className="debug-object-content json-renderer">
+          <div className="json-line">
+            <span className="json-bracket">{'{'}</span>
+          </div>
+          {Object.keys(stackMemoryData).map((key) => {
+            const value = stackMemoryData[key]
+            const path = `root.${key}`
+            if (isObject(value)) {
+              return renderJsonValue(value, key, path, 1)
+            }
+            return (
+              <div key={path} className="json-line" style={{ marginLeft: '12px' }}>
+                <span className="json-expand-icon-placeholder"></span>
+                <span className="json-key">"{key}"</span>
+                <span className="json-separator">: </span>
+                <span className="json-value">{JSON.stringify(value)}</span>
+                {key !== Object.keys(stackMemoryData)[Object.keys(stackMemoryData).length - 1] && <span className="json-comma">,</span>}
+              </div>
+            )
+          })}
+          <div className="json-line">
+            <span className="json-bracket">{'}'}</span>
+          </div>
+        </div>
       )
     }
   }
@@ -908,33 +955,28 @@ export const DebugLayout = ({
         )}
       </div>
 
-      {/* Section 4: Parameters & Return Values */}
+      {/* Section 4: State & Locals / Stack & Memory */}
       <div className="debug-section debug-section-object" style={!expandedSections.parametersReturnValues ? { minHeight: 'auto' } : {}}>
         <div
           className="debug-section-header"
           onClick={() => toggleSection('parametersReturnValues')}
           style={{ cursor: 'pointer' }}
         >
-          <h6 className="debug-section-title">
-            <FormattedMessage id="debugger.parametersAndReturnValues" defaultMessage="Parameters & Return Values" />
-          </h6>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <i className={`fas ${expandedSections.parametersReturnValues ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', color: 'var(--bs-body-color)' }}></i>
-            <div className="debug-tabs" onClick={(e) => e.stopPropagation()}>
-              <button
-                className={`debug-tab ${activeObjectTab === 'json' ? 'active' : ''}`}
-                onClick={() => setActiveObjectTab('json')}
-              >
-                <FormattedMessage id="debugger.json" defaultMessage="JSON" />
-              </button>
-              <button
-                className={`debug-tab ${activeObjectTab === 'raw' ? 'active' : ''}`}
-                onClick={() => setActiveObjectTab('raw')}
-              >
-                <FormattedMessage id="debugger.raw" defaultMessage="Raw" />
-              </button>
-            </div>
+          <div className="debug-tabs" onClick={(e) => e.stopPropagation()} style={{ paddingLeft: '1rem' }}>
+            <button
+              className={`debug-tab ${activeObjectTab === 'stateLocals' ? 'active' : ''}`}
+              onClick={() => setActiveObjectTab('stateLocals')}
+            >
+              <FormattedMessage id="debugger.stateLocals" defaultMessage="State & Locals" />
+            </button>
+            <button
+              className={`debug-tab ${activeObjectTab === 'stackMemory' ? 'active' : ''}`}
+              onClick={() => setActiveObjectTab('stackMemory')}
+            >
+              <FormattedMessage id="debugger.stackMemory" defaultMessage="Stack & Memory" />
+            </button>
           </div>
+          <i className={`fas ${expandedSections.parametersReturnValues ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', marginRight: '1rem', color: 'var(--bs-body-color)' }}></i>
         </div>
         {expandedSections.parametersReturnValues && (
           <div className="debug-section-content debug-section-scrollable">
