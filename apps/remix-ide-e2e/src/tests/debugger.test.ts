@@ -96,7 +96,7 @@ module.exports = {
       .waitForElementVisible('#stepdetail')
       .waitForElementVisible({
         locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"3")]',
+        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"474")]',
       }).pause(1000)      
       .getEditorValue((content) => {
         browser.assert.ok(content.indexOf(`constructor (string memory name_, string memory symbol_) {
@@ -132,7 +132,7 @@ module.exports = {
       .waitForElementVisible('#stepdetail')
       .waitForElementVisible({
         locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"42")]',
+        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"131")]',
       })
       .goToVMTraceStep(261)
       .waitForElementPresent('.highlightLine8')
@@ -452,35 +452,71 @@ const sources = [
 ]
 
 const localVariable_step266_ABIEncoder = { // eslint-disable-line
-  idAsk: {
-    type: 'bytes32',
-    value: '0x0000000000000000000000000000000000000000000000000000000000000002'
-  },
-  userData: {
-    value: '0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4',
-    type: 'bytes'
-  }
+	"userData": {
+		"value": "0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4",
+		"type": "bytes"
+	},
+	"<1>": {
+		"length": "0x0",
+		"value": "0x",
+		"type": "bytes"
+	},
+	"<2>": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+		"type": "bytes32"
+	},
+	"<3>": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+		"type": "bytes32"
+	},
+	"<4>": {
+		"value": "0",
+		"type": "uint256"
+	},
+	"idAsk": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000002",
+		"type": "bytes32"
+	}
 }
 
 const localVariable_step717_ABIEncoder = { // eslint-disable-line
-  idAsk: {
-    type: 'bytes32',
-    value: '0x0000000000000000000000000000000000000000000000000000000000000002'
-  },
-  idOffer: {
-    type: 'bytes32',
-    value: '0x0000000000000000000000000000000000000000000000000000000000000001'
-  },
-  ro: {
-    length: '0xd0',
-    type: 'bytes',
-    value: '0x5b38da6a701c568545dcfcb03fcb875f56beddc45b38da6a701c568545dcfcb03fcb875f56beddc400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001'
-  },
-  userData: {
-    value: '0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4',
-    type: 'bytes'
-  }
+	"userData": {
+		"value": "0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4",
+		"type": "bytes"
+	},
+	"<1>": {
+		"length": "0xd0",
+		"value": "0x5b38da6a701c568545dcfcb03fcb875f56beddc45b38da6a701c568545dcfcb03fcb875f56beddc400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001",
+		"type": "bytes"
+	},
+	"<2>": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000002",
+		"type": "bytes32"
+	},
+	"<3>": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		"type": "bytes32"
+	},
+	"<4>": {
+		"value": "84",
+		"type": "uint256"
+	},
+	"idAsk": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000002",
+		"type": "bytes32"
+	},
+	"idOffer": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		"type": "bytes32"
+	},
+	"ro": {
+		"length": "0xd0",
+		"value": "0x5b38da6a701c568545dcfcb03fcb875f56beddc45b38da6a701c568545dcfcb03fcb875f56beddc400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001",
+		"type": "bytes"
+	}
 }
+
+
 
 const jsGetTrace = `(async () => {
   try {
