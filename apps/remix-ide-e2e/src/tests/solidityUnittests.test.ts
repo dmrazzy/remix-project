@@ -350,7 +350,7 @@ module.exports = {
   'Basic Solidity Unit tests with local compiler #group6': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('udapp')
-      .switchEnvironment('vm-cancun')
+      .switchEnvironment('vm-cancun', 'Remix_VM')
       .clickLaunchIcon('solidity')
       .setSolidityCompilerVersion('builtin')
       .click('.remixui_compilerConfigSection')
