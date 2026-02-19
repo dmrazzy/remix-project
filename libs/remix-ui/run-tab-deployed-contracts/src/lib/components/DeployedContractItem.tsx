@@ -208,7 +208,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
         index,
         false,
         funcABI,
-        '',
+        calldata,
         contract,
         -1, // Use -1 for low level interactions
         { value: sendValue, gasLimit: gasLimitValue }
@@ -605,7 +605,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                         </button>
                       </div>
                       {llIError && (
-                        <div className="alert alert-danger mt-2 p-2" role="alert" style={{ fontSize: '0.75rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                        <div data-id="deployAndRunLLTxError" className="alert alert-danger mt-2 p-2" role="alert" style={{ fontSize: '0.75rem', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                           {llIError}
                         </div>
                       )}

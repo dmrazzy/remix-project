@@ -58,7 +58,7 @@ declare module 'nightwatch' {
     setSolidityCompilerVersion(version: string): NightwatchBrowser
     clickElementAtPosition(cssSelector: string, index: number, opt?: {forceSelectIfUnselected: boolean}): NightwatchBrowser
     notContainsText(cssSelector: string, text: string): NightwatchBrowser
-    sendLowLevelTx(address: string, value: string, callData: string): NightwatchBrowser
+    sendLowLevelTx(index: number, value: string, callData: string): NightwatchBrowser
     journalLastChild(val: string): NightwatchBrowser
     checkTerminalFilter(filter: string, test: string, notContain: boolean): NightwatchBrowser
     noWorkerErrorFor(version: string): NightwatchBrowser
