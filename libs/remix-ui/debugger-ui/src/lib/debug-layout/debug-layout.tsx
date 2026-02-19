@@ -66,6 +66,8 @@ export const DebugLayout = ({
   const [memoryData, setMemoryData] = useState<any>(null)
   const [callStackData, setCallStackData] = useState<any>(null)
   const [opcodeData, setOpcodeData] = useState<any>(null)
+  const opcodeRefs = React.useRef<{ [key: number]: HTMLDivElement | null }>({})
+  const opcodeContainerRef = React.useRef<HTMLDivElement | null>(null)
 
   // Auto-expand sender node when nestedScopes are loaded
   React.useEffect(() => {
@@ -89,11 +91,26 @@ export const DebugLayout = ({
         setCallStackData(callStack)
       })
 
-      registerEvent('codeManagerChanged', (code: any) => {
-        setOpcodeData(code)
+      registerEvent('codeManagerChanged', (code: any, address: any, index: any, nextIndexes: any) => {
+        setOpcodeData({
+          code: code,
+          address: address,
+          index: index,
+          nextIndexes: nextIndexes || []
+        })
       })
     }
   }, [registerEvent])
+
+  // Scroll to current opcode when it changes
+  React.useEffect(() => {
+    if (opcodeData && opcodeData.index !== undefined && opcodeContainerRef.current) {
+      const currentOpcodeElement = opcodeRefs.current[opcodeData.index]
+      if (currentOpcodeElement) {
+        opcodeContainerRef.current.scrollTop = currentOpcodeElement.offsetTop - opcodeContainerRef.current.offsetTop
+      }
+    }
+  }, [opcodeData])
 
   const toggleSection = (section: 'transactionDetails' | 'callTrace' | 'parametersReturnValues') => {
     setExpandedSections(prev => ({
@@ -310,7 +327,7 @@ export const DebugLayout = ({
               />
             )}
             {!hasItems && <span className="json-expand-icon-placeholder"></span>}
-            <span className="json-key">"{key}"</span>
+            <span className="json-key">{key}</span>
             <span className="json-separator">: </span>
             <span className="json-bracket">[</span>
             {!isExpanded && hasItems && <span className="json-ellipsis">...</span>}
@@ -355,7 +372,7 @@ export const DebugLayout = ({
               />
             )}
             {!hasKeys && <span className="json-expand-icon-placeholder"></span>}
-            <span className="json-key">"{key}"</span>
+            <span className="json-key">{key}</span>
             <span className="json-separator">: </span>
             <span className="json-bracket">{'{'}</span>
             {!isExpanded && hasKeys && <span className="json-ellipsis">...</span>}
@@ -371,7 +388,7 @@ export const DebugLayout = ({
                 return (
                   <div key={objPath} className="json-line" style={{ marginLeft: `${(depth + 1) * 12}px` }}>
                     <span className="json-expand-icon-placeholder"></span>
-                    <span className="json-key">"{objKey}"</span>
+                    <span className="json-key">{objKey}</span>
                     <span className="json-separator">: </span>
                     <span className="json-value">{JSON.stringify(value[objKey])}</span>
                     {index < keys.length - 1 && <span className="json-comma">,</span>}
@@ -392,7 +409,7 @@ export const DebugLayout = ({
       return (
         <div key={path} className="json-line" style={{ marginLeft: `${indent}px` }}>
           <span className="json-expand-icon-placeholder"></span>
-          <span className="json-key">"{key}"</span>
+          <span className="json-key">{key}</span>
           <span className="json-separator">: </span>
           <span className="json-value">{JSON.stringify(value)}</span>
         </div>
@@ -781,46 +798,56 @@ export const DebugLayout = ({
     )
   }
 
+  const renderOpcodes = () => {
+    if (!opcodeData || !opcodeData.code || opcodeData.code.length === 0) {
+      return <div className="text-muted p-2">No opcode data at current step</div>
+    }
+
+    const { code, index, nextIndexes } = opcodeData
+
+    return (
+      <div className="opcodes-container" ref={opcodeContainerRef} style={{ maxHeight: '300px', overflowY: 'auto' }}>
+        {code.map((opcode: string, i: number) => {
+          const isCurrent = i === index
+          const isNext = nextIndexes && nextIndexes.includes(i)
+
+          let className = 'opcode-item'
+          let style: React.CSSProperties = {
+            padding: '2px 4px',
+            fontSize: '0.75rem',
+            fontFamily: 'monospace',
+            color: 'var(--bs-warning)'
+          }
+
+          if (isCurrent) {
+            style.backgroundColor = 'var(--bs-primary)'
+            style.color = 'var(--bs-light)'
+          } else if (isNext) {
+            style.color = 'var(--bs-primary)'
+            style.fontWeight = 'bold'
+          }
+
+          return (
+            <div
+              key={i}
+              className={className}
+              style={style}
+              ref={(ref) => {
+                opcodeRefs.current[i] = ref
+              }}
+            >
+              {opcode}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   const renderObjectContent = () => {
     if (activeObjectTab === 'stateLocals') {
-      // State & Locals tab - show parameters, locals, state
-      const tx = currentTransaction
-      const inputData = tx?.data || tx?.input
-
-      // Extract and decode parameters
-      let parameters: any = 'N/A'
-
-      // First, try to get decoded parameters from solidityLocals
-      if (solidityLocals && typeof solidityLocals === 'object') {
-        const decodedParams: any = {}
-        let hasParams = false
-
-        // Iterate through locals to find parameters
-        for (const [key, value] of Object.entries(solidityLocals)) {
-          if (key !== 'length' && key !== 'decode') {
-            decodedParams[key] = value
-            hasParams = true
-          }
-        }
-
-        if (hasParams) {
-          parameters = decodedParams
-        }
-      }
-
-      // Fallback to raw hex if no decoded params available
-      if (parameters === 'N/A' && tx && inputData) {
-        if (inputData === '0x' || inputData === '') {
-          parameters = !tx.to ? 'Contract Bytecode' : 'None (ETH Transfer)'
-        } else if (inputData.length > 10) {
-          parameters = '0x' + inputData.substring(10)
-        } else {
-          parameters = inputData
-        }
-      }
-
+      // State & Locals tab - show locals and state
       const objectData: any = {
-        parameters: parameters,
         locals: solidityLocals || 'No local variables at current step',
         state: solidityState || 'No state variables at current step'
       }
@@ -839,7 +866,7 @@ export const DebugLayout = ({
             return (
               <div key={path} className="json-line" style={{ marginLeft: '12px' }}>
                 <span className="json-expand-icon-placeholder"></span>
-                <span className="json-key">"{key}"</span>
+                <span className="json-key">{key}</span>
                 <span className="json-separator">: </span>
                 <span className="json-value">{JSON.stringify(value)}</span>
                 {key !== Object.keys(objectData)[Object.keys(objectData).length - 1] && <span className="json-comma">,</span>}
@@ -852,35 +879,98 @@ export const DebugLayout = ({
         </div>
       )
     } else {
-      // Stack & Memory tab - show opcode, call stack, memory
-      const stackMemoryData: any = {
-        opcode: opcodeData || 'No opcode data at current step',
-        callStack: callStackData || 'No call stack at current step',
-        memory: memoryData || 'No memory data at current step',
-        stack: stackData || 'No stack data at current step'
-      }
-
+      // Stack & Memory tab - show opcode, call stack, stack, memory
       return (
         <div className="debug-object-content json-renderer">
           <div className="json-line">
             <span className="json-bracket">{'{'}</span>
           </div>
-          {Object.keys(stackMemoryData).map((key) => {
-            const value = stackMemoryData[key]
-            const path = `root.${key}`
+
+          {/* Opcode - Custom Renderer */}
+          <div style={{ marginLeft: '12px' }}>
+            <div className="json-line" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <i
+                className={`fas ${expandedObjectPaths.has('root.opcode') ? 'fa-minus-square' : 'fa-plus-square'} json-expand-icon`}
+                onClick={() => toggleObjectPath('root.opcode')}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+              />
+              <span className="json-key">opcode</span>
+              <span className="json-separator">: </span>
+              {!expandedObjectPaths.has('root.opcode') && (
+                <>
+                  <span className="json-ellipsis">...</span>
+                  <span className="json-comma">,</span>
+                </>
+              )}
+              {expandedObjectPaths.has('root.opcode') && <span className="json-separator">[</span>}
+            </div>
+            {expandedObjectPaths.has('root.opcode') && (
+              <>
+                <div style={{ marginLeft: '26px', marginTop: '4px', marginBottom: '4px' }}>
+                  {renderOpcodes()}
+                </div>
+                <div className="json-line" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <span className="json-expand-icon-placeholder"></span>
+                  <span className="json-separator">]</span>
+                  <span className="json-comma">,</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Call Stack */}
+          {(() => {
+            const value = callStackData || 'No call stack at current step'
+            const path = 'root.callStack'
             if (isObject(value)) {
-              return renderJsonValue(value, key, path, 1)
+              return renderJsonValue(value, 'callStack', path, 1)
             }
             return (
               <div key={path} className="json-line" style={{ marginLeft: '12px' }}>
                 <span className="json-expand-icon-placeholder"></span>
-                <span className="json-key">"{key}"</span>
+                <span className="json-key">callStack</span>
                 <span className="json-separator">: </span>
                 <span className="json-value">{JSON.stringify(value)}</span>
-                {key !== Object.keys(stackMemoryData)[Object.keys(stackMemoryData).length - 1] && <span className="json-comma">,</span>}
+                <span className="json-comma">,</span>
               </div>
             )
-          })}
+          })()}
+
+          {/* Stack */}
+          {(() => {
+            const value = stackData || 'No stack data at current step'
+            const path = 'root.stack'
+            if (isObject(value)) {
+              return renderJsonValue(value, 'stack', path, 1)
+            }
+            return (
+              <div key={path} className="json-line" style={{ marginLeft: '12px' }}>
+                <span className="json-expand-icon-placeholder"></span>
+                <span className="json-key">stack</span>
+                <span className="json-separator">: </span>
+                <span className="json-value">{JSON.stringify(value)}</span>
+                <span className="json-comma">,</span>
+              </div>
+            )
+          })()}
+
+          {/* Memory */}
+          {(() => {
+            const value = memoryData || 'No memory data at current step'
+            const path = 'root.memory'
+            if (isObject(value)) {
+              return renderJsonValue(value, 'memory', path, 1)
+            }
+            return (
+              <div key={path} className="json-line" style={{ marginLeft: '12px' }}>
+                <span className="json-expand-icon-placeholder"></span>
+                <span className="json-key">memory</span>
+                <span className="json-separator">: </span>
+                <span className="json-value">{JSON.stringify(value)}</span>
+              </div>
+            )
+          })()}
+
           <div className="json-line">
             <span className="json-bracket">{'}'}</span>
           </div>
@@ -925,7 +1015,7 @@ export const DebugLayout = ({
       </div>
 
       {/* Section 2: Transaction Details */}
-      <div className="debug-section debug-section-transaction" style={!expandedSections.transactionDetails ? { minHeight: 'auto' } : {}}>
+      <div className="debug-section debug-section-transaction" style={!expandedSections.transactionDetails ? { minHeight: 'auto', flex: '0 0 auto' } : {}}>
         <div
           className="debug-section-header"
           onClick={() => toggleSection('transactionDetails')}
@@ -944,7 +1034,7 @@ export const DebugLayout = ({
       </div>
 
       {/* Section 3: Call Trace */}
-      <div className="debug-section debug-section-trace" style={!expandedSections.callTrace ? { minHeight: 'auto' } : {}}>
+      <div className="debug-section debug-section-trace" style={!expandedSections.callTrace ? { minHeight: 'auto', flex: '0 0 auto' } : {}}>
         <div
           className="debug-section-header"
           onClick={() => toggleSection('callTrace')}
@@ -963,7 +1053,7 @@ export const DebugLayout = ({
       </div>
 
       {/* Section 4: State & Locals / Stack & Memory */}
-      <div className="debug-section debug-section-object" style={!expandedSections.parametersReturnValues ? { minHeight: 'auto' } : {}}>
+      <div className="debug-section debug-section-object" style={!expandedSections.parametersReturnValues ? { minHeight: 'auto', flex: '0 0 auto' } : {}}>
         <div
           className="debug-section-header"
           onClick={() => toggleSection('parametersReturnValues')}
