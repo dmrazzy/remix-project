@@ -777,21 +777,15 @@ export const DebugLayout = ({
       }
     }
 
-    // Extract return values from receipt logs if available
-    const returnValues = receipt?.logs && receipt.logs.length > 0
-      ? receipt.logs
-      : 'No events emitted'
-
     // Debug logging
     console.log('[DebugLayout] solidityLocals:', solidityLocals)
     console.log('[DebugLayout] solidityState:', solidityState)
 
-    // Build objectData with returnValues at the end
+    // Build objectData
     const objectData: any = {
       parameters: parameters,
       locals: solidityLocals || 'No local variables at current step',
-      state: solidityState || 'No state variables at current step',
-      returnValues: returnValues
+      state: solidityState || 'No state variables at current step'
     }
 
     if (activeObjectTab === 'json') {
