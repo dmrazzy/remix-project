@@ -19,8 +19,7 @@ module.exports = {
       .clickLaunchIcon('solidity').click('*[data-id="compilerContainerCompileBtn"]')
       .pause(4000)
       .clickLaunchIcon('udapp')
-      .waitForElementPresent('*[data-bs-title="Deploy - transact (not payable)"]', 60000)
-      .click('*[data-bs-title="Deploy - transact (not payable)"]')
+      .createContract('')
       .debugTransaction(0)
       .waitForElementContainsText('*[data-id="sidePanelSwapitTitle"]', 'DEBUGGER', 60000)
       .clearConsole()
@@ -30,9 +29,7 @@ module.exports = {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
       .clickLaunchIcon('udapp')
       .clickInstance(0)
-      .scrollAndClick('*[data-bs-title="string name, uint256 goal"]')
-      .setValue('*[data-bs-title="string name, uint256 goal"]', '"toast", 999')
-      .click('*[data-id="createProject - transact (not payable)"]')
+      .clickFunction(0, 0, { types: 'string name, uint256 goal', values: '"toast", 999' })
       .debugTransaction(0)
       .pause(2000)
       .goToVMTraceStep(327)
@@ -89,14 +86,13 @@ module.exports = {
       .clickLaunchIcon('solidity')
       .testContracts('externalImport.sol', sources[1]['externalImport.sol'], ['ERC20'])
       .clickLaunchIcon('udapp')
-      .waitForElementPresent('*[data-bs-title="Deploy - transact (not payable)"]', 35000)
       .selectContract('ERC20')
       .createContract('"tokenName", "symbol"')
       .debugTransaction(0)
       .waitForElementVisible('#stepdetail')
       .waitForElementVisible({
         locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"3")]',
+        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"474")]',
       }).pause(1000)      
       .getEditorValue((content) => {
         browser.assert.ok(content.indexOf(`constructor (string memory name_, string memory symbol_) {
@@ -127,12 +123,12 @@ module.exports = {
       .createContract('')
       .clearConsole()
       .clickInstance(0)
-      .clickFunction('test1 - transact (not payable)', { types: 'bytes userData', values: '0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4' })
+      .clickFunction(0, 0, { types: 'bytes userData', values: '0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4' })
       .debugTransaction(0)
       .waitForElementVisible('#stepdetail')
       .waitForElementVisible({
         locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"42")]',
+        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"131")]',
       })
       .goToVMTraceStep(261)
       .waitForElementPresent('.highlightLine8')
@@ -157,12 +153,11 @@ module.exports = {
       .clickLaunchIcon('solidity')
       .testContracts('locals.sol', sources[3]['locals.sol'], ['testLocals'])
       .clickLaunchIcon('udapp')
-      .waitForElementPresent('*[data-bs-title="Deploy - transact (not payable)"]', 40000)
       .createContract('')
       .pause(2000)
       .clearConsole()
       .clickInstance(0)
-      .clickFunction('t - transact (not payable)')
+      .clickFunction(0, 0)
       .pause(2000)
       .debugTransaction(0)
       .waitForElementVisible('*[data-id="slider"]')
@@ -177,7 +172,7 @@ module.exports = {
       .waitForElementVisible('*[data-id="solidityLocals"]')
       .waitForElementContainsText('*[data-id="solidityLocals"]', '9: 9 uint256', 60000)
       .notContainsText('*[data-id="solidityLocals"]', '10: 10 uint256')
-      .clearTransactions()
+      .clearDeployedContracts()
       .clearConsole().pause(2000)
   },
 
@@ -190,7 +185,7 @@ module.exports = {
       .createContract('')
       .clearConsole()
       .clickInstance(0)
-      .clickFunction('f - transact (not payable)', { types: 'uint256[] ', values: '[]' })
+      .clickFunction(0, 0, { types: 'uint256[] ', values: '[]' })
       .debugTransaction(0)
       .pause(2000)
       .click('*[id="debuggerTransactionStartButtonContainer"]') // stop debugging
@@ -254,11 +249,8 @@ module.exports = {
       .setSolidityCompilerVersion('soljson-v0.8.7+commit.e28d00a7.js')
       .addFile('useDebugNodes.sol', sources[5]['useDebugNodes.sol']) // compile contract
       .clickLaunchIcon('udapp')
-      .switchEnvironment('basic-http-provider') // select web3 provider with debug nodes URL
-      .clearValue('*[data-id="modalDialogCustomPromptText"]')
-      .setValue('*[data-id="modalDialogCustomPromptText"]', 'https://remix-rinkeby.ethdevops.io')
-      .modalFooterOKClick()
-      .waitForElementPresent('*[title="Deploy - transact (not payable)"]', 65000) // wait for the compilation to succeed
+      .connectToExternalHttpProvider('https://remix-rinkeby.ethdevops.io', 'Custom')
+      .createContract('') // wait for the compilation to succeed
       .clickLaunchIcon('debugger')
       .clearValue('*[data-id="debuggerTransactionInput"]')
       .setValue('*[data-id="debuggerTransactionInput"]', '0x156dbf7d0f9b435dd900cfc8f3264d523dd25733418ddbea1ce53e294f421013')
@@ -278,7 +270,7 @@ module.exports = {
       .createContract('')
       .pause(500)
       .clickInstance(0)
-      .clickFunction('callA - transact (not payable)')
+      .clickFunction(0, 0)
       .debugTransaction(1)
       .pause(4000)
       .goToVMTraceStep(80)
@@ -452,35 +444,71 @@ const sources = [
 ]
 
 const localVariable_step266_ABIEncoder = { // eslint-disable-line
-  idAsk: {
-    type: 'bytes32',
-    value: '0x0000000000000000000000000000000000000000000000000000000000000002'
-  },
-  userData: {
-    value: '0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4',
-    type: 'bytes'
-  }
+	"userData": {
+		"value": "0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4",
+		"type": "bytes"
+	},
+	"<1>": {
+		"length": "0x0",
+		"value": "0x",
+		"type": "bytes"
+	},
+	"<2>": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+		"type": "bytes32"
+	},
+	"<3>": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+		"type": "bytes32"
+	},
+	"<4>": {
+		"value": "0",
+		"type": "uint256"
+	},
+	"idAsk": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000002",
+		"type": "bytes32"
+	}
 }
 
 const localVariable_step717_ABIEncoder = { // eslint-disable-line
-  idAsk: {
-    type: 'bytes32',
-    value: '0x0000000000000000000000000000000000000000000000000000000000000002'
-  },
-  idOffer: {
-    type: 'bytes32',
-    value: '0x0000000000000000000000000000000000000000000000000000000000000001'
-  },
-  ro: {
-    length: '0xd0',
-    type: 'bytes',
-    value: '0x5b38da6a701c568545dcfcb03fcb875f56beddc45b38da6a701c568545dcfcb03fcb875f56beddc400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001'
-  },
-  userData: {
-    value: '0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4',
-    type: 'bytes'
-  }
+	"userData": {
+		"value": "0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4",
+		"type": "bytes"
+	},
+	"<1>": {
+		"length": "0xd0",
+		"value": "0x5b38da6a701c568545dcfcb03fcb875f56beddc45b38da6a701c568545dcfcb03fcb875f56beddc400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001",
+		"type": "bytes"
+	},
+	"<2>": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000002",
+		"type": "bytes32"
+	},
+	"<3>": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		"type": "bytes32"
+	},
+	"<4>": {
+		"value": "84",
+		"type": "uint256"
+	},
+	"idAsk": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000002",
+		"type": "bytes32"
+	},
+	"idOffer": {
+		"value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		"type": "bytes32"
+	},
+	"ro": {
+		"length": "0xd0",
+		"value": "0x5b38da6a701c568545dcfcb03fcb875f56beddc45b38da6a701c568545dcfcb03fcb875f56beddc400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001",
+		"type": "bytes"
+	}
 }
+
+
 
 const jsGetTrace = `(async () => {
   try {

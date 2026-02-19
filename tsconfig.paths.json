@@ -232,10 +232,21 @@
             ],
             "@remix-ui/invites": [
               "libs/remix-ui/invites/src/index.ts"
-            ]
-            ,
+            ],
+            "@remix-ui/run-tab-environment": [
+              "libs/remix-ui/run-tab-environment/src/index.ts"
+            ],
+            "@remix-ui/run-tab-deploy": [
+              "libs/remix-ui/run-tab-deploy/src/index.ts"
+            ],
+            "@remix-ui/run-tab-deployed-contracts": [
+              "libs/remix-ui/run-tab-deployed-contracts/src/index.ts"
+            ],
             "@remix-project/import-resolver": [
               "libs/remix-import-resolver/src/index.ts"
+            ],
+            "@remix-ui/run-tab-transactions": [
+              "libs/remix-ui/run-tab-transactions/src/index.ts"
             ]
         }
     }
