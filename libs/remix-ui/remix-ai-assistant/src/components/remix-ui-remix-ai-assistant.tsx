@@ -22,6 +22,8 @@ import { useAudioTranscription } from '../hooks/useAudioTranscription'
 import { QueryParams } from '@remix-project/remix-lib'
 import ChatHistoryHeading from './chatHistoryHeading'
 import { ChatHistorySidebar } from './chatHistorySidebar'
+import AiChatPromptAreaForHistory from './aiChatPromptAreaForHistory'
+import AiChatPromptArea from './aiChatPromptArea'
 
 export interface RemixUiRemixAiAssistantProps {
   plugin: RemixAIAssistant
@@ -69,8 +71,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   )
   const [showArchivedConversations, setShowArchivedConversations] = useState(false)
   const [showButton, setShowButton] = useState(true);
-
-  const [aiAssistantHeight, setAiAssistantHeight] = useState(window.innerHeight < 750 ? 87 : window.innerHeight < 1000 ? 89.6 : 92)
 
   // Check if MCP is enabled via query parameter
   const queryParams = new QueryParams()
@@ -1065,12 +1065,13 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             onClose={props.onToggleHistorySidebar || (() => {})}
             isFloating={false}
             isMaximized={true}
+            theme={themeTracker?.name}
           />
         )}
 
         {/* Maximized Mode: Always show chat area */}
         {props.isMaximized ? (
-          <div className="d-flex flex-column flex-grow-1 ai-assistant-bg" style={{ overflow: 'hidden', minHeight: 0 }}>
+          <div className="d-flex flex-column flex-grow-1 ai-assistant-bg always-show" style={{ overflow: 'hidden', minHeight: 0, backgroundColor: themeTracker?.name.toLowerCase() === 'dark' ? 'red' : 'var(--bs-light)' }} data-theme={themeTracker && themeTracker?.name.toLowerCase()}>
             <ChatHistoryHeading
               onNewChat={props.onNewConversation || (() => {})}
               onToggleHistory={props.onToggleHistorySidebar || (() => {})}
@@ -1079,6 +1080,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               currentConversationId={props.currentConversationId}
               showButton={showButton}
               setShowButton={setShowButton}
+              theme={themeTracker?.name}
             />
             <section id="remix-ai-chat-history" className="d-flex flex-column p-2" style={{ flex: 1, overflow: 'auto', minHeight: 0 }} ref={chatHistoryRef}>
               <div data-id="remix-ai-assistant-ready"></div>
@@ -1102,15 +1104,18 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         ) : (
           /* Non-Maximized Mode: Toggle between history view and chat view */
           props.showHistorySidebar && props.isMaximized === false && props.conversations ? (
-            <div className="d-flex flex-column flex-grow-1 ai-assistant-bg" style={{ overflow: 'hidden', minHeight: 0 }}>
+            <div className="d-flex flex-column flex-grow-1 ai-assistant-bg nonMaximizedMode" style={{ overflow: 'hidden', minHeight: 0 }} data-theme={themeTracker && themeTracker?.name.toLowerCase()}>
               {/* Back button header */}
-              <div className="p-2 border-bottom">
+              <div
+                className="p-2 border-bottom"
+                style={{ backgroundColor: themeTracker?.name.toLowerCase() === 'dark' ? '#222336' : '#eff1f5' }}
+              >
                 <button
-                  className="chat-history-back-btn"
+                  className="btn btn-sm btn-light text-light-emphasis"
                   onClick={props.onToggleHistorySidebar || (() => {})}
                   data-id="chat-history-back-btn"
                 >
-                  <i className="fas fa-arrow-left"></i>
+                  <i className="fas fa-chevron-left me-3"></i>
                   <span>Back to chat</span>
                 </button>
               </div>
@@ -1132,12 +1137,13 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                   onClose={props.onToggleHistorySidebar || (() => {})}
                   isFloating={false}
                   isMaximized={false}
+                  theme={themeTracker?.name}
                 />
               </div>
             </div>
           ) : (
             /* Show chat area when sidebar is closed */
-            <div className="d-flex flex-column flex-grow-1 ai-assistant-bg" style={{ overflow: 'hidden', minHeight: 0 }}>
+            <div className="d-flex flex-column flex-grow-1 ai-assistant-bg sideBarIsClosed" style={{ overflow: 'hidden', minHeight: 0, }} data-theme={themeTracker && themeTracker?.name.toLowerCase()}>
               <ChatHistoryHeading
                 onNewChat={props.onNewConversation || (() => {})}
                 onToggleHistory={props.onToggleHistorySidebar || (() => {})}
@@ -1146,6 +1152,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                 currentConversationId={props.currentConversationId}
                 showButton={showButton}
                 setShowButton={setShowButton}
+                theme={themeTracker?.name}
               />
               <section id="remix-ai-chat-history" className="d-flex flex-column p-2" style={{ flex: 1, overflow: 'auto', minHeight: 0 }} ref={chatHistoryRef}>
                 <div data-id="remix-ai-assistant-ready"></div>
@@ -1170,128 +1177,81 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         )}
       </div>
 
-      {/* Prompt area - fixed at bottom */}
-      <section
-        id="remix-ai-prompt-area"
-        className="ai-assistant-prompt-bg"
-        style={{ flexShrink: 0, minHeight: '140px', background: 'transparent' }}
-        data-theme={themeTracker && themeTracker?.name.toLowerCase()}
-      >
-        {showModelSelector && (
-          <div
-            className="pt-2 mb-2 z-3 bg-light border border-text w-75"
-            style={{ borderRadius: '8px' }}
-          >
-            <div className="text-uppercase ms-2 mb-2 small">AI Model</div>
-            <GroupListMenu
-              setChoice={handleModelSelection}
-              setShowOptions={setShowModelSelector}
-              choice={selectedModelId}
-              groupList={AVAILABLE_MODELS
-                .filter(model => {
-                  // Check if user is logged in by checking for token
-                  const isLoggedIn = !!localStorage.getItem('remix_access_token')
-
-                  // If not logged in, only show models that don't require auth
-                  if (!isLoggedIn) {
-                    return !model.requiresAuth
-                  }
-
-                  // If logged in, only show models the user has access to
-                  return modelAccess.checkAccess(model.id)
-                })
-                .map(model => ({
-                  label: model.name,
-                  bodyText: model.description,
-                  icon: 'fa-solid fa-check',
-                  stateValue: model.id,
-                  dataId: `ai-model-${model.id.replace(/[^a-zA-Z0-9]/g, '-')}`
-                }))}
-            />
-            {mcpEnabled && (
-              <div className="border-top mt-2 pt-2">
-                <div className="text-uppercase ms-2 mb-2 small">MCP Enhancement</div>
-                <div className="form-check ms-2 mb-2">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="mcpEnhancementToggle"
-                    checked={mcpEnhanced}
-                    onChange={(e) => setMcpEnhanced(e.target.checked)}
-                  />
-                  <label className="form-check-label small" htmlFor="mcpEnhancementToggle">
-                    Enable MCP context enhancement
-                  </label>
-                </div>
-                <div className="small text-muted ms-2">
-                  Adds relevant context from configured MCP servers to AI requests
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        {showOllamaModelSelector && selectedModel.provider === 'ollama' && (
-          <div
-            className="pt-2 mb-2 z-3 bg-light border border-text w-75"
-            style={{ borderRadius: '8px' }}
-          >
-            <div className="text-uppercase ml-2 mb-2 small">Ollama Model</div>
-            <GroupListMenu
-              setChoice={handleOllamaModelSelection}
-              setShowOptions={setShowOllamaModelSelector}
-              choice={selectedOllamaModel}
-              groupList={ollamaModels.map(model => ({
-                label: model,
-                bodyText: `Use ${model} model`,
-                icon: 'fa-solid fa-check',
-                stateValue: model,
-                dataId: `ollama-model-${model.replace(/[^a-zA-Z0-9]/g, '-')}`
-              }))}
-            />
-          </div>
-        )}
-        <PromptArea
-          input={input}
-          maximizePanel={maximizePanel}
-          setInput={setInput}
-          isStreaming={isStreaming}
-          handleSend={handleSend}
-          handleStop={stopRequest}
-          showContextOptions={false}
-          setShowContextOptions={() => {}}
-          showAssistantOptions={showAssistantOptions}
-          setShowAssistantOptions={setShowAssistantOptions}
-          showModelOptions={showModelOptions}
-          setShowModelOptions={setShowModelOptions}
-          assistantChoice={assistantChoice}
-          setAssistantChoice={setAssistantChoice}
-          availableModels={availableModels}
-          selectedModel={selectedModel}
-          ollamaModels={ollamaModels}
-          selectedOllamaModel={selectedOllamaModel}
-          contextFiles={contextFiles}
-          clearContext={clearContext}
-          handleAddContext={handleAddContext}
-          handleSetModel={handleSetModel}
-          handleModelSelection={handleModelSelection}
-          handleOllamaModelSelection={handleOllamaModelSelection}
-          handleGenerateWorkspace={handleGenerateWorkspace}
-          handleRecord={handleRecord}
-          isRecording={isRecording}
-          dispatchActivity={dispatchActivity}
-          contextBtnRef={contextBtnRef}
-          modelBtnRef={modelBtnRef}
-          modelSelectorBtnRef={modelSelectorBtnRef}
-          aiContextGroupList={aiContextGroupList}
-          textareaRef={textareaRef}
-          aiMode={aiMode}
-          setAiMode={setAiMode}
-          setIsMaximized={setIsMaximized}
-          modelAccess={modelAccess}
-          isMaximized={props.isMaximized || false}
-          themeTracker={themeTracker}
-        />
-      </section>
+      {
+        props.showHistorySidebar && props.isMaximized === false && props.conversations ? (
+          <AiChatPromptAreaForHistory
+            themeTracker={themeTracker}
+            showHistorySidebar={props.showHistorySidebar || false}
+            isMaximized={false}
+            showAssistantOptions={showAssistantOptions}
+            modelOpt={modelOpt}
+            menuRef={menuRef}
+            setShowAssistantOptions={setShowAssistantOptions}
+            assistantChoice={assistantChoice}
+            setAssistantChoice={setAssistantChoice}
+            aiAssistantGroupList={aiAssistantGroupList}
+            mcpEnabled={mcpEnabled}
+            mcpEnhanced={mcpEnhanced}
+            setMcpEnhanced={setMcpEnhanced}
+            availableModels={availableModels}
+            selectedModel={selectedModel}
+            handleModelSelection={handleModelSelection}
+            input={input}
+            setInput={setInput}
+            isStreaming={isStreaming}
+            handleSend={handleSend}
+            stopRequest={stopRequest}
+            showModelOptions={showModelOptions}
+            setShowModelOptions={setShowModelOptions}
+            handleSetAssistant={handleSetAssistant}
+            handleSetModel={handleSetModel}
+            handleGenerateWorkspace={handleGenerateWorkspace}
+            handleRecord={handleRecord}
+            isRecording={isRecording}
+            dispatchActivity={dispatchActivity}
+            modelBtnRef={modelBtnRef}
+            modelSelectorBtnRef={modelSelectorBtnRef}
+            textareaRef={textareaRef}
+            maximizePanel={maximizePanel}
+          />
+        ) : (
+          <AiChatPromptArea
+            themeTracker={themeTracker}
+            showHistorySidebar={props.showHistorySidebar || false}
+            isMaximized={props.isMaximized || false}
+            showAssistantOptions={showAssistantOptions}
+            modelOpt={modelOpt}
+            menuRef={menuRef}
+            setShowAssistantOptions={setShowAssistantOptions}
+            assistantChoice={assistantChoice}
+            setAssistantChoice={setAssistantChoice}
+            aiAssistantGroupList={aiAssistantGroupList}
+            mcpEnabled={mcpEnabled}
+            mcpEnhanced={mcpEnhanced}
+            setMcpEnhanced={setMcpEnhanced}
+            availableModels={availableModels}
+            selectedModel={selectedModel}
+            handleModelSelection={handleModelSelection}
+            input={input}
+            setInput={setInput}
+            isStreaming={isStreaming}
+            handleSend={handleSend}
+            stopRequest={stopRequest}
+            showModelOptions={showModelOptions}
+            setShowModelOptions={setShowModelOptions}
+            handleSetAssistant={handleSetAssistant}
+            handleSetModel={handleSetModel}
+            handleGenerateWorkspace={handleGenerateWorkspace}
+            handleRecord={handleRecord}
+            isRecording={isRecording}
+            dispatchActivity={dispatchActivity}
+            modelBtnRef={modelBtnRef}
+            modelSelectorBtnRef={modelSelectorBtnRef}
+            textareaRef={textareaRef}
+            maximizePanel={maximizePanel}
+          />
+        )
+      }
     </div>
   )
 })
