@@ -761,11 +761,15 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
     if (blocksDefinition && blocksDefinition.length) tree.lastValidBlocksDefinition = blocksDefinition
     const functionisLeaf = functionDefinitionInScope && nodes && nodes.length && nodes[nodes.length - 1] && nodes[nodes.length - 1].id === functionDefinitionInScope.id
 
-    const functionDefinition = functionDefinitionInScope // await resolveFunctionDefinition(tree, sourceLocation, generatedSources, address)
+    const functionDefinition = functionDefinitionInScope
 
+    let functionPointer
+    if (functionDefinition) {
+      functionPointer = currentAddress + ' ' + functionDefinition.id
+    }
     // registering function definition whose src location is available when hitting JUMPDEST
     if (!tree.scopes[scopeId].functionDefinition && stepDetail.op === 'JUMPDEST' && functionDefinition && functionisLeaf && functionDefinition.kind !== 'constructor' && tree.scopes[scopeId].firstStep === step - 1) {
-      tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id] = nextStepDetail && nextStepDetail.pc
+      tree.fnJumpDest[functionPointer] = nextStepDetail && nextStepDetail.pc
       tree.scopes[scopeId].functionDefinition = functionDefinition
       tree.scopes[scopeId].lowLevelScope = false
       await registerFunctionParameters(tree, functionDefinition, contractDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
@@ -778,8 +782,8 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
 
     // registering constructors
     const executionInFunctionBody = functionDefinition && nodes && nodes.length && nodes[nodes.length - 1].id !== functionDefinition.id
-    if (executionInFunctionBody && functionDefinition && functionDefinition.kind === 'constructor' && !tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id] && !isInvalidSource) {
-      tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id] = nextStepDetail && nextStepDetail.pc
+    if (executionInFunctionBody && functionDefinition && functionDefinition.kind === 'constructor' && !tree.fnJumpDest[functionPointer] && !isInvalidSource) {
+      tree.fnJumpDest[functionPointer] = nextStepDetail && nextStepDetail.pc
       tree.scopes[scopeId].functionDefinition = functionDefinition
       tree.scopes[scopeId].lowLevelScope = false
       await registerFunctionParameters(tree, functionDefinition, contractDefinition, step - 1, scopeId, contractObj, previousSourceLocation, address)
@@ -807,12 +811,12 @@ async function buildTree (tree: InternalCallTree, step, scopeId, isCreation, sou
     const internalfunctionCall = /*functionDefinition &&*/ (sourceLocation && sourceLocation.jump === 'i') /*&& functionDefinition.kind !== 'constructor'*/
     const isJumpOutOfFunction = /*functionDefinition &&*/ (sourceLocation && sourceLocation.jump === 'o') /*&& functionDefinition.kind !== 'constructor'*/
 
-    if (stepDetail.op === 'JUMP' && functionDefinition && functionDefinition.kind !== 'constructor' && functionisLeaf && internalfunctionCall && !tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id]) {
+    if (stepDetail.op === 'JUMP' && functionDefinition && functionDefinition.kind !== 'constructor' && functionisLeaf && internalfunctionCall && !tree.fnJumpDest[functionPointer]) {
       // record entry point for that function
-      tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id] = nextStepDetail && nextStepDetail.pc // JUMPDEST
+      tree.fnJumpDest[functionPointer] = nextStepDetail && nextStepDetail.pc // JUMPDEST
     }
 
-    const currentStepIsFunctionEntryPoint = functionDefinition && nextStepDetail && nextStepDetail.pc === tree.fnJumpDest[currentAddress + ' ' + functionDefinition.id]
+    const currentStepIsFunctionEntryPoint = functionDefinition && nextStepDetail && nextStepDetail.pc === tree.fnJumpDest[functionPointer]
     let lowLevelScope = internalfunctionCall // by default assume it's a low level scope
     if (isInternalTxInstrn) lowLevelScope = false
     if (currentStepIsFunctionEntryPoint) lowLevelScope = false
