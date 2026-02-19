@@ -403,7 +403,7 @@ export function extractFunctionDefinitions (ast, astWalker) {
 export function addInputParams (step, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, stackLength, forceFreeSlot) {
   if (!contractObj) {
     console.warn('No contract object found while adding input params')
-    return { params: [], freeStackIndex: null}
+    return { params: [], freeStackIndex: null }
   }
 
   const contractName = contractObj.name
