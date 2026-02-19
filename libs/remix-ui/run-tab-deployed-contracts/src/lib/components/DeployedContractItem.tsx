@@ -584,6 +584,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                       </div>
                       <div className="position-relative flex-fill">
                         <input
+                          data-id={`fallbackInput-${index}`}
                           type="text"
                           placeholder="0x..."
                           className="form-control"
