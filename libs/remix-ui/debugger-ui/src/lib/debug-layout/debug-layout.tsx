@@ -55,6 +55,11 @@ export const DebugLayout = ({
   const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
   const [selectedScope, setSelectedScope] = useState<any>(null)
   const [expandedObjectPaths, setExpandedObjectPaths] = useState<Set<string>>(new Set())
+  const [expandedSections, setExpandedSections] = useState({
+    transactionDetails: true,
+    callTrace: true,
+    parametersReturnValues: true
+  })
 
   // Auto-expand sender node when nestedScopes are loaded
   React.useEffect(() => {
@@ -62,6 +67,13 @@ export const DebugLayout = ({
       setExpandedScopes(new Set(['sender']))
     }
   }, [nestedScopes])
+
+  const toggleSection = (section: 'transactionDetails' | 'callTrace' | 'parametersReturnValues') => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
 
   const formatAddress = (address: string | undefined) => {
     if (!address) return ''
@@ -737,7 +749,6 @@ export const DebugLayout = ({
 
   const renderObjectContent = () => {
     const tx = currentTransaction
-    const receipt = currentReceipt
 
     // Get input data (can be either 'data' or 'input' property)
     const inputData = tx?.data || tx?.input
@@ -827,7 +838,7 @@ export const DebugLayout = ({
   return (
     <div className="debug-layout">
       {/* Section 1: Search Bar + Transaction Global Values */}
-      <div className="debug-section debug-section-search">
+      <div className="debug-section debug-section-search ms-1 me-1">
         <SearchBar
           onSearch={onSearch}
           debugging={debugging}
@@ -857,48 +868,79 @@ export const DebugLayout = ({
             </span>
           </CustomTooltip>
         </div>
-
-        <div className="mt-1 ms-3">
-          {renderGlobalVariables()}
-        </div>
       </div>
 
-      {/* Section 2: Call Trace */}
-      <div className="debug-section debug-section-trace">
-        <div className="debug-section-header">
+      {/* Section 2: Transaction Details */}
+      <div className="debug-section debug-section-transaction" style={!expandedSections.transactionDetails ? { minHeight: 'auto' } : {}}>
+        <div
+          className="debug-section-header"
+          onClick={() => toggleSection('transactionDetails')}
+          style={{ cursor: 'pointer' }}
+        >
+          <h6 className="debug-section-title">
+            <FormattedMessage id="debugger.transactionDetails" defaultMessage="Transaction Details" />
+          </h6>
+          <i className={`fas ${expandedSections.transactionDetails ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', marginRight: '1rem', color: 'var(--bs-body-color)' }}></i>
+        </div>
+        {expandedSections.transactionDetails && (
+          <div className="debug-section-content ms-3">
+            {renderGlobalVariables()}
+          </div>
+        )}
+      </div>
+
+      {/* Section 3: Call Trace */}
+      <div className="debug-section debug-section-trace" style={!expandedSections.callTrace ? { minHeight: 'auto' } : {}}>
+        <div
+          className="debug-section-header"
+          onClick={() => toggleSection('callTrace')}
+          style={{ cursor: 'pointer' }}
+        >
           <h6 className="debug-section-title">
             Call Trace (Trace Length: {(traceData && traceData.traceLength) || 0})
           </h6>
+          <i className={`fas ${expandedSections.callTrace ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', marginRight: '1rem', color: 'var(--bs-body-color)' }}></i>
         </div>
-        <div className="debug-section-content debug-section-scrollable">
-          {renderCallTrace()}
-        </div>
+        {expandedSections.callTrace && (
+          <div className="debug-section-content debug-section-scrollable">
+            {renderCallTrace()}
+          </div>
+        )}
       </div>
 
-      {/* Section 3: Parameters & Return Values */}
-      <div className="debug-section debug-section-object">
-        <div className="debug-section-header">
+      {/* Section 4: Parameters & Return Values */}
+      <div className="debug-section debug-section-object" style={!expandedSections.parametersReturnValues ? { minHeight: 'auto' } : {}}>
+        <div
+          className="debug-section-header"
+          onClick={() => toggleSection('parametersReturnValues')}
+          style={{ cursor: 'pointer' }}
+        >
           <h6 className="debug-section-title">
             <FormattedMessage id="debugger.parametersAndReturnValues" defaultMessage="Parameters & Return Values" />
           </h6>
-          <div className="debug-tabs">
-            <button
-              className={`debug-tab ${activeObjectTab === 'json' ? 'active' : ''}`}
-              onClick={() => setActiveObjectTab('json')}
-            >
-              <FormattedMessage id="debugger.json" defaultMessage="JSON" />
-            </button>
-            <button
-              className={`debug-tab ${activeObjectTab === 'raw' ? 'active' : ''}`}
-              onClick={() => setActiveObjectTab('raw')}
-            >
-              <FormattedMessage id="debugger.raw" defaultMessage="Raw" />
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className={`fas ${expandedSections.parametersReturnValues ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', color: 'var(--bs-body-color)' }}></i>
+            <div className="debug-tabs" onClick={(e) => e.stopPropagation()}>
+              <button
+                className={`debug-tab ${activeObjectTab === 'json' ? 'active' : ''}`}
+                onClick={() => setActiveObjectTab('json')}
+              >
+                <FormattedMessage id="debugger.json" defaultMessage="JSON" />
+              </button>
+              <button
+                className={`debug-tab ${activeObjectTab === 'raw' ? 'active' : ''}`}
+                onClick={() => setActiveObjectTab('raw')}
+              >
+                <FormattedMessage id="debugger.raw" defaultMessage="Raw" />
+              </button>
+            </div>
           </div>
         </div>
-        <div className="debug-section-content debug-section-scrollable">
-          {renderObjectContent()}
-        </div>
+        {expandedSections.parametersReturnValues && (
+          <div className="debug-section-content debug-section-scrollable">
+            {renderObjectContent()}
+          </div>
+        )}
       </div>
     </div>
   )

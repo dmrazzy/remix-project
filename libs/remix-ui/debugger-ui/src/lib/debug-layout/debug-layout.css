@@ -6,7 +6,6 @@
 }
 
 .debug-section {
-  border-bottom: 1px solid var(--bs-border-color);
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -14,7 +13,7 @@
 }
 
 .debug-section-search {
-  padding: 1rem;
+  padding: 0.25rem;
   flex-shrink: 0;
 }
 
@@ -45,7 +44,6 @@
   align-items: center;
   padding: 0;
   background-color: var(--custom-onsurface-layer-2);
-  border-bottom: 1px solid var(--bs-border-color);
   flex-shrink: 0;
   width: 100%;
   min-height: 2rem;
@@ -71,7 +69,6 @@
 
 .debug-section-content {
   padding: 1rem;
-  padding-bottom: 0;
 }
 
 .debug-section-trace .debug-section-content {
