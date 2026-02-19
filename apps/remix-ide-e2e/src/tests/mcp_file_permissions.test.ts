@@ -19,7 +19,7 @@ const tests = {
     init(browser, done, 'http://127.0.0.1:8080/#experimental=true', true, undefined, true, true)
   },
 
-  after: function (browser: NightwatchBrowser) {
+  after: '' + function (browser: NightwatchBrowser) {
     browser.perform((done) => {
       // Clean up any test artifacts
       browser.execute(function () {
@@ -33,7 +33,7 @@ const tests = {
     });
   },
 
-  'Setup: Enable MCP experimental features #group1 #group2 #group3': function (browser: NightwatchBrowser) {
+  'Setup: Enable MCP experimental features #group1 #group2 #group3': '' + function (browser: NightwatchBrowser) {
     browser
       // Refresh to apply settings
       .refresh()
@@ -71,7 +71,7 @@ const tests = {
    * Verifies that when a file write is attempted for the first time,
    * the user is prompted with the permission modal.
    */
-  'Should show permission modal on first file write #group1': function (browser: NightwatchBrowser) {
+  'Should show permission modal on first file write #group1': '' + function (browser: NightwatchBrowser) {
     browser
       // Clear any existing config to ensure fresh state
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemremix.config.json"]', 5000)
@@ -112,7 +112,7 @@ const tests = {
    * Test 2: Allow + "Just This File" creates allow-specific mode
    * Tests the flow where user allows one specific file.
    */
-  'Should allow write for specific file only #group1': function (browser: NightwatchBrowser) {
+  'Should allow write for specific file only #group1': '' + function (browser: NightwatchBrowser) {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
@@ -187,7 +187,7 @@ const tests = {
    * Test 3: Allow + "All Files in Project" creates allow-all mode
    * Tests the flow where user allows all file writes.
    */
-  'Should allow all files in project #group2': function (browser: NightwatchBrowser) {
+  'Should allow all files in project #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
@@ -270,7 +270,7 @@ const tests = {
    * Test 4: Deny sets deny-all mode
    * Tests that clicking Deny blocks file writes.
    */
-  'Should deny all file writes when user clicks Deny #group2': function (browser: NightwatchBrowser) {
+  'Should deny all file writes when user clicks Deny #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
@@ -312,7 +312,7 @@ const tests = {
    * Test 5: Config persists across page reload
    * Tests that permission settings survive page refresh.
    */
-  'Should persist permissions after page reload #group3': function (browser: NightwatchBrowser) {
+  'Should persist permissions after page reload #group3': '' + function (browser: NightwatchBrowser) {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
@@ -362,7 +362,7 @@ const tests = {
    * Test 6: File create operation also requires permission
    * Tests that file_create tool also uses the permission system.
    */
-  'Should require permission for file_create operation #group3': function (browser: NightwatchBrowser) {
+  'Should require permission for file_create operation #group3': '' + function (browser: NightwatchBrowser) {
     browser
       .refresh()
       .waitForElementVisible('*[data-id="remixIdeSidePanel"]', 10000)
