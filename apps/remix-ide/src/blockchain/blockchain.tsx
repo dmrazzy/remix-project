@@ -976,8 +976,8 @@ export class Blockchain extends Plugin {
   }
 
   async runTransaction(args) {
-    const gasLimit = args.data?.gasLimit || await this.call('udappDeploy', 'getGasLimit')
-    const value = args.data?.value || await this.call('udappDeploy', 'getValue')
+    const gasLimit = args.to ? args.data?.gasLimit : await this.call('udappDeploy', 'getGasLimit')
+    const value = args.to ? args.data?.value : await this.call('udappDeploy', 'getValue')
     const queryValue = !args.useCall ? value : '0x0'
     let fromAddress
     let fromSmartAccount

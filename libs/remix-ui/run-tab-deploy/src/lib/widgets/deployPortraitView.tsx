@@ -688,6 +688,7 @@ function DeployPortraitView() {
                 <div className="position-relative flex-fill">
                   <input
                     id='value'
+                    data-id='udapp_value'
                     type="number"
                     min="0"
                     className="form-control form-control-sm border-0"

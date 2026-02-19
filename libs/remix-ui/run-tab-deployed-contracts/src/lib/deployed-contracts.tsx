@@ -70,12 +70,13 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
       await loadPinnedContracts(plugin, dispatch, providerName)
     })
 
-    plugin.on('blockchain', 'transactionExecuted', async (error, _, to) => {
+    plugin.on('blockchain', 'transactionExecuted', async (error, _, to, __, ___, txResult) => {
       if (error) return
-      if (to) {
-        const balance = await plugin.call('blockchain', 'getBalanceInEther', to)
+      if (to || txResult?.receipt?.contractAddress) {
+        const address = to || txResult?.receipt?.contractAddress
+        const balance = await plugin.call('blockchain', 'getBalanceInEther', address)
 
-        if (balance) dispatch({ type: 'UPDATE_CONTRACT_BALANCE', payload: { address: to, balance } })
+        if (balance) dispatch({ type: 'UPDATE_CONTRACT_BALANCE', payload: { address: address, balance } })
       }
     })
 

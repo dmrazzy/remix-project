@@ -464,7 +464,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                               </button>
                             </div>
                             {lookupOnly && (
-                              <div className="udapp_value" data-id="udapp_value">
+                              <div className="udapp_value" data-id="udapp_tree_value">
                                 <TreeView id="treeView">
                                   {Object.keys(contract.decodedResponse || {}).map((key) => {
                                     const response = contract.decodedResponse[key]
@@ -489,7 +489,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                         </label>
                         <div className="position-relative flex-fill">
                           <input
-                            id='value'
+                            data-id={`contractItem-sendValue-${index}`}
                             type="number"
                             min="0"
                             className="form-control form-control-sm border-0"
@@ -595,6 +595,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
                           }}
                         />
                         <button
+                          data-id={`fallbackExecute-${index}`}
                           className="btn btn-sm btn-secondary"
                           onClick={sendData}
                           style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 2, fontSize: '0.65rem', fontWeight: 'bold' }}
