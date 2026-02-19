@@ -62,12 +62,15 @@ function DeployedContractsWidget({ plugin }: DeployedContractsWidgetProps) {
       }
     })
 
-    plugin.on('filePanel', 'setWorkspace', async () => {
-      const network = await plugin.call('udappEnv', 'getNetwork')
-      const chainId = network?.chainId
-      const providerName = network?.name === 'VM' ? await plugin.call('udappEnv', 'getSelectedProvider') : chainId
+    plugin.on('filePanel', 'setWorkspace', async (workspace) => {
+      if (workspace.name && widgetState.lastLoadedWorkspace !== workspace.name) {
+        const network = await plugin.call('udappEnv', 'getNetwork')
+        const chainId = network?.chainId
+        const providerName = network?.name === 'VM' ? await plugin.call('udappEnv', 'getSelectedProvider') : chainId
 
-      await loadPinnedContracts(plugin, dispatch, providerName)
+        dispatch({ type: 'SET_LAST_LOADED_WORKSPACE', payload: workspace.name })
+        await loadPinnedContracts(plugin, dispatch, providerName)
+      }
     })
 
     plugin.on('blockchain', 'transactionExecuted', async (error, _, to, __, ___, txResult) => {

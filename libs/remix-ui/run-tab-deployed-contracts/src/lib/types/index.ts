@@ -26,6 +26,7 @@ export interface DeployedContractsWidgetState {
   loadType: 'abi' | 'sol' | 'vyper' | 'lexon' | 'contract' | 'other',
   currentFile: string
   lastLoadedChainId: string | null
+  lastLoadedWorkspace: string | null
 }
 
 export interface DeployedContractsAppContextType {
@@ -51,3 +52,4 @@ export type Actions =
   | { type: 'SET_DECODED_RESPONSE'; payload: { instanceIndex: number; funcIndex: number; response: any } }
   | { type: 'UPDATE_CONTRACT_BALANCE'; payload: { address: string; balance: string } }
   | { type: 'SET_LAST_LOADED_CHAIN_ID'; payload: string | null }
+  | { type: 'SET_LAST_LOADED_WORKSPACE'; payload: string | null }

@@ -8,7 +8,8 @@ export const deployedContractsInitialState: DeployedContractsWidgetState = {
   showClearAllDialog: false,
   loadType: 'other',
   currentFile: '',
-  lastLoadedChainId: null
+  lastLoadedChainId: null,
+  lastLoadedWorkspace: null
 }
 
 export const deployedContractsReducer = (state: DeployedContractsWidgetState, action: Actions): DeployedContractsWidgetState => {
@@ -120,6 +121,12 @@ export const deployedContractsReducer = (state: DeployedContractsWidgetState, ac
     return {
       ...state,
       lastLoadedChainId: action.payload
+    }
+
+  case 'SET_LAST_LOADED_WORKSPACE':
+    return {
+      ...state,
+      lastLoadedWorkspace: action.payload
     }
 
   default:
