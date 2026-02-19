@@ -944,7 +944,7 @@ export const DebugLayout = ({
           style={{ cursor: 'pointer' }}
         >
           <h6 className="debug-section-title">
-            Call Trace (Trace Length: {(traceData && traceData.traceLength) || 0})
+            Call Trace (Step: {stepManager?.currentStepIndex ?? 0} / {(traceData && (traceData.traceLength - 1)) || 0})
           </h6>
           <i className={`fas ${expandedSections.callTrace ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', marginRight: '1rem', color: 'var(--bs-body-color)' }}></i>
         </div>
