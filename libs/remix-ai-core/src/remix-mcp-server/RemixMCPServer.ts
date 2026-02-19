@@ -67,6 +67,8 @@ import { ValidationMiddleware } from './middleware/ValidationMiddleware';
 import { FilePermissionMiddleware } from './middleware/FilePermissionMiddleware';
 import { MCPConfigManager } from './config/MCPConfigManager';
 
+import isElectron from 'is-electron'
+
 /**
  * Main Remix MCP Server implementation
  */
@@ -852,21 +854,26 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
       this._tools.registerBatch(tutorialTools);
 
       // Register Amp tools
+      /*
       const ampTools = createAmpTools();
       this._tools.registerBatch(ampTools);
+      */
 
       // Register Math Utils tools
       const mathUtilsTools = createMathUtilsTools();
       this._tools.registerBatch(mathUtilsTools);
 
       // Register Foundry and Hardhat tools
-      const foundryHardhatTools = createFoundryHardhatTools();
-      this._tools.registerBatch(foundryHardhatTools);
+      if (isElectron()) {
+        const foundryHardhatTools = createFoundryHardhatTools();
+        this._tools.registerBatch(foundryHardhatTools);
+      }
 
       // Register Chartjs tool
+      /*
       const chartJsTools = createChartJsTools();
       this._tools.registerBatch(chartJsTools);
-
+      */
       const totalTools = this._tools.list().length;
 
     } catch (error) {
