@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react' // eslint-disable-line
+import { CustomTooltip } from '@remix-ui/helper'
 import './DebuggerCallStack.css'
 
 interface DebuggerCallStackProps {
@@ -9,6 +10,7 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
   const [selectedScope, setSelectedScope] = useState<any>(null)
   const [deployments, setDeployments] = useState<any[]>([])
   const [expandedScopes, setExpandedScopes] = useState<Set<string>>(new Set())
+  const [hoveredScope, setHoveredScope] = useState<string | null>(null)
 
   useEffect(() => {
     // Listen for scope selection from debugger UI
@@ -96,6 +98,22 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
     }
   }
 
+  const handleJumpTo = async (step: number) => {
+    try {
+      await plugin.call('debugger', 'jumpTo', step)
+    } catch (error) {
+      console.error('Error jumping to step:', error)
+    }
+  }
+
+  const handleJumpOut = async () => {
+    try {
+      await plugin.call('debugger', 'jumpOut', true)
+    } catch (error) {
+      console.error('Error jumping out:', error)
+    }
+  }
+
   const renderExecutionItem = (scope: any, depth: number = 0): JSX.Element => {
     const opcode = scope.opcodeInfo?.op || ''
     // Only show 'fallback' if it's actually a fallback function (kind === 'fallback')
@@ -149,11 +167,15 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
     const hasChildren = scope.children && scope.children.length > 0
     const isExpanded = expandedScopes.has(scope.scopeId)
 
+    const isHovered = hoveredScope === scope.scopeId
+
     return (
       <div key={scope.scopeId}>
         <div
           className="call-stack-item"
           onClick={() => handleExecutionItemClick(scope)}
+          onMouseEnter={() => setHoveredScope(scope.scopeId)}
+          onMouseLeave={() => setHoveredScope(null)}
         >
           <div className="call-stack-line">
             <span className="call-stack-step">{scope.firstStep}</span>
@@ -221,6 +243,64 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
                   </>
                 )}
               </span>
+              {/* Jump buttons */}
+              {(scope.firstStep !== undefined || scope.lastStep !== undefined) && (
+                <div className="call-stack-actions" style={{ opacity: isHovered ? 1 : 0 }}>
+                  {scope.firstStep !== undefined && (
+                    <CustomTooltip tooltipText="Jump Into" tooltipId={`jump-into-exec-${scope.scopeId}`} placement="top">
+                      <button
+                        className="jump-debug-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const stepToJump = scope.functionEntryStep !== undefined ? scope.functionEntryStep : scope.firstStep
+                          handleJumpTo(stepToJump)
+                        }}
+                      >
+                        <i className="fas fa-sign-in-alt"></i>
+                      </button>
+                    </CustomTooltip>
+                  )}
+                  {scope.lastStep !== undefined && (
+                    <>
+                      <CustomTooltip tooltipText="Jump End" tooltipId={`jump-end-exec-${scope.scopeId}`} placement="top">
+                        <button
+                          className="jump-debug-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleJumpTo(scope.lastStep)
+                          }}
+                        >
+                          <i className="fas fa-step-forward"></i>
+                        </button>
+                      </CustomTooltip>
+                      <CustomTooltip tooltipText="Jump Over" tooltipId={`jump-over-exec-${scope.scopeId}`} placement="top">
+                        <button
+                          className="jump-debug-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleJumpTo(scope.lastStep + 1)
+                          }}
+                        >
+                          <i className="fas fa-level-down-alt"></i>
+                        </button>
+                      </CustomTooltip>
+                    </>
+                  )}
+                  {isHovered && scope.lastStep !== undefined && (
+                    <CustomTooltip tooltipText="Jump Out" tooltipId={`jump-out-exec-${scope.scopeId}`} placement="top">
+                      <button
+                        className="jump-debug-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleJumpOut()
+                        }}
+                      >
+                        <i className="fas fa-sign-out-alt"></i>
+                      </button>
+                    </CustomTooltip>
+                  )}
+                </div>
+              )}
               <span className="call-stack-gas"><i className="fas fa-gas-pump"></i> {scope.gasCost}</span>
             </div>
           </div>
