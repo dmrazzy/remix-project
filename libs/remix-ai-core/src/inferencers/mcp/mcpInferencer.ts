@@ -43,6 +43,7 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
   private mcpClients: Map<string, MCPClient> = new Map();
   private connectionStatuses: Map<string, IMCPConnectionStatus> = new Map();
   private resourceCache: Map<string, IMCPResourceContent> = new Map();
+  private toolsCache: Map<string, IMCPTool[]> = new Map();
   private intentAnalyzer: IntentAnalyzer = new IntentAnalyzer();
   private resourceScoring: ResourceScoring = new ResourceScoring();
   private remixMCPServer?: any; // Internal RemixMCPServer instance
@@ -71,12 +72,19 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
         });
 
         // Set up event listeners
-        client.on('connected', (serverName: string, result: IMCPInitializeResult) => {
+        client.on('connected', async (serverName: string, result: IMCPInitializeResult) => {
           this.connectionStatuses.set(serverName, {
             status: 'connected',
             serverName,
             capabilities: result.capabilities
           });
+          // Populate tools cache on connect
+          try {
+            const tools = await client.listTools();
+            this.toolsCache.set(serverName, tools);
+          } catch (error) {
+            this.toolsCache.set(serverName, []);
+          }
           this.event.emit('mcpServerConnected', serverName, result);
         });
 
@@ -87,6 +95,7 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
             error: error.message,
             lastAttempt: Date.now()
           });
+          this.toolsCache.delete(serverName);
           this.event.emit('mcpServerError', serverName, error);
         });
 
@@ -95,6 +104,7 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
             status: 'disconnected',
             serverName
           });
+          this.toolsCache.delete(serverName);
           this.event.emit('mcpServerDisconnected', serverName);
         });
       }
@@ -648,15 +658,34 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
 
     for (const [serverName, client] of this.mcpClients) {
       if (client.isConnected()) {
-        try {
-          result[serverName] = await client.listTools();
-        } catch (error) {
-          result[serverName] = [];
-        }
+        result[serverName] = this.toolsCache.get(serverName) || [];
       }
     }
 
     return result;
+  }
+
+  async refreshToolsCache(serverName?: string): Promise<void> {
+    if (serverName) {
+      const client = this.mcpClients.get(serverName);
+      if (client?.isConnected()) {
+        try {
+          this.toolsCache.set(serverName, await client.listTools());
+        } catch (error) {
+          this.toolsCache.set(serverName, []);
+        }
+      }
+    } else {
+      for (const [name, client] of this.mcpClients) {
+        if (client.isConnected()) {
+          try {
+            this.toolsCache.set(name, await client.listTools());
+          } catch (error) {
+            this.toolsCache.set(name, []);
+          }
+        }
+      }
+    }
   }
 
   async executeTool(serverName: string, toolCall: IMCPToolCall): Promise<IMCPToolResult> {

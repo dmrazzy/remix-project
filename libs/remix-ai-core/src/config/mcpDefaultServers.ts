@@ -98,6 +98,15 @@ export const mcpDefaultServersConfig: MCPDefaultServersConfig = {
       autoStart: true,
       enabled: true,
       timeout: 30000
+    },
+    {
+      name: 'ethskills',
+      description: 'eth skills',
+      transport: 'http',
+      url: 'http://localhost:9005/mcp',
+      autoStart: true,
+      enabled: true,
+      timeout: 30000
     }
   ]
 };
