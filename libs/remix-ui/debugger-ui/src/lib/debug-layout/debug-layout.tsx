@@ -614,63 +614,70 @@ export const DebugLayout = ({
                   </>
                 )}
               </span>
-              {/* Navigation action buttons - show for external calls and parent calls with children */}
-              {!scope.isSenderNode && (hasChildren || opcode === 'CALL' || opcode === 'DELEGATECALL' || opcode === 'STATICCALL' ||
-                opcode === 'CREATE' || opcode === 'CREATE2' || callTypeLabel === 'INTERNAL') && (
+              {/* Navigation action buttons - show for all non-sender nodes */}
+              {!scope.isSenderNode && (scope.firstStep !== undefined || scope.lastStep !== undefined) && (
                 <div className="call-trace-actions">
                   {scope.firstStep !== undefined && (
-                    <button
-                      className="btn btn-primary btn-sm jump-debug-btn fw-bold"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (stepManager && stepManager.jumpTo) {
-                          // Use functionEntryStep if available (skips dispatcher), otherwise use firstStep
-                          const stepToJump = scope.functionEntryStep !== undefined ? scope.functionEntryStep : scope.firstStep
-                          stepManager.jumpTo(stepToJump)
-                        }
-                      }}
-                    >
-                      Jump Into
-                    </button>
+                    <CustomTooltip tooltipText="Jump Into" tooltipId={`jump-into-${scope.scopeId}`} placement="top">
+                      <button
+                        className="jump-debug-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (stepManager && stepManager.jumpTo) {
+                            // Use functionEntryStep if available (skips dispatcher), otherwise use firstStep
+                            const stepToJump = scope.functionEntryStep !== undefined ? scope.functionEntryStep : scope.firstStep
+                            stepManager.jumpTo(stepToJump)
+                          }
+                        }}
+                      >
+                        <i className="fas fa-sign-in-alt"></i>
+                      </button>
+                    </CustomTooltip>
                   )}
                   {scope.lastStep !== undefined && (
                     <>
-                      <button
-                        className="btn btn-primary btn-sm jump-debug-btn fw-bold"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (stepManager && stepManager.jumpTo) {
-                            stepManager.jumpTo(scope.lastStep)
-                          }
-                        }}
-                      >
-                        Jump End
-                      </button>
-                      <button
-                        className="btn btn-primary btn-sm jump-debug-btn fw-bold"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (stepManager && stepManager.jumpTo) {
-                            stepManager.jumpTo(scope.lastStep + 1)
-                          }
-                        }}
-                      >
-                        Jump Over
-                      </button>
+                      <CustomTooltip tooltipText="Jump End" tooltipId={`jump-end-${scope.scopeId}`} placement="top">
+                        <button
+                          className="jump-debug-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (stepManager && stepManager.jumpTo) {
+                              stepManager.jumpTo(scope.lastStep)
+                            }
+                          }}
+                        >
+                          <i className="fas fa-step-forward"></i>
+                        </button>
+                      </CustomTooltip>
+                      <CustomTooltip tooltipText="Jump Over" tooltipId={`jump-over-${scope.scopeId}`} placement="top">
+                        <button
+                          className="jump-debug-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (stepManager && stepManager.jumpTo) {
+                              stepManager.jumpTo(scope.lastStep + 1)
+                            }
+                          }}
+                        >
+                          <i className="fas fa-level-down-alt"></i>
+                        </button>
+                      </CustomTooltip>
                     </>
                   )}
                   {isSelected && stepManager && stepManager.jumpOut && (
-                    <button
-                      className="btn btn-primary btn-sm jump-debug-btn fw-bold"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (stepManager && stepManager.jumpOut) {
-                          stepManager.jumpOut(true) // true for solidity mode
-                        }
-                      }}
-                    >
-                      Jump Out
-                    </button>
+                    <CustomTooltip tooltipText="Jump Out" tooltipId={`jump-out-${scope.scopeId}`} placement="top">
+                      <button
+                        className="jump-debug-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (stepManager && stepManager.jumpOut) {
+                            stepManager.jumpOut(true) // true for solidity mode
+                          }
+                        }}
+                      >
+                        <i className="fas fa-sign-out-alt"></i>
+                      </button>
+                    </CustomTooltip>
                   )}
                 </div>
               )}
