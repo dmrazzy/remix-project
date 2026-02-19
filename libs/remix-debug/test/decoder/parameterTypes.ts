@@ -145,6 +145,18 @@ contract ParameterTestContract is BaseContract {
         message = string(abi.encodePacked("Create2: ", _create2Message));
         return address(child);
     }
+    
+    // 9. Function with return values - uint and string
+    function returnValueTest(uint256 _inputValue, string memory _inputMessage) public returns (uint256, string memory) {
+        uint256 returnUint = _inputValue + 1000;
+        string memory returnString = string(abi.encodePacked("Return: ", _inputMessage));
+        return (returnUint, returnString);
+    }
+    
+    // 10. Pure function with return values
+    function pureReturnTest(uint256 _pureValue, string memory _pureMessage) public pure returns (uint256, string memory) {
+        return (_pureValue + 2000, string(abi.encodePacked("Pure: ", _pureMessage)));
+    }
 }`
 }
 
