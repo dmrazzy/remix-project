@@ -136,16 +136,16 @@ export async function registerFunctionParameters (tree: InternalCallTree, functi
       const outputs = functionDefinition.returnParameters
 
       // input params - they are at the bottom of the stack at function entry
-      let availableSlot
+      let availableSlot = stack.length
       if (inputs && inputs.parameters && inputs.parameters.length > 0) {
         const { params, freeStackIndex } = addInputParams(step, functionDefinition, inputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, stackPosOnCtor)
-        availableSlot = freeStackIndex
+        if (freeStackIndex != null) availableSlot = freeStackIndex
         functionDefinitionAndInputs.inputs = params
       }
 
       // return params - register them but they're not yet on the stack
       if (outputs && outputs.parameters && outputs.parameters.length > 0) {
-        addReturnParams(step, availableSlot, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation, stack.length, inputs && inputs.parameters && inputs.parameters.length)
+        addReturnParams(step, availableSlot, functionDefinition, outputs, tree, scopeId, states, contractObj, sourceLocation)
       }
     }
 
@@ -426,7 +426,7 @@ export function extractFunctionDefinitions (ast, astWalker) {
 export function addInputParams (step, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, stackLength, forceFreeSlot) {
   if (!contractObj) {
     console.warn('No contract object found while adding input params')
-    return { params: []}
+    return { params: [], freeStackIndex: null}
   }
 
   const contractName = contractObj.name
@@ -495,7 +495,7 @@ export function addInputParams (step, functionDefinition, parameterList, tree: I
  * @param {Object} contractObj - Contract object with name and ABI
  * @param {Object} sourceLocation - Source location of the parameter
  */
-export function addReturnParams (step, availableSlot, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation, stackLength, inputParamCount) {
+export function addReturnParams (step, availableSlot, functionDefinition, parameterList, tree: InternalCallTree, scopeId, states, contractObj, sourceLocation) {
   if (!contractObj) {
     console.warn('No contract object found while adding return params')
     return
