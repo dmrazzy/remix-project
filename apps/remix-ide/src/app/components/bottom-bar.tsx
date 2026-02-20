@@ -194,7 +194,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
           </button>
           <button
             className="btn btn-sm btn-secondary debug-btn"
-            onClick={() => stepManager?.stepOverBack && stepManager.stepOverBack(!(stepManager.showOpcodes ?? false))}
+            onClick={() => stepManager?.stepOverBack && stepManager.stepOverBack(stepManager.showOpcodes ?? false)}
             disabled={stepState === 'initial'}
             data-id="btnStepBackward"
           >
@@ -203,7 +203,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
           </button>
           <button
             className="btn btn-sm btn-primary debug-btn"
-            onClick={() => stepManager?.stepIntoBack && stepManager.stepIntoBack(!(stepManager.showOpcodes ?? false))}
+            onClick={() => stepManager?.stepIntoBack && stepManager.stepIntoBack(stepManager.showOpcodes ?? false)}
             disabled={stepState === 'initial'}
             data-id="btnStepBack"
           >
@@ -212,7 +212,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
           </button>
           <button
             className="btn btn-sm btn-primary debug-btn"
-            onClick={() => stepManager?.stepIntoForward && stepManager.stepIntoForward(!(stepManager.showOpcodes ?? false))}
+            onClick={() => stepManager?.stepIntoForward && stepManager.stepIntoForward(stepManager.showOpcodes ?? false)}
             disabled={stepState === 'end'}
             data-id="btnStepInto"
           >
@@ -221,7 +221,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
           </button>
           <button
             className="btn btn-sm btn-secondary debug-btn"
-            onClick={() => stepManager?.stepOverForward && stepManager.stepOverForward(!(stepManager.showOpcodes ?? false))}
+            onClick={() => stepManager?.stepOverForward && stepManager.stepOverForward(stepManager.showOpcodes ?? false)}
             disabled={stepState === 'end'}
             data-id="btnStepForward"
           >

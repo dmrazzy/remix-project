@@ -745,8 +745,8 @@ export const DebugLayout = ({
     // Show message in this case
     if (nestedScopes !== null && nestedScopes !== undefined) {
       return (
-        <p className="text-muted">
-          <FormattedMessage id="debugger.noExternalCalls" defaultMessage="No external calls in this transaction" />
+        <p className="text-muted ms-1">
+          <FormattedMessage id="debugger.noExternalCalls" defaultMessage="No external calls found." />
         </p>
       )
     }
@@ -1011,7 +1011,7 @@ export const DebugLayout = ({
         />
 
         {/* Use generated sources checkbox */}
-        <div className="mt-1 mb-2 ms-1 debuggerConfig form-check">
+        <div className="mt-1 mb-2 ms-2 debuggerConfig form-check">
           <CustomTooltip tooltipId="debuggerGenSourceCheckbox" tooltipText={<FormattedMessage id="debugger.debugWithGeneratedSources" />} placement="bottom-start">
             <span className="p-0 m-0">
               <input
