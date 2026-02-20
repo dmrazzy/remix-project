@@ -599,7 +599,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     <div style={{ height: '100%' }}>
       <Toaster message={state.toastMessage} />
       {!state.debugging && (
-        <div className="px-2 pb-3 pt-3" ref={debuggerTopRef}>
+        <div className="pb-2 pt-2" ref={debuggerTopRef}>
           {/* Search Bar */}
           <SearchBar
             onSearch={handleSearch}
@@ -609,7 +609,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
           />
 
           {/* Informational Text */}
-          <div className="debugger-info mb-2">
+          <div className="debugger-info ms-2 me-2 mb-2">
             <h6 className="search-bar-title mt-3">
               <FormattedMessage id="debugger.startDebugging" defaultMessage="Start debugging a transaction" />
             </h6>
@@ -625,7 +625,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
 
           {/* Configuration Options */}
           <div>
-            <div className="mb-2 debuggerConfig form-check">
+            <div className="ms-2 mb-2 debuggerConfig form-check">
               <CustomTooltip tooltipId="debuggerGenSourceCheckbox" tooltipText={<FormattedMessage id="debugger.debugWithGeneratedSources" />} placement="bottom-start">
                 {customJSX}
               </CustomTooltip>
@@ -654,8 +654,10 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             )}
           </div>
 
-        {/* Transaction Recorder Section */}
-        {!state.debugging && transactionRecorderUI}
+          {/* Transaction Recorder Section */}
+          {transactionRecorderUI}
+        </div>
+      )}
 
         {state.debugging && state.sourceLocationStatus && (
           <div className="text-warning mt-3">
