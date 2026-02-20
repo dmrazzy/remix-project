@@ -33,15 +33,41 @@ export default class TabProxy extends Plugin {
       this.renderComponent()
     })
 
+    // Track if debugging session is actually active (not just the button state)
+    this.debuggingSessionActive = false
+
     // Listen for debugger events to update isDebugging state
     this.on('debugger', 'debuggingStarted', () => {
+      this.debuggingSessionActive = true
       this.isDebugging = true
       this.renderComponent()
     })
 
     this.on('debugger', 'debuggingStopped', () => {
+      this.debuggingSessionActive = false
       this.isDebugging = false
       this.renderComponent()
+    })
+
+    // Listen for side panel plugin changes
+    this.on('sidePanel', 'focusChanged', (pluginName) => {
+      if (pluginName === 'debugger' && this.debuggingSessionActive) {
+        // Returning to debugger while debugging is in progress - show Ask RemixAI button
+        this.isDebugging = true
+        this.renderComponent()
+      } else if (pluginName !== 'debugger' && this.isDebugging) {
+        // Switching away from debugger - hide Ask RemixAI button
+        this.isDebugging = false
+        this.renderComponent()
+      }
+    })
+
+    // Also listen for menuicons changes (for main panel plugins)
+    this.on('menuicons', 'showContent', (pluginName) => {
+      if (pluginName !== 'debugger' && this.isDebugging) {
+        this.isDebugging = false
+        this.renderComponent()
+      }
     })
 
     this.on('fileManager', 'filesAllClosed', () => {
