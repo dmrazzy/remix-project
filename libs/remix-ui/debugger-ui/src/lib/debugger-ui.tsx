@@ -392,6 +392,10 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     // Reset solidity locals and state
     setSolidityLocals(null)
     setSolidityState(null)
+    // Clear all breakpoints from editor
+    debuggerModule.call('editor', 'clearAllBreakpoints').catch((e) => {
+      console.error('Failed to clear breakpoints:', e)
+    })
     // Emit debugging stopped event
     debuggerModule.emit('debuggingStopped')
   }
