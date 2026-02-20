@@ -718,7 +718,7 @@ export const DebugLayout = ({
                   )}
                 </div>
               )}
-              <span className="call-trace-gas ms-1"><i className="fas fa-gas-pump"></i> {scope.gasCost}</span>
+              {/* <span className="call-trace-gas ms-1"><i className="fas fa-gas-pump"></i> {scope.gasCost}</span> */}
             </div>
           </div>
         </div>
@@ -766,7 +766,7 @@ export const DebugLayout = ({
           const functionName = func.functionDefinition?.name || func.functionDefinition?.kind || 'Unknown'
           const callType = func.callType || func.functionDefinition?.visibility || ''
           const inputs = func.inputs || []
-          const gasCost = func.gasCost || 0
+          // const gasCost = func.gasCost || 0
           const step = func.firstStep !== undefined ? func.firstStep : '-'
 
           // Determine call type icon and label
@@ -808,7 +808,7 @@ export const DebugLayout = ({
                       </>
                     )}
                   </span>
-                  <span className="call-trace-gas ms-1"><i className="fas fa-gas-pump"></i> {gasCost}</span>
+                  {/* <span className="call-trace-gas ms-1"><i className="fas fa-gas-pump"></i> {gasCost}</span> */}
                 </div>
               </div>
             </div>

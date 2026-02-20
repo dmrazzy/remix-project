@@ -301,7 +301,7 @@ export const DebuggerCallStack = ({ plugin }: DebuggerCallStackProps) => {
                   )}
                 </div>
               )}
-              <span className="call-stack-gas"><i className="fas fa-gas-pump"></i> {scope.gasCost}</span>
+              {/* <span className="call-stack-gas"><i className="fas fa-gas-pump"></i> {scope.gasCost}</span> */}
             </div>
           </div>
         </div>
