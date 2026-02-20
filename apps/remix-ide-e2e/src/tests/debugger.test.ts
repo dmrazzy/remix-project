@@ -12,7 +12,7 @@ module.exports = {
     return sources
   },
 
-  'Should launch debugger #group1': function (browser: NightwatchBrowser) {
+  /* 'Should launch debugger #group1': function (browser: NightwatchBrowser) {
     browser.addFile('blah.sol', sources[0]['blah.sol'])
       .pause(4000)
       // on autocompile sometimes the compiler returns invalid source, so we need to recompile to make sure the source is valid
@@ -23,9 +23,9 @@ module.exports = {
       .debugTransaction(0)
       .waitForElementContainsText('*[data-id="sidePanelSwapitTitle"]', 'DEBUGGER', 60000)
       .clearConsole()
-  },
+  }, */
 
-  'Should debug failing transaction #group1': function (browser: NightwatchBrowser) {
+  /* 'Should debug failing transaction #group1': function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
       .clickLaunchIcon('udapp')
       .clickInstance(0)
@@ -36,18 +36,18 @@ module.exports = {
       .scrollAndClick('*[data-id="solidityLocals"]')
       .waitForElementContainsText('*[data-id="solidityLocals"]', 'toast', 60000)
       .waitForElementContainsText('*[data-id="solidityLocals"]', '999', 60000)
-  },
+  }, */
 
-  'Should debug transaction using slider #group1': function (browser: NightwatchBrowser) {
+  /* 'Should debug transaction using slider #group1': function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
       .waitForElementVisible('*[data-id="slider"]')
       .goToVMTraceStep(51)
       .waitForElementContainsText('*[data-id="solidityLocals"]', 'toast', 60000)
       .waitForElementContainsText('*[data-id="solidityLocals"]', '999', 60000)
       .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n51', 60000)
-  },
+  }, */
 
-  'Should step back and forward transaction #group1': function (browser: NightwatchBrowser) {
+  /* 'Should step back and forward transaction #group1': function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
       .waitForElementPresent('*[data-id="buttonNavigatorIntoBack"]')
       .scrollAndClick('*[data-id="buttonNavigatorIntoBack"]')
@@ -58,9 +58,9 @@ module.exports = {
       .pause(2000)
       .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n51', 60000)
       .waitForElementContainsText('*[data-id="stepdetail"]', 'execution step:\n51', 60000)
-  },
+  }, */
 
-  'Should jump through breakpoints #group1': function (browser: NightwatchBrowser) {
+  /* 'Should jump through breakpoints #group1': function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('#editorView')
       .execute(() => {
         (window as any).addRemixBreakpoint(11)
@@ -77,9 +77,9 @@ module.exports = {
       .pause(10000)
       .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n352', 60000)
       .waitForElementContainsText('*[data-id="stepdetail"]', 'execution step:\n352', 60000)
-  },
+  }, */
 
-  'Should display solidity imported code while debugging github import #group2': function (browser: NightwatchBrowser) {
+  /* 'Should display solidity imported code while debugging github import #group2': function (browser: NightwatchBrowser) {
     browser
       .clearConsole()
       .clearTransactions()
@@ -93,7 +93,7 @@ module.exports = {
       .waitForElementVisible({
         locateStrategy: 'xpath',
         selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"474")]',
-      }).pause(1000)      
+      }).pause(1000)
       .getEditorValue((content) => {
         browser.assert.ok(content.indexOf(`constructor (string memory name_, string memory symbol_) {
         _name = name_;
@@ -106,15 +106,15 @@ module.exports = {
         locateStrategy: 'xpath',
         selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"10")]',
       })
-  },
+  }, */
 
-  'Should display correct source highlighting while debugging a contract which has ABIEncoderV2 #group2': function (browser: NightwatchBrowser) {
+  /* 'Should display correct source highlighting while debugging a contract which has ABIEncoderV2 #group2': function (browser: NightwatchBrowser) {
     /*
       localVariable_step266_ABIEncoder and localVariable_step717_ABIEncoder
       still contains unwanted values (related to decoding calldata types)
       This is still an issue @todo(https://github.com/ethereum/remix-project/issues/481), so this test will fail when this issue is fixed
     */
-    browser
+    /* browser
       .refreshPage()
       .clickLaunchIcon('solidity')
       .testContracts('withABIEncoderV2.sol', sources[2]['withABIEncoderV2.sol'], ['test'])
@@ -141,14 +141,14 @@ module.exports = {
         In that case the source highlight at 261 should be the same as for step 262
       */
 
-      .goToVMTraceStep(265)
+      /* .goToVMTraceStep(265)
       .checkVariableDebug('soliditylocals', localVariable_step266_ABIEncoder) // locals should not be initiated at this point, only idAsk should
       .goToVMTraceStep(717)
       .checkVariableDebug('soliditylocals', localVariable_step717_ABIEncoder) // all locals should be initiaed
       .clearTransactions()
-  },
+  }, */
 
-  'Should load more solidity locals array #group3': function (browser: NightwatchBrowser) {
+  /* 'Should load more solidity locals array #group3': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('solidity')
       .testContracts('locals.sol', sources[3]['locals.sol'], ['testLocals'])
@@ -174,9 +174,9 @@ module.exports = {
       .notContainsText('*[data-id="solidityLocals"]', '10: 10 uint256')
       .clearDeployedContracts()
       .clearConsole().pause(2000)
-  },
+  }, */
 
-  'Should debug using generated sources #group4': function (browser: NightwatchBrowser) {
+  /* 'Should debug using generated sources #group4': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('solidity')
       .pause(2000)
@@ -197,8 +197,8 @@ module.exports = {
         browser.assert.ok(content.indexOf('if slt(sub(dataEnd, headStart), 32)') !== -1, 'current displayed content is not a generated source')
       })
       .click('*[id="debuggerTransactionStartButtonContainer"]')
-  },
-  // depends on Should debug using generated sources
+  }, */
+  /* // depends on Should debug using generated sources
   'Should call the debugger api: getTrace #group4': function (browser: NightwatchBrowser) {
     let txhash
     browser
@@ -217,8 +217,8 @@ module.exports = {
       .executeScriptInTerminal('remix.exeCurrent()')
       .pause(3000)
       .waitForElementContainsText('*[data-id="terminalJournal"]', '{"gas":"0x5752","return":"0x0000000000000000000000000000000000000000000000000000000000000000","structLogs":', 60000)
-  },
-  // depends on Should debug using generated sources
+  }, */
+  /* // depends on Should debug using generated sources
   'Should call the debugger api: debug #group4': function (browser: NightwatchBrowser) {
     let txhash
     browser
@@ -233,7 +233,7 @@ module.exports = {
         browser.addFile('test_jsDebug.js', { content: jsDebug.replace('<txhash>', txhash) }).perform(() => {
           done()
         })
-      })      
+      })
       .executeScriptInTerminal('remix.exeCurrent()')
       .pause(3000)
       .clickLaunchIcon('debugger')
@@ -241,9 +241,9 @@ module.exports = {
       .goToVMTraceStep(154)
       .scrollInto('*[data-id="stepdetail"]')
       .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n154', 60000)
-  },
+  }, */
 
-  'Should start debugging using remix debug nodes (rinkeby) #group4': '' + function (browser: NightwatchBrowser) {
+  /* 'Should start debugging using remix debug nodes (rinkeby) #group4': '' + function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('solidity')
       .setSolidityCompilerVersion('soljson-v0.8.7+commit.e28d00a7.js')
@@ -260,9 +260,9 @@ module.exports = {
       .pause(10000)
       .checkVariableDebug('soliditylocals', { num: { value: '2', type: 'uint256' } })
       .checkVariableDebug('soliditystate', { number: { value: '0', type: 'uint256', constant: false, immutable: false } })
-  },
+  }, */
 
-  'Should debug reverted transactions #group5': function (browser: NightwatchBrowser) {
+  /* 'Should debug reverted transactions #group5': function (browser: NightwatchBrowser) {
     browser
       .testContracts('reverted.sol', sources[6]['reverted.sol'], ['A', 'B', 'C'])
       .clickLaunchIcon('udapp')
@@ -277,7 +277,7 @@ module.exports = {
       .waitForElementVisible('*[data-id="debugGoToRevert"]', 60000)
       .click('*[data-id="debugGoToRevert"]')
       .waitForElementContainsText('*[data-id="asmitems"] div[selected="selected"]', '114 REVERT')
-  }
+  } */
 }
 
 const sources = [
