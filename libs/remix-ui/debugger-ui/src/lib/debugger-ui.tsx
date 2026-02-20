@@ -1,10 +1,10 @@
 import React, {useState, useEffect, useRef, useContext} from 'react' // eslint-disable-line
+import { createPortal } from 'react-dom'
 import { FormattedMessage, useIntl } from 'react-intl'
 import StepManager from './step-manager/step-manager' // eslint-disable-line
 import VmDebugger from './vm-debugger/vm-debugger' // eslint-disable-line
 import VmDebuggerHead from './vm-debugger/vm-debugger-head' // eslint-disable-line
 import SearchBar from './search-bar/search-bar' // eslint-disable-line
-import TransactionRecorder from './transaction-recorder/transaction-recorder' // eslint-disable-line
 import DebugLayout from './debug-layout/debug-layout' // eslint-disable-line
 import {TransactionDebugger as Debugger} from '@remix-project/remix-debug' // eslint-disable-line
 import {DebuggerUIProps} from './idebugger-api' // eslint-disable-line
@@ -57,6 +57,7 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   const [callTreeInstance, setCallTreeInstance] = useState<any>(null)
   const [solidityLocals, setSolidityLocals] = useState<any>(null)
   const [solidityState, setSolidityState] = useState<any>(null)
+  const [transactionRecorderUI, setTransactionRecorderUI] = useState<React.ReactNode>(null)
 
   if (props.onReady) {
     props.onReady({
@@ -80,10 +81,6 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   }
 
   useEffect(() => {
-    handleResize()
-  }, [])
-
-  useEffect(() => {
     window.addEventListener('resize', handleResize)
     // TODO: not a good way to wait on the ref doms element to be rendered of course
     setTimeout(() => handleResize(), 2000)
@@ -91,111 +88,12 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
   }, [state.debugging, state.isActive])
 
   useEffect(() => {
+    debuggerModule.call('udappTransactions', 'getUI').then((ui) => {
+      setTransactionRecorderUI(ui)
+    })
+    handleResize()
+
     return unLoad()
-  }, [])
-
-  // Fetch deployed contracts from UDAPP plugin
-  useEffect(() => {
-    const fetchDeployedContracts = async () => {
-      try {
-        if (!debuggerModule.call) return
-
-        // Use getDeployedContracts instead of getAllDeployedInstances to get enriched data
-        const deployedContracts = await debuggerModule.call('udapp', 'getDeployedContracts')
-        if (!deployedContracts) return
-
-        console.log('[Debugger] Initial fetch of deployed contracts:', deployedContracts)
-
-        const deploymentList: ContractDeployment[] = []
-
-        // Process deployed contracts from all providers
-        for (const provider in deployedContracts) {
-          for (const address in deployedContracts[provider]) {
-            const contract = deployedContracts[provider][address]
-            deploymentList.push({
-              address: contract.address,
-              name: contract.name || 'Unknown',
-              abi: contract.abi || [],
-              timestamp: contract.timestamp ? new Date(contract.timestamp).getTime() : Date.now(),
-              from: contract.from || '',
-              transactionHash: contract.transactionHash || '',
-              blockHash: contract.blockHash || '',
-              blockNumber: contract.blockNumber || 0,
-              gasUsed: contract.gasUsed || 0,
-              status: contract.status || 'success'
-            })
-          }
-        }
-
-        setDeployments(deploymentList)
-      } catch (e) {
-        console.error('Error fetching deployed contracts:', e)
-      }
-    }
-
-    fetchDeployedContracts()
-
-    // Listen for new transactions from blockchain plugin
-    if (debuggerModule.on) {
-      const handleNewTransaction = (error: any, from: any, to: any, data: any, useCall: any, result: any, timestamp: any, payload: any) => {
-        if (error || useCall) return
-
-        console.log('[Debugger] Transaction execution detected:', {
-          contractAddress: result?.receipt?.contractAddress,
-          payload: payload,
-          contractName: payload?.contractName
-        })
-
-        // Check if this is a contract deployment
-        if (result?.receipt?.contractAddress) {
-          const contractAddress = result.receipt.contractAddress
-
-          // Get contract name from payload (this is what blockchain plugin provides)
-          const contractName = payload?.contractName || payload?.contractData?.name || 'Unknown'
-          const contractAbi = payload?.contractABI || payload?.contractData?.abi || []
-
-          console.log('[Debugger] Using contract name:', contractName)
-
-          // Add deployment with data from payload
-          const newDeployment: ContractDeployment = {
-            address: contractAddress,
-            name: contractName,
-            abi: contractAbi,
-            timestamp: timestamp || Date.now(),
-            from: from,
-            transactionHash: result.receipt.transactionHash || result.receipt.hash || result.transactionHash || result.hash,
-            blockHash: result.receipt.blockHash || '',
-            blockNumber: result.receipt.blockNumber || 0,
-            gasUsed: result.receipt.gasUsed || 0,
-            status: result.receipt.status ? 'success' : 'failed'
-          }
-
-          setDeployments(prev => [newDeployment, ...prev])
-        } else if (to && result?.receipt) {
-          // This is a contract interaction
-          const interaction: ContractInteraction = {
-            transactionHash: result.receipt.transactionHash || result.receipt.hash || result.transactionHash || result.hash,
-            from: from,
-            to: to,
-            timestamp: timestamp || Date.now(),
-            blockNumber: result.receipt.blockNumber || 0,
-            gasUsed: result.receipt.gasUsed || 0,
-            status: result.receipt.status ? 'success' : 'failed',
-            methodName: payload?.funAbi?.name,
-            value: payload?.value
-          }
-
-          setTransactions(prev => {
-            const newMap = new Map(prev)
-            const existing = newMap.get(to) || []
-            newMap.set(to, [interaction, ...existing])
-            return newMap
-          })
-        }
-      }
-
-      debuggerModule.on('blockchain', 'transactionExecuted', handleNewTransaction)
-    }
   }, [])
 
   debuggerModule.onDebugRequested((hash, web3?) => {
@@ -756,19 +654,14 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
             )}
           </div>
 
-          {/* Transaction Recorder Section */}
-          <TransactionRecorder
-            requestDebug={requestDebug}
-            unloadRequested={unloadRequested}
-            updateTxNumberFlag={updateTxNumberFlag}
-            transactionNumber={state.txNumber}
-            debugging={state.debugging}
-            deployments={deployments}
-            transactions={transactions}
-            onDebugTransaction={(txHash) => debug(txHash)}
-          />
-        </div>
-      )}
+        {/* Transaction Recorder Section */}
+        {!state.debugging && transactionRecorderUI}
+
+        {state.debugging && state.sourceLocationStatus && (
+          <div className="text-warning mt-3">
+            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {state.sourceLocationStatus}
+          </div>
+        )}
 
       {state.debugging && (
         <div ref={debuggerTopRef} style={{ height: '100%' }}>

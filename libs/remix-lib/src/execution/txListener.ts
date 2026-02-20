@@ -259,8 +259,8 @@ export class TxListener {
     }
   }
 
-  _resolveTx (tx, receipt, cb) {
-    const contracts = this._api.contracts()
+  async _resolveTx (tx, receipt, cb) {
+    const contracts = await this._api.contracts()
     if (!contracts) return cb()
     let fun
     let contract

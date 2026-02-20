@@ -94,7 +94,6 @@ export default class DebuggerTab extends DebuggerApiMixin(ViewPlugin) {
    * @returns {Promise<any|null>} The decoded variable value and metadata, or null if debugger backend is not initialized
    */
   async decodeLocalVariable (variableId: number, stepIndex?: number) {
-    console.log("debuggerBackend", this.debuggerBackend)
     if (!this.debuggerBackend) return null
     return await this.debuggerBackend.debugger.decodeLocalVariableById(stepIndex || this.debuggerBackend.step_manager.currentStepIndex, variableId)
   }
@@ -108,7 +107,6 @@ export default class DebuggerTab extends DebuggerApiMixin(ViewPlugin) {
    * @returns {Promise<any|null>} The decoded variable value and metadata, or null if debugger backend is not initialized
    */
   async decodeStateVariable (variableId: number, stepIndex?: number) {
-    console.log("debuggerBackend", this.debuggerBackend)
     if (!this.debuggerBackend) return null
     return await this.debuggerBackend.debugger.decodeStateVariableById(stepIndex || this.debuggerBackend.step_manager.currentStepIndex, variableId)
   }
@@ -220,7 +218,6 @@ export default class DebuggerTab extends DebuggerApiMixin(ViewPlugin) {
    * @returns {Promise<any|null>} Array of state variable metadata objects, or null if debugger backend is not initialized
    */
   async extractStateAt (step: number) {
-    console.log("debuggerBackend", this.debuggerBackend)
     if (!this.debuggerBackend) return null
     return await this.debuggerBackend.debugger.extractStateAt(step)
   }
@@ -235,7 +232,6 @@ export default class DebuggerTab extends DebuggerApiMixin(ViewPlugin) {
    * @returns {Promise<any|null>} Object mapping variable names to their decoded values, or null if debugger backend is not initialized
    */
   async decodeStateAt (step: number, stateVars: any[], callback?: (result: any) => void) {
-    console.log("debuggerBackend", this.debuggerBackend)
     if (!this.debuggerBackend) return null
     return await this.debuggerBackend.debugger.decodeStateAt(step, stateVars, callback)
   }
@@ -259,7 +255,6 @@ export default class DebuggerTab extends DebuggerApiMixin(ViewPlugin) {
    * @returns {void|null} Returns null if debugger backend is not initialized
    */
   jumpTo (step: number) {
-    console.log("debuggerBackend", this.debuggerBackend)
     if (!this.debuggerBackend) return null
     return this.debuggerBackend.step_manager.jumpTo(step)
   }

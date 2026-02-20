@@ -32,12 +32,18 @@ export class Layout extends Plugin {
   event: any
   panels: panels
   enhanced: { [key: string]: boolean }
-  maximized: { [key: string]: boolean }
+  maximized: { [key: string]: {
+    maximized: boolean
+    coeff?: number
+  } }
   constructor () {
     super(profile)
     this.maximized = {
       // 'remixaiassistant': true
-      'LearnEth': true,
+      'LearnEth': {
+        maximized: true,
+        coeff: undefined
+      },
     }
     this.enhanced = {
       'dgit': true,
@@ -92,11 +98,11 @@ export class Layout extends Plugin {
         this.event.emit('enhancesidepanel')
       }
 
-      if (this.maximized[current]) {
-        this.event.emit('maximisesidepanel')
+      if (this.maximized[current] && this.maximized[current].maximized) {
+        this.event.emit('maximisesidepanel', this.maximized[current].coeff)
       }
 
-      if (!this.enhanced[current] && !this.maximized[current]) {
+      if (!this.enhanced[current] && (!this.maximized[current] || !this.maximized[current].maximized)) {
         this.event.emit('resetsidepanel')
       }
     })
@@ -107,11 +113,11 @@ export class Layout extends Plugin {
         this.event.emit('enhanceRightSidePanel')
       }
 
-      if (this.maximized[current]) {
-        this.event.emit('maximiseRightSidePanel')
+      if (this.maximized[current] && this.maximized[current].maximized) {
+        this.event.emit('maximiseRightSidePanel', this.maximized[current].coeff)
       }
 
-      if (!this.enhanced[current] && !this.maximized[current]) {
+      if (!this.enhanced[current] && (!this.maximized[current] || !this.maximized[current].maximized)) {
         this.event.emit('resetRightSidePanel')
       }
     })
@@ -122,11 +128,11 @@ export class Layout extends Plugin {
         this.event.emit('enhanceRightSidePanel')
       }
 
-      if (this.maximized[current]) {
-        this.event.emit('maximiseRightSidePanel')
+      if (this.maximized[current] && this.maximized[current].maximized) {
+        this.event.emit('maximiseRightSidePanel', this.maximized[current].coeff)
       }
 
-      if (!this.enhanced[current] && !this.maximized[current]) {
+      if (!this.enhanced[current] && (!this.maximized[current] || !this.maximized[current].maximized)) {
         this.event.emit('resetRightSidePanel')
       }
     })
@@ -165,16 +171,22 @@ export class Layout extends Plugin {
     this.event.emit('minimizesidepanel')
   }
 
-  async maximiseSidePanel () {
+  async maximiseSidePanel (coeff?: number) {
     const current = await this.call('sidePanel', 'currentFocus')
-    this.maximized[current] = true
-    this.event.emit('maximisesidepanel')
+    this.maximized[current] = {
+      maximized: true,
+      coeff
+    }
+    this.event.emit('maximisesidepanel', coeff)
   }
 
-  async maximiseRightSidePanel () {
+  async maximiseRightSidePanel (coeff?: number) {
     const current = await this.call('rightSidePanel', 'currentFocus')
-    this.maximized[current] = true
-    this.event.emit('maximiseRightSidePanel')
+    this.maximized[current] = {
+      maximized: true,
+      coeff
+    }
+    this.event.emit('maximiseRightSidePanel', coeff)
   }
 
   async maximizeTerminal() {
