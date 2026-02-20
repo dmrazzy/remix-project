@@ -24,6 +24,8 @@ interface DebugLayoutProps {
   callTree?: any
   debugWithGeneratedSources?: boolean
   onDebugWithGeneratedSourcesChange?: (checked: boolean) => void
+  onShowOpcodesChange?: (checked: boolean) => void
+  showOpcodes?: boolean
   registerEvent?: any
 }
 
@@ -47,6 +49,8 @@ export const DebugLayout = ({
   callTree,
   debugWithGeneratedSources,
   onDebugWithGeneratedSourcesChange,
+  onShowOpcodesChange,
+  showOpcodes = false,
   registerEvent
 }: DebugLayoutProps) => {
   const [activeObjectTab, setActiveObjectTab] = useState<'stateLocals' | 'stackMemory'>('stateLocals')
@@ -68,6 +72,12 @@ export const DebugLayout = ({
   const [opcodeData, setOpcodeData] = useState<any>(null)
   const opcodeRefs = React.useRef<{ [key: number]: HTMLDivElement | null }>({})
   const opcodeContainerRef = React.useRef<HTMLDivElement | null>(null)
+
+  const handleShowOpcodesChange = (checked: boolean) => {
+    if (onShowOpcodesChange) {
+      onShowOpcodesChange(checked)
+    }
+  }
 
   // Auto-expand sender node when nestedScopes are loaded
   React.useEffect(() => {
@@ -297,14 +307,24 @@ export const DebugLayout = ({
   const toggleObjectPath = (path: string) => {
     setExpandedObjectPaths(prev => {
       const newSet = new Set(prev)
+
       if (newSet.has(path)) {
         newSet.delete(path)
       } else {
         newSet.add(path)
       }
+
       return newSet
     })
   }
+
+  // Watch for opcode expansion/collapse and update showOpcodes accordingly
+  React.useEffect(() => {
+    const isOpcodeExpanded = expandedObjectPaths.has('root.opcode')
+    if (handleShowOpcodesChange && isOpcodeExpanded !== showOpcodes) {
+      handleShowOpcodesChange(isOpcodeExpanded)
+    }
+  }, [expandedObjectPaths, handleShowOpcodesChange, showOpcodes])
 
   const isObject = (value: any): boolean => {
     return value !== null && typeof value === 'object'

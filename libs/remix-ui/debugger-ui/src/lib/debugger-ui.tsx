@@ -12,7 +12,7 @@ import {Toaster} from '@remix-ui/toaster' // eslint-disable-line
 import { CustomTooltip, isValidHash } from '@remix-ui/helper'
 import { DebuggerEvent, MatomoEvent } from '@remix-api';
 import { TrackingContext } from '@remix-ide/tracking'
-import { ContractDeployment, ContractInteraction } from './transaction-recorder/types'
+import { ContractDeployment } from './transaction-recorder/types'
 /* eslint-disable-next-line */
 import './debugger-ui.css'
 import type { CompilerAbstract } from '@remix-project/remix-solidity'
@@ -45,11 +45,10 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     txNumberIsEmpty: true,
     isLocalNodeUsed: false,
     sourceLocationStatus: '',
-    showOpcodes: true
+    showOpcodes: false
   })
 
-  const [deployments, setDeployments] = useState<ContractDeployment[]>([])
-  const [transactions, setTransactions] = useState<Map<string, ContractInteraction[]>>(new Map())
+  const [deployments] = useState<ContractDeployment[]>([])
   const [traceData, setTraceData] = useState<{ currentStep: number; traceLength: number } | null>(null)
   const [currentFunction, setCurrentFunction] = useState<string>('')
   const [functionStack, setFunctionStack] = useState<any[]>([])
@@ -344,7 +343,6 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
       })
     }
   }
-
   const requestDebug = (blockNumber, txNumber, tx) => {
     startDebugging(blockNumber, txNumber, tx)
   }
@@ -508,7 +506,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
               jumpNextBreakpoint: debuggerInstance.step_manager?.jumpNextBreakpoint.bind(debuggerInstance.step_manager),
               traceLength: debuggerInstance.step_manager?.traceLength,
               currentStepIndex: debuggerInstance.step_manager?.currentStepIndex,
-              registerEvent: debuggerInstance.step_manager?.event.register.bind(debuggerInstance.step_manager?.event)
+              registerEvent: debuggerInstance.step_manager?.event.register.bind(debuggerInstance.step_manager?.event),
+              showOpcodes: state.showOpcodes
             }
           })
         })
@@ -547,6 +546,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     setState((prevState) => {
       return { ...prevState, showOpcodes }
     })
+    // Emit event to update external listeners (like bottom-bar)
+    debuggerModule.emit('showOpcodesChanged', showOpcodes)
   }
 
   const stepManager = {
@@ -698,6 +699,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
                 }
               })
             }}
+            onShowOpcodesChange={handleShowOpcodesChange}
+            showOpcodes={state.showOpcodes}
             registerEvent={vmDebugger.registerEvent}
           />
         </div>

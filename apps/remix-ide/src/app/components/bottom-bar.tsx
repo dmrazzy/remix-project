@@ -115,10 +115,18 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
       setStepState('initial')
     }
 
+    const onShowOpcodesChanged = (showOpcodes: boolean) => {
+      setStepManager((prevStepManager: any) => {
+        if (!prevStepManager) return null
+        return { ...prevStepManager, showOpcodes }
+      })
+    }
+
     plugin.on('sidePanel', 'pluginDisabled', onPluginActivated)
     plugin.on('sidePanel', 'focusChanged', onPluginActivated)
     plugin.on('debugger', 'debuggingStarted', onDebuggingStarted)
     plugin.on('debugger', 'debuggingStopped', onDebuggingStopped)
+    plugin.on('debugger', 'showOpcodesChanged', onShowOpcodesChanged)
 
     return () => {
       plugin.off('tabs', 'extChanged')
@@ -128,6 +136,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
       plugin.off('sidePanel', 'focusChanged')
       plugin.off('debugger', 'debuggingStarted')
       plugin.off('debugger', 'debuggingStopped')
+      plugin.off('debugger', 'showOpcodesChanged')
     }
   }, [plugin])
 
@@ -185,7 +194,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
           </button>
           <button
             className="btn btn-sm btn-secondary debug-btn"
-            onClick={() => stepManager?.stepOverBack && stepManager.stepOverBack(true)}
+            onClick={() => stepManager?.stepOverBack && stepManager.stepOverBack(!(stepManager.showOpcodes ?? false))}
             disabled={stepState === 'initial'}
             data-id="btnStepBackward"
           >
@@ -194,7 +203,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
           </button>
           <button
             className="btn btn-sm btn-primary debug-btn"
-            onClick={() => stepManager?.stepIntoBack && stepManager.stepIntoBack(true)}
+            onClick={() => stepManager?.stepIntoBack && stepManager.stepIntoBack(!(stepManager.showOpcodes ?? false))}
             disabled={stepState === 'initial'}
             data-id="btnStepBack"
           >
@@ -203,7 +212,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
           </button>
           <button
             className="btn btn-sm btn-primary debug-btn"
-            onClick={() => stepManager?.stepIntoForward && stepManager.stepIntoForward(true)}
+            onClick={() => stepManager?.stepIntoForward && stepManager.stepIntoForward(!(stepManager.showOpcodes ?? false))}
             disabled={stepState === 'end'}
             data-id="btnStepInto"
           >
@@ -212,7 +221,7 @@ export const BottomBar = ({ plugin }: BottomBarProps) => {
           </button>
           <button
             className="btn btn-sm btn-secondary debug-btn"
-            onClick={() => stepManager?.stepOverForward && stepManager.stepOverForward()}
+            onClick={() => stepManager?.stepOverForward && stepManager.stepOverForward(!(stepManager.showOpcodes ?? false))}
             disabled={stepState === 'end'}
             data-id="btnStepForward"
           >
