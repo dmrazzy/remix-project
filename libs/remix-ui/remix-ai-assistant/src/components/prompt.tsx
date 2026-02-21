@@ -42,14 +42,11 @@ export interface PromptAreaProps {
   assistantChoice: any
   handleSetAssistant: () => void
   dispatchActivity: (type: ActivityType, payload?: any) => void
-  contextBtnRef: React.RefObject<HTMLButtonElement>
   modelBtnRef: React.RefObject<HTMLButtonElement>
   modelSelectorBtnRef: React.RefObject<HTMLButtonElement>
   aiContextGroupList: groupListType[]
   textareaRef?: React.RefObject<HTMLTextAreaElement>
   maximizePanel: () => Promise<void>
-  aiMode: 'ask' | 'edit'
-  setAiMode: React.Dispatch<React.SetStateAction<'ask' | 'edit'>>
   isMaximized: boolean
   setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
   modelAccess: ModelAccess

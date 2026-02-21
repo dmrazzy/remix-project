@@ -163,11 +163,11 @@ export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
         modelAccess={props.modelAccess}
         showAssistantOptions={false}
         setShowAssistantOptions={props.setShowAssistantOptions}
-        showModelOptions={props.showModelOptions}
-        setShowModelOptions={props.setShowModelOptions}
+        // showModelOptions={props.showModelOptions}
+        // setShowModelOptions={props.setShowModelOptions}
         assistantChoice={props.assistantChoice}
-        setAssistantChoice={props.setAssistantChoice}
-        availableModels={props.availableModels}
+        // setAssistantChoice={props.setAssistantChoice}
+        // availableModels={props.availableModels}
         handleSetAssistant={props.handleSetAssistant}
         themeTracker={props.themeTracker}
       />

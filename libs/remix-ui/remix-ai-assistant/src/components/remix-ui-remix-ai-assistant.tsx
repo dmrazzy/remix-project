@@ -83,12 +83,10 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   }
   const modelAccess = useModelAccess()
   const [isOllamaFailureFallback, setIsOllamaFailureFallback] = useState(false)
-  const [aiMode, setAiMode] = useState<'ask' | 'edit'>('ask')
   const [themeTracker, setThemeTracker] = useState(null)
   const historyRef = useRef<HTMLDivElement | null>(null)
   const modelBtnRef = useRef(null)
   const modelSelectorBtnRef = useRef(null)
-  const contextBtnRef = useRef(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const aiChatRef = useRef<HTMLDivElement>(null)
   const userHasScrolledRef = useRef(false)
@@ -164,8 +162,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   }, [isTranscribing])
 
-  useOnClickOutside([modelBtnRef, contextBtnRef], () => setShowModelSelector(false))
-  useOnClickOutside([modelBtnRef, contextBtnRef], () => setShowContextOptions(false))
+  useOnClickOutside([modelBtnRef], () => setShowModelSelector(false))
+  useOnClickOutside([modelBtnRef], () => setShowContextOptions(false))
   useOnClickOutside([modelSelectorBtnRef], () => setShowOllamaModelSelector(false))
 
   const getBoundingRect = (ref: MutableRefObject<any>) => ref.current?.getBoundingClientRect()

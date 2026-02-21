@@ -151,7 +151,6 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         handleRecord={props.handleRecord}
         isRecording={props.isRecording}
         dispatchActivity={props.dispatchActivity}
-        // contextBtnRef={props.contextBtnRef}
         modelBtnRef={props.modelBtnRef}
         modelSelectorBtnRef={props.modelSelectorBtnRef}
         aiContextGroupList={props.aiContextGroupList}
@@ -163,13 +162,13 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         modelAccess={props.modelAccess}
         showAssistantOptions={false}
         setShowAssistantOptions={props.setShowAssistantOptions}
-        showModelOptions={false}
-        setShowModelOptions={props.setShowModelOptions}
+        // showModelOptions={false}
+        // setShowModelOptions={props.setShowModelOptions}
         assistantChoice={props.assistantChoice}
-        setAssistantChoice={props.setAssistantChoice}
-        availableModels={props.availableModels}
+        // setAssistantChoice={props.setAssistantChoice}
+        // availableModels={props.availableModels}
         handleSetAssistant={props.handleSetAssistant}
-        themeTracker={undefined}
+        themeTracker={props.themeTracker}
       />
     </section>
   )
