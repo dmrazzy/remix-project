@@ -37,6 +37,26 @@ interface AiChatPromptAreaForHistoryProps {
   modelSelectorBtnRef: React.RefObject<HTMLButtonElement>
   textareaRef?: React.RefObject<HTMLTextAreaElement>
   maximizePanel: () => Promise<void>
+  showContextOptions: boolean
+  setShowContextOptions: React.Dispatch<React.SetStateAction<boolean>>
+  contextChoice: any
+  setContextChoice: React.Dispatch<React.SetStateAction<any>>
+  ollamaModels: string[]
+  selectedOllamaModel: string
+  handleOllamaModelSelection: (modelName: string) => void
+  showOllamaModelSelector: boolean
+  setShowOllamaModelSelector: React.Dispatch<React.SetStateAction<boolean>>
+  contextFiles: any[]
+  clearContext: () => void
+  aiContextGroupList: any[]
+  aiMode: string
+  setAiMode: React.Dispatch<React.SetStateAction<string>>
+  modelAccess: any
+  setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
+  showModelSelector: boolean
+  setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
+  contextBtnRef: React.RefObject<any>
+  handleAddContext: () => void
 }
 
 export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHistoryProps) {
@@ -140,8 +160,10 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         // setAiMode={props.setAiMode}
         isMaximized={props.isMaximized}
         setIsMaximized={props.setIsMaximized}
-        modelAccess={props.modelAccess} showAssistantOptions={false}
-        setShowAssistantOptions={props.setShowAssistantOptions} showModelOptions={false}
+        modelAccess={props.modelAccess}
+        showAssistantOptions={false}
+        setShowAssistantOptions={props.setShowAssistantOptions}
+        showModelOptions={false}
         setShowModelOptions={props.setShowModelOptions}
         assistantChoice={props.assistantChoice}
         setAssistantChoice={props.setAssistantChoice}

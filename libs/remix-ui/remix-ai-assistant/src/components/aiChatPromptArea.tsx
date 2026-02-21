@@ -4,38 +4,58 @@ import { PromptArea } from './prompt'
 
 interface AiChatPromptAreaProps {
   themeTracker: any
-  showHistorySidebar: boolean
-  isMaximized: boolean
-  showAssistantOptions: boolean
-  modelOpt: { top: number, left: number }
-  menuRef: React.RefObject<HTMLDivElement>
-  setShowAssistantOptions: React.Dispatch<React.SetStateAction<boolean>>
-  assistantChoice: any
-  setAssistantChoice: React.Dispatch<React.SetStateAction<any>>
-  aiAssistantGroupList: any[]
-  mcpEnabled: boolean
-  mcpEnhanced: boolean
-  setMcpEnhanced: React.Dispatch<React.SetStateAction<boolean>>
-  availableModels: string[]
-  selectedModel: string | null
-  handleModelSelection: (modelName: string) => void
-  input: string
-  setInput: React.Dispatch<React.SetStateAction<string>>
-  isStreaming: boolean
-  handleSend: () => void
-  stopRequest: () => void
-  showModelOptions: boolean
-  setShowModelOptions: React.Dispatch<React.SetStateAction<boolean>>
-  handleSetAssistant: () => void
-  handleSetModel: () => void
-  handleGenerateWorkspace: () => void
-  handleRecord: () => void
-  isRecording: boolean
-  dispatchActivity: (type: string, payload?: any) => void
-  modelBtnRef: React.RefObject<HTMLButtonElement>
-  modelSelectorBtnRef: React.RefObject<HTMLButtonElement>
-  textareaRef?: React.RefObject<HTMLTextAreaElement>
-  maximizePanel: () => Promise<void>
+    showHistorySidebar: boolean
+    isMaximized: boolean
+    showAssistantOptions: boolean
+    modelOpt: { top: number, left: number }
+    menuRef: React.RefObject<HTMLDivElement>
+    setShowAssistantOptions: React.Dispatch<React.SetStateAction<boolean>>
+    assistantChoice: any
+    setAssistantChoice: React.Dispatch<React.SetStateAction<any>>
+    aiAssistantGroupList: any[]
+    mcpEnabled: boolean
+    mcpEnhanced: boolean
+    setMcpEnhanced: React.Dispatch<React.SetStateAction<boolean>>
+    availableModels: string[]
+    selectedModel: any
+    handleModelSelection: (modelName: string) => void
+    input: string
+    setInput: React.Dispatch<React.SetStateAction<string>>
+    isStreaming: boolean
+    handleSend: () => void
+    stopRequest: () => void
+    showModelOptions: boolean
+    setShowModelOptions: React.Dispatch<React.SetStateAction<boolean>>
+    handleSetAssistant: () => void
+    handleSetModel: () => void
+    handleGenerateWorkspace: () => void
+    handleRecord: () => void
+    isRecording: boolean
+    dispatchActivity: (type: string, payload?: any) => void
+    modelBtnRef: React.RefObject<HTMLButtonElement>
+    modelSelectorBtnRef: React.RefObject<HTMLButtonElement>
+    textareaRef?: React.RefObject<HTMLTextAreaElement>
+    maximizePanel: () => Promise<void>
+    showContextOptions: boolean
+    setShowContextOptions: React.Dispatch<React.SetStateAction<boolean>>
+    contextChoice: any
+    setContextChoice: React.Dispatch<React.SetStateAction<any>>
+    ollamaModels: string[]
+    selectedOllamaModel: string
+    handleOllamaModelSelection: (modelName: string) => void
+    showOllamaModelSelector: boolean
+    setShowOllamaModelSelector: React.Dispatch<React.SetStateAction<boolean>>
+    contextFiles: any[]
+    clearContext: () => void
+    aiContextGroupList: any[]
+    aiMode: string
+    setAiMode: React.Dispatch<React.SetStateAction<string>>
+    modelAccess: any
+    setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
+    showModelSelector: boolean
+    setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
+    contextBtnRef: React.RefObject<any>
+    handleAddContext: () => void
 }
 
 export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
@@ -110,27 +130,45 @@ export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
         isStreaming={props.isStreaming}
         handleSend={props.handleSend}
         handleStop={props.stopRequest}
-        showContextOptions={false}
-        setShowContextOptions={() => {}}
-        showAssistantOptions={props.showAssistantOptions}
+        showContextOptions={props.showContextOptions}
+        setShowContextOptions={props.setShowContextOptions}
+        showModelSelector={props.showModelSelector}
+        setShowModelSelector={props.setShowModelSelector}
+        showOllamaModelSelector={props.showOllamaModelSelector}
+        setShowOllamaModelSelector={props.setShowOllamaModelSelector}
+        contextChoice={props.contextChoice}
+        setContextChoice={props.setContextChoice}
+        selectedModel={props.selectedModel}
+        ollamaModels={props.ollamaModels}
+        selectedOllamaModel={props.selectedOllamaModel}
+        contextFiles={props.contextFiles}
+        clearContext={props.clearContext}
+        handleAddContext={props.handleAddContext}
+        handleSetModel={props.handleSetModel}
+        handleModelSelection={props.handleModelSelection}
+        handleOllamaModelSelection={props.handleOllamaModelSelection}
+        handleGenerateWorkspace={props.handleGenerateWorkspace}
+        handleRecord={props.handleRecord}
+        isRecording={props.isRecording}
+        dispatchActivity={props.dispatchActivity}
+        // contextBtnRef={props.contextBtnRef}
+        modelBtnRef={props.modelBtnRef}
+        modelSelectorBtnRef={props.modelSelectorBtnRef}
+        aiContextGroupList={props.aiContextGroupList}
+        textareaRef={props.textareaRef}
+        // aiMode={props.aiMode}
+        // setAiMode={props.setAiMode}
+        isMaximized={props.isMaximized}
+        setIsMaximized={props.setIsMaximized}
+        modelAccess={props.modelAccess}
+        showAssistantOptions={false}
         setShowAssistantOptions={props.setShowAssistantOptions}
         showModelOptions={props.showModelOptions}
         setShowModelOptions={props.setShowModelOptions}
         assistantChoice={props.assistantChoice}
         setAssistantChoice={props.setAssistantChoice}
         availableModels={props.availableModels}
-        selectedModel={props.selectedModel}
         handleSetAssistant={props.handleSetAssistant}
-        handleSetModel={props.handleSetModel}
-        handleModelSelection={props.handleModelSelection}
-        handleGenerateWorkspace={props.handleGenerateWorkspace}
-        handleRecord={props.handleRecord}
-        isRecording={props.isRecording}
-        dispatchActivity={props.dispatchActivity}
-        modelBtnRef={props.modelBtnRef}
-        modelSelectorBtnRef={props.modelSelectorBtnRef}
-        textareaRef={props.textareaRef}
-        isMaximized={props.isMaximized || false}
         themeTracker={props.themeTracker}
       />
     </section>
