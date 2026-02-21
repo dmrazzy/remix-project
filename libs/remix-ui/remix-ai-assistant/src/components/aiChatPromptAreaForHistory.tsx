@@ -49,13 +49,10 @@ interface AiChatPromptAreaForHistoryProps {
   contextFiles: any[]
   clearContext: () => void
   aiContextGroupList: any[]
-  aiMode: string
-  setAiMode: React.Dispatch<React.SetStateAction<string>>
   modelAccess: any
   setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
   showModelSelector: boolean
   setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
-  contextBtnRef: React.RefObject<any>
   handleAddContext: () => void
 }
 

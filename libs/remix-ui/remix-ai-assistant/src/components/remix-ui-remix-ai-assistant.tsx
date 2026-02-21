@@ -1211,6 +1211,39 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             modelSelectorBtnRef={modelSelectorBtnRef}
             textareaRef={textareaRef}
             maximizePanel={maximizePanel}
+            showContextOptions={false}
+            setShowContextOptions={function (value: React.SetStateAction<boolean>): void {
+              throw new Error('Function not implemented.')
+            } }
+            contextChoice={undefined}
+            setContextChoice={function (value: any): void {
+              throw new Error('Function not implemented.')
+            } }
+            ollamaModels={[]}
+            selectedOllamaModel={''}
+            handleOllamaModelSelection={function (modelName: string): void {
+              throw new Error('Function not implemented.')
+            } }
+            showOllamaModelSelector={false}
+            setShowOllamaModelSelector={function (value: React.SetStateAction<boolean>): void {
+              throw new Error('Function not implemented.')
+            } }
+            contextFiles={[]}
+            clearContext={function (): void {
+              throw new Error('Function not implemented.')
+            } }
+            aiContextGroupList={[]}
+            modelAccess={undefined}
+            setIsMaximized={function (value: React.SetStateAction<boolean>): void {
+              throw new Error('Function not implemented.')
+            } }
+            showModelSelector={false}
+            setShowModelSelector={function (value: React.SetStateAction<boolean>): void {
+              throw new Error('Function not implemented.')
+            } }
+            handleAddContext={function (): void {
+              throw new Error('Function not implemented.')
+            } }
           />
         ) : (
           <AiChatPromptArea
