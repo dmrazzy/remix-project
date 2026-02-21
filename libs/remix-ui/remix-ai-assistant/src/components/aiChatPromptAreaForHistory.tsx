@@ -1,7 +1,7 @@
 import React from 'react'
 import GroupListMenu from './contextOptMenu'
 import { PromptArea } from './prompt'
-import { AiContextType } from '../types/componentTypes'
+import { AiAssistantType } from '../types/componentTypes'
 
 interface AiChatPromptAreaForHistoryProps {
   themeTracker: any
@@ -49,10 +49,13 @@ interface AiChatPromptAreaForHistoryProps {
   contextFiles: any[]
   clearContext: () => void
   aiContextGroupList: any[]
+  aiMode: string
+  setAiMode: React.Dispatch<React.SetStateAction<string>>
   modelAccess: any
   setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
   showModelSelector: boolean
   setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
+  contextBtnRef: React.RefObject<any>
   handleAddContext: () => void
 }
 
@@ -152,20 +155,18 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         modelSelectorBtnRef={props.modelSelectorBtnRef}
         aiContextGroupList={props.aiContextGroupList}
         textareaRef={props.textareaRef}
-        // aiMode={props.aiMode}
-        // setAiMode={props.setAiMode}
         isMaximized={props.isMaximized}
         setIsMaximized={props.setIsMaximized}
         modelAccess={props.modelAccess}
         showAssistantOptions={false}
         setShowAssistantOptions={props.setShowAssistantOptions}
-        // showModelOptions={false}
-        // setShowModelOptions={props.setShowModelOptions}
+        showModelOptions={false}
+        setShowModelOptions={props.setShowModelOptions}
         assistantChoice={props.assistantChoice}
-        // setAssistantChoice={props.setAssistantChoice}
-        // availableModels={props.availableModels}
+        setAssistantChoice={props.setAssistantChoice}
+        availableModels={props.availableModels}
         handleSetAssistant={props.handleSetAssistant}
-        themeTracker={props.themeTracker}
+        themeTracker={undefined}
       />
     </section>
   )
