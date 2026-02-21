@@ -2,7 +2,7 @@ import { ActivityType } from "../lib/types"
 import React, { MutableRefObject, Ref, useContext, useEffect, useRef, useState } from 'react'
 import GroupListMenu from "./contextOptMenu"
 import { AiContextType, groupListType } from '../types/componentTypes'
-import { AIEvent, MatomoEvent } from '@remix-api';
+import { AIEvent, MatomoEvent, trackMatomoEvent } from '@remix-api';
 import { TrackingContext } from '@remix-ide/tracking'
 import { CustomTooltip } from '@remix-ui/helper'
 import { AIModel } from '@remix/remix-ai-core'
@@ -155,7 +155,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
                   className={`btn btn-sm ${aiMode === 'edit' ? 'btn-primary' : 'btn-outline-secondary'} px-2`}
                   onClick={() => {
                     setAiMode('edit')
-                    trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ModeSwitch_edit', isClick: true })
+                    trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ModeSwitch_edit', isClick: true }, baseTrackEvent)
                   }}
                 >
                   Edit
