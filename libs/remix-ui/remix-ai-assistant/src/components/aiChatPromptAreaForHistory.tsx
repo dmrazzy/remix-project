@@ -49,13 +49,10 @@ interface AiChatPromptAreaForHistoryProps {
   contextFiles: any[]
   clearContext: () => void
   aiContextGroupList: any[]
-  aiMode: string
-  setAiMode: React.Dispatch<React.SetStateAction<string>>
   modelAccess: any
   setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
   showModelSelector: boolean
   setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
-  contextBtnRef: React.RefObject<any>
   handleAddContext: () => void
 }
 
@@ -129,44 +126,22 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         setInput={props.setInput}
         isStreaming={props.isStreaming}
         handleSend={props.handleSend}
-        handleStop={props.stopRequest}
-        showContextOptions={props.showContextOptions}
-        setShowContextOptions={props.setShowContextOptions}
-        showModelSelector={props.showModelSelector}
-        setShowModelSelector={props.setShowModelSelector}
-        showOllamaModelSelector={props.showOllamaModelSelector}
-        setShowOllamaModelSelector={props.setShowOllamaModelSelector}
-        contextChoice={props.contextChoice}
-        setContextChoice={props.setContextChoice}
-        selectedModel={props.selectedModel}
-        ollamaModels={props.ollamaModels}
         selectedOllamaModel={props.selectedOllamaModel}
-        contextFiles={props.contextFiles}
-        clearContext={props.clearContext}
         handleAddContext={props.handleAddContext}
         handleSetModel={props.handleSetModel}
         handleModelSelection={props.handleModelSelection}
-        handleOllamaModelSelection={props.handleOllamaModelSelection}
         handleGenerateWorkspace={props.handleGenerateWorkspace}
         handleRecord={props.handleRecord}
         isRecording={props.isRecording}
         dispatchActivity={props.dispatchActivity}
         modelBtnRef={props.modelBtnRef}
-        modelSelectorBtnRef={props.modelSelectorBtnRef}
-        aiContextGroupList={props.aiContextGroupList}
         textareaRef={props.textareaRef}
         isMaximized={props.isMaximized}
         setIsMaximized={props.setIsMaximized}
-        modelAccess={props.modelAccess}
-        showAssistantOptions={false}
-        setShowAssistantOptions={props.setShowAssistantOptions}
-        showModelOptions={false}
-        setShowModelOptions={props.setShowModelOptions}
+        showAssistantOptions={props.showAssistantOptions}
         assistantChoice={props.assistantChoice}
-        setAssistantChoice={props.setAssistantChoice}
-        availableModels={props.availableModels}
         handleSetAssistant={props.handleSetAssistant}
-        themeTracker={undefined}
+        themeTracker={props.themeTracker}
       />
     </section>
   )
