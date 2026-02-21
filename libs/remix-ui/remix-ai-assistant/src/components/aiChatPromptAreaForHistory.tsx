@@ -1,6 +1,7 @@
 import React from 'react'
 import GroupListMenu from './contextOptMenu'
 import { PromptArea } from './prompt'
+import { AiContextType } from '../types/componentTypes'
 
 interface AiChatPromptAreaForHistoryProps {
   themeTracker: any
@@ -110,14 +111,14 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         handleSend={props.handleSend}
         handleStop={props.stopRequest}
         showContextOptions={false}
-        setShowContextOptions={() => {}}
+        setShowContextOptions={() => { } }
         showAssistantOptions={props.showAssistantOptions}
         setShowAssistantOptions={props.setShowAssistantOptions}
-        showModelOptions={props.showModelOptions}
-        setShowModelOptions={props.setShowModelOptions}
+        // showModelOptions={props.showModelOptions}
+        // setShowModelOptions={props.setShowModelOptions}
         assistantChoice={props.assistantChoice}
-        setAssistantChoice={props.setAssistantChoice}
-        availableModels={props.availableModels}
+        // setAssistantChoice={props.setAssistantChoice}
+        // availableModels={props.availableModels}
         selectedModel={props.selectedModel}
         handleSetAssistant={props.handleSetAssistant}
         handleSetModel={props.handleSetModel}
@@ -130,7 +131,23 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         modelSelectorBtnRef={props.modelSelectorBtnRef}
         textareaRef={props.textareaRef}
         isMaximized={props.isMaximized || false}
-        themeTracker={props.themeTracker}
+        themeTracker={props.themeTracker} showModelSelector={false} setShowModelSelector={function (value: React.SetStateAction<boolean>): void {
+          throw new Error('Function not implemented.')
+        } } showOllamaModelSelector={false} setShowOllamaModelSelector={function (value: React.SetStateAction<boolean>): void {
+          throw new Error('Function not implemented.')
+        } } contextChoice={'none'} setContextChoice={function (value: React.SetStateAction<AiContextType>): void {
+          throw new Error('Function not implemented.')
+        } } ollamaModels={[]} selectedOllamaModel={''} contextFiles={[]} clearContext={function (): void {
+          throw new Error('Function not implemented.')
+        } } handleAddContext={function (): void {
+          throw new Error('Function not implemented.')
+        } } handleOllamaModelSelection={function (modelName: string): void {
+          throw new Error('Function not implemented.')
+        } } contextBtnRef={undefined} aiContextGroupList={[]} aiMode={'ask'} setAiMode={function (value: React.SetStateAction<'ask' | 'edit'>): void {
+          throw new Error('Function not implemented.')
+        } } setIsMaximized={function (value: React.SetStateAction<boolean>): void {
+          throw new Error('Function not implemented.')
+        } } modelAccess={undefined}
       />
     </section>
   )

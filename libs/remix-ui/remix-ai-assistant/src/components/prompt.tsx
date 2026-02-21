@@ -7,6 +7,8 @@ import { TrackingContext } from '@remix-ide/tracking'
 import { CustomTooltip } from '@remix-ui/helper'
 import { AIModel } from '@remix/remix-ai-core'
 import { ModelAccess } from '../hooks/useModelAccess'
+import { PromptDefault } from "./promptDefault";
+import { PromptActiveButtons } from "./promptActiveButtons";
 
 // PromptArea component
 export interface PromptAreaProps {
@@ -35,6 +37,10 @@ export interface PromptAreaProps {
   handleGenerateWorkspace: () => void
   handleRecord: () => void
   isRecording: boolean
+  showAssistantOptions: any
+  setShowAssistantOptions: any
+  assistantChoice: any
+  handleSetAssistant: () => void
   dispatchActivity: (type: ActivityType, payload?: any) => void
   contextBtnRef: React.RefObject<HTMLButtonElement>
   modelBtnRef: React.RefObject<HTMLButtonElement>
@@ -58,6 +64,9 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   handleStop,
   showContextOptions,
   setShowContextOptions,
+  showAssistantOptions,
+  assistantChoice,
+  handleSetAssistant,
   showModelSelector,
   setShowModelSelector,
   showOllamaModelSelector,
@@ -76,15 +85,11 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   handleGenerateWorkspace,
   handleRecord,
   isRecording,
-  dispatchActivity,
-  contextBtnRef,
   modelBtnRef,
   modelSelectorBtnRef,
   aiContextGroupList,
   textareaRef,
   maximizePanel,
-  aiMode,
-  setAiMode,
   isMaximized,
   setIsMaximized,
   modelAccess,
@@ -96,80 +101,33 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   }
   return (
     <>
-      {showContextOptions && (
-        <div
-          className="bg-light mb-1 p-2 border border-text w-75"
-          style={{ borderRadius: '8px' }}
-        >
-          <div className="text-uppercase ms-2 mb-2">Context</div>
-          <GroupListMenu
-            setChoice={setContextChoice}
-            setShowOptions={setShowContextOptions}
-            choice={contextChoice}
-            groupList={aiContextGroupList}
-          />
-        </div>
-      )}
-
       <div
         className="prompt-area d-flex flex-column mx-2 p-2 rounded-3 border border-text bg-light"
         style={{ backgroundColor: themeTracker && themeTracker?.name.toLowerCase() === 'light' ? '#d9dee8' : '#2a2c3f' }}
       >
-        <div className="d-flex justify-content-between mb-3 border border-end-0 border-start-0 border-top-0 border-bottom pb-1">
+        <div className="d-flex justify-content-between align-items-center mb-3 border border-end-0 border-start-0 border-top-0 border-bottom pb-1">
           <button
-            onClick={handleAddContext}
-            data-id="composer-ai-add-context"
-            className="btn btn-dim btn-sm text-secondary small fw-light border border-text rounded"
-            ref={contextBtnRef}
+            onClick={handleSetAssistant}
+            className="btn btn-text btn-sm small font-weight-light text-secondary mt-2 align-self-end border-0 rounded"
+            ref={modelBtnRef}
+            data-id="assistant-selector-btn"
           >
-            <span>{}</span>{contextChoice === 'none' && <span data-id="aiContext-file">{'Select Context'}</span>}
-            {contextChoice === 'workspace' && <span data-id="aiContext-workspace">{'Workspace'}</span>}
-            {contextChoice === 'opened' && <span data-id="aiContext-opened">{'Open Files'}</span>}
-            {contextChoice === 'current' && <span data-id="aiContext-current">{'Current File'}</span>}
+            {assistantChoice === null && 'Default'}
+            {assistantChoice === 'openai' && ' OpenAI'}
+            {assistantChoice === 'mistralai' && ' MistralAI'}
+            {assistantChoice === 'anthropic' && ' Anthropic'}
+            {assistantChoice === 'ollama' && ' Ollama'}
+            {'  '}
+            <span className={showAssistantOptions ? "fa fa-caret-up" : "fa fa-caret-down"}></span>
           </button>
-
-          <div className="d-flex justify-content-center align-items-center gap-2">
-            {/* Ask/Edit Mode Toggle */}
-            <div className="btn-group btn-group-sm" role="group">
-              <CustomTooltip
-                placement="top"
-                tooltipText="Ask mode - Chat with AI"
-                tooltipId="askModeTooltip"
-              >
-                <button
-                  type="button"
-                  className={`btn btn-sm ${aiMode === 'ask' ? 'btn-primary' : 'btn-outline-secondary'} px-2`}
-                  onClick={() => {
-                    setAiMode('ask')
-                    trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ModeSwitch_ask', isClick: true })
-                  }}
-                >
-                  Ask
-                </button>
-              </CustomTooltip>
-              <CustomTooltip
-                placement="top"
-                tooltipText="Edit mode - Edit workspace code"
-                tooltipId="editModeTooltip"
-              >
-                <button
-                  type="button"
-                  className={`btn btn-sm ${aiMode === 'edit' ? 'btn-primary' : 'btn-outline-secondary'} px-2`}
-                  onClick={() => {
-                    setAiMode('edit')
-                    trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ModeSwitch_edit', isClick: true }, baseTrackEvent)
-                  }}
-                >
-                  Edit
-                </button>
-              </CustomTooltip>
-            </div>
-            <span
-              className="badge align-self-center text-bg-info fw-light rounded"
-            >
-              AI Beta
-            </span>
-          </div>
+          <span
+            className="btn btn-sm small rounded-3 align-self-center fw-light"
+            // eslint-disable-next-line no-constant-condition
+            style={{ backgroundColor: themeTracker && themeTracker?.name.toLowerCase() === 'dark' ? '#2b3b4d' : '#c6e8f1', color: themeTracker && themeTracker.name.toLowerCase() === 'light' ? '#1ea2aa' : '#2de7f3' }}
+          >
+            <i className="fa fa-info-circle me-1"></i>
+            AI beta
+          </span>
         </div>
         <div className="ai-chat-input d-flex flex-column">
           <div
@@ -228,22 +186,17 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
             /> : null }
           </div>
 
-          <div className="d-flex justify-content-between">
+          <div className="d-flex flex-row justify-content-between align-items-center overflow-x-scroll overflow-y-hidden p-2 mt-2 gap-2"
+            style={{
+              scrollbarWidth: 'none'
+            }}
+          >
 
-            <div className="d-flex">
-              <button
-                onClick={handleSetModel}
-                className="btn btn-text btn-sm small font-weight-light text-secondary mt-2 align-self-end border border-text rounded"
-                ref={modelBtnRef}
-              >
-                {selectedModel.name}
-                {'  '}
-                <span className={showModelSelector ? "fa fa-caret-up" : "fa fa-caret-down"}></span>
-              </button>
-              {selectedModel.provider === 'ollama' && ollamaModels.length > 0 && (
+            {/* <div className="d-flex">
+              {assistantChoice === 'ollama' && availableModels.length > 0 && (
                 <button
-                  onClick={() => setShowOllamaModelSelector(prev => !prev)}
-                  className="btn btn-text btn-sm small font-weight-light text-secondary mt-2 align-self-end border border-text rounded ms-2"
+                  onClick={handleSetModel}
+                  className="btn btn-sm small font-weight-light text-secondary mt-2 align-self-end border border-text rounded ms-2"
                   ref={modelSelectorBtnRef}
                   data-id="ollama-model-selector"
                 >
@@ -277,42 +230,8 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
             >
               {'Create new workspace with AI'}
             </button>
-            {/* <button
-              className={input.length > 0 ? 'btn bg-ai border-text border btn-sm fw-light text-secondary mt-2 align-self-end' : 'btn btn-text border-text border btn-sm fw-light text-secondary mt-2 align-self-end disabled'}
-              style={{ backgroundColor: input.length > 0 ? '#2de7f3' : 'transparent' }}
-              onClick={handleSend}
-            >
-              <span className="fa fa-arrow-up text-light"></span>
-            </button> */}
           </div>
         </div>
-        {/* {contextChoice !== 'none' && contextFiles.length > 0 && (
-          <div className="mt-2 d-flex flex-wrap gap-1 overflow-y-auto" style={{ maxHeight: '110px' }}>
-            {contextFiles.slice(0, 6).map(f => {
-              const name = f.split('/').pop()
-              return (
-                <span
-                  key={f}
-                  className="badge text-bg-info me-1 aiContext-file text-success"
-                  style={{ cursor: 'pointer' }}
-                  onClick={clearContext}
-                >
-                  {name}
-                  <i className="fa fa-times ms-1 ms-1" style={{ cursor: 'pointer' }}></i>
-                </span>
-              )
-            })}
-            {contextFiles.length > 6 && (
-              <span
-                className="badge text-bg-info"
-                style={{ cursor: 'pointer' }}
-                onClick={clearContext}
-              >
-              … {contextFiles.length - 6} more <i className="fa fa-times ms-1" style={{ cursor: 'pointer' }}></i>
-              </span>
-            )}
-          </div>
-        )} */}
       </div>
     </>
   )
