@@ -91,7 +91,9 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   themeTracker
 }) => {
   const { trackMatomoEvent: baseTrackEvent } = useContext(TrackingContext)
-
+  const trackMatomoEvent = <T extends MatomoEvent = AIEvent>(event: T) => {
+    baseTrackEvent?.<T>(event)
+  }
   return (
     <>
       {showContextOptions && (
