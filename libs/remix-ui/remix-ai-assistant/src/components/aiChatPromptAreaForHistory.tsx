@@ -110,44 +110,44 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         isStreaming={props.isStreaming}
         handleSend={props.handleSend}
         handleStop={props.stopRequest}
-        showContextOptions={false}
-        setShowContextOptions={() => { } }
-        showAssistantOptions={props.showAssistantOptions}
-        setShowAssistantOptions={props.setShowAssistantOptions}
-        // showModelOptions={props.showModelOptions}
-        // setShowModelOptions={props.setShowModelOptions}
-        assistantChoice={props.assistantChoice}
-        // setAssistantChoice={props.setAssistantChoice}
-        // availableModels={props.availableModels}
+        showContextOptions={props.showContextOptions}
+        setShowContextOptions={props.setShowContextOptions}
+        showModelSelector={props.showModelSelector}
+        setShowModelSelector={props.setShowModelSelector}
+        showOllamaModelSelector={props.showOllamaModelSelector}
+        setShowOllamaModelSelector={props.setShowOllamaModelSelector}
+        contextChoice={props.contextChoice}
+        setContextChoice={props.setContextChoice}
         selectedModel={props.selectedModel}
-        handleSetAssistant={props.handleSetAssistant}
+        ollamaModels={props.ollamaModels}
+        selectedOllamaModel={props.selectedOllamaModel}
+        contextFiles={props.contextFiles}
+        clearContext={props.clearContext}
+        handleAddContext={props.handleAddContext}
         handleSetModel={props.handleSetModel}
         handleModelSelection={props.handleModelSelection}
+        handleOllamaModelSelection={props.handleOllamaModelSelection}
         handleGenerateWorkspace={props.handleGenerateWorkspace}
         handleRecord={props.handleRecord}
         isRecording={props.isRecording}
         dispatchActivity={props.dispatchActivity}
+        // contextBtnRef={props.contextBtnRef}
         modelBtnRef={props.modelBtnRef}
         modelSelectorBtnRef={props.modelSelectorBtnRef}
+        aiContextGroupList={props.aiContextGroupList}
         textareaRef={props.textareaRef}
-        isMaximized={props.isMaximized || false}
-        themeTracker={props.themeTracker} showModelSelector={false} setShowModelSelector={function (value: React.SetStateAction<boolean>): void {
-          throw new Error('Function not implemented.')
-        } } showOllamaModelSelector={false} setShowOllamaModelSelector={function (value: React.SetStateAction<boolean>): void {
-          throw new Error('Function not implemented.')
-        } } contextChoice={'none'} setContextChoice={function (value: React.SetStateAction<AiContextType>): void {
-          throw new Error('Function not implemented.')
-        } } ollamaModels={[]} selectedOllamaModel={''} contextFiles={[]} clearContext={function (): void {
-          throw new Error('Function not implemented.')
-        } } handleAddContext={function (): void {
-          throw new Error('Function not implemented.')
-        } } handleOllamaModelSelection={function (modelName: string): void {
-          throw new Error('Function not implemented.')
-        } } contextBtnRef={undefined} aiContextGroupList={[]} aiMode={'ask'} setAiMode={function (value: React.SetStateAction<'ask' | 'edit'>): void {
-          throw new Error('Function not implemented.')
-        } } setIsMaximized={function (value: React.SetStateAction<boolean>): void {
-          throw new Error('Function not implemented.')
-        } } modelAccess={undefined}
+        // aiMode={props.aiMode}
+        // setAiMode={props.setAiMode}
+        isMaximized={props.isMaximized}
+        setIsMaximized={props.setIsMaximized}
+        modelAccess={props.modelAccess} showAssistantOptions={false}
+        setShowAssistantOptions={props.setShowAssistantOptions} showModelOptions={false}
+        setShowModelOptions={props.setShowModelOptions}
+        assistantChoice={props.assistantChoice}
+        setAssistantChoice={props.setAssistantChoice}
+        availableModels={props.availableModels}
+        handleSetAssistant={props.handleSetAssistant}
+        themeTracker={undefined}
       />
     </section>
   )
