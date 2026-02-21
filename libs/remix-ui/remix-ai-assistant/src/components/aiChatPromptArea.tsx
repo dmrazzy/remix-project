@@ -1,6 +1,7 @@
 import React from 'react'
 import GroupListMenu from './contextOptMenu'
 import { PromptArea } from './prompt'
+import { AiAssistantType } from '../types/componentTypes'
 
 interface AiChatPromptAreaProps {
   themeTracker: any
@@ -54,7 +55,6 @@ interface AiChatPromptAreaProps {
     setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
     showModelSelector: boolean
     setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
-    contextBtnRef: React.RefObject<any>
     handleAddContext: () => void
 }
 
@@ -151,25 +151,30 @@ export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
         handleRecord={props.handleRecord}
         isRecording={props.isRecording}
         dispatchActivity={props.dispatchActivity}
-        // contextBtnRef={props.contextBtnRef}
         modelBtnRef={props.modelBtnRef}
         modelSelectorBtnRef={props.modelSelectorBtnRef}
         aiContextGroupList={props.aiContextGroupList}
         textareaRef={props.textareaRef}
-        // aiMode={props.aiMode}
-        // setAiMode={props.setAiMode}
         isMaximized={props.isMaximized}
         setIsMaximized={props.setIsMaximized}
         modelAccess={props.modelAccess}
         showAssistantOptions={false}
-        setShowAssistantOptions={props.setShowAssistantOptions}
-        // showModelOptions={props.showModelOptions}
-        // setShowModelOptions={props.setShowModelOptions}
-        assistantChoice={props.assistantChoice}
-        // setAssistantChoice={props.setAssistantChoice}
-        // availableModels={props.availableModels}
-        handleSetAssistant={props.handleSetAssistant}
-        themeTracker={props.themeTracker}
+        setShowAssistantOptions={function (value: React.SetStateAction<boolean>): void {
+          throw new Error('Function not implemented.')
+        } }
+        showModelOptions={false}
+        setShowModelOptions={function (value: React.SetStateAction<boolean>): void {
+          throw new Error('Function not implemented.')
+        } }
+        assistantChoice={'openai'}
+        setAssistantChoice={function (value: React.SetStateAction<AiAssistantType>): void {
+          throw new Error('Function not implemented.')
+        } }
+        availableModels={[]}
+        handleSetAssistant={function (): void {
+          throw new Error('Function not implemented.')
+        } }
+        themeTracker={undefined}
       />
     </section>
   )
