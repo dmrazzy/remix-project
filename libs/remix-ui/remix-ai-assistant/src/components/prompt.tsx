@@ -19,8 +19,8 @@ export interface PromptAreaProps {
   showAssistantOptions: boolean
   assistantChoice: AiAssistantType
   handleSetAssistant: () => void
-  selectedOllamaModel: string | null
-  handleAddContext: () => void
+  selectedOllamaModel?: any
+  handleAddContext?: () => void
   handleSetModel: () => void
   handleModelSelection: (modelId: string) => void
   handleGenerateWorkspace: () => void
@@ -32,7 +32,6 @@ export interface PromptAreaProps {
   maximizePanel: () => Promise<void>
   isMaximized: boolean
   themeTracker: any
-  setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
 }
 
 export const PromptArea: React.FC<PromptAreaProps> = ({

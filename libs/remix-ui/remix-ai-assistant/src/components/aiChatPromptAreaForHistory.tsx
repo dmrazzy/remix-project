@@ -37,23 +37,6 @@ interface AiChatPromptAreaForHistoryProps {
   modelSelectorBtnRef: React.RefObject<HTMLButtonElement>
   textareaRef?: React.RefObject<HTMLTextAreaElement>
   maximizePanel: () => Promise<void>
-  showContextOptions: boolean
-  setShowContextOptions: React.Dispatch<React.SetStateAction<boolean>>
-  contextChoice: any
-  setContextChoice: React.Dispatch<React.SetStateAction<any>>
-  ollamaModels: string[]
-  selectedOllamaModel: string
-  handleOllamaModelSelection: (modelName: string) => void
-  showOllamaModelSelector: boolean
-  setShowOllamaModelSelector: React.Dispatch<React.SetStateAction<boolean>>
-  contextFiles: any[]
-  clearContext: () => void
-  aiContextGroupList: any[]
-  modelAccess: any
-  setIsMaximized: React.Dispatch<React.SetStateAction<boolean>>
-  showModelSelector: boolean
-  setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
-  handleAddContext: () => void
 }
 
 export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHistoryProps) {
@@ -126,8 +109,6 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         setInput={props.setInput}
         isStreaming={props.isStreaming}
         handleSend={props.handleSend}
-        selectedOllamaModel={props.selectedOllamaModel}
-        handleAddContext={props.handleAddContext}
         handleSetModel={props.handleSetModel}
         handleModelSelection={props.handleModelSelection}
         handleGenerateWorkspace={props.handleGenerateWorkspace}
@@ -137,7 +118,6 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         modelBtnRef={props.modelBtnRef}
         textareaRef={props.textareaRef}
         isMaximized={props.isMaximized}
-        setIsMaximized={props.setIsMaximized}
         showAssistantOptions={props.showAssistantOptions}
         assistantChoice={props.assistantChoice}
         handleSetAssistant={props.handleSetAssistant}
