@@ -60,10 +60,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     >
       <div className="d-flex justify-content-between align-items-start">
         <div className="flex-grow-1 overflow-hidden pe-2">
-          <div className="conversation-title text-truncate mb-1 text-light-emphasis">
+          <div className="conversation-title text-truncate mb-1 text-light-emphasis" data-id="conversation-item-title">
             {conversation.title || 'New Conversation'}
           </div>
-          <div className="conversation-meta text-light-emphasis small">
+          <div className="conversation-meta text-light-emphasis small" data-id="conversation-item-meta">
             {formatDate(conversation.lastAccessedAt)} · {conversation.messageCount} message{conversation.messageCount !== 1 ? 's' : ''}
           </div>
         </div>
