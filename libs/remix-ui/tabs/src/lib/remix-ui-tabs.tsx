@@ -812,6 +812,28 @@ export const TabsUI = (props: TabsUIProps) => {
 
   const handleAskRemixAI = async () => {
     try {
+      // When debugging is active, ensure AI assistant is always on the right side
+      if (props.isDebugging) {
+        // First, activate the AI assistant to ensure it's loaded
+        await props.plugin.call('manager', 'activatePlugin', 'remixaiassistant')
+
+        // Check if AI assistant is currently active in the left side panel
+        const leftPanelActive = await props.plugin.call('sidePanel', 'currentFocus')
+
+        // Check if AI assistant is currently active in the right side panel
+        const rightPanelActive = await props.plugin.call('rightSidePanel', 'currentFocus')
+
+        if (leftPanelActive === 'remixaiassistant') {
+          // AI is on the left side during debugging - move it to the right side
+          const profile = await props.plugin.call('remixaiassistant', 'getProfile')
+          await props.plugin.call('sidePanel', 'pinView', profile)
+        } else if (rightPanelActive !== 'remixaiassistant') {
+          // AI is not on either panel - pin it to the right side
+          const profile = await props.plugin.call('remixaiassistant', 'getProfile')
+          await props.plugin.call('sidePanel', 'pinView', profile)
+        }
+      }
+
       // Show right side panel if it's hidden
       const isPanelHidden = await props.plugin.call('rightSidePanel', 'isPanelHidden')
       if (isPanelHidden) {
