@@ -123,7 +123,7 @@ const RemixUIPanelHeader = (props: RemixPanelProps) => {
                       </CustomTooltip>
                     </>
                   </RenderIf>
-                  <RenderIfNot condition={plugin.pinned}>
+                  <RenderIfNot condition={plugin.pinned || plugin.profile.name === 'debugger'}>
                     <div className='d-flex' data-id="movePluginToRight" data-pinnedplugin={`movePluginToRight-${plugin.profile.name}`} onClick={pinPlugin}>
                       <CustomTooltip placement="auto-end" tooltipId="pinnedMsg" tooltipClasses="text-nowrap" tooltipText={<FormattedMessage id="panel.pinnedMsg" />}>
                         <div className="codicon codicon-layout-sidebar-right-dock ms-2 fs-6 fw-bold lh-1" style={{ marginTop: '2px' }}></div>

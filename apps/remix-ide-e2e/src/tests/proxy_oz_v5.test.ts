@@ -231,11 +231,7 @@ module.exports = {
   'Should debug the call': function(browser: NightwatchBrowser) {
     browser
       .debugTransaction(0)
-      .waitForElementVisible({
-        locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"5")]',
-        timeout: 60000
-      })
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 5', 60000)
     /* TODO test the nested calls component here
     .goToVMTraceStep(129)
     .waitForElementContainsText('*[data-id="functionPanel"]', 'version()', 60000)

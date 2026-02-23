@@ -141,6 +141,7 @@ export type EditorAPIType = {
   clearErrorMarkers: (sources: string[] | { [fileName: string]: any }, from: string) => void
   getPositionAt: (offset: number) => monacoTypes.IPosition
   showCustomDiff: (file: string, content: string) => Promise<void>
+  clearAllBreakpoints: () => void
 }
 
 /* eslint-disable-next-line */
@@ -172,6 +173,7 @@ export const EditorUI = (props: EditorUIProps) => {
   }
   const changedTypeMap = useRef<ChangeTypeMap>({})
   const pendingCustomDiff = useRef({})
+  const currentBreakpointsRef = useRef<Record<string, Record<number, any>>>({})
   const [, setCurrentBreakpoints] = useState({})
   const [isSplit, setIsSplit] = useState(true)
   const [currentDiffFile, setCurrentDiffFile] = useState(props.currentDiffFile || '')
@@ -738,9 +740,50 @@ export const EditorUI = (props: EditorUIProps) => {
           )
           prevState[currentFile][position.lineNumber] = decorationIds[0]
         }
+        currentBreakpointsRef.current = { ...prevState }
         return prevState
       })
     }
+  }
+
+  props.editorAPI.clearAllBreakpoints = () => {
+    const breakpoints = currentBreakpointsRef.current
+
+    // Clear decorations by finding and removing all breakpoint decorations from all models
+    if (monacoRef.current) {
+      const allModels = monacoRef.current.editor.getModels()
+
+      // Clear breakpoint decorations from ALL models
+      for (const model of allModels) {
+        // Get all decorations from this model
+        const allDecorations = model.getAllDecorations()
+
+        // Find decorations with the breakpoint glyph class
+        const breakpointDecorations = allDecorations.filter(decoration =>
+          decoration.options.glyphMarginClassName &&
+          decoration.options.glyphMarginClassName.includes('fa-circle')
+        )
+
+        if (breakpointDecorations.length > 0) {
+          // Remove the breakpoint decorations
+          const decorationIds = breakpointDecorations.map(d => d.id)
+          model.deltaDecorations(decorationIds, [])
+        }
+      }
+
+      // Emit clear events for each breakpoint
+      for (const file in breakpoints) {
+        if (breakpoints[file]) {
+          for (const line in breakpoints[file]) {
+            props.events.onBreakPointCleared(file, parseInt(line))
+          }
+        }
+      }
+    }
+
+    // Reset breakpoint tracking
+    currentBreakpointsRef.current = {}
+    setCurrentBreakpoints({})
   }
 
   props.editorAPI.showCustomDiff = async (file: string, content: string) => {

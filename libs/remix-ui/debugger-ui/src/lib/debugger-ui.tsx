@@ -1,18 +1,14 @@
 import React, {useState, useEffect, useRef, useContext} from 'react' // eslint-disable-line
-import { createPortal } from 'react-dom'
 import { FormattedMessage, useIntl } from 'react-intl'
-import StepManager from './step-manager/step-manager' // eslint-disable-line
-import VmDebugger from './vm-debugger/vm-debugger' // eslint-disable-line
-import VmDebuggerHead from './vm-debugger/vm-debugger-head' // eslint-disable-line
 import SearchBar from './search-bar/search-bar' // eslint-disable-line
-// import TransactionRecorder from './transaction-recorder/transaction-recorder' // eslint-disable-line
+import DebugLayout from './debug-layout/debug-layout' // eslint-disable-line
 import {TransactionDebugger as Debugger} from '@remix-project/remix-debug' // eslint-disable-line
 import {DebuggerUIProps} from './idebugger-api' // eslint-disable-line
 import {Toaster} from '@remix-ui/toaster' // eslint-disable-line
 import { CustomTooltip, isValidHash } from '@remix-ui/helper'
 import { DebuggerEvent, MatomoEvent } from '@remix-api';
 import { TrackingContext } from '@remix-ide/tracking'
-import { ContractDeployment, ContractInteraction } from './transaction-recorder/types'
+import { ContractDeployment } from './transaction-recorder/types'
 /* eslint-disable-next-line */
 import './debugger-ui.css'
 import type { CompilerAbstract } from '@remix-project/remix-solidity'
@@ -45,9 +41,17 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     txNumberIsEmpty: true,
     isLocalNodeUsed: false,
     sourceLocationStatus: '',
-    showOpcodes: true
+    showOpcodes: false
   })
 
+  const [deployments] = useState<ContractDeployment[]>([])
+  const [traceData, setTraceData] = useState<{ currentStep: number; traceLength: number } | null>(null)
+  const [currentFunction, setCurrentFunction] = useState<string>('')
+  const [functionStack, setFunctionStack] = useState<any[]>([])
+  const [nestedScopes, setNestedScopes] = useState<any[]>([])
+  const [callTreeInstance, setCallTreeInstance] = useState<any>(null)
+  const [solidityLocals, setSolidityLocals] = useState<any>(null)
+  const [solidityState, setSolidityState] = useState<any>(null)
   const [transactionRecorderUI, setTransactionRecorderUI] = useState<React.ReactNode>(null)
 
   if (props.onReady) {
@@ -62,27 +66,21 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     })
   }
 
-  const panelsRef = useRef<HTMLDivElement>(null)
   const debuggerTopRef = useRef(null)
 
-  const handleResize = () => {
-    if (panelsRef.current && debuggerTopRef.current) {
-      panelsRef.current.style.height = window.innerHeight - debuggerTopRef.current.clientHeight - debuggerTopRef.current.offsetTop - 7 + 'px'
-    }
-  }
-
   useEffect(() => {
-    window.addEventListener('resize', handleResize)
-    // TODO: not a good way to wait on the ref doms element to be rendered of course
-    setTimeout(() => handleResize(), 2000)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [state.debugging, state.isActive])
-
-  useEffect(() => {
+    // Get the transaction recorder UI from udappTransactions plugin
     debuggerModule.call('udappTransactions', 'getUI').then((ui) => {
       setTransactionRecorderUI(ui)
+    }).catch(() => {
+      // If udappTransactions is not available, show fallback message
+      setTransactionRecorderUI(
+        <div className="alert alert-info m-3">
+          <i className="fas fa-info-circle mr-2"></i>
+          Transaction recorder is available in the Deploy & Run Transactions tab.
+        </div>
+      )
     })
-    handleResize()
 
     return unLoad()
   }, [])
@@ -126,6 +124,52 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     }
 
     providerChanged()
+  }, [state.debugger])
+
+  useEffect(() => {
+    if (state.debugger && state.debugger.step_manager) {
+      const updateTraceData = (step) => {
+        setTraceData({
+          currentStep: step,
+          traceLength: state.debugger.step_manager.traceLength || 0
+        })
+      }
+
+      state.debugger.step_manager.event.register('stepChanged', updateTraceData)
+    }
+
+    // Listen for function stack updates to get the current function name
+    if (state.debugger && state.debugger.vmDebuggerLogic) {
+      const updateFunctionStack = (stack) => {
+        if (stack && stack.length > 0) {
+          // Get the top-level function from the stack
+          const topFunction = stack[0]
+          const funcName = topFunction.functionDefinition?.name || topFunction.functionDefinition?.kind || ''
+          setCurrentFunction(funcName)
+          // Store the full stack for the trace view
+          setFunctionStack(stack)
+        } else {
+          setCurrentFunction('')
+          setFunctionStack([])
+        }
+      }
+
+      state.debugger.vmDebuggerLogic.event.register('functionsStackUpdate', updateFunctionStack)
+
+      // Listen for solidityState updates
+      const updateSolidityState = (stateData) => {
+        console.log('[Debugger] solidityState event received:', stateData)
+        setSolidityState(stateData)
+      }
+      state.debugger.vmDebuggerLogic.event.register('solidityState', updateSolidityState)
+
+      // Listen for solidityLocals updates
+      const updateSolidityLocals = (localsData) => {
+        console.log('[Debugger] solidityLocals event received:', localsData)
+        setSolidityLocals(localsData)
+      }
+      state.debugger.vmDebuggerLogic.event.register('solidityLocals', updateSolidityLocals)
+    }
   }, [state.debugger])
 
   const listenToEvents = (debuggerInstance, currentReceipt) => {
@@ -201,8 +245,94 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     })
 
     debuggerInstance.event.register('debuggerUnloaded', () => unLoad())
-  }
 
+    // Listen for callTreeReady event to get nested scopes
+    if (debuggerInstance && debuggerInstance.debugger && debuggerInstance.debugger.callTree) {
+      // Store the callTree instance for later use
+      setCallTreeInstance(debuggerInstance.debugger.callTree)
+
+      debuggerInstance.debugger.callTree.event.register('callTreeReady', () => {
+        try {
+          // Get the root scope with low-level scopes merged
+          const nojumpScopes = debuggerInstance.debugger.callTree.getScopesAsNestedJSON('nojump')
+          // Also get all scopes to access the original scope tree
+          const allScopes = debuggerInstance.debugger.callTree.getScopesAsNestedJSON('all')
+
+          if (nojumpScopes && nojumpScopes.length > 0) {
+            const rootScope = nojumpScopes[0]
+
+            // Get external calls made by this transaction
+            const externalCalls = debuggerInstance.debugger.callTree.getScopesAsNestedJSON('call')
+
+            // Find the actual function entry step by looking at the scope tree
+            // The root might include dispatcher, so we look for the first meaningful child scope
+            let functionEntryStep = rootScope.firstStep
+
+            // Helper function to find first function scope in the tree
+            const findFirstFunctionScope = (scope: any): any => {
+              // If this scope has a function definition with a name, it's a function scope
+              if (scope.functionDefinition && scope.functionDefinition.name) {
+                return scope
+              }
+              // Otherwise, look at children
+              if (scope.children && scope.children.length > 0) {
+                for (const child of scope.children) {
+                  const found = findFirstFunctionScope(child)
+                  if (found) return found
+                }
+              }
+              return null
+            }
+
+            // Try to find a better entry step and function definition from the all-scopes tree
+            let actualFunctionDefinition = rootScope.functionDefinition
+            if (allScopes && allScopes.length > 0) {
+              const firstFunctionScope = findFirstFunctionScope(allScopes[0])
+              if (firstFunctionScope) {
+                if (firstFunctionScope.firstStep > rootScope.firstStep) {
+                  functionEntryStep = firstFunctionScope.firstStep
+                }
+                // Use the function definition from the actual function scope
+                if (firstFunctionScope.functionDefinition) {
+                  actualFunctionDefinition = firstFunctionScope.functionDefinition
+                }
+              }
+            }
+
+            // Create the root transaction call (CALL to the contract method)
+            const rootTransactionCall = {
+              ...rootScope,
+              functionDefinition: actualFunctionDefinition, // Use the actual function definition
+              children: externalCalls, // External calls become children of the root transaction
+              isRootTransaction: true, // Mark this as the root transaction call
+              functionEntryStep: functionEntryStep // Store the actual function entry step
+            }
+
+            // Create a synthetic SENDER node as the parent
+            const senderNode = {
+              scopeId: 'sender',
+              firstStep: rootScope.firstStep,
+              lastStep: rootScope.lastStep,
+              gasCost: rootScope.gasCost,
+              address: rootScope.address,
+              isCreation: rootScope.isCreation,
+              functionDefinition: rootScope.functionDefinition,
+              opcodeInfo: rootScope.opcodeInfo,
+              locals: {},
+              children: [rootTransactionCall], // Root transaction is a child of sender
+              isSenderNode: true // Mark this as the synthetic sender node
+            }
+
+            setNestedScopes([senderNode])
+          } else {
+            setNestedScopes([])
+          }
+        } catch (error) {
+          console.error('[DebuggerUI] Error loading nested scopes:', error)
+        }
+      })
+    }
+  }
   const requestDebug = (blockNumber, txNumber, tx) => {
     startDebugging(blockNumber, txNumber, tx)
   }
@@ -249,6 +379,15 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
         debugging: false
       }
     })
+    // Reset solidity locals and state
+    setSolidityLocals(null)
+    setSolidityState(null)
+    // Clear all breakpoints from editor
+    debuggerModule.call('editor', 'clearAllBreakpoints').catch((e) => {
+      console.error('Failed to clear breakpoints:', e)
+    })
+    // Emit debugging stopped event
+    debuggerModule.emit('debuggingStopped')
   }
   const startDebugging = async (blockNumber, txNumber, tx, optWeb3?) => {
     if (state.debugger) {
@@ -335,6 +474,36 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
               validationError: ''
             }
           })
+          // Activate the debugger plugin when debugging starts
+          debuggerModule.call('menuicons', 'select', 'debugger').catch(err => {
+            console.error('Failed to activate debugger:', err)
+          })
+          // Close right side panel if it's open when debugging starts
+          debuggerModule.call('rightSidePanel', 'isPanelHidden').then((isHidden: boolean) => {
+            if (!isHidden) {
+              debuggerModule.call('rightSidePanel', 'togglePanel').catch(err => {
+                console.error('Failed to close right side panel:', err)
+              })
+            }
+          }).catch(err => {
+            console.error('Failed to check right side panel state:', err)
+          })
+          // Emit debugging started event
+          debuggerModule.emit('debuggingStarted', {
+            txHash: txNumber,
+            stepManager: {
+              stepOverBack: debuggerInstance.step_manager?.stepOverBack.bind(debuggerInstance.step_manager),
+              stepIntoBack: debuggerInstance.step_manager?.stepIntoBack.bind(debuggerInstance.step_manager),
+              stepIntoForward: debuggerInstance.step_manager?.stepIntoForward.bind(debuggerInstance.step_manager),
+              stepOverForward: debuggerInstance.step_manager?.stepOverForward.bind(debuggerInstance.step_manager),
+              jumpPreviousBreakpoint: debuggerInstance.step_manager?.jumpPreviousBreakpoint.bind(debuggerInstance.step_manager),
+              jumpNextBreakpoint: debuggerInstance.step_manager?.jumpNextBreakpoint.bind(debuggerInstance.step_manager),
+              traceLength: debuggerInstance.step_manager?.traceLength,
+              currentStepIndex: debuggerInstance.step_manager?.currentStepIndex,
+              registerEvent: debuggerInstance.step_manager?.event.register.bind(debuggerInstance.step_manager?.event),
+              showOpcodes: state.showOpcodes
+            }
+          })
         })
       } catch (error) {
         unLoad()
@@ -350,7 +519,6 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
         })
       }
     }, 300)
-    handleResize()
 
     return debuggerInstance
   }
@@ -371,6 +539,8 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     setState((prevState) => {
       return { ...prevState, showOpcodes }
     })
+    // Emit event to update external listeners (like bottom-bar)
+    debuggerModule.emit('showOpcodesChanged', showOpcodes)
   }
 
   const stepManager = {
@@ -420,20 +590,20 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     </span>
   )
   return (
-    <div>
+    <div style={{ height: '100%' }}>
       <Toaster message={state.toastMessage} />
-      <div className="px-2 pb-3 pt-3" ref={debuggerTopRef}>
-        {/* Search Bar */}
-        <SearchBar
-          onSearch={handleSearch}
-          debugging={state.debugging}
-          currentTxHash={state.txNumber}
-          onStopDebugging={unLoad}
-        />
+      {!state.debugging && (
+        <div className="pb-2 pt-2" ref={debuggerTopRef}>
+          {/* Search Bar */}
+          <SearchBar
+            onSearch={handleSearch}
+            debugging={state.debugging}
+            currentTxHash={state.txNumber}
+            onStopDebugging={unLoad}
+          />
 
-        {/* Informational Text */}
-        {!state.debugging && (
-          <div className="debugger-info mb-2">
+          {/* Informational Text */}
+          <div className="debugger-info ms-2 me-2 mb-2">
             <h6 className="search-bar-title mt-3">
               <FormattedMessage id="debugger.startDebugging" defaultMessage="Start debugging a transaction" />
             </h6>
@@ -443,66 +613,91 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
               </span>
             </div>
           </div>
-        )}
 
-        {/* Validation Error */}
-        {state.validationError && <span className="w-100 py-1 text-danger validationError d-block mb-3">{state.validationError}</span>}
+          {/* Validation Error */}
+          {state.validationError && <span className="w-100 py-1 text-danger validationError d-block mb-3">{state.validationError}</span>}
 
-        {/* Configuration Options */}
-        <div>
-          <div className="mb-2 debuggerConfig form-check">
-            <CustomTooltip tooltipId="debuggerGenSourceCheckbox" tooltipText={<FormattedMessage id="debugger.debugWithGeneratedSources" />} placement="bottom-start">
-              {customJSX}
-            </CustomTooltip>
-          </div>
-          {state.isLocalNodeUsed && (
-            <div className="mb-2 debuggerConfig form-check">
-              <CustomTooltip tooltipId="debuggerGenSourceInput" tooltipText={<FormattedMessage id="debugger.forceToUseCurrentLocalNode" />} placement="right">
-                <input
-                  className="form-check-input"
-                  id="debugWithLocalNodeInput"
-                  onChange={({ target: { checked } }) => {
-                    setState((prevState) => {
-                      return {
-                        ...prevState,
-                        opt: { ...prevState.opt, debugWithLocalNode: checked }
-                      }
-                    })
-                  }}
-                  type="checkbox"
-                />
+          {/* Configuration Options */}
+          <div>
+            <div className="ms-2 mb-2 debuggerConfig form-check">
+              <CustomTooltip tooltipId="debuggerGenSourceCheckbox" tooltipText={<FormattedMessage id="debugger.debugWithGeneratedSources" />} placement="bottom-start">
+                {customJSX}
               </CustomTooltip>
-              <label data-id="debugLocaNodeLabel" className="form-check-label" htmlFor="debugWithLocalNodeInput">
-                <FormattedMessage id="debugger.debugLocaNodeLabel" />
-              </label>
             </div>
-          )}
-        </div>
-
-        {/* Transaction Recorder Section */}
-        {!state.debugging && transactionRecorderUI}
-
-        {state.debugging && state.sourceLocationStatus && (
-          <div className="text-warning mt-3">
-            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {state.sourceLocationStatus}
+            {state.isLocalNodeUsed && (
+              <div className="mb-2 debuggerConfig form-check">
+                <CustomTooltip tooltipId="debuggerGenSourceInput" tooltipText={<FormattedMessage id="debugger.forceToUseCurrentLocalNode" />} placement="right">
+                  <input
+                    className="form-check-input"
+                    id="debugWithLocalNodeInput"
+                    onChange={({ target: { checked } }) => {
+                      setState((prevState) => {
+                        return {
+                          ...prevState,
+                          opt: { ...prevState.opt, debugWithLocalNode: checked }
+                        }
+                      })
+                    }}
+                    type="checkbox"
+                  />
+                </CustomTooltip>
+                <label data-id="debugLocaNodeLabel" className="form-check-label" htmlFor="debugWithLocalNodeInput">
+                  <FormattedMessage id="debugger.debugLocaNodeLabel" />
+                </label>
+              </div>
+            )}
           </div>
-        )}
 
-        {state.debugging && <StepManager stepManager={stepManager} />}
-      </div>
-      <div className="debuggerPanels" ref={panelsRef}>
-        {state.debugging && <VmDebuggerHead debugging={state.debugging} vmDebugger={vmDebugger} stepManager={stepManager} onShowOpcodesChange={handleShowOpcodesChange} />}
-        {state.debugging && (
-          <VmDebugger
+          {/* Transaction Recorder Section */}
+          {transactionRecorderUI}
+        </div>
+      )}
+
+      {state.debugging && state.sourceLocationStatus && (
+        <div className="text-warning mt-3">
+          <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {state.sourceLocationStatus}
+        </div>
+      )}
+
+      {state.debugging && (
+        <div ref={debuggerTopRef} style={{ height: '100%' }}>
+          <DebugLayout
+            onSearch={handleSearch}
             debugging={state.debugging}
-            vmDebugger={vmDebugger}
+            currentTxHash={state.txNumber}
+            onStopDebugging={unLoad}
             currentBlock={state.currentBlock}
             currentReceipt={state.currentReceipt}
             currentTransaction={state.currentTransaction}
+            traceData={traceData}
+            currentFunction={currentFunction}
+            functionStack={functionStack}
+            nestedScopes={nestedScopes}
+            deployments={deployments}
+            onScopeSelected={(scope) => {
+              if (debuggerModule.emit) {
+                debuggerModule.emit('scopeSelected', scope, deployments)
+              }
+            }}
+            solidityLocals={solidityLocals}
+            solidityState={solidityState}
+            stepManager={stepManager}
+            callTree={callTreeInstance}
+            debugWithGeneratedSources={state.opt.debugWithGeneratedSources}
+            onDebugWithGeneratedSourcesChange={(checked) => {
+              setState((prevState) => {
+                return {
+                  ...prevState,
+                  opt: { ...prevState.opt, debugWithGeneratedSources: checked }
+                }
+              })
+            }}
+            onShowOpcodesChange={handleShowOpcodesChange}
+            showOpcodes={state.showOpcodes}
+            registerEvent={vmDebugger.registerEvent}
           />
-        )}
-        <div id="bottomSpacer" className="p-1 mt-3"></div>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
