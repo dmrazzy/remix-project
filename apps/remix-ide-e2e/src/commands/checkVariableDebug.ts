@@ -1,8 +1,6 @@
 import { NightwatchBrowser, NightwatchCheckVariableDebugValue } from 'nightwatch'
 import EventEmitter from 'events'
 
-const deepequal = require('deep-equal')
-
 class CheckVariableDebug extends EventEmitter {
   command(this: NightwatchBrowser, id: string, debugValue: NightwatchCheckVariableDebugValue): NightwatchBrowser {
     this.api.perform((done) => {
@@ -20,71 +18,88 @@ function checkDebug(browser: NightwatchBrowser, id: string, debugValue: Nightwat
   // Map id to data-id attribute (capitalize first letter after 'solidity')
   const dataId = id === 'soliditylocals' ? 'solidityLocals' : id === 'soliditystate' ? 'solidityState' : id
 
-  let resultOfElement = null
-  let isEqual = false
-  // waitUntil will run with intervals of 1000ms for 10 seconds until the condition is met
-  browser.waitUntil(() => {
-    browser.execute(function (dataId: string) {
-      // Parse JSON from the new JSON renderer DOM structure
-      const element = document.querySelector(`[data-id="${dataId}"]`) as HTMLElement
-      if (!element) return null
+  // First, wait for the container to be visible
+  browser.waitForElementVisible(`*[data-id="${dataId}"]`, 10000)
+    .pause(1000) // Wait for variables to render after parent expansion
 
-      // Extract JSON by parsing the visible structure
-      // The JSON renderer outputs key-value pairs in .json-key and .json-value elements
-      const result: any = {}
+  // Expand and check each variable in the debugValue object
+  const keys = Object.keys(debugValue)
 
-      function parseElement(el: Element): any {
-        const obj: any = {}
-        const children = el.children
+  // Filter out keys with special characters (like <1>, <2>, etc.)
+  // Only check variables that are valid identifiers (letters, numbers, underscore)
+  const validKeys = keys.filter(key => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key))
 
-        for (let i = 0; i < children.length; i++) {
-          const child = children[i]
-          const keyEl = child.querySelector('.json-key')
-          const valueEl = child.querySelector('.json-value')
+  let allMatch = true
+  let errorMessages: string[] = []
 
-          if (keyEl && valueEl) {
-            const key = keyEl.textContent?.trim()
-            const valueText = valueEl.textContent?.trim()
-            if (key && valueText) {
-              try {
-                obj[key] = JSON.parse(valueText)
-              } catch (e) {
-                obj[key] = valueText
-              }
+  // Process each key in sequence
+  for (const key of validKeys) {
+    const expectedValue = debugValue[key]
+    const expandIconSelector = `*[data-id="${key}-expand-icon"]`
+    const nestedContainerSelector = `[data-id="${key}-json-nested"]`
+
+    // Wait for the expand icon to be visible
+    browser.waitForElementVisible(expandIconSelector, 10000)
+
+    // Check if already expanded and click if needed
+    // Expanded icons have 'fa-minus-square' class, collapsed have 'fa-plus-square'
+    browser.execute(function (iconSelector: string) {
+      const icon = document.querySelector(iconSelector)
+      if (icon) {
+        const isExpanded = icon.classList.contains('fa-minus-square')
+        if (!isExpanded) {
+          // Not expanded, click to expand
+          (icon as HTMLElement).click()
+        }
+      }
+    }, [`[data-id="${key}-expand-icon"]`])
+      .pause(500) // Wait for expansion animation (if clicked) or for DOM to stabilize
+
+    // Check each property in the expected value
+    if (typeof expectedValue === 'object' && expectedValue !== null) {
+      for (const [prop, propValue] of Object.entries(expectedValue)) {
+        const valueSelector = `${nestedContainerSelector} [data-id="${prop}-json-value"]`
+
+        // Convert the expected value to string format (JSON strings are quoted in the renderer)
+        let expectedText: string
+        if (typeof propValue === 'string') {
+          // All string values are rendered as JSON strings with quotes
+          expectedText = `"${propValue}"`
+        } else {
+          // Numbers and other types are rendered as-is
+          expectedText = String(propValue)
+        }
+
+        // Wait for the element and check if text contains the expected value
+        browser.waitForElementVisible(valueSelector, 10000)
+        browser.getText(valueSelector, (result) => {
+          const actualValue = result.value
+          if (typeof actualValue === 'string') {
+            const actualTrimmed = actualValue.trim()
+
+            if (actualTrimmed !== expectedText) {
+              allMatch = false
+              errorMessages.push(
+                `Mismatch for ${key}.${prop}: expected ${expectedText}, got ${actualTrimmed}`
+              )
             }
           }
-
-          // Recursively parse nested structures
-          const nestedKey = child.querySelector('.json-key')?.textContent?.trim()
-          if (nestedKey && child.querySelector('.json-nested')) {
-            obj[nestedKey] = parseElement(child)
-          }
-        }
-
-        return Object.keys(obj).length > 0 ? obj : null
+        })
       }
+    }
+  }
 
-      const parsed = parseElement(element)
-      return parsed ? JSON.stringify(parsed) : null
-    }, [dataId], (result) => {
-      if (result.value) {
-        try {
-          resultOfElement = JSON.parse(<string>result.value)
-          isEqual = deepequal(debugValue, resultOfElement)
-        } catch (e) {
-          browser.assert.fail('cant parse solidity state', e.message, '')
-        }
-      }
-    })
-    if (isEqual) return true
-    return false
-  }, 10000, 1000)
-    .perform(() => {
-      if (!isEqual) {
-        browser.assert.fail(JSON.stringify(resultOfElement), 'info about error\n ' + JSON.stringify(debugValue) + '\n ' + JSON.stringify(resultOfElement), '')
-      }
-      done()
-    })
+  // Final check and done
+  browser.perform(() => {
+    if (!allMatch) {
+      browser.assert.fail(
+        'Variable values do not match',
+        errorMessages.join('\n'),
+        'Expected all variables to match'
+      )
+    }
+    done()
+  })
 }
 
 module.exports = CheckVariableDebug

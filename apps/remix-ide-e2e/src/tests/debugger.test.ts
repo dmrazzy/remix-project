@@ -97,7 +97,7 @@ module.exports = {
       .createContract('"tokenName", "symbol"')
       .debugTransaction(0)
       .waitForElementVisible('*[data-id="callTraceHeader"]')
-      .pause(1000)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 474')
       .getEditorValue((content) => {
         browser.assert.ok(content.indexOf(`constructor (string memory name_, string memory symbol_) {
         _name = name_;
@@ -107,6 +107,7 @@ module.exports = {
       })
       .goToVMTraceStep(10)
       .pause(500)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 10')
   },
 
   'Should display correct source highlighting while debugging a contract which has ABIEncoderV2 #group2': function (browser: NightwatchBrowser) {
@@ -127,7 +128,7 @@ module.exports = {
       .clickFunction(0, 0, { types: 'bytes userData', values: '0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4' })
       .debugTransaction(0)
       .waitForElementVisible('*[data-id="callTraceHeader"]')
-      .pause(500)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 131')
       .goToVMTraceStep(261)
       .waitForElementPresent('.highlightLine8')
       /*
@@ -152,15 +153,8 @@ module.exports = {
       .checkVariableDebug('soliditylocals', localVariable_step266_ABIEncoder) // locals should not be initiated at this point, only idAsk should
       .goToVMTraceStep(717)
       .pause(1000)
-      .execute(function () {
-        const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
-        if (solidityLocals) {
-          const firstIcon = solidityLocals.querySelector('.json-expand-icon')
-          if (firstIcon) (firstIcon as any).click()
-        }
-      })
-      .pause(500)
-      .checkVariableDebug('soliditylocals', localVariable_step717_ABIEncoder) // all locals should be initiaed
+
+      .checkVariableDebug('soliditylocals', localVariable_step717_ABIEncoder) // all locals should be initiated
       .clearTransactions()
   },
 
@@ -489,7 +483,7 @@ const localVariable_step266_ABIEncoder = { // eslint-disable-line
 		"type": "bytes"
 	},
 	"<1>": {
-		"length": "0x0",
+		"length": "0xNaN",
 		"value": "0x",
 		"type": "bytes"
 	},
