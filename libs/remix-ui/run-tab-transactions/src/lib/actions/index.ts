@@ -39,6 +39,7 @@ export async function replayTransaction (transaction: Transaction, recorderData:
     const accounts = recorderData._usedAccounts
     const abis = recorderData._abis
     const linkReferences = recorderData._linkReferences
+    const targetTimestamp = extractRecorderTimestamp(tx?.record?.to)
     const record = resolveAddress(tx.record, accounts)
     const abi = abis[tx.record.abi]
 
@@ -95,10 +96,11 @@ export async function replayTransaction (transaction: Transaction, recorderData:
     }
 
     try {
-      const txData = { ...record, data: { dataHex: data.data, funArgs: tx.record.parameters, funAbi: fnABI, contractBytecode: tx.record.bytecode, contractName: tx.record.contractName, timestamp: tx.timestamp, contractABI: recorderData._abis[transaction.record.abi], value: record.value, recorderTo: tx.record.to } }
+      const to = plugin.getWidgetState().recorderData._createdContractsReverse[targetTimestamp]
+      const txData = { to, data: { dataHex: data.data, funArgs: tx.record.parameters, funAbi: fnABI, contractBytecode: tx.record.bytecode, contractName: tx.record.contractName, timestamp: tx.timestamp, contractABI: recorderData._abis[transaction.record.abi], value: record.value } }
       const result = await plugin.call('blockchain', 'runTx', txData)
 
-      if (txData.type === 'constructor') await plugin.call('udappDeployedContracts', 'addInstance', result.address, txData.data.contractABI, txData.contractName, txData.data)
+      if (tx.record.type === 'constructor') await plugin.call('udappDeployedContracts', 'addInstance', result.address, txData.data.contractABI, tx.record.contractName, txData.data)
     } catch (err) {
       console.error(err)
       throw new Error(err + '. Execution failed at ' + record.targetAddress)

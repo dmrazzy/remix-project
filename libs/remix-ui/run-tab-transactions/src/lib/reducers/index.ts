@@ -145,9 +145,9 @@ export const transactionsReducer = (state: TransactionsWidgetState, action: Acti
       }
     } else {
       // Contract interaction - reference the contract that was deployed
-      const creationTimestamp = state.recorderData._createdContracts[to]
+      const creationTimestamp = newState.recorderData._createdContracts[to]
       record.to = `created{${creationTimestamp}}`
-      record.abi = state.recorderData._contractABIReferences[creationTimestamp]
+      record.abi = newState.recorderData._contractABIReferences[creationTimestamp]
       record.targetAddress = to
     }
 
