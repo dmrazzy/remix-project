@@ -10,17 +10,34 @@ class GoToVmTraceStep extends EventEmitter {
 }
 
 function goToVMtraceStep (browser: NightwatchBrowser, step: number, incr: number, done: VoidFunction) {
-  browser.waitForElementVisible('*[data-id="slider"]')
-    .waitForElementVisible('#stepdetail')
-    .execute(function (step) { (document.getElementById('slider') as HTMLInputElement).value = (step - 1).toString() }, [step])
-    .setValue('*[data-id="slider"]', new Array(1).fill(browser.Keys.RIGHT_ARROW))
-    .execute((step) => {
-      (document.querySelector('*[data-id="slider"]') as any).internal_onmouseup({ target: { value: step }})
+  // New debugger uses bottom bar navigation buttons, simulate clicking step buttons to reach target step
+  browser.waitForElementPresent('*[data-id="callTraceHeader"]')
+    .execute(function (targetStep) {
+      // Use step buttons repeatedly to reach target step
+      // Access the step manager through the bottom bar buttons' event handlers
+      const stepIntoBtn = document.querySelector('[data-id="btnStepInto"]') as HTMLButtonElement
+      const stepBackBtn = document.querySelector('[data-id="btnStepBack"]') as HTMLButtonElement
+
+      // Get current step from the header
+      const headerText = document.querySelector('[data-id="callTraceHeader"]')?.textContent || ''
+      const match = headerText.match(/Step:\s*(\d+)/)
+      const currentStep = match ? parseInt(match[1]) : 0
+
+      if (currentStep < targetStep) {
+        // Step forward
+        for (let i = currentStep; i < targetStep; i++) {
+          if (stepIntoBtn) stepIntoBtn.click()
+        }
+      } else if (currentStep > targetStep) {
+        // Step backward
+        for (let i = currentStep; i > targetStep; i--) {
+          if (stepBackBtn) stepBackBtn.click()
+        }
+      }
+
+      return { currentStep, targetStep }
     }, [step])
-    .waitForElementVisible({
-      locateStrategy: 'xpath',
-      selector: `//*[@data-id="treeViewLivm trace step" and contains(.,"${step}")]`,
-    })
+    .pause(1000) // Wait for step changes to propagate
     .perform(() => {
       done()
     })

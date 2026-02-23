@@ -344,6 +344,7 @@ export const DebugLayout = ({
                 className={`fas ${isExpanded ? 'fa-minus-square' : 'fa-plus-square'} json-expand-icon`}
                 onClick={() => toggleObjectPath(path)}
                 style={{ cursor: 'pointer', userSelect: 'none' }}
+                data-id={`${key}-expand-icon`}
               />
             )}
             {!hasItems && <span className="json-expand-icon-placeholder"></span>}
@@ -354,7 +355,7 @@ export const DebugLayout = ({
             {!hasItems && <span className="json-bracket">]</span>}
           </div>
           {isExpanded && hasItems && (
-            <div className="json-nested">
+            <div data-id={`${key}-json-nested`}className="json-nested">
               {value.map((item, index) => {
                 const itemPath = `${path}[${index}]`
                 if (isObject(item)) {
@@ -363,7 +364,7 @@ export const DebugLayout = ({
                 return (
                   <div key={itemPath} className="json-line" style={{ marginLeft: `${(depth + 1) * 12}px` }}>
                     <span className="json-expand-icon-placeholder"></span>
-                    <span className="json-value">{JSON.stringify(item)}</span>
+                    <span data-id={`${key}-json-value`} className="json-value">{JSON.stringify(item)}</span>
                     {index < value.length - 1 && <span className="json-comma">,</span>}
                   </div>
                 )
@@ -389,6 +390,7 @@ export const DebugLayout = ({
                 className={`fas ${isExpanded ? 'fa-minus-square' : 'fa-plus-square'} json-expand-icon`}
                 onClick={() => toggleObjectPath(path)}
                 style={{ cursor: 'pointer', userSelect: 'none' }}
+                data-id={`${key}-expand-icon`}
               />
             )}
             {!hasKeys && <span className="json-expand-icon-placeholder"></span>}
@@ -399,7 +401,7 @@ export const DebugLayout = ({
             {!hasKeys && <span className="json-bracket">{'}'}</span>}
           </div>
           {isExpanded && hasKeys && (
-            <div className="json-nested">
+            <div data-id={`${key}-json-nested`} className="json-nested">
               {keys.map((objKey, index) => {
                 const objPath = `${path}.${objKey}`
                 if (isObject(value[objKey])) {
@@ -410,7 +412,7 @@ export const DebugLayout = ({
                     <span className="json-expand-icon-placeholder"></span>
                     <span className="json-key">{objKey}</span>
                     <span className="json-separator">: </span>
-                    <span className="json-value">{JSON.stringify(value[objKey])}</span>
+                    <span data-id={`${objKey}-json-value`} className="json-value">{JSON.stringify(value[objKey])}</span>
                     {index < keys.length - 1 && <span className="json-comma">,</span>}
                   </div>
                 )
@@ -431,7 +433,7 @@ export const DebugLayout = ({
           <span className="json-expand-icon-placeholder"></span>
           <span className="json-key">{key}</span>
           <span className="json-separator">: </span>
-          <span className="json-value">{JSON.stringify(value)}</span>
+          <span data-id={`${key}-json-value`} className="json-value">{JSON.stringify(value)}</span>
         </div>
       )
     }
@@ -873,22 +875,24 @@ export const DebugLayout = ({
       }
 
       return (
-        <div className="debug-object-content json-renderer">
+        <div className="debug-object-content json-renderer" data-id="stateLocalsContent">
           <div className="json-line">
             <span className="json-bracket">{'{'}</span>
           </div>
           {Object.keys(objectData).map((key) => {
             const value = objectData[key]
             const path = `root.${key}`
+            // Add data-id for e2e tests
+            const dataId = key === 'locals' ? 'solidityLocals' : key === 'state' ? 'solidityState' : undefined
             if (isObject(value)) {
-              return renderJsonValue(value, key, path, 1)
+              return <div key={path} data-id={dataId}>{renderJsonValue(value, key, path, 1)}</div>
             }
             return (
-              <div key={path} className="json-line" style={{ marginLeft: '12px' }}>
+              <div key={path} className="json-line" style={{ marginLeft: '12px' }} data-id={dataId}>
                 <span className="json-expand-icon-placeholder"></span>
                 <span className="json-key">{key}</span>
                 <span className="json-separator">: </span>
-                <span className="json-value">{JSON.stringify(value)}</span>
+                <span data-id={`${key}-json-value`} className="json-value">{JSON.stringify(value)}</span>
                 {key !== Object.keys(objectData)[Object.keys(objectData).length - 1] && <span className="json-comma">,</span>}
               </div>
             )
@@ -950,7 +954,7 @@ export const DebugLayout = ({
                 <span className="json-expand-icon-placeholder"></span>
                 <span className="json-key">callStack</span>
                 <span className="json-separator">: </span>
-                <span className="json-value">{JSON.stringify(value)}</span>
+                <span data-id={`callStack-json-value`} className="json-value">{JSON.stringify(value)}</span>
                 <span className="json-comma">,</span>
               </div>
             )
@@ -968,7 +972,7 @@ export const DebugLayout = ({
                 <span className="json-expand-icon-placeholder"></span>
                 <span className="json-key">stack</span>
                 <span className="json-separator">: </span>
-                <span className="json-value">{JSON.stringify(value)}</span>
+                <span data-id={`stack-json-value`} className="json-value">{JSON.stringify(value)}</span>
                 <span className="json-comma">,</span>
               </div>
             )
@@ -986,7 +990,7 @@ export const DebugLayout = ({
                 <span className="json-expand-icon-placeholder"></span>
                 <span className="json-key">memory</span>
                 <span className="json-separator">: </span>
-                <span className="json-value">{JSON.stringify(value)}</span>
+                <span data-id={`memory-json-value`} className="json-value">{JSON.stringify(value)}</span>
               </div>
             )
           })()}
@@ -1060,7 +1064,7 @@ export const DebugLayout = ({
           onClick={() => toggleSection('callTrace')}
           style={{ cursor: 'pointer' }}
         >
-          <h6 className="debug-section-title">
+          <h6 className="debug-section-title" data-id="callTraceHeader">
             Call Trace (Step: {stepManager?.currentStepIndex ?? 0} / {(traceData && (traceData.traceLength - 1)) || 0})
           </h6>
           <i className={`fas ${expandedSections.callTrace ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', marginRight: '1rem', color: 'var(--bs-body-color)' }}></i>

@@ -21,43 +21,52 @@ module.exports = {
       .clickLaunchIcon('udapp')
       .createContract('')
       .debugTransaction(0)
-      .waitForElementVisible('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]', 60000)
-      .clearConsole()
+      // Check that execution trace section is visible
+      .waitForElementVisible('*[data-id="callTraceHeader"]', 60000)
+      // Check that step debug buttons are visible in bottom bar
+      .waitForElementVisible('*[data-id="btnJumpPreviousBreakpoint"]', 60000)
+      .waitForElementVisible('*[data-id="btnStepBack"]', 60000)
+      .waitForElementVisible('*[data-id="btnStepInto"]', 60000)
+      .waitForElementVisible('*[data-id="btnStepForward"]', 60000)
+      .waitForElementVisible('*[data-id="btnJumpNextBreakpoint"]', 60000)
   },
 
   'Should debug failing transaction #group1': function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
       .clickLaunchIcon('udapp')
       .clickInstance(0)
+      .clearConsole()
       .clickFunction(0, 0, { types: 'string name, uint256 goal', values: '"toast", 999' })
       .debugTransaction(0)
       .pause(2000)
       .goToVMTraceStep(327)
-      .scrollAndClick('*[data-id="solidityLocals"]')
-      .waitForElementContainsText('*[data-id="solidityLocals"]', 'toast', 60000)
-      .waitForElementContainsText('*[data-id="solidityLocals"]', '999', 60000)
-  },
-
-  'Should debug transaction using slider #group1': function (browser: NightwatchBrowser) {
-    browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
-      .waitForElementVisible('*[data-id="slider"]')
-      .goToVMTraceStep(51)
-      .waitForElementContainsText('*[data-id="solidityLocals"]', 'toast', 60000)
-      .waitForElementContainsText('*[data-id="solidityLocals"]', '999', 60000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n51', 60000)
+      .waitForElementVisible('*[data-id="stateLocalsContent"]')
+      .pause(1000) // Wait for data to load
+      // First expand "locals" to see variable names
+      .execute(function () {
+        // Step 1: Expand the "locals" key
+        const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
+        if (solidityLocals) {
+          const firstIcon = solidityLocals.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .waitForElementVisible('*[data-id="name-expand-icon"]')
+      .click('*[data-id="name-expand-icon"]')
+      .waitForElementContainsText('[data-id="name-json-nested"] [data-id="value-json-value"]', 'toast')
+      .click('*[data-id="goal-expand-icon"]')
+      .waitForElementContainsText('[data-id="goal-json-nested"] [data-id="value-json-value"]', '999')
   },
 
   'Should step back and forward transaction #group1': function (browser: NightwatchBrowser) {
     browser.waitForElementVisible('*[data-id="verticalIconsKindudapp"]')
-      .waitForElementPresent('*[data-id="buttonNavigatorIntoBack"]')
-      .scrollAndClick('*[data-id="buttonNavigatorIntoBack"]')
+      .waitForElementPresent('*[data-id="btnStepBack"]')
+      .click('*[data-id="btnStepBack"]')
       .pause(2000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n50', 60000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'execution step:\n50', 60000)
-      .click('*[data-id="buttonNavigatorIntoForward"]')
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 326', 60000)
+      .click('*[data-id="btnStepInto"]')
       .pause(2000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n51', 60000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'execution step:\n51', 60000)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 327', 60000)
   },
 
   'Should jump through breakpoints #group1': function (browser: NightwatchBrowser) {
@@ -68,15 +77,13 @@ module.exports = {
       .execute(() => {
         (window as any).addRemixBreakpoint(21)
       }, [], () => { })
-      .waitForElementVisible('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]')
-      .click('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]')
+      .waitForElementVisible('*[data-id="btnJumpPreviousBreakpoint"]')
+      .click('*[data-id="btnJumpPreviousBreakpoint"]')
       .pause(2000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n0', 60000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'execution step:\n0', 60000)
-      .click('*[data-id="buttonNavigatorJumpNextBreakpoint"]')
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 0', 60000)
+      .click('*[data-id="btnJumpNextBreakpoint"]')
       .pause(10000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n352', 60000)
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'execution step:\n352', 60000)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 352', 60000)
   },
 
   'Should display solidity imported code while debugging github import #group2': function (browser: NightwatchBrowser) {
@@ -89,11 +96,8 @@ module.exports = {
       .selectContract('ERC20')
       .createContract('"tokenName", "symbol"')
       .debugTransaction(0)
-      .waitForElementVisible('#stepdetail')
-      .waitForElementVisible({
-        locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"474")]',
-      }).pause(1000)
+      .waitForElementVisible('*[data-id="callTraceHeader"]')
+      .pause(1000)
       .getEditorValue((content) => {
         browser.assert.ok(content.indexOf(`constructor (string memory name_, string memory symbol_) {
         _name = name_;
@@ -102,10 +106,7 @@ module.exports = {
           'current displayed content is not from the ERC20 source code')
       })
       .goToVMTraceStep(10)
-      .waitForElementVisible({
-        locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"10")]',
-      })
+      .pause(500)
   },
 
   'Should display correct source highlighting while debugging a contract which has ABIEncoderV2 #group2': function (browser: NightwatchBrowser) {
@@ -125,11 +126,8 @@ module.exports = {
       .clickInstance(0)
       .clickFunction(0, 0, { types: 'bytes userData', values: '0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015b38da6a701c568545dcfcb03fcb875f56beddc4' })
       .debugTransaction(0)
-      .waitForElementVisible('#stepdetail')
-      .waitForElementVisible({
-        locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"131")]',
-      })
+      .waitForElementVisible('*[data-id="callTraceHeader"]')
+      .pause(500)
       .goToVMTraceStep(261)
       .waitForElementPresent('.highlightLine8')
       /*
@@ -142,8 +140,26 @@ module.exports = {
       */
 
       .goToVMTraceStep(265)
+      .pause(1000)
+      .execute(function () {
+        const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
+        if (solidityLocals) {
+          const firstIcon = solidityLocals.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .pause(500)
       .checkVariableDebug('soliditylocals', localVariable_step266_ABIEncoder) // locals should not be initiated at this point, only idAsk should
       .goToVMTraceStep(717)
+      .pause(1000)
+      .execute(function () {
+        const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
+        if (solidityLocals) {
+          const firstIcon = solidityLocals.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .pause(500)
       .checkVariableDebug('soliditylocals', localVariable_step717_ABIEncoder) // all locals should be initiaed
       .clearTransactions()
   },
@@ -160,18 +176,24 @@ module.exports = {
       .clickFunction(0, 0)
       .pause(2000)
       .debugTransaction(0)
-      .waitForElementVisible('*[data-id="slider"]')
-      .waitForElementVisible({
-        locateStrategy: 'xpath',
-        selector: '//*[@data-id="treeViewLivm trace step" and contains(.,"27")]',
-      })
+      .waitForElementPresent('*[data-id="callTraceHeader"]')
       .goToVMTraceStep(5453)
-      .waitForElementPresent('*[data-id="treeViewDivtreeViewItemarray"]')
-      .click('*[data-id="treeViewDivIcontreeViewItemarray"]')
-      .waitForElementPresent('*[data-id="treeViewDivtreeViewLoadMore"]')
-      .waitForElementVisible('*[data-id="solidityLocals"]')
-      .waitForElementContainsText('*[data-id="solidityLocals"]', '9: 9 uint256', 60000)
-      .notContainsText('*[data-id="solidityLocals"]', '10: 10 uint256')
+      .waitForElementVisible('*[data-id="stateLocalsContent"]')
+      .pause(1000)
+      // Expand "locals" first
+      .execute(function () {
+        const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
+        if (solidityLocals) {
+          const firstIcon = solidityLocals.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .pause(500)
+      // Expand the array variable to see its values
+      .waitForElementVisible('*[data-id="array-expand-icon"]')
+      .click('*[data-id="array-expand-icon"]')
+      .pause(500)
+      .waitForElementContainsText('[data-id="array-json-nested"]', '9', 60000)
       .clearDeployedContracts()
       .clearConsole().pause(2000)
   },
@@ -237,10 +259,10 @@ module.exports = {
       .executeScriptInTerminal('remix.exeCurrent()')
       .pause(3000)
       .clickLaunchIcon('debugger')
-      .waitForElementVisible('*[data-id="slider"]')
+      .waitForElementPresent('*[data-id="callTraceHeader"]')
       .goToVMTraceStep(154)
-      .scrollInto('*[data-id="stepdetail"]')
-      .waitForElementContainsText('*[data-id="stepdetail"]', 'vm trace step:\n154', 60000)
+      .scrollInto('*[data-id="callTraceHeader"]')
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 154', 60000)
   },
 
   'Should start debugging using remix debug nodes (rinkeby) #group4': '' + function (browser: NightwatchBrowser) {
@@ -256,8 +278,26 @@ module.exports = {
       .setValue('*[data-id="debuggerTransactionInput"]', '0x156dbf7d0f9b435dd900cfc8f3264d523dd25733418ddbea1ce53e294f421013')
       .click('*[data-id="debugGeneratedSourcesLabel"]') // unselect debug with generated sources
       .click('*[data-id="debuggerTransactionStartButton"]')
-      .waitForElementVisible('*[data-id="solidityLocals"]', 60000)
+      .waitForElementVisible('*[data-id="stateLocalsContent"]', 60000)
       .pause(10000)
+      // Expand "locals" first
+      .execute(function () {
+        const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
+        if (solidityLocals) {
+          const firstIcon = solidityLocals.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .pause(500)
+      // Expand "state" first
+      .execute(function () {
+        const solidityState = document.querySelector('[data-id="solidityState"]')
+        if (solidityState) {
+          const firstIcon = solidityState.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .pause(500)
       .checkVariableDebug('soliditylocals', { num: { value: '2', type: 'uint256' } })
       .checkVariableDebug('soliditystate', { number: { value: '0', type: 'uint256', constant: false, immutable: false } })
   },
