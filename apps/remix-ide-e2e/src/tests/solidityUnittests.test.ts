@@ -316,8 +316,8 @@ module.exports = {
       .waitForElementContainsText('*[data-id="sidePanelSwapitTitle"]', 'DEBUGGER', 60000)
       .waitForElementVisible('*[data-id="callTraceHeader"]', 60000)
       .goToVMTraceStep(1451)
-      .pause(9000)
-      // .getEditorValue((content) => browser.assert.ok(content.indexOf('library Assert {') !== -1)) it is difficult to determine the right step, this can be flaky
+      .pause(2000)
+      .getEditorValue((content) => browser.assert.ok(content.indexOf('library Assert {') !== -1))
       .click('*[id="debuggerTransactionStartButtonContainer"]') // stop debugging
       .openFile('tests/ballotFailedDebug_test.sol')
       .pause(2000)
