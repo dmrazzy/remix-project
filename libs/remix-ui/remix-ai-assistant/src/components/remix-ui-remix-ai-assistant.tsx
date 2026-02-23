@@ -639,17 +639,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
 
   useEffect(() => {
     const handleMCPToggle = async () => {
-      // Only toggle MCP if it's enabled via query parameter
-      if (!mcpEnabled) {
-        // Ensure MCP is disabled if query param is not set
-        try {
-          await props.plugin.call('remixAI', 'disableMCPEnhancement')
-        } catch (error) {
-          console.warn('Failed to disable MCP enhancement:', error)
-        }
-        return
-      }
-
       try {
         if (mcpEnhanced) {
           await props.plugin.call('remixAI', 'enableMCPEnhancement')
@@ -660,10 +649,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         console.warn('Failed to toggle MCP enhancement:', error)
       }
     }
-    if (mcpEnhanced !== null) { // Only call when state is initialized
-      handleMCPToggle()
-    }
-  }, [mcpEnhanced, mcpEnabled])
+    handleMCPToggle()
+  }, [mcpEnhanced])
 
   // Fetch available models everytime Ollama is selected
   useEffect(() => {
