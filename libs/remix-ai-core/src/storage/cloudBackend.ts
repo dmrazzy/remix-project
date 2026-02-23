@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /**
  * AWS S3 cloud backend for chat history synchronization
  */
@@ -36,9 +37,9 @@ export class S3ChatHistoryBackend implements IChatHistoryBackend {
   private userId: string
   private syncQueue: SyncOperation[] = []
   private isInitialized: boolean = false
-  private messageIndex: MessageIndex | null = null  // In-memory cache
-  private indexLoadPromise: Promise<void> | null = null  // Prevent concurrent loads
-  private indexDirty: boolean = false  // Track if needs persisting
+  private messageIndex: MessageIndex | null = null // In-memory cache
+  private indexLoadPromise: Promise<void> | null = null // Prevent concurrent loads
+  private indexDirty: boolean = false // Track if needs persisting
 
   constructor(config: S3Config) {
     this.bucketName = config.bucketName
@@ -450,45 +451,45 @@ export class S3ChatHistoryBackend implements IChatHistoryBackend {
    */
   private async executeSyncOperation(operation: SyncOperation): Promise<void> {
     switch (operation.type) {
-      case 'conversation':
-        if (operation.action === 'create' || operation.action === 'update') {
-          await this.saveConversation(operation.data)
-        } else if (operation.action === 'delete') {
-          await this.deleteConversation(operation.data.id)
-        }
-        break
+    case 'conversation':
+      if (operation.action === 'create' || operation.action === 'update') {
+        await this.saveConversation(operation.data)
+      } else if (operation.action === 'delete') {
+        await this.deleteConversation(operation.data.id)
+      }
+      break
 
-      case 'message':
-        if (operation.action === 'create') {
-          await this.saveMessage(operation.data)
-        } else if (operation.action === 'update') {
-          const { messageId, sentiment, conversationId } = operation.data
+    case 'message':
+      if (operation.action === 'create') {
+        await this.saveMessage(operation.data)
+      } else if (operation.action === 'update') {
+        const { messageId, sentiment, conversationId } = operation.data
 
-          // If conversationId provided, use direct update (extra optimization)
-          if (conversationId) {
-            try {
-              const key = this.getConversationKey(conversationId)
-              const data = await this.getObject(key)
-              const conversationData = JSON.parse(data) as ConversationData
+        // If conversationId provided, use direct update (extra optimization)
+        if (conversationId) {
+          try {
+            const key = this.getConversationKey(conversationId)
+            const data = await this.getObject(key)
+            const conversationData = JSON.parse(data) as ConversationData
 
-              const msgIndex = conversationData.messages.findIndex(m => m.id === messageId)
-              if (msgIndex >= 0) {
-                conversationData.messages[msgIndex].sentiment = sentiment
-                await this.putObject(key, JSON.stringify(conversationData, null, 2))
+            const msgIndex = conversationData.messages.findIndex(m => m.id === messageId)
+            if (msgIndex >= 0) {
+              conversationData.messages[msgIndex].sentiment = sentiment
+              await this.putObject(key, JSON.stringify(conversationData, null, 2))
 
-                // Update message index cache
-                this.addMessageToIndex(messageId, conversationId)
-                return
-              }
-            } catch (error) {
-              console.warn('Direct update with conversationId failed, falling back to index:', error)
+              // Update message index cache
+              this.addMessageToIndex(messageId, conversationId)
+              return
             }
+          } catch (error) {
+            console.warn('Direct update with conversationId failed, falling back to index:', error)
           }
-
-          // Fallback to index-based lookup
-          await this.updateMessageSentiment(messageId, sentiment)
         }
-        break
+
+        // Fallback to index-based lookup
+        await this.updateMessageSentiment(messageId, sentiment)
+      }
+      break
     }
   }
 
