@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import React from "react"
 import { Plugin } from "@remixproject/engine"
 import { Actions, Provider, SmartAccount, WidgetState, Account } from "../types"

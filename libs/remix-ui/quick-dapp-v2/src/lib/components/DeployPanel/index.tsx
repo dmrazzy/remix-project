@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { Form, Button, Alert, Card, Collapse, Spinner } from 'react-bootstrap';
 import { ethers } from 'ethers';
