@@ -171,9 +171,10 @@ module.exports = {
       .pause(2000)
       .debugTransaction(0)
       .waitForElementPresent('*[data-id="callTraceHeader"]')
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 27')
       .goToVMTraceStep(5453)
       .waitForElementVisible('*[data-id="stateLocalsContent"]')
-      .pause(1000)
+      .pause(2000) // Wait longer for large array to process
       // Expand "locals" first
       .execute(function () {
         const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
@@ -182,9 +183,9 @@ module.exports = {
           if (firstIcon) (firstIcon as any).click()
         }
       })
-      .pause(500)
+      .pause(2000) // Wait longer for variables to render
       // Expand the array variable to see its values
-      .waitForElementVisible('*[data-id="array-expand-icon"]')
+      .waitForElementVisible('*[data-id="array-expand-icon"]', 20000)
       .click('*[data-id="array-expand-icon"]')
       .pause(500)
       .waitForElementContainsText('[data-id="array-json-nested"]', '9', 60000)
@@ -251,11 +252,10 @@ module.exports = {
         })
       })
       .executeScriptInTerminal('remix.exeCurrent()')
-      .pause(3000)
-      .clickLaunchIcon('debugger')
-      .waitForElementPresent('*[data-id="callTraceHeader"]')
+      .pause(5000) // Wait for the API call to start debugging and open the panel      
+      .waitForElementVisible('*[data-id="callTraceHeader"]')
       .goToVMTraceStep(154)
-      .scrollInto('*[data-id="callTraceHeader"]')
+      .pause(1000)
       .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 154', 60000)
   },
 
