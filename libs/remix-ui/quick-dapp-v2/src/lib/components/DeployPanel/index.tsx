@@ -27,6 +27,7 @@ function DeployPanel(): JSX.Element {
   });
 
   const [ensName, setEnsName] = useState('');
+  const [ensNameError, setEnsNameError] = useState('');
   const [ensResult, setEnsResult] = useState({
     success: activeDapp?.deployment?.ensDomain ? `Linked: ${activeDapp.deployment.ensDomain}` : '',
     error: '',
@@ -273,9 +274,23 @@ function DeployPanel(): JSX.Element {
               <Alert variant="info">Register <strong>.remixdapp.eth</strong> on Arbitrum.</Alert>
               <Form.Group className="mb-2">
                 <div className="input-group">
-                  <Form.Control type="text" placeholder="myapp" value={ensName} onChange={(e) => { setEnsName(e.target.value.toLowerCase()); setEnsResult({ ...ensResult, success: '' }) }} />
+                  <Form.Control type="text" placeholder="myapp" value={ensName} onChange={(e) => {
+                    const val = e.target.value.toLowerCase();
+                    setEnsName(val);
+                    setEnsResult({ ...ensResult, success: '' });
+                    if (val && !/^[a-z0-9-]+$/.test(val)) {
+                      setEnsNameError('Only lowercase letters, numbers, and hyphens are allowed.');
+                    } else if (val && (val.startsWith('-') || val.endsWith('-'))) {
+                      setEnsNameError('Name cannot start or end with a hyphen.');
+                    } else if (val && val.includes('--')) {
+                      setEnsNameError('Name cannot contain consecutive hyphens.');
+                    } else {
+                      setEnsNameError('');
+                    }
+                  }} />
                   <span className="input-group-text">.remixdapp.eth</span>
                 </div>
+                {ensNameError && <small className="text-danger mt-1 d-block">{ensNameError}</small>}
               </Form.Group>
               <Button variant="secondary" className="w-100" onClick={() => {
                 const targetCid = deployResult.cid || activeDapp?.deployment?.ipfsCid;
@@ -315,7 +330,7 @@ function DeployPanel(): JSX.Element {
                   } catch (e: any) { setEnsResult(prev => ({ ...prev, error: e.message })) }
                   finally { setIsEnsLoading(false) }
                 })();
-              }} disabled={isEnsLoading || !ensName}>{isEnsLoading ? 'Processing...' : ensButtonText}</Button>
+              }} disabled={isEnsLoading || !ensName || !!ensNameError}>{isEnsLoading ? 'Processing...' : ensButtonText}</Button>
               {currentEnsDomain && (
                 <Alert variant="success" className="mt-3" style={{ wordBreak: 'break-all' }}>
                   <div className="fw-bold mb-1">
@@ -344,6 +359,10 @@ function DeployPanel(): JSX.Element {
                       </a>
                     </div>
                   )}
+                  <small className="d-block mt-2 text-muted">
+                    <i className="fas fa-info-circle me-1"></i>
+                    It may take a few minutes for the ENS link to become accessible. If not available yet, try the IPFS gateway link above.
+                  </small>
                 </Alert>
               )}
               {ensResult.error && <Alert variant="danger" className="mt-3">{ensResult.error}</Alert>}

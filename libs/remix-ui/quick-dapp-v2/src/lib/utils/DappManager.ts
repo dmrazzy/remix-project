@@ -291,6 +291,12 @@ export class DappManager {
     await this.switchToWorkspace(workspaceName);
     await new Promise(resolve => setTimeout(resolve, 300));
 
+    // Notify user about the new workspace
+    try {
+      // @ts-ignore
+      await this.plugin.call('notification', 'toast', `A new workspace '${workspaceName}' has been created for your DApp.`);
+    } catch (e) { /* non-critical */ }
+
     // Restore VM state in the new DApp workspace.
     if (vmStateSnapshot && vmProviderName) {
       const foldersToWrite = new Set([vmProviderName, 'vm-osaka']);
