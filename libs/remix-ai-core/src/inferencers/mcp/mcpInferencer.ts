@@ -697,7 +697,6 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
     if (!client.isConnected()) {
       throw new Error(`MCP server ${serverName} is not connected`);
     }
-
     return client.callTool(toolCall);
   }
 
