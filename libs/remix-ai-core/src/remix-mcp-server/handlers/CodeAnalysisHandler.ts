@@ -84,13 +84,23 @@ export class SolidityScanHandler extends BaseToolHandler {
  */
 export function createCodeAnalysisTools(): RemixToolDefinition[] {
   return [
-    {
+    /*{
       name: 'solidity_scan',
       description: 'Scan Solidity smart contracts for security vulnerabilities and code quality issues using SolidityScan API',
       inputSchema: new SolidityScanHandler().inputSchema,
       category: ToolCategory.ANALYSIS,
       permissions: ['analysis:scan', 'file:read'],
       handler: new SolidityScanHandler()
-    }
+    },
+    {
+      name: 'slither_scan',
+      description: `Scan Solidity smart contracts for security vulnerabilities and code quality issues using Slither
+  For scanning a contract by providing the source code, the tools: analyze_files_with_slither and run_detectors_with_slither should be used.
+  This tool is for scanning a contract by providing the contract name and it will fetch the source code from the compiler artefacts.`,
+      inputSchema: new SlitherHandler().inputSchema,
+      category: ToolCategory.ANALYSIS,
+      permissions: ['slither:scan', 'file:read'],
+      handler: new SlitherHandler()
+    }*/
   ];
 }
