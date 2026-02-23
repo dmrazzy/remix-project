@@ -53,13 +53,30 @@ module.exports = {
   'Debug Ballot / delegate #group1': function (browser: NightwatchBrowser) {
     browser.pause(500)
       .debugTransaction(1)
-      .waitForElementVisible('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]')
-      .click('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]')
+      .waitForElementVisible('*[data-id="callTraceHeader"]', 60000)
       .pause(2000)
-      .waitForElementVisible('#stepdetail')
       .goToVMTraceStep(144)
-      .pause(2000)
+      .pause(1000)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 144', 60000)
+      // Expand solidityState first
+      .execute(function () {
+        const solidityState = document.querySelector('[data-id="solidityState"]')
+        if (solidityState) {
+          const firstIcon = solidityState.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .pause(500)
       .checkVariableDebug('soliditystate', stateCheck)
+      // Expand solidityLocals
+      .execute(function () {
+        const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
+        if (solidityLocals) {
+          const firstIcon = solidityLocals.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .pause(500)
       .checkVariableDebug('soliditylocals', localsCheck)
   },
 

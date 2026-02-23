@@ -51,13 +51,21 @@ module.exports = {
   'Debug Ballot / delegate #group1': function (browser: NightwatchBrowser) {
     browser.pause(500)
       .debugTransaction(1)
+      .waitForElementVisible('*[data-id="callTraceHeader"]', 60000)
       .pause(2000)
-      // .waitForElementVisible('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]')
-      // .click('*[data-id="buttonNavigatorJumpPreviousBreakpoint"]') That button is disabled
-      .waitForElementVisible('#stepdetail')
       .goToVMTraceStep(20)
       .pause(1000)
-      .checkVariableDebug('callstackpanel', ['0x692a70D2e424a56D2C6C27aA97D1a86395877b3A'])
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 20', 60000)
+      // Click on Stack & Memory tab to access call stack
+      .useXpath()
+      .waitForElementVisible('//button[contains(text(), "Stack & Memory")]', 10000)
+      .click('//button[contains(text(), "Stack & Memory")]')
+      .useCss()
+      // Expand callStack using the expand icon
+      .waitForElementVisible('*[data-id="callStack-expand-icon"]', 10000)
+      .click('*[data-id="callStack-expand-icon"]')
+      .waitForElementVisible('*[data-id="callStack-json-value"]', 10000)
+      .assert.containsText('*[data-id="callStack-json-value"]', '"0x692a70D2e424a56D2C6C27aA97D1a86395877b3A"')
   },
 
   'Access Ballot via at address #group1': function (browser: NightwatchBrowser) {

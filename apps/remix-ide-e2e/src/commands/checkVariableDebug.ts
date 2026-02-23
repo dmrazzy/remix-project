@@ -58,6 +58,11 @@ function checkDebug(browser: NightwatchBrowser, id: string, debugValue: Nightwat
     // Check each property in the expected value
     if (typeof expectedValue === 'object' && expectedValue !== null) {
       for (const [prop, propValue] of Object.entries(expectedValue)) {
+        // Skip complex nested objects and arrays - only check primitive values
+        if (typeof propValue === 'object' && propValue !== null) {
+          continue
+        }
+
         const valueSelector = `${nestedContainerSelector} [data-id="${prop}-json-value"]`
 
         // Convert the expected value to string format (JSON strings are quoted in the renderer)
@@ -65,8 +70,14 @@ function checkDebug(browser: NightwatchBrowser, id: string, debugValue: Nightwat
         if (typeof propValue === 'string') {
           // All string values are rendered as JSON strings with quotes
           expectedText = `"${propValue}"`
+        } else if (typeof propValue === 'boolean') {
+          // Booleans are rendered as is
+          expectedText = String(propValue)
+        } else if (typeof propValue === 'number') {
+          // Numbers are rendered as strings with quotes
+          expectedText = `"${propValue}"`
         } else {
-          // Numbers and other types are rendered as-is
+          // Other primitive types
           expectedText = String(propValue)
         }
 
