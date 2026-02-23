@@ -684,9 +684,9 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
               </div>
             ) : (
               <>
-              <div id="journal" className="remix_ui_terminal_journal d-flex flex-column pt-3 pb-4 px-2 mx-2 me-0" data-id="terminalJournal">
-              {!terminalState.clearConsole && <TerminalWelcomeMessage storage={storage} packageJson={version} />}
-              {terminalState.journalBlocks &&
+                <div id="journal" className="remix_ui_terminal_journal d-flex flex-column pt-3 pb-4 px-2 mx-2 me-0" data-id="terminalJournal">
+                  {!terminalState.clearConsole && <TerminalWelcomeMessage storage={storage} packageJson={version} />}
+                  {terminalState.journalBlocks &&
               terminalState.journalBlocks.map((x, index) => {
                 if (x.name === EMPTY_BLOCK) {
                   return (
@@ -826,25 +826,25 @@ export const RemixUiTerminal = (props: RemixUiTerminalProps) => {
                   }
                 }
               })}
-              <div ref={messagesEndRef} />
-              </div>
-              {isOpen && (
-                <div id="terminalCli" data-id="terminalCli" className="remix_ui_terminal_cli position-absolute w-100" onClick={focusinput}>
-                  <span className="remix_ui_terminal_prompt blink mx-1 fw-bold text-dark">{'>'}</span>
-                  <input
-                    className="remix_ui_terminal_input ms-1 text-dark text-break border-0"
-                    ref={inputEl}
-                    spellCheck="false"
-                    contentEditable="true"
-                    id="terminalCliInput"
-                    data-id="terminalCliInput"
-                    onChange={(event) => onChange(event)}
-                    onKeyDown={(event) => handleKeyDown(event)}
-                    value={autoCompletState.userInput}
-                    onPaste={handlePaste}
-                  ></input>
+                  <div ref={messagesEndRef} />
                 </div>
-              )}
+                {isOpen && (
+                  <div id="terminalCli" data-id="terminalCli" className="remix_ui_terminal_cli position-absolute w-100" onClick={focusinput}>
+                    <span className="remix_ui_terminal_prompt blink mx-1 fw-bold text-dark">{'>'}</span>
+                    <input
+                      className="remix_ui_terminal_input ms-1 text-dark text-break border-0"
+                      ref={inputEl}
+                      spellCheck="false"
+                      contentEditable="true"
+                      id="terminalCliInput"
+                      data-id="terminalCliInput"
+                      onChange={(event) => onChange(event)}
+                      onKeyDown={(event) => handleKeyDown(event)}
+                      value={autoCompletState.userInput}
+                      onPaste={handlePaste}
+                    ></input>
+                  </div>
+                )}
               </>
             )}
           </div>

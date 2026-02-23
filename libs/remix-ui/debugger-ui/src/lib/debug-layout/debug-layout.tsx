@@ -831,8 +831,8 @@ export const DebugLayout = ({
           const isCurrent = i === index
           const isNext = nextIndexes && nextIndexes.includes(i)
 
-          let className = 'opcode-item'
-          let style: React.CSSProperties = {
+          const className = 'opcode-item'
+          const style: React.CSSProperties = {
             padding: '2px 4px',
             fontSize: '0.75rem',
             fontFamily: 'monospace',

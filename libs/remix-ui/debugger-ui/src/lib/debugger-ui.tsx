@@ -664,11 +664,11 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
         </div>
       )}
 
-        {state.debugging && state.sourceLocationStatus && (
-          <div className="text-warning mt-3">
-            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {state.sourceLocationStatus}
-          </div>
-        )}
+      {state.debugging && state.sourceLocationStatus && (
+        <div className="text-warning mt-3">
+          <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {state.sourceLocationStatus}
+        </div>
+      )}
 
       {state.debugging && (
         <div ref={debuggerTopRef} style={{ height: '100%' }}>

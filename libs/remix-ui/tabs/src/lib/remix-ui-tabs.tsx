@@ -881,7 +881,7 @@ export const TabsUI = (props: TabsUIProps) => {
                     }}
                     onClick={handleAskRemixAI}
                   >
-                    <img src="assets/img/remixAI_small.svg" alt="Remix AI" style={{ width: "16px", height: "16px"}} />
+                    <img src="assets/img/remixAI_small.svg" alt="Remix AI" style={{ width: "16px", height: "16px" }} />
                     <span style={{ lineHeight: "12px", position: "relative", top: "1px" }}>
                       Ask RemixAI
                     </span>
