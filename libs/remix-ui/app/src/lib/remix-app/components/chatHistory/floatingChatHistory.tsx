@@ -83,7 +83,7 @@ export const FloatingChatHistory: React.FC<FloatingChatHistoryProps> = ({
       {/* Header */}
       <div className="p-3">
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <h6 className={`mb-0 fw-normal ${theme.toLowerCase() === 'dark' ? 'text-secondary' : ''} sidebar-title`}>
+          <h6 className={`mb-0 fw-normal ${theme.toLowerCase() === 'dark' ? 'text-secondary' : ''} sidebar-title`} data-id="floating-chat-heading">
             {isMaximized ? 'Your chats' : 'Chat history'} <span className="text-muted">{filteredConversations.length}</span>
           </h6>
         </div>
