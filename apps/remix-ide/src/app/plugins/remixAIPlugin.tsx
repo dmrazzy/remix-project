@@ -27,7 +27,7 @@ const profile = {
     'getSelectedModel', 'getModelAccess', 'getOllamaModels',
     'addMCPServer', 'removeMCPServer', 'getMCPConnectionStatus', 'getMCPResources', 'getMCPTools', 'executeMCPTool',
     'enableMCPEnhancement', 'disableMCPEnhancement', 'isMCPEnabled', 'getIMCPServers',
-    'loadMCPServersFromSettings', 'clearCaches'
+    'clearCaches'
   ],
   events: [],
   icon: 'assets/img/remix-logo-blue.png',
@@ -73,8 +73,26 @@ export class RemixAIPlugin extends Plugin {
     this.contractor = ContractAgent.getInstance(this)
     this.workspaceAgent = workspaceAgent.getInstance(this)
 
-    // Load MCP servers from settings (after initialize() completes)
-    await this.loadMCPServersFromSettings();
+    // Initialize MCP servers with defaults (after initialize() completes)
+    this.mcpServers = mcpDefaultServersConfig.defaultServers;
+
+    // Initialize MCP inferencer if we have servers and remixMCPServer exists
+    if (this.mcpServers.length > 0 && this.remixMCPServer) {
+      this.mcpInferencer = new MCPInferencer(this.mcpServers, undefined, undefined, this.remixMCPServer, this.remoteInferencer);
+      this.mcpInferencer.event.on('mcpServerConnected', (serverName: string) => {
+        console.log(`[RemixAI Plugin] MCP server connected: ${serverName}`);
+      });
+      this.mcpInferencer.event.on('mcpServerError', (serverName: string, error: Error) => {
+        console.error(`[RemixAI Plugin] MCP server error (${serverName}):`, error);
+      });
+
+      // Connect to enabled servers for status tracking
+      const enabledServers = this.mcpServers.filter((s: IMCPServer) => s.enabled);
+      if (enabledServers.length > 0) {
+        await this.mcpInferencer.connectAllServers();
+        this.emit('mcpServersLoaded');
+      }
+    }
   }
 
   async initialize(remoteModel?:IRemoteModel){
@@ -139,7 +157,6 @@ export class RemixAIPlugin extends Plugin {
     let newPrompt = await this.codeExpAgent.chatCommand(prompt)
     // add workspace context
     newPrompt = !this.workspaceAgent.ctxFiles ? newPrompt : "Using the following context: ```\n" + this.workspaceAgent.ctxFiles + "```\n\n" + newPrompt
-
     let result
     if (this.mcpEnabled && this.mcpInferencer){
       return this.mcpInferencer.answer(prompt, params)
@@ -530,16 +547,12 @@ export class RemixAIPlugin extends Plugin {
   // MCP Server Management Methods
   async addMCPServer(server: IMCPServer): Promise<void> {
     try {
-      // Add to local configuration
       this.mcpServers.push(server);
 
       // If MCP inferencer is active, add the server dynamically
       if (this.mcpInferencer) {
         await this.mcpInferencer.addMCPServer(server);
       }
-
-      // Persist configuration
-      await this.call('settings', 'set', 'settings/mcp/servers', JSON.stringify(this.mcpServers));
     } catch (error) {
       console.error(`[RemixAI Plugin] Failed to add MCP server ${server.name}:`, error);
       throw error;
@@ -548,7 +561,6 @@ export class RemixAIPlugin extends Plugin {
 
   async removeMCPServer(serverName: string): Promise<void> {
     try {
-
       const serverToRemove = this.mcpServers.find(s => s.name === serverName);
       if (serverToRemove?.isBuiltIn) {
         throw new Error(`Cannot remove built-in server: ${serverName}`);
@@ -559,8 +571,6 @@ export class RemixAIPlugin extends Plugin {
       if (this.mcpInferencer) {
         await this.mcpInferencer.removeMCPServer(serverName);
       }
-
-      await this.call('settings', 'set', 'settings/mcp/servers', JSON.stringify(this.mcpServers));
     } catch (error) {
       console.error(`[RemixAI Plugin] Failed to remove MCP server ${serverName}:`, error);
       throw error;
@@ -605,70 +615,9 @@ export class RemixAIPlugin extends Plugin {
     throw new Error('MCP provider not active');
   }
 
-  async loadMCPServersFromSettings(): Promise<void> {
-    try {
-      const savedServers = await this.call('settings', 'get', 'settings/mcp/servers');
-      if (savedServers) {
-        const loadedServers = JSON.parse(savedServers);
-        // Get built-in servers from config file
-        const builtInServers: IMCPServer[] = mcpDefaultServersConfig.defaultServers.filter(s => s.isBuiltIn);
-
-        // Add built-in servers if they don't exist, or ensure they're enabled if they do
-        for (const builtInServer of builtInServers) {
-          const existingServer = loadedServers.find(s => s.name === builtInServer.name);
-          if (!existingServer) {
-            loadedServers.push(builtInServer);
-          } else if (!existingServer.enabled || !existingServer.isBuiltIn) {
-            // Force enable and mark as built-in
-            existingServer.enabled = true;
-            existingServer.isBuiltIn = true;
-          }
-        }
-
-        this.mcpServers = loadedServers;
-        const originalServers = JSON.parse(savedServers);
-        const serversChanged = loadedServers.length !== originalServers.length ||
-                               loadedServers.some(server => {
-                                 const original = originalServers.find(s => s.name === server.name);
-                                 return !original || (server.isBuiltIn && (!original.enabled || !original.isBuiltIn));
-                               });
-
-        if (serversChanged) {
-          await this.call('settings', 'set', 'settings/mcp/servers', JSON.stringify(loadedServers));
-        }
-      } else {
-        // Initialize with default MCP servers from config file
-        const defaultServers: IMCPServer[] = mcpDefaultServersConfig.defaultServers;
-        this.mcpServers = defaultServers;
-        // Save default servers to settings
-        await this.call('settings', 'set', 'settings/mcp/servers', JSON.stringify(defaultServers));
-      }
-
-      // Initialize MCP inferencer if we have servers and it's not already initialized
-      // NOTE: Always initialize if remixMCPServer exists (internal server should always connect)
-      // The mcpEnabled flag only controls whether MCP is used to enhance AI requests
-      if (this.mcpServers.length > 0 && !this.mcpInferencer && this.remixMCPServer) {
-        this.mcpInferencer = new MCPInferencer(this.mcpServers, undefined, undefined, this.remixMCPServer, this.remoteInferencer);
-        this.mcpInferencer.event.on('mcpServerConnected', (serverName: string) => {
-          console.log(`[RemixAI Plugin] MCP server connected: ${serverName}`);
-        });
-        this.mcpInferencer.event.on('mcpServerError', (serverName: string, error: Error) => {
-          console.error(`[RemixAI Plugin] MCP server error (${serverName}):`, error);
-        });
-
-        // Connect to enabled servers for status tracking
-        const enabledServers = this.mcpServers.filter((s: IMCPServer) => s.enabled);
-        if (enabledServers.length > 0) {
-          await this.mcpInferencer.connectAllServers();
-          this.emit('mcpServersLoaded');
-        }
-      }
-    } catch (error) {
-      this.mcpServers = [];
-    }
-  }
-
   async enableMCPEnhancement(): Promise<void> {
+    this.mcpEnabled = true;
+
     if (!this.mcpServers || this.mcpServers.length === 0) {
       return;
     }
@@ -688,8 +637,6 @@ export class RemixAIPlugin extends Plugin {
 
       await this.mcpInferencer.connectAllServers();
     }
-
-    this.mcpEnabled = true;
   }
 
   async disableMCPEnhancement(): Promise<void> {
