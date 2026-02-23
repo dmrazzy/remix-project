@@ -54,8 +54,12 @@ function TransactionsPortraitView() {
         transactions: widgetState.recorderData.journal,
         abis: widgetState.recorderData._abis
       }
-
-      await plugin.call('fileManager', 'writeFile', scenarioInput, JSON.stringify(scenario, null, 2))
+      await plugin.call('fileManager', 'writeFile', scenarioInput, JSON.stringify(scenario, (_: string, value: any) => {
+        if (typeof value === 'bigint') {
+          return value.toString()
+        }
+        return value
+      }, 2))
 
       // Save the scenario path to remix.config.json
       let config: any = {}

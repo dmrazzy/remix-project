@@ -1,13 +1,9 @@
 import React from 'react'
-import { trackMatomoEvent } from '@remix-api'
 // eslint-disable-next-line @nrwl/nx/enforce-module-boundaries
 import { TransactionsPlugin } from 'apps/remix-ide/src/app/udapp/udappTransactions'
 import { Actions, Transaction, RecorderData } from '../types'
 import * as remixLib from '@remix-project/remix-lib'
-import { bytesToHex } from '@ethereumjs/util'
-import { hash } from '@remix-project/remix-lib'
-import { addressToString, extractRecorderTimestamp } from '@remix-ui/helper'
-import { FuncABI } from '@remix-project/core-plugin'
+import { extractRecorderTimestamp } from '@remix-ui/helper'
 
 const format = remixLib.execution.txFormat
 const txHelper = remixLib.execution.txHelper
@@ -21,68 +17,6 @@ function resolveAddress (record: Transaction['record'], accounts: Record<string,
   }
   record.from = accounts[record.from]
   return record
-}
-
-async function runTransactions (
-  records: any[],
-  accounts: any,
-  options: any,
-  abis: any,
-  linkReferences: any,
-  recorderData: RecorderData,
-  dispatch: React.Dispatch<Actions>,
-  plugin: TransactionsPlugin
-) {
-  try {
-    for (let index = 0; index < records.length; index++) {
-
-    }
-  } finally {
-    // Execution complete
-  }
-}
-
-async function runScenario (
-  liveMode: any,
-  json: any,
-  recorderData: RecorderData,
-  dispatch: React.Dispatch<Actions>,
-  plugin: TransactionsPlugin
-) {
-  trackMatomoEvent(plugin, { category: 'run', action: 'recorder', name: 'start', isClick: true })
-
-  if (!json) {
-    trackMatomoEvent(plugin, { category: 'run', action: 'recorder', name: 'wrong-json', isClick: false })
-    throw new Error('a json content must be provided')
-  }
-  if (typeof json === 'string') {
-    try {
-      json = JSON.parse(json)
-    } catch (e) {
-      throw new Error('A scenario file is required. It must be json formatted')
-    }
-  }
-
-  let txArray
-  let accounts
-  let options
-  let abis
-  let linkReferences
-  try {
-    txArray = json.transactions || []
-    accounts = json.accounts || []
-    options = json.options || {}
-    abis = json.abis || {}
-    linkReferences = json.linkReferences || {}
-  } catch (e) {
-    throw new Error('Invalid scenario file. Please try again')
-  }
-
-  if (!txArray.length) {
-    throw new Error('No transactions found in scenario file')
-  }
-
-  // return runTransactions(txArray, accounts, options, abis, linkReferences, liveMode, recorderData, dispatch, plugin)
 }
 
 // Transaction action handlers
@@ -161,9 +95,10 @@ export async function replayTransaction (transaction: Transaction, recorderData:
     }
 
     try {
-      const txData = { ...record, data: { dataHex: data.data, funArgs: tx.record.parameters, funAbi: fnABI, contractBytecode: tx.record.bytecode, contractName: tx.record.contractName, timestamp: tx.timestamp, contractABI: recorderData._abis[transaction.record.abi], value: record.value } }
+      const txData = { ...record, data: { dataHex: data.data, funArgs: tx.record.parameters, funAbi: fnABI, contractBytecode: tx.record.bytecode, contractName: tx.record.contractName, timestamp: tx.timestamp, contractABI: recorderData._abis[transaction.record.abi], value: record.value, recorderTo: tx.record.to } }
+      const result = await plugin.call('blockchain', 'runTx', txData)
 
-      await plugin.call('blockchain', 'runTx', txData)
+      if (txData.type === 'constructor') await plugin.call('udappDeployedContracts', 'addInstance', result.address, txData.data.contractABI, txData.contractName, txData.data)
     } catch (err) {
       console.error(err)
       throw new Error(err + '. Execution failed at ' + record.targetAddress)
@@ -176,11 +111,6 @@ export async function replayTransaction (transaction: Transaction, recorderData:
 
 export async function openTransactionInTerminal (plugin: TransactionsPlugin, transaction: Transaction) {
   try {
-    await plugin.call('terminal', 'log', {
-      type: 'info',
-      value: `Transaction: ${transaction.record?.txHash}\nFunction: ${transaction.record?.name}\nStatus: ${transaction.record?.status}`
-    })
-
     // Scroll to the transaction element in the terminal and click it
     const txHash = transaction.record?.txHash
     if (txHash) {

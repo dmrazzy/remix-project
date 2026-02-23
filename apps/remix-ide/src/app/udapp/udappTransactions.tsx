@@ -37,11 +37,13 @@ export class TransactionsPlugin extends Plugin {
     return this.getWidgetState()?.recorderData.journal.length || 0
   }
 
-  async runScenario(scenario: any) {
+  async runScenario(scenarioPath: string) {
     try {
-      if (!scenario) {
+      if (!scenarioPath) {
         throw new Error('A scenario is required')
       }
+      const scenarioContent = await this.call('fileManager', 'readFile', scenarioPath)
+      const scenario = JSON.parse(scenarioContent)
 
       // Validate scenario structure
       if (!scenario.transactions || !Array.isArray(scenario.transactions)) {
@@ -50,6 +52,11 @@ export class TransactionsPlugin extends Plugin {
 
       if (scenario.transactions.length === 0) {
         throw new Error('No transactions found in scenario')
+      }
+      const dispatch = this.getDispatch?.()
+
+      if (!dispatch) {
+        throw new Error('Dispatch not available')
       }
 
       // Build RecorderData from scenario
@@ -63,31 +70,23 @@ export class TransactionsPlugin extends Plugin {
         _linkReferences: scenario.linkReferences || {}
       }
 
-      // Build _contractABIReferences and _createdContracts from transactions
       scenario.transactions.forEach((tx: Transaction) => {
-        if (tx.record.type === 'constructor' && tx.record.abi && tx.timestamp) {
-          recorderData._contractABIReferences[tx.timestamp] = tx.record.abi
+        if (tx.record.type === 'constructor') {
+          dispatch({ type: 'SET_CREATED_CONTRACT', payload: { address: tx.record.targetAddress, timestamp: tx.timestamp } })
+        }
+        if (tx.record.value && typeof tx.record.value === 'string') {
+          tx.record.value = BigInt(tx.record.value)
         }
       })
-
-      const dispatch = this.getDispatch?.()
-      if (!dispatch) {
-        throw new Error('Dispatch not available')
-      }
 
       await this.call('notification', 'toast', `Replaying ${scenario.transactions.length} transaction(s)...`)
 
       // Replay each transaction
       for (let i = 0; i < scenario.transactions.length; i++) {
         const transaction = scenario.transactions[i]
+
         try {
           await replayTransaction(transaction, recorderData, this, dispatch)
-
-          // If it's a contract deployment, update the _createdContracts
-          if (transaction.record.type === 'constructor' && transaction.record.targetAddress) {
-            recorderData._createdContracts[transaction.record.targetAddress] = transaction.timestamp
-            recorderData._createdContractsReverse[transaction.timestamp] = transaction.record.targetAddress
-          }
         } catch (error) {
           console.error(`Error replaying transaction ${i + 1}:`, error)
           await this.call('notification', 'toast', `Error replaying transaction ${i + 1}: ${error.message}`)
