@@ -15,7 +15,7 @@ const profile = {
   */
 export class TransactionsPlugin extends Plugin {
   getWidgetState: (() => TransactionsWidgetState) | null = null
-  private getDispatch: (() => React.Dispatch<Actions>) | null = null
+  private _getDispatch: (() => React.Dispatch<Actions>) | null = null
 
   constructor () {
     super(profile)
@@ -26,7 +26,11 @@ export class TransactionsPlugin extends Plugin {
   }
 
   setDispatchGetter(getter: () => React.Dispatch<Actions>) {
-    this.getDispatch = getter
+    this._getDispatch = getter
+  }
+
+  getDispatch() {
+    return this._getDispatch?.()
   }
 
   getTransactionRecorderCount() {

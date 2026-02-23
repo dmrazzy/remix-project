@@ -1,9 +1,5 @@
 import React, {useState, useEffect, useRef, useContext} from 'react' // eslint-disable-line
-import { createPortal } from 'react-dom'
 import { FormattedMessage, useIntl } from 'react-intl'
-import StepManager from './step-manager/step-manager' // eslint-disable-line
-import VmDebugger from './vm-debugger/vm-debugger' // eslint-disable-line
-import VmDebuggerHead from './vm-debugger/vm-debugger-head' // eslint-disable-line
 import SearchBar from './search-bar/search-bar' // eslint-disable-line
 import DebugLayout from './debug-layout/debug-layout' // eslint-disable-line
 import {TransactionDebugger as Debugger} from '@remix-project/remix-debug' // eslint-disable-line
@@ -70,27 +66,21 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
     })
   }
 
-  const panelsRef = useRef<HTMLDivElement>(null)
   const debuggerTopRef = useRef(null)
 
-  const handleResize = () => {
-    if (panelsRef.current && debuggerTopRef.current) {
-      panelsRef.current.style.height = window.innerHeight - debuggerTopRef.current.clientHeight - debuggerTopRef.current.offsetTop - 7 + 'px'
-    }
-  }
-
   useEffect(() => {
-    window.addEventListener('resize', handleResize)
-    // TODO: not a good way to wait on the ref doms element to be rendered of course
-    setTimeout(() => handleResize(), 2000)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [state.debugging, state.isActive])
-
-  useEffect(() => {
+    // Get the transaction recorder UI from udappTransactions plugin
     debuggerModule.call('udappTransactions', 'getUI').then((ui) => {
       setTransactionRecorderUI(ui)
+    }).catch(() => {
+      // If udappTransactions is not available, show fallback message
+      setTransactionRecorderUI(
+        <div className="alert alert-info m-3">
+          <i className="fas fa-info-circle mr-2"></i>
+          Transaction recorder is available in the Deploy & Run Transactions tab.
+        </div>
+      )
     })
-    handleResize()
 
     return unLoad()
   }, [])
@@ -529,7 +519,6 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
         })
       }
     }, 300)
-    handleResize()
 
     return debuggerInstance
   }
@@ -709,27 +698,6 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
           />
         </div>
       )}
-
-      {/* OLD DEBUGGER UI - COMMENTED OUT */}
-      {/* {state.debugging && (
-        <div className="debuggerPanels" ref={panelsRef}>
-          {state.sourceLocationStatus && (
-            <div className="text-warning px-2 py-2">
-              <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {state.sourceLocationStatus}
-            </div>
-          )}
-          <StepManager stepManager={stepManager} />
-          <VmDebuggerHead debugging={state.debugging} vmDebugger={vmDebugger} stepManager={stepManager} onShowOpcodesChange={handleShowOpcodesChange} />
-          <VmDebugger
-            debugging={state.debugging}
-            vmDebugger={vmDebugger}
-            currentBlock={state.currentBlock}
-            currentReceipt={state.currentReceipt}
-            currentTransaction={state.currentTransaction}
-          />
-          <div id="bottomSpacer" className="p-1 mt-3"></div>
-        </div>
-      )} */}
     </div>
   )
 }
