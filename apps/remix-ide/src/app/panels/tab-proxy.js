@@ -24,6 +24,7 @@ export default class TabProxy extends Plugin {
     this.themeQuality = 'dark'
     this.maximize = false
     this.isDebugging = false
+    this.canRunScenario = false
   }
 
   async onActivation () {
@@ -113,8 +114,10 @@ export default class TabProxy extends Plugin {
       }
     })
 
-    this.on('fileManager', 'currentFileChanged', (file) => {
+    this.on('fileManager', 'currentFileChanged', async (file) => {
       const workspace = this.fileManager.currentWorkspace()
+
+      await this.checkIfCanRunScenario(file)
 
       if (this.fileManager.mode === 'browser') {
         const workspacePath = workspace + '/' + file
@@ -237,7 +240,42 @@ export default class TabProxy extends Plugin {
     } catch (e) {
       console.log('theme plugin has an issue: ', e)
     }
+    try {
+      const currentFile = await this.call('fileManager', 'getCurrentFile')
+      if (currentFile) {
+        await this.checkIfCanRunScenario(currentFile)
+      }
+    } catch (error) {
+      console.error('Error getting current file:', error)
+    }
+
     this.renderComponent()
+  }
+
+  async checkIfCanRunScenario(currentFile) {
+    try {
+      if (!currentFile) {
+        this.canRunScenario = false
+        this.renderComponent()
+        return
+      }
+      const configContent = await this.call('fileManager', 'readFile', 'remix.config.json')
+      const config = JSON.parse(configContent)
+      const lastSavedScenario = config?.scenarios?.lastSavedScenario
+
+      if (lastSavedScenario) {
+        const normalizedCurrentFile = currentFile.replace(/^.*?\//, '')
+        const normalizedScenarioPath = lastSavedScenario.replace(/^.*?\//, '')
+
+        this.canRunScenario = normalizedCurrentFile === normalizedScenarioPath
+      } else {
+        this.canRunScenario = false
+      }
+      this.renderComponent()
+    } catch (error) {
+      this.canRunScenario = false
+      this.renderComponent()
+    }
   }
 
   focus (name) {
@@ -418,6 +456,7 @@ export default class TabProxy extends Plugin {
       themeQuality={state.themeQuality}
       maximize={this.maximize}
       isDebugging={state.isDebugging}
+      canRunScenario={state.canRunScenario}
     />
   }
 
@@ -454,7 +493,8 @@ export default class TabProxy extends Plugin {
       onZoomOut,
       onReady,
       themeQuality: this.themeQuality,
-      isDebugging: this.isDebugging
+      isDebugging: this.isDebugging,
+      canRunScenario: this.canRunScenario
     })
   }
 

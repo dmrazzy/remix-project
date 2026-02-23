@@ -70,8 +70,8 @@ function TransactionsPortraitView() {
       config.scenarios.lastSavedScenario = scenarioInput
 
       await plugin.call('fileManager', 'writeFile', 'remix.config.json', JSON.stringify(config, null, 2))
-
       await plugin.call('notification', 'toast', `Scenario saved to ${scenarioInput}`)
+      await plugin.call('fileManager', 'open', scenarioInput)
       dispatch({ type: 'SHOW_SAVE_DIALOG', payload: false })
     } catch (error) {
       console.error('Error saving scenario:', error)
