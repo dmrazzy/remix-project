@@ -120,7 +120,12 @@ export class FileWriteHandler extends BaseToolHandler {
       }
       await new Promise(resolve => setTimeout(resolve, 1000))
 
+      // make sure the LLM has actually updated the content if that is intended.
+      const currentContent = await plugin.call('fileManager', 'readFile', args.path)
       const cleanContent = typeof args.content === 'string' ? args.content : String(args.content)
+      if (cleanContent === currentContent && currentContent !== '') {
+        return this.createErrorResult(`File content is the same as the current content. No changes made to: ${args.path} . Is that intended? If not, makre sure the content you are passing is different from the existing content.`);
+      }
       await plugin.call('editor', 'showCustomDiff', args.path, cleanContent)
 
       const result: FileOperationResult = {
