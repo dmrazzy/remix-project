@@ -771,14 +771,18 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
     const apiDescription = apiGenerator.generateAPIDescription();
     const toolsList = apiGenerator.generateToolsList(selectedTools);
 
-    // Create single execute_tool with TypeScript API definitions
+    // Create tool names list for get_tool_schema description
+    const toolNamesList = mcpTools.map(t => `- ${t.name}`).join('\n');
+
     const executeToolDef = {
       name: "execute_tool",
       description: `Execute TypeScript code to interact with the Remix IDE API.
 
 ${apiDescription}
 
-${toolsList}`,
+${toolsList}
+
+Note: For detailed schema information about any tool, use the get_tool_schema tool.`,
       input_schema: {
         type: "object",
         properties: {
@@ -791,19 +795,53 @@ ${toolsList}`,
       }
     };
 
+    const getToolSchemaDef = {
+      name: "get_tool_schema",
+      description: `Get the full JSON schema for a specific MCP tool. This allows you to retrieve detailed parameter information, types, and requirements for any available tool.
+
+Available tools that you can query:
+${toolNamesList}
+
+Use this tool when you need:
+- Detailed parameter specifications for a tool
+- Required vs optional parameters
+- Parameter types and constraints
+- Full input schema validation rules`,
+      input_schema: {
+        type: "object",
+        properties: {
+          tool_name: {
+            type: "string",
+            description: "The name of the tool to get schema for (e.g., 'file_read', 'solidity_compile')"
+          }
+        },
+        required: ["tool_name"]
+      }
+    };
+
     // Format based on provider
     if (provider === 'anthropic') {
-      return [executeToolDef];
+      return [executeToolDef, getToolSchemaDef];
     } else {
       // OpenAI and other providers format
-      return [{
-        type: "function",
-        function: {
-          name: executeToolDef.name,
-          description: executeToolDef.description,
-          parameters: executeToolDef.input_schema
+      return [
+        {
+          type: "function",
+          function: {
+            name: executeToolDef.name,
+            description: executeToolDef.description,
+            parameters: executeToolDef.input_schema
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: getToolSchemaDef.name,
+            description: getToolSchemaDef.description,
+            parameters: getToolSchemaDef.input_schema
+          }
         }
-      }];
+      ];
     }
   }
 
@@ -833,6 +871,41 @@ ${toolsList}`,
    * Execute a tool call from the LLM
    */
   async executeToolForLLM(toolCall: IMCPToolCall, uiCallback?: any): Promise<IMCPToolResult> {
+    // Handle get_tool_schema requests
+    if (toolCall.name === 'get_tool_schema') {
+      const toolName = toolCall.arguments?.tool_name;
+      if (!toolName || typeof toolName !== 'string') {
+        return {
+          content: [{
+            type: 'text',
+            text: 'Error: get_tool_schema requires a tool_name parameter (string)'
+          }],
+          isError: true
+        };
+      }
+
+      const allTools = await this.getAvailableToolsForLLM()
+      const tool = await allTools.find(t => t.name === toolName);
+      if (!tool) {
+        const availableNames = allTools.map(t => t.name).join(', ');
+        return {
+          content: [{
+            type: 'text',
+            text: `Error: Tool '${toolName}' not found. Available tools: ${availableNames}`
+          }],
+          isError: true
+        };
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(tool, null, 2)
+        }],
+        isError: false
+      };
+    }
+
     // Handle code execution mode
     if (toolCall.name === 'execute_tool') {
       const code = toolCall.arguments?.code;
@@ -889,7 +962,7 @@ ${toolsList}`,
             const toolResult = record.result.content
               .map((c: any) => c.text || JSON.stringify(c))
               .join('\n');
-            isError = record.result?.isError
+            isError = record.result?.isError || false
 
             content.push({
               type: 'text' as const,
