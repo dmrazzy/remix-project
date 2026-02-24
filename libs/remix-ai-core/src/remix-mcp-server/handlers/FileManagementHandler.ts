@@ -125,10 +125,10 @@ export class FileReplacerHandler extends BaseToolHandler {
         return this.createErrorResult(`File not found: ${args.path}`);
       }
 
-      let originContent = await plugin.call('fileManager', 'readFile', args.path)
+      const originContent = await plugin.call('fileManager', 'readFile', args.path)
 
-      let content = originContent.replace(new RegExp(args.regEx, 'g'), args.contentToReplace)
-      
+      const content = originContent.replace(new RegExp(args.regEx, 'g'), args.contentToReplace)
+
       // make sure the LLM has actually updated the content if that is intended.
       const cleanContent = typeof content === 'string' ? content : String(content)
       if (cleanContent === originContent && originContent !== '') {

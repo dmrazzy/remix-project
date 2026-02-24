@@ -122,7 +122,7 @@ export const extractLineNumberRangesWithText = (diff: ChangeObject<string>[]) =>
 
   for (let i = 0; i < diff.length; i++) {
     const part = diff[i]
-    
+
     // Handle unchanged parts
     if (!part.added && !part.removed) {
       changes.push({ part })
@@ -138,7 +138,7 @@ export const extractLineNumberRangesWithText = (diff: ChangeObject<string>[]) =>
     if (isModification) {
       // Mark previous change as discarded and create modified change
       previousChange.discarded = true
-      
+
       changes.push({
         part,
         lineNumber: originalLineNumber - 1,
@@ -172,7 +172,7 @@ function isConsecutiveModification(previousChange: ChangeType | undefined, curre
   if (!previousChange || !previousChange.lineNumber) {
     return false
   }
-  
-  return previousChange.lineNumber === currentLineNumber - 1 && 
+
+  return previousChange.lineNumber === currentLineNumber - 1 &&
          (previousChange.type === 'removed' || previousChange.type === 'added')
 }
