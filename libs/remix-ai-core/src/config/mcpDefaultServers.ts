@@ -108,6 +108,7 @@ export const mcpDefaultServersConfig: MCPDefaultServersConfig = {
       enabled: true,
       timeout: 30000
     },
+    /*
     {
         name: 'slither',
         description: 'slither static analysis tool',
@@ -116,6 +117,6 @@ export const mcpDefaultServersConfig: MCPDefaultServersConfig = {
         autoStart: true,
         enabled: true,
         timeout: 30000
-    }
+    }*/
   ]
 };

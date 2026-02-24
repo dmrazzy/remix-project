@@ -9,15 +9,10 @@ import {
   RemixToolDefinition
 } from '../types/mcpTools';
 import { Plugin } from '@remixproject/engine';
-import { performSolidityScan } from '@remix-project/core-plugin';
 
-/**
- * Solidity Scan Tool Handler
- * Analyzes Solidity code for security vulnerabilities and code quality issues
- */
-export class SolidityScanHandler extends BaseToolHandler {
-  name = 'solidity_scan';
-  description = 'Scan Solidity smart contracts for security vulnerabilities and code quality issues using SolidityScan API';
+export class SlitherHandler extends BaseToolHandler {
+  name = 'slither_scan';
+  description = 'Scan Solidity smart contracts for security vulnerabilities and code quality issues using Slither';
   inputSchema = {
     type: 'object',
     properties: {
@@ -61,15 +56,37 @@ export class SolidityScanHandler extends BaseToolHandler {
         return this.createErrorResult(`File not found: ${args.filePath}`);
       }
 
-      // Use the core scanning function from remix-core-plugin
-      const scanReport = await performSolidityScan(plugin, args.filePath);
+      const compilationResult: any = await plugin.call('compilerArtefacts' as any, 'getCompilerAbstract', args.filePath)
+      if (!compilationResult || !compilationResult.source || !compilationResult.source.sources) {
+        return this.createErrorResult('No compilation result available for the specified file path');
+      }
+      
+      const flattened = await plugin.call('contractflattener', 'flattenContract', compilationResult.source, args.filePath, compilationResult.data, JSON.parse(compilationResult.input), false);
+
+      console.log('Flattened contract source code:\n', flattened);
+      // Call external Slither endpoint
+      // url: 'http://localhost:9005/mcp', // endpointUrls.mcpCorsProxy8443 + '/slither/mcp',
+      const response = await fetch('http://localhost:9005/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sources: { [args.filePath]: { content: flattened } },
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const scanReport = await response.json();
 
       const result = {
         success: true,
         fileName,
         scanCompletedAt: new Date().toISOString(),
-        multi_file_scan_details: scanReport.multi_file_scan_details,
-        multi_file_scan_summary: scanReport.multi_file_scan_summary
+        analysis_result: scanReport
       };
       return this.createSuccessResult(result);
 
@@ -84,14 +101,6 @@ export class SolidityScanHandler extends BaseToolHandler {
  */
 export function createCodeAnalysisTools(): RemixToolDefinition[] {
   return [
-    /*{
-      name: 'solidity_scan',
-      description: 'Scan Solidity smart contracts for security vulnerabilities and code quality issues using SolidityScan API',
-      inputSchema: new SolidityScanHandler().inputSchema,
-      category: ToolCategory.ANALYSIS,
-      permissions: ['analysis:scan', 'file:read'],
-      handler: new SolidityScanHandler()
-    },
     {
       name: 'slither_scan',
       description: `Scan Solidity smart contracts for security vulnerabilities and code quality issues using Slither
@@ -101,6 +110,6 @@ export function createCodeAnalysisTools(): RemixToolDefinition[] {
       category: ToolCategory.ANALYSIS,
       permissions: ['slither:scan', 'file:read'],
       handler: new SlitherHandler()
-    }*/
+    }
   ];
 }
