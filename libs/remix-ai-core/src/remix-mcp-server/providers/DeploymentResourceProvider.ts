@@ -129,7 +129,7 @@ export class DeploymentResourceProvider extends BaseResourceProvider {
 
   private async addContractInstances(plugin: Plugin, resources: IMCPResource[]): Promise<void> {
     try {
-      const deployedContracts:DeployedContractsByNetwork = await plugin.call('udapp' as any, 'getDeployedContracts');
+      const deployedContracts:DeployedContractsByNetwork = await plugin.call('udappDeployedContracts' as any, 'getDeployedContracts');
       for (const [networkKey, contracts] of Object.entries(deployedContracts)) {
         if (contracts && typeof contracts === 'object') {
           for (const [address, contractInfo] of Object.entries(contracts)) {
@@ -163,7 +163,7 @@ export class DeploymentResourceProvider extends BaseResourceProvider {
 
   private async getDeploymentHistory(plugin: Plugin): Promise<IMCPResourceContent> {
     try {
-      const deployedContracts:DeployedContractsByNetwork = await plugin.call('udapp' as any, 'getDeployedContracts').catch(() => ({}));
+      const deployedContracts:DeployedContractsByNetwork = await plugin.call('udappDeployedContracts' as any, 'getDeployedContracts').catch(() => ({}));
 
       // Get compilation results for contract names
       const compilationResult = await plugin.call('solidity' as any, 'getCompilationResult').catch(() => null);
@@ -225,7 +225,7 @@ export class DeploymentResourceProvider extends BaseResourceProvider {
   private async getActiveDeployments(plugin: Plugin): Promise<IMCPResourceContent> {
     try {
       // Get deployed contracts
-      const deployedContracts = await plugin.call('udapp' as any, 'getDeployedContracts').catch(() => ({}));
+      const deployedContracts = await plugin.call('udappDeployedContracts' as any, 'getDeployedContracts').catch(() => ({}));
 
       // Get current environment info
       const provider = await plugin.call('blockchain' as any, 'getCurrentProvider').catch(() => ({ displayName: 'unknown' }));
@@ -352,7 +352,7 @@ export class DeploymentResourceProvider extends BaseResourceProvider {
       }
 
       // Get deployed contracts count
-      const deployedContracts = await plugin.call('udapp' as any, 'getDeployedContracts').catch(() => ({}));
+      const deployedContracts = await plugin.call('udappDeployedContracts' as any, 'getDeployedContracts').catch(() => ({}));
       let totalDeployments = 0;
 
       for (const [, contracts] of Object.entries(deployedContracts)) {
@@ -439,7 +439,7 @@ export class DeploymentResourceProvider extends BaseResourceProvider {
   private async getDeploymentTransactions(plugin: Plugin): Promise<IMCPResourceContent> {
     try {
       // Get deployed contracts to extract transaction history
-      const deployedContracts = await plugin.call('udapp' as any, 'getDeployedContracts').catch(() => ({}));
+      const deployedContracts = await plugin.call('udappDeployedContracts' as any, 'getDeployedContracts').catch(() => ({}));
 
       // Get current network info
       const provider = await plugin.call('blockchain' as any, 'getCurrentProvider').catch(() => ({ displayName: 'unknown' }));
@@ -560,7 +560,7 @@ export class DeploymentResourceProvider extends BaseResourceProvider {
       const compilerConfig = await plugin.call('solidity' as any, 'getCurrentCompilerConfig').catch(() => ({}));
 
       // Get gas settings (approximate from recent transactions)
-      const deployedContracts = await plugin.call('udapp' as any, 'getDeployedContracts').catch(() => ({}));
+      const deployedContracts = await plugin.call('udappDeployedContracts' as any, 'getDeployedContracts').catch(() => ({}));
       let avgGasPrice = '20000000000'; // default
       let avgGasUsed = 0;
       let contractCount = 0;
@@ -634,7 +634,7 @@ export class DeploymentResourceProvider extends BaseResourceProvider {
 
     try {
       // Get deployed contracts to find this specific instance
-      const deployedContracts = await plugin.call('udapp' as any, 'getDeployedContracts').catch(() => ({}));
+      const deployedContracts = await plugin.call('udappDeployedContracts' as any, 'getDeployedContracts').catch(() => ({}));
 
       let contractInfo = null;
       let networkKey = null;

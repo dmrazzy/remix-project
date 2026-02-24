@@ -18,7 +18,8 @@ import { ResourceScoring } from "../../services/resourceScoring";
 import { CodeExecutor } from "./codeExecutor";
 import { ToolApiGenerator } from "./toolApiGenerator";
 import { MCPClient } from "./mcpClient";
-import { SimpleToolSelector } from "../../services/simpleToolSelector";
+import { WeightedToolSelector, IChatMessage } from "../../services/weightedToolSelector";
+import { buildChatPrompt } from "../../prompts/promptBuilder";
 
 // Helper function to track events using MatomoManager instance
 function trackMatomoEvent(category: string, action: string, name: string) {
@@ -49,7 +50,8 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
   private remixMCPServer?: any; // Internal RemixMCPServer instance
   private MAX_TOOL_EXECUTIONS = 10;
   private baseInferencer: RemoteInferencer; // The actual inferencer to use (could be Ollama or Remote)
-  private toolSelector: SimpleToolSelector = new SimpleToolSelector();
+  private toolSelector: WeightedToolSelector = new WeightedToolSelector();
+  MAXTOOLS = 25
 
   constructor(servers: IMCPServer[] = [], apiUrl?: string, completionUrl?: string, remixMCPServer?: any, baseInferencer?: RemoteInferencer) {
     super(apiUrl, completionUrl);
@@ -381,7 +383,7 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
     const enrichedPrompt = mcpContext ? `${mcpContext}\n\n${prompt}` : prompt;
 
     // Add available tools to the request in LLM format (with prompt for tool selection)
-    const llmFormattedTools = await this.getToolsForLLMRequest(options.provider, prompt);
+    const llmFormattedTools = await this.getToolsForLLMRequest(options.provider, prompt, buildChatPrompt());
     const enhancedOptions = {
       ...options,
       tools: llmFormattedTools.length > 0 ? llmFormattedTools : undefined,
@@ -700,9 +702,6 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
     return client.callTool(toolCall);
   }
 
-  /**
-   * Infer tool category from tool name (simple heuristic)
-   */
   private inferToolCategory(toolName: string): string {
     const name = toolName.toLowerCase()
     if (name.includes('compile')) return 'compilation'
@@ -738,24 +737,26 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
     return allTools;
   }
 
-  async getToolsForLLMRequest(provider?: string, prompt?: string): Promise<any[]> {
+  async getToolsForLLMRequest(provider?: string, prompt?: string, chatHistory?: IChatMessage[]): Promise<any[]> {
     const mcpTools = await this.getAvailableToolsForLLM();
     console.log('[MCPInferencer] Total available tools:', mcpTools.length)
 
     if (mcpTools.length === 0) return [];
 
-    // Use keyword-based tool selection if prompt provided and more than 15 tools
+    // Use weighted tool selection if prompt provided and more than threshold tools
     let selectedTools = mcpTools;
-    if (prompt && mcpTools.length > 15) {
+    if (prompt && mcpTools.length > this.MAXTOOLS) {
       try {
-        selectedTools = this.toolSelector.selectTools(mcpTools, prompt, 15);
+        // Use weighted selector with chat history for improved tool selection
+        selectedTools = this.toolSelector.selectTools(mcpTools, prompt, this.MAXTOOLS, chatHistory);
 
         // Emit selection event for debugging/analytics
         this.event.emit('mcpToolSelection', {
           totalTools: mcpTools.length,
           selectedTools: selectedTools.map(t => t.name),
           categories: this.toolSelector.detectCategories(prompt),
-          method: 'keyword'
+          method: chatHistory && chatHistory.length > 0 ? 'weighted_with_history' : 'keyword',
+          historyLength: chatHistory?.length || 0
         });
 
         console.log(`[MCPInferencer] Tool selection: ${mcpTools.length} → ${selectedTools.length} tools (${Math.round((1 - selectedTools.length / mcpTools.length) * 100)}% reduction)`)
@@ -885,7 +886,7 @@ Use this tool when you need:
       }
 
       const allTools = await this.getAvailableToolsForLLM()
-      const tool = await allTools.find(t => t.name === toolName);
+      const tool = allTools.find(t => t.name === toolName);
       if (!tool) {
         const availableNames = allTools.map(t => t.name).join(', ');
         return {
