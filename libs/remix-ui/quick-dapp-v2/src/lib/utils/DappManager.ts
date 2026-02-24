@@ -106,7 +106,7 @@ export class DappManager {
   private async focusPlugin(): Promise<void> {
     try {
       // @ts-ignore
-      await this.plugin.call('menuicons', 'select', 'quick-dapp-v2');
+      await this.plugin.call('tabs', 'focus', 'quick-dapp-v2');
     } catch (e) {
       console.warn('[DappManager] Failed to focus plugin:', e);
     }
@@ -294,7 +294,13 @@ export class DappManager {
     // Notify user about the new workspace
     try {
       // @ts-ignore
-      await this.plugin.call('notification', 'toast', `A new workspace '${workspaceName}' has been created for your DApp.`);
+      await this.plugin.call('notification', 'modal', {
+        id: 'quick-dapp-workspace-created',
+        title: 'Workspace Created',
+        message: `A new workspace '${workspaceName}' has been created for your DApp.\n\nAll generated files will be stored in this workspace.`,
+        modalType: 'alert',
+        okLabel: 'OK',
+      });
     } catch (e) { /* non-critical */ }
 
     // Restore VM state in the new DApp workspace.

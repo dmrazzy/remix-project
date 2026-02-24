@@ -302,7 +302,7 @@ export function DeployedContractItem({ contract, index }: DeployedContractItemPr
           sourceFilePath: contract.filePath || contract.contractData?.contract?.file || ''
         })
 
-        await plugin.call('menuicons', 'select', 'quick-dapp-v2')
+        await plugin.call('tabs', 'focus', 'quick-dapp-v2')
       } catch (e) {
         console.error('[DeployedContractItem] Quick Dapp V2 call failed:', e)
         await plugin.call('notification', 'toast', 'Failed to call Quick Dapp V2 plugin.')

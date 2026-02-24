@@ -56,11 +56,14 @@ module.exports = {
       })
       .pause(500)
       .click('*[data-id="generate-website-ai-modal-footer-ok-react"]')
+      .pause(3000)
+      .waitForElementVisible('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]', 30000)
+      .click('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]')
       .pause(1000)
   },
 
   // ──────────────────────────────────
-  // Test 3: Wait for DApp generation and verify QuickDapp V2 side panel opens with dashboard
+  // Test 3: Wait for DApp generation and verify QuickDapp V2 main panel opens with dashboard
   // ──────────────────────────────────
   'Should wait for DApp generation and display dashboard #group1': function (browser: NightwatchBrowser) {
     browser
@@ -277,6 +280,9 @@ module.exports = {
       })
       .pause(500)
       .click('*[data-id="generate-website-ai-modal-footer-ok-react"]')
+      .pause(3000)
+      .waitForElementVisible('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]', 30000)
+      .click('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]')
       .pause(1000)
       .pause(10000)
       .waitForElementVisible('*[data-id="quick-dapp-dashboard"]', 180000)
@@ -287,7 +293,13 @@ module.exports = {
       .pause(1000)
       .waitForElementVisible('*[data-id="confirm-delete-one-btn"]', 5000)
       .click('*[data-id="confirm-delete-one-btn"]')
-      .pause(3000)
+      .pause(5000)
+      .execute(function () {
+        // Re-focus quick-dapp-v2 tab (deleteWorkspace shifts mainPanel focus)
+        const tab = document.querySelector('[plugin="quick-dapp-v2"]') as HTMLElement
+        if (tab) tab.click()
+      })
+      .pause(2000)
       .waitForElementVisible('*[data-id="quickdapp-getting-started"]', 30000)
       .assert.textContains('*[data-id="quickdapp-getting-started"]', 'Getting Started')
       .end()
@@ -332,6 +344,9 @@ module.exports = {
       })
       .pause(500)
       .click('*[data-id="generate-website-ai-modal-footer-ok-react"]')
+      .pause(3000)
+      .waitForElementVisible('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]', 30000)
+      .click('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]')
       .pause(10000)
       .waitForElementVisible('*[data-id="quick-dapp-dashboard"]', 180000)
       .waitForElementVisible('[data-id^="dapp-card-"]', 30000)
@@ -448,6 +463,9 @@ module.exports = {
       })
       .pause(500)
       .click('*[data-id="generate-website-ai-modal-footer-ok-react"]')
+      .pause(3000)
+      .waitForElementVisible('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]', 30000)
+      .click('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]')
       .pause(10000)
       .waitForElementVisible('*[data-id="quick-dapp-dashboard"]', 180000)
       .waitForElementNotPresent('.spinner-border', 180000)
@@ -530,6 +548,9 @@ module.exports = {
       })
       .pause(500)
       .click('*[data-id="generate-website-ai-modal-footer-ok-react"]')
+      .pause(3000)
+      .waitForElementVisible('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]', 30000)
+      .click('*[data-id="quick-dapp-workspace-created-modal-footer-ok-react"]')
       .pause(10000)
       .waitForElementVisible('*[data-id="quick-dapp-dashboard"]', 180000)
       .waitForElementVisible('[data-id^="dapp-card-"]', 30000)

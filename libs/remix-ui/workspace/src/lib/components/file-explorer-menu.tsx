@@ -295,7 +295,7 @@ export const FileExplorerMenu = (props: FileExplorerMenuProps) => {
       }
       await new Promise(resolve => setTimeout(resolve, 500))
 
-      await global.plugin.call('menuicons', 'select', 'quick-dapp-v2')
+      await global.plugin.call('tabs', 'focus', 'quick-dapp-v2')
 
       try {
         await global.plugin.call('quick-dapp-v2', 'openDapp', workspaceName)

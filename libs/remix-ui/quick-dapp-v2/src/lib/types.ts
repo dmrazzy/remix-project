@@ -67,4 +67,5 @@ export interface QuickDappV2PluginApi {
     files: any,
     image: string | null
   ) => Promise<void>;
+  consumePendingCreateDapp?: () => any;
 }

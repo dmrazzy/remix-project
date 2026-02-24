@@ -150,6 +150,8 @@ function DeployPanel(): JSX.Element {
       if (modifiedHtml.includes('</head>')) modifiedHtml = modifiedHtml.replace('</head>', `${walletScript}\n${injectionScript}\n</head>`);
       else modifiedHtml = `<html><head>${injectionScript}</head>${modifiedHtml}</html>`;
 
+      console.log("[IPFS Deploy] indexHtml length:", indexHtmlContent.length, "scriptRegexTest:", /<script type="module"[^>]*src="(?:\/|\.\/)?src\/main\.jsx"[^>]*><\/script>/.test(indexHtmlContent));
+      if (!/<script type="module"[^>]*src="(?:\/|\.\/)?src\/main\.jsx"[^>]*><\/script>/.test(indexHtmlContent)) { console.log("[IPFS Deploy] Script tags:", indexHtmlContent.match(/<script[^>]*>/g)); console.log("[IPFS Deploy] HTML head:", indexHtmlContent.substring(0, 500)); }
       const inlineScript = `<script type="module">\n${jsResult.js}\n</script>`;
       modifiedHtml = modifiedHtml.replace(/<script type="module"[^>]*src="(?:\/|\.\/)?src\/main\.jsx"[^>]*><\/script>/, inlineScript);
       modifiedHtml = modifiedHtml.replace(/<link rel="stylesheet"[^>]*href="(?:\/|\.\/)?src\/index\.css"[^>]*>/, '');

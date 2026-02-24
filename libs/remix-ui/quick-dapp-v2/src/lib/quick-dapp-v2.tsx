@@ -195,6 +195,11 @@ export function RemixUiQuickDappV2({ plugin }: RemixUiQuickDappV2Props): JSX.Ele
     plugin.event.on('dappUpdateStart', handleDappUpdateStart);
     plugin.event.on('workspaceDeleted', handleWorkspaceDeleted);
 
+    const pending = plugin.consumePendingCreateDapp?.();
+    if (pending) {
+      handleCreateDapp(pending);
+    }
+
     // Cleanup function to remove event listeners
     return () => {
       plugin.event.off('createDapp', handleCreateDapp);
@@ -287,6 +292,11 @@ export function RemixUiQuickDappV2({ plugin }: RemixUiQuickDappV2Props): JSX.Ele
         type: 'SET_DAPPS',
         payload: dappsRef.current.filter((d: DappConfig) => d.id !== dapp.id)
       });
+      // Re-focus quick-dapp-v2 tab after a delay since deleteWorkspace
+      // triggers async workspace switching that shifts mainPanel focus
+      setTimeout(async () => {
+        try { await plugin.call('tabs', 'focus', 'quick-dapp-v2'); } catch (e) {}
+      }, 500);
     } catch (e) {
       console.error('[QuickDapp] Failed to delete workspace:', e);
     }
@@ -302,6 +312,8 @@ export function RemixUiQuickDappV2({ plugin }: RemixUiQuickDappV2Props): JSX.Ele
     }
     dispatch({ type: 'SET_DAPPS', payload: []});
     dispatch({ type: 'SET_VIEW', payload: 'create' });
+    // Re-focus quick-dapp-v2 tab since deleteWorkspace shifts mainPanel focus
+    try { await plugin.call('tabs', 'focus', 'quick-dapp-v2'); } catch (e) {}
   };
 
   const renderContent = () => {

@@ -612,10 +612,22 @@ export const TabsUI = (props: TabsUIProps) => {
       const instances = await props.plugin.call('udappDeployedContracts', 'getDeployedContracts') || []
 
       const currentFileName = currentFile.split('/').pop()
-      const matchingInstances = instances.filter((inst: any) => {
+
+      let matchingInstances = instances.filter((inst: any) => {
         const instFile = inst.contractData?.contract?.file || inst.filePath || ''
-        return instFile.endsWith(currentFileName)
+        return instFile && instFile.endsWith(currentFileName)
       })
+
+      if (matchingInstances.length === 0) {
+        const baseName = currentFileName.replace('.sol', '')
+        matchingInstances = instances.filter((inst: any) =>
+          baseName.toLowerCase().includes(inst.name?.toLowerCase())
+        )
+      }
+
+      if (matchingInstances.length === 0 && instances.length > 0) {
+        matchingInstances = instances
+      }
 
       if (matchingInstances.length === 0) {
         props.plugin.call('notification', 'modal', {
@@ -732,6 +744,7 @@ export const TabsUI = (props: TabsUIProps) => {
         chainId = network?.id?.toString() || providerName
       }
 
+      await props.plugin.call('manager', 'activatePlugin', 'quick-dapp-v2')
       await props.plugin.call('quick-dapp-v2', 'createDapp', {
         description: descriptionObj.text,
         contractName: instance.name,
@@ -746,7 +759,7 @@ export const TabsUI = (props: TabsUIProps) => {
         sourceFilePath: tabsState.name
       })
 
-      await props.plugin.call('menuicons', 'select', 'quick-dapp-v2')
+      await props.plugin.call('tabs', 'focus', 'quick-dapp-v2')
 
     } catch (error) {
       if (error.message !== 'Canceled' && error.message !== 'Hide') {
