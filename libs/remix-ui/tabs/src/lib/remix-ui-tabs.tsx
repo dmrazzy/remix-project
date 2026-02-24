@@ -585,7 +585,7 @@ export const TabsUI = (props: TabsUIProps) => {
     const currentFile = tabsState.name
 
     try {
-      const instances = await props.plugin.call('udapp', 'getAllDeployedInstances') || []
+      const instances = await props.plugin.call('udappDeployedContracts', 'getDeployedContracts') || []
 
       const currentFileName = currentFile.split('/').pop()
       const matchingInstances = instances.filter((inst: any) => {

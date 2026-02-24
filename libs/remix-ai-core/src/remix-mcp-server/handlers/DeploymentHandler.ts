@@ -490,7 +490,7 @@ export class GetDeployedContractsHandler extends BaseToolHandler {
 
   async execute(args: { network?: string }, plugin: Plugin): Promise<IMCPToolResult> {
     try {
-      const deployedContracts = await plugin.call('udapp', 'getAllDeployedInstances')
+      const deployedContracts = await plugin.call('udappDeployedContracts', 'getDeployedContracts')
       return this.createSuccessResult({
         success: true,
         contracts: deployedContracts,
