@@ -2,6 +2,7 @@
  * Code Analysis Tool Handlers for Remix MCP Server
  */
 
+import { endpointUrls } from "@remix-endpoints-helper"
 import { IMCPToolResult } from '../../types/mcp';
 import { BaseToolHandler } from '../registry/RemixToolRegistry';
 import {
@@ -65,8 +66,7 @@ export class SlitherHandler extends BaseToolHandler {
 
       console.log('Flattened contract source code:\n', flattened);
       // Call external Slither endpoint
-      // url: 'http://localhost:9005/mcp', // endpointUrls.mcpCorsProxy8443 + '/slither/mcp',
-      const response = await fetch('http://localhost:9005/analyze', {
+      const response = await fetch(endpointUrls.mcpCorsProxy8443 + '/slither/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,9 +103,7 @@ export function createCodeAnalysisTools(): RemixToolDefinition[] {
   return [
     {
       name: 'slither_scan',
-      description: `Scan Solidity smart contracts for security vulnerabilities and code quality issues using Slither
-  For scanning a contract by providing the source code, the tools: analyze_files_with_slither and run_detectors_with_slither should be used.
-  This tool is for scanning a contract by providing the contract name and it will fetch the source code from the compiler artefacts.`,
+      description: `Scan Solidity smart contracts for security vulnerabilities and code quality issues using Slither.`,
       inputSchema: new SlitherHandler().inputSchema,
       category: ToolCategory.ANALYSIS,
       permissions: ['slither:scan', 'file:read'],
