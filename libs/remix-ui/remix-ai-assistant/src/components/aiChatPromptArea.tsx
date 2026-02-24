@@ -1,9 +1,13 @@
-import React from 'react'
+import React, { Dispatch } from 'react'
 import GroupListMenu from './contextOptMenu'
 import { PromptArea } from './prompt'
 import { AiAssistantType } from '../types/componentTypes'
 
 interface AiChatPromptAreaProps {
+    selectedModelId: unknown
+    handleOllamaModelSelection: Dispatch<any>
+    selectedOllamaModel: unknown
+    ollamaModels: any
     themeTracker: any
     showHistorySidebar: boolean
     isMaximized: boolean
@@ -17,7 +21,7 @@ interface AiChatPromptAreaProps {
     mcpEnabled: boolean
     mcpEnhanced: boolean
     setMcpEnhanced: React.Dispatch<React.SetStateAction<boolean>>
-    availableModels: string[]
+    availableModels: any[]
     selectedModel: any
     handleModelSelection: (modelName: string) => void
     input: string
@@ -37,10 +41,15 @@ interface AiChatPromptAreaProps {
     modelSelectorBtnRef: React.RefObject<HTMLButtonElement>
     textareaRef?: React.RefObject<HTMLTextAreaElement>
     maximizePanel: () => Promise<void>
+    setShowOllamaModelSelector: React.Dispatch<React.SetStateAction<boolean>>
+    showOllamaModelSelector: boolean
+    showModelSelector: boolean
+    modelAccess: any
+    setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
 }
 
 export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
-
+  const [showMenu, setShowMenu] = React.useState(false)
   {/* Prompt area - fixed at bottom */}
   return (
     <section
@@ -49,18 +58,38 @@ export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
       style={{ flexShrink: 0, minHeight: '140px', backgroundColor: props.showHistorySidebar && props.isMaximized === false ? (props.themeTracker?.name.toLowerCase() === 'dark' ? 'var(--bs-dark)' : 'var(--bs-light)') : 'transparent' }}
       data-theme={props.themeTracker && props.themeTracker?.name.toLowerCase()}
     >
-      {props.showAssistantOptions && (
+      {props.showModelSelector && (
         <div
           className="pt-2 mb-2 z-3 bg-light border border-text position-fixed"
           style={{ borderRadius: '8px', top: props.modelOpt.top, left: props.modelOpt.left, zIndex: 1000, minWidth: '300px', maxWidth: '400px' }}
           ref={props.menuRef}
         >
-          <div className="text-uppercase ms-2 mb-2 small">AI Assistant Provider</div>
+          <div className="text-uppercase ms-2 mb-2 small">AI Model</div>
           <GroupListMenu
-            setChoice={props.setAssistantChoice}
-            setShowOptions={props.setShowAssistantOptions}
-            choice={props.assistantChoice}
-            groupList={props.aiAssistantGroupList}
+            setChoice={props.handleModelSelection}
+            setShowOptions={props.setShowModelSelector}
+            choice={props.selectedModelId}
+            groupList={props.availableModels
+              .filter(model => {
+                // Check if user is logged in by checking for token
+                const isLoggedIn = !!localStorage.getItem('remix_access_token')
+
+                // If not logged in, only show models that don't require auth
+                if (!isLoggedIn) {
+                  return !model.requiresAuth
+                }
+
+                // If logged in, only show models the user has access to
+                return props.modelAccess.checkAccess(model.id)
+              })
+              .map(model => ({
+                label: model.name,
+                bodyText: model.description,
+                icon: 'fa-solid fa-check',
+                stateValue: model.id,
+                dataId: `ai-model-${model.id.replace(/[^a-zA-Z0-9]/g, '-')}`
+              }))
+            }
           />
           {props.mcpEnabled && (
             <div className="border-top mt-2 pt-2">
@@ -84,17 +113,17 @@ export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
           )}
         </div>
       )}
-      {props.showModelOptions && props.assistantChoice === 'ollama' && (
+      {props.showOllamaModelSelector && props.selectedModel?.provider === 'ollama' && (
         <div
           className="pt-2 mb-2 z-3 bg-light border border-text w-75 position-absolute"
           style={{ borderRadius: '8px' }}
         >
           <div className="text-uppercase ml-2 mb-2 small">Ollama Model</div>
           <GroupListMenu
-            setChoice={props.handleModelSelection}
-            setShowOptions={props.setShowModelOptions}
-            choice={props.selectedModel}
-            groupList={props.availableModels.map(model => ({
+            setChoice={props.handleOllamaModelSelection}
+            setShowOptions={props.setShowOllamaModelSelector}
+            choice={props.selectedOllamaModel}
+            groupList={props.ollamaModels.map(model => ({
               label: model,
               bodyText: `Use ${model} model`,
               icon: 'fa-solid fa-check',
@@ -123,6 +152,17 @@ export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
         assistantChoice={props.assistantChoice}
         handleSetAssistant={props.handleSetAssistant}
         themeTracker={props.themeTracker}
+        setShowOllamaModelSelector={props.setShowOllamaModelSelector}
+        showOllamaModelSelector={props.showOllamaModelSelector}
+        showModelSelector={props.showModelSelector}
+        setShowModelSelector={props.setShowModelSelector}
+        selectedModel={props.selectedModel}
+        handleOllamaModelSelection={props.handleOllamaModelSelection}
+        ollamaModels={props.ollamaModels}
+        selectedOllamaModel={props.selectedOllamaModel}
+        // setShowMenu={setShowMenu}
+        // showMenu={showMenu}
+        modelSelectorBtnRef={props.modelSelectorBtnRef}
       />
     </section>
   )

@@ -72,7 +72,7 @@ module.exports = {
     browser
       .waitForElementVisible('*[data-id="chat-history-back-btn"]')
       .click('*[data-id="chat-history-back-btn"]')
-      .waitForElementVisible('*[data-id="assistant-selector-btn"]')
+      .waitForElementVisible('*[data-assist-btn="assistant-selector-btn"]')
       .waitForElementVisible('*[data-id="remix-ai-prompt-input"]')
       .clearValue('*[data-id="remix-ai-prompt-input"]')
       .setValue('*[data-id="remix-ai-prompt-input"]', 'Second message')
