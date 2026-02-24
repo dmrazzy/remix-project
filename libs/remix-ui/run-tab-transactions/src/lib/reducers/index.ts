@@ -148,7 +148,12 @@ export const transactionsReducer = (state: TransactionsWidgetState, action: Acti
       const creationTimestamp = newState.recorderData._createdContracts[to]
       record.to = `created{${creationTimestamp}}`
       record.abi = newState.recorderData._contractABIReferences[creationTimestamp]
-      record.targetAddress = to
+      if (newState.recorderData._createdContractsReverse[creationTimestamp] === to) {
+        record.targetAddress = to
+      } else {
+        record.targetAddress = newState.recorderData._createdContractsReverse[creationTimestamp]
+        delete newState.recorderData._createdContracts[to]
+      }
     }
 
     // Replace contract addresses in parameters with tokens
@@ -185,6 +190,38 @@ export const transactionsReducer = (state: TransactionsWidgetState, action: Acti
     }
 
     return newState
+  }
+
+  case 'REMOVE_TRANSACTION': {
+    const txToRemove = state.recorderData.journal.find(tx => tx.timestamp.toString() === action.payload)
+
+    if (!txToRemove) {
+      return state
+    }
+    const newJournal = state.recorderData.journal.filter(tx => tx.timestamp.toString() !== action.payload)
+
+    if (txToRemove.record.type === 'constructor' && txToRemove.record.targetAddress) {
+      const { [txToRemove.record.targetAddress]: _, ...restCreatedContracts } = state.recorderData._createdContracts
+      const { [txToRemove.timestamp]: __, ...restCreatedContractsReverse } = state.recorderData._createdContractsReverse
+
+      return {
+        ...state,
+        recorderData: {
+          ...state.recorderData,
+          journal: newJournal,
+          _createdContracts: restCreatedContracts,
+          _createdContractsReverse: restCreatedContractsReverse
+        }
+      }
+    }
+
+    return {
+      ...state,
+      recorderData: {
+        ...state.recorderData,
+        journal: newJournal
+      }
+    }
   }
 
   case 'CLEAR_RECORDER_DATA':

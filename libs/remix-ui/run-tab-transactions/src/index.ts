@@ -1,3 +1,3 @@
 export { default as TransactionsWidget } from './lib/transactions'
 export type { Actions, RecorderData, TransactionsWidgetState, Transaction } from './lib/types'
-export { replayTransaction } from './lib/actions'
+export { replayTransaction, clearTransaction } from './lib/actions'

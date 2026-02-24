@@ -158,7 +158,12 @@ export async function openTransactionInExplorer (plugin: TransactionsPlugin, tra
   }
 }
 
-export async function clearTransaction (plugin: TransactionsPlugin, transaction: Transaction) {
-  // For now, just show a toast - you can implement actual clearing logic later
-  await plugin.call('notification', 'toast', 'Clear functionality coming soon')
+export async function clearTransaction (plugin: TransactionsPlugin, transaction: Transaction, dispatch: React.Dispatch<Actions>) {
+  try {
+    dispatch({ type: 'REMOVE_TRANSACTION', payload: transaction.timestamp.toString() })
+    await plugin.call('notification', 'toast', 'Transaction removed')
+  } catch (error) {
+    console.error('Error clearing transaction:', error)
+    await plugin.call('notification', 'toast', `Error: ${error.message}`)
+  }
 }
