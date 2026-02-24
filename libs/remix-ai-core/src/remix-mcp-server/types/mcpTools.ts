@@ -251,7 +251,7 @@ export interface CompilationResult {
   errors: any[];
   errorFiles?: any[];
   warnings: any[];
-  sources: Record<string, any>;
+  // sources: Record<string, any>; // comment out to avoid large payloads, can be added back if needed
 }
 
 export interface DeploymentResult {
