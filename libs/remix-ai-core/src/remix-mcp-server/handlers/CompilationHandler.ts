@@ -214,8 +214,8 @@ export class GetCompilationResultHandler extends BaseToolHandler {
  * Get Compilation Result Tool Handler
  */
 export class GetCompilationResultByFilePathHandler extends BaseToolHandler {
-  name = 'get_compilation_result_by_file_path';
-  description = 'Get the compilation result for a specific file path';
+  name = 'get_compilation_result_sources_by_file_path';
+  description = 'Get the compilation result sources for a specific file path';
   inputSchema = {
     type: 'object',
     properties: {
@@ -235,12 +235,18 @@ export class GetCompilationResultByFilePathHandler extends BaseToolHandler {
     try {
       const compilationResult: any = await plugin.call('compilerArtefacts' as any, 'getCompilerAbstract', args.filePath)
       if (!compilationResult) {
-        return this.createErrorResult('No compilation result available');
+        return this.createErrorResult('No compilation result available for the specified file path');
+      }
+      if (!compilationResult.source) {
+        return this.createErrorResult('No compilation result available for the specified file path');
+      }
+      if (!compilationResult.source.sources) {
+        return this.createErrorResult('No compilation result available for the specified file path');
       }
 
-      console.log('get_compilation_result_by_file_path', compilationResult)
+      console.log('get_compilation_result_sources_by_file_path', compilationResult.source.sources)
 
-      return this.createSuccessResult(compilationResult);
+      return this.createSuccessResult(compilationResult.source.sources);
     } catch (error) {
       return this.createErrorResult(`Failed to get compilation result: ${error.message}`);
     }
@@ -601,7 +607,7 @@ export function createCompilationTools(): RemixToolDefinition[] {
       handler: new GetCompilationResultHandler()
     },
     {
-      name: 'get_compilation_result_by_file_path',
+      name: 'get_compilation_result_sources_by_file_path',
       description: 'Get the compilation result for a specific file path',
       inputSchema: new GetCompilationResultByFilePathHandler().inputSchema,
       category: ToolCategory.COMPILATION,
