@@ -55,6 +55,12 @@ export interface FileReadArgs {
   path: string;
 }
 
+export interface FileReplacerArgs {
+  path: string
+  contentToReplace: string
+  regEx: string
+}
+
 export interface FileWriteArgs {
   path: string;
   content: string;

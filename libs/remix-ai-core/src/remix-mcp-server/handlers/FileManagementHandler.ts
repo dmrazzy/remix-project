@@ -14,7 +14,8 @@ import {
   FileMoveArgs,
   FileCopyArgs,
   DirectoryListArgs,
-  FileOperationResult
+  FileOperationResult,
+  FileReplacerArgs
 } from '../types/mcpTools';
 import { Plugin } from '@remixproject/engine';
 
@@ -117,7 +118,7 @@ export class FileReplacerHandler extends BaseToolHandler {
     return true;
   }
 
-  async execute(args: any, plugin: Plugin): Promise<IMCPToolResult> {
+  async execute(args: FileReplacerArgs, plugin: Plugin): Promise<IMCPToolResult> {
     try {
       const exists = await plugin.call('fileManager', 'exists', args.path)
       if (!exists) {
