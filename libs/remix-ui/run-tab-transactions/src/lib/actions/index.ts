@@ -51,8 +51,8 @@ export async function replayTransaction (transaction: Transaction, recorderData:
       for (const k in linkReferences) {
         let link = linkReferences[k]
         const timestamp = extractRecorderTimestamp(link)
-        if (timestamp && recorderData._createdContractsReverse[timestamp]) {
-          link = recorderData._createdContractsReverse[timestamp]
+        if (timestamp && plugin.getWidgetState()?.recorderData?._createdContractsReverse[timestamp]) {
+          link = plugin.getWidgetState()?.recorderData?._createdContractsReverse[timestamp]
         }
         tx.record.bytecode = format.linkLibraryStandardFromlinkReferences(k, link.replace('0x', ''), tx.record.bytecode, tx.record.linkReferences)
       }
@@ -80,8 +80,8 @@ export async function replayTransaction (transaction: Transaction, recorderData:
             isString = false
             value = JSON.stringify(value)
           }
-          for (const timestamp in recorderData._createdContractsReverse) {
-            value = value.replace(new RegExp('created\\{' + timestamp + '\\}', 'g'), recorderData._createdContractsReverse[timestamp])
+          for (const timestamp in plugin.getWidgetState()?.recorderData?._createdContractsReverse) {
+            value = value.replace(new RegExp('created\\{' + timestamp + '\\}', 'g'), plugin.getWidgetState()?.recorderData?._createdContractsReverse[timestamp])
           }
           if (!isString) value = JSON.parse(value)
           tx.record.parameters[paramIndex] = value
@@ -97,7 +97,20 @@ export async function replayTransaction (transaction: Transaction, recorderData:
 
     try {
       const to = plugin.getWidgetState().recorderData._createdContractsReverse[targetTimestamp]
-      const txData = { to, data: { dataHex: data.data, funArgs: tx.record.parameters, funAbi: fnABI, contractBytecode: tx.record.bytecode, contractName: tx.record.contractName, timestamp: tx.timestamp, contractABI: recorderData._abis[transaction.record.abi], value: record.value } }
+      const txData = {
+        to,
+        data: {
+          dataHex: data.data,
+          funArgs: tx.record.parameters,
+          funAbi: fnABI,
+          contractBytecode: tx.record.bytecode,
+          contractName: tx.record.contractName,
+          timestamp: tx.timestamp,
+          contractABI: recorderData._abis[transaction.record.abi],
+          value: record.value,
+          linkReferences: tx.record.linkReferences
+        }
+      }
       const result = await plugin.call('blockchain', 'runTx', txData)
 
       if (tx.record.type === 'constructor') await plugin.call('udappDeployedContracts', 'addInstance', result.address, txData.data.contractABI, tx.record.contractName, txData.data)

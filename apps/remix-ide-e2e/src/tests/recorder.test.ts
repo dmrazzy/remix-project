@@ -12,23 +12,26 @@ module.exports = {
     return sources
   },
 
-  'Run Scenario #group1': '' + function (browser: NightwatchBrowser) {
+  'Run Scenario using editor play button #group1': function (browser: NightwatchBrowser) {
     let addressRef
-    browser.addFile('scenario.json', { content: records })
+    browser
+      .openFile('remix.config.json')
+      .setEditorValue(configFile)
+      .addFile('scenario.json', { content: records })
       .waitForElementVisible({
         locateStrategy: 'xpath',
         selector: "//*[contains(@class, 'view-lines') and contains(.,'0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c')]"
       })
       .clickLaunchIcon('udapp')
       .selectAccount('0xCA35b7d915458EF540aDe6068dFe2F44E8fa733c') // this account will be used for this test suite
-      .click('[data-id="udappRecorderTitleExpander"]')
-      .click('[data-id="runtransaction"]')
+      .waitForElementVisible('[data-id="compile_group"]')
+      .click('[data-id="compile_group"]')
       .clickInstance(0)
       .clickInstance(1)
-      .clickFunction('getInt - call')
-      .clickFunction('getAddress - call')
-      .clickFunction('getFromLib - call')
-      .waitForElementPresent('[data-id="udapp_value"]')
+      .clickFunction(1, 0)
+      .clickFunction(1, 1)
+      .clickFunction(1, 2)
+      .waitForElementPresent('[data-id="contractItem-1"] > [data-id="udapp_tree_value"]')
       .getAddressAtPosition(1, (address) => {
         console.log('Test Recorder ' + address)
         addressRef = address
@@ -37,22 +40,26 @@ module.exports = {
         browser.verifyCallReturnValue(addressRef, ['0:uint256: 1', '0:uint256: 3456', '0:address: 0xbBF289D846208c16EDc8474705C748aff07732dB'])
           .perform(() => done())
       })
-      .click('*[data-id="deployAndRunClearInstances"]')
-
-    },
-    'Save scenario #group1': '' + function (browser: NightwatchBrowser) {
-      browser.testContracts('testRecorder.sol', sources[0]['testRecorder.sol'], ['testRecorder'])
+      .clickLaunchIcon('udapp')
+      .clearDeployedContracts()
+      .clearTransactionsRecorder()
+  },
+  'Save scenario #group1': function (browser: NightwatchBrowser) {
+    browser.testContracts('testRecorder.sol', sources[0]['testRecorder.sol'], ['testRecorder'])
       .clickLaunchIcon('udapp')
       .createContract('12')
       .clickInstance(0)
-      .clickFunction('set - transact (not payable)', { types: 'uint256 _p', values: '34' })
-      .click('.savetransaction')
-      .waitForElementVisible('[data-id="udappNotify-modal-footer-ok-react"]')
+      .clickFunction(0, 0, { types: 'uint256 _p', values: '34' })
       .execute(function () {
-        const modalOk = document.querySelector('[data-id="udappNotify-modal-footer-ok-react"]') as any
-
-        modalOk.click()
-      }).pause(1000)
+        const saveScenarioBtn = document.querySelector('[data-id="save-transactions"]') as HTMLElement
+        if (saveScenarioBtn) {
+          saveScenarioBtn.scrollIntoView({ behavior: 'auto', block: 'center' })
+        }
+      })
+      .click('[data-id="save-transactions"]')
+      .waitForElementVisible('[data-id="save-transaction-dialog-btn"]')
+      .click('[data-id="save-transaction-dialog-btn"]')
+      .pause(2000)
       .getEditorValue(function (result) {
         const parsed = JSON.parse(result)
         browser.assert.equal(JSON.stringify(parsed.transactions[0].record.parameters), JSON.stringify(scenario.transactions[0].record.parameters))
@@ -68,7 +75,7 @@ module.exports = {
       })
   },
 
-  'Record more than one contract #group2': '' + function (browser: NightwatchBrowser) {
+  'Record more than one contract #group2': function (browser: NightwatchBrowser) {
     // deploy 2 contracts (2 different ABIs), save the record, reexecute and test one of the function.
     browser
       .testContracts('multipleContracts.sol', sources[1]['multipleContracts.sol'], ['t1est', 't2est'])
@@ -80,21 +87,22 @@ module.exports = {
       .selectContract('t2est')
       .pause(1000)
       .createContract('')
-      .click('[data-id="udappRecorderTitleExpander"]')
-      .click('.savetransaction')
-      .waitForElementVisible('[data-id="udappNotify-modal-footer-ok-react"]')
       .execute(function () {
-        const modalOk = document.querySelector('[data-id="udappNotify-modal-footer-ok-react"]') as any
-
-        modalOk.click()
+        const saveScenarioBtn = document.querySelector('[data-id="save-transactions"]') as HTMLElement
+        if (saveScenarioBtn) {
+          saveScenarioBtn.scrollIntoView({ behavior: 'auto', block: 'center' })
+        }
       })
-      .pause(1000)
-      .click('*[data-id="deployAndRunClearInstances"]') // clear udapp
+      .click('[data-id="save-transactions"]')
+      .waitForElementVisible('[data-id="save-transaction-dialog-btn"]')
+      .click('[data-id="save-transaction-dialog-btn"]')
+      .clickLaunchIcon('udapp')
+      .clearDeployedContracts()
       .click('*[data-id="terminalClearConsole"]') // clear terminal
-      .click('[data-id="runtransaction"]')
+      .click('[data-id="compile_group"]')
       .clickInstance(1)
       .pause(1000)
-      .clickFunction('set2 - transact (not payable)', { types: 'uint256 _po', values: '10' })
+      .clickFunction(1, 0, { types: 'uint256 _po', values: '10' })
       .testFunction('last', {
         status: '1 Transaction mined and execution succeed',
         'decoded input': { 'uint256 _po': '10' }
@@ -499,3 +507,14 @@ contract Storage {
         return number;
     }
 }`
+
+const configFile = `
+{
+  "project": "remixDefault",
+  "version": "1.6.0-dev",
+  "IDE": "127.0.0.1",
+  "scenarios": {
+    "lastSavedScenario": "scenario.json"
+  }
+}
+`
