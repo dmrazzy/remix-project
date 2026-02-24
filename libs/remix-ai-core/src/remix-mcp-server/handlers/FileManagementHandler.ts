@@ -24,15 +24,11 @@ import { Plugin } from '@remixproject/engine';
 export class FileReadHandler extends BaseToolHandler {
   name = 'file_read';
   description = `Read contents of a file
-  Input Interface:
-  {
-    path: string;
-  }
-  Returns an object with fileContent (string) and metadata:
+  Returns an object with content (string) and metadata:
   {
     success: boolean,
     path: string,
-    fileContent: string,
+    content: string,
     size: number
   }`
   inputSchema = {
@@ -72,7 +68,7 @@ export class FileReadHandler extends BaseToolHandler {
       const result: FileOperationResult = {
         success: true,
         path: args.path,
-        fileContent: content,
+        content: content,
         size: content.length
       }
       return this.createSuccessResult(result)
@@ -87,13 +83,7 @@ export class FileReadHandler extends BaseToolHandler {
  */
 export class FileWriteHandler extends BaseToolHandler {
   name = 'file_write';
-  description = `Write content to a file
-  Input Interface:
-  {
-    path: string;
-    content: string;
-  }
-  Returns an object with success status and metadata.
+  description = `Write content to a file.
   Always wrap string with a backquote to avoid issues with special characters in the content and to ensure multiline content is properly handled.`
   inputSchema = {
     type: 'object',
