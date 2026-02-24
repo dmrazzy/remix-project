@@ -448,12 +448,13 @@ export const TabsUI = (props: TabsUIProps) => {
         await props.plugin.call('notification', 'toast', 'No file selected.')
         return
       }
-      // Execute the scenario through the udappTransactions plugin
+      setCompileState('compiling')
       await props.plugin.call('udappTransactions', 'runScenario', currentFile)
-      await props.plugin.call('notification', 'toast', 'Scenario execution started')
+      setCompileState('compiled')
     } catch (error) {
       console.error('Error running scenario:', error)
       await props.plugin.call('notification', 'toast', `Error running scenario: ${error.message}`)
+      setCompileState('idle')
     }
   }
 
@@ -763,7 +764,7 @@ export const TabsUI = (props: TabsUIProps) => {
 
   let mainLabel = ''
   if (canRunScenario) {
-    mainLabel = 'Run'
+    mainLabel = compileState === 'compiling' ? 'Running...' : 'Run'
   } else if (tabsState.currentExt === 'sql') {
     mainLabel = 'Run SQL'
   } else if (isVegaVisualization) {
@@ -864,7 +865,7 @@ export const TabsUI = (props: TabsUIProps) => {
   }
 
   if (canRunScenario) {
-    btnDisabled = false
+    btnDisabled = compileState === 'compiling'
   }
   return (
     <>

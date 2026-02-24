@@ -93,8 +93,6 @@ export class TransactionsPlugin extends Plugin {
           throw error
         }
       }
-
-      await this.call('notification', 'toast', `Successfully replayed ${scenario.transactions.length} transaction(s)`)
     } catch (error) {
       console.error('Error running scenario:', error)
       await this.call('notification', 'toast', `Error running scenario: ${error.message}`)
