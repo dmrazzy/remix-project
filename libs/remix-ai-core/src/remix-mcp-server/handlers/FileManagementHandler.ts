@@ -79,6 +79,73 @@ export class FileReadHandler extends BaseToolHandler {
 }
 
 /**
+ * File Read Tool Handler
+ */
+export class FileReplacerHandler extends BaseToolHandler {
+  name = 'file_replace';
+  description = `Replace content in a file`
+  inputSchema = {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'File path to replace content in'
+      },
+      regEx: {
+        type: 'string',
+        description: 'Regular expression pattern to match content to replace'
+      },
+      contentToReplace: {
+        type: 'string',
+        description: 'New content to replace with'
+      }
+    },
+    required: ['path', 'regEx', 'contentToReplace']
+  };
+
+  getPermissions(): string[] {
+    return ['file:write'];
+  }
+
+  validate(args: any): boolean | string {
+    const required = this.validateRequired(args, ['path', 'regEx', 'contentToReplace']);
+    if (required !== true) return required;
+
+    const types = this.validateTypes(args, { path: 'string', regEx: 'string', contentToReplace: 'string' });
+    if (types !== true) return types;
+
+    return true;
+  }
+
+  async execute(args: any, plugin: Plugin): Promise<IMCPToolResult> {
+    try {
+      const exists = await plugin.call('fileManager', 'exists', args.path)
+      if (!exists) {
+        return this.createErrorResult(`File not found: ${args.path}`);
+      }
+
+      let originContent = await plugin.call('fileManager', 'readFile', args.path)
+
+      let content = originContent.replace(new RegExp(args.regEx, 'g'), args.contentToReplace)
+      
+      // make sure the LLM has actually updated the content if that is intended.
+      const cleanContent = typeof content === 'string' ? content : String(content)
+      if (cleanContent === originContent && originContent !== '') {
+        return this.createErrorResult(`File content is the same as the current content. No changes made to: ${args.path} . Is that intended? If not, makre sure the content you are passing is different from the existing content.`);
+      }
+      await plugin.call('editor', 'showCustomDiff', args.path, cleanContent)
+
+      const result: any = {
+        success: true
+      }
+      return this.createSuccessResult(result)
+    } catch (error) {
+      return this.createErrorResult(`Failed to replace content in file: ${error.message}`)
+    }
+  }
+}
+
+/**
  * File Write Tool Handler
  */
 export class FileWriteHandler extends BaseToolHandler {
@@ -630,6 +697,14 @@ export function createFileManagementTools(): RemixToolDefinition[] {
       category: ToolCategory.FILE_MANAGEMENT,
       permissions: ['file:read'],
       handler: new FileExistsHandler()
+    },
+    {
+      name: 'file_replace',
+      description: 'Replace content in a file',
+      inputSchema: new FileReplacerHandler().inputSchema,
+      category: ToolCategory.FILE_MANAGEMENT,
+      permissions: ['file:write'],
+      handler: new FileReplacerHandler()
     }
   ];
 }

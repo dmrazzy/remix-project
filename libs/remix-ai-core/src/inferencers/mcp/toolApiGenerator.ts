@@ -22,10 +22,16 @@ If required, do JSON.parse on the text content to convert it into an object befo
 Example of correct usage:
 const toolReturnValue = (await callMCPTool('tool_name', { param1: 'value1' })).content[0].text
 
+Every tool returns a success or failed response following this schema:
+{
+  content: [{
+    type: 'text',
+    text: typeof content === 'string' ? content : JSON.stringify(content, replacer, 2)
+  }],
+  isError: false
+};
+
 Examples:
-// Reading files - returns string content directly
-const result = await callMCPTool('file_read', { path: 'contract.sol' });
-const modified = JSON.parse(result.content[0].text).content.replace('old', 'new');
 
 // Multiple tasks 1
 const compiled = await callMCPTool('solidity_compile', { file: 'contract.sol' });
