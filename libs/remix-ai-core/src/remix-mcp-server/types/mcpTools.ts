@@ -234,7 +234,7 @@ export interface FileOperationResult {
   success: boolean;
   path: string;
   message?: string;
-  content?: string;
+  fileContent?: string;
   size?: number;
   lastModified?: string;
 }
