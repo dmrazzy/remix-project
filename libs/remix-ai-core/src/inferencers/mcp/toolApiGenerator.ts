@@ -25,7 +25,7 @@ const toolReturnValue = (await callMCPTool('tool_name', { param1: 'value1' })).c
 Examples:
 // Reading files - returns string content directly
 const result = await callMCPTool('file_read', { path: 'contract.sol' });
-const modified = JSON.parse(result.content[0].text).fileContent.replace('old', 'new');
+const modified = JSON.parse(result.content[0].text).content.replace('old', 'new');
 
 // Multiple tasks 1
 const compiled = await callMCPTool('solidity_compile', { file: 'contract.sol' });
