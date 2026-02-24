@@ -58,14 +58,7 @@ export class FileReadHandler extends BaseToolHandler {
 
       const content = await plugin.call('fileManager', 'readFile', args.path)
 
-      const result: FileOperationResult = {
-        success: true,
-        path: args.path,
-        content: content,
-        size: content.length
-      };
-
-      return this.createSuccessResult(result);
+     return this.createSuccessResult(content);
     } catch (error) {
       return this.createErrorResult(`Failed to read file: ${error.message}`);
     }
