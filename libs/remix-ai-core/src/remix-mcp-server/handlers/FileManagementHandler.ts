@@ -118,6 +118,13 @@ export class FileWriteHandler extends BaseToolHandler {
   async execute(args: FileWriteArgs, plugin: Plugin): Promise<IMCPToolResult> {
     try {
       const exists = await plugin.call('fileManager', 'exists', args.path)
+      if (exists) {
+        const hasUnacceptedChanges = await plugin.call('editor', 'hasUnacceptedChanges')
+        console.log(`[FileWriteHandler] - File ${args.path} already exists. Checking for unaccepted changes: ${hasUnacceptedChanges}`);
+        if (hasUnacceptedChanges) {
+          return this.createErrorResult(`Project has unaccepted changes. Please review and accept/reject changes before overwriting.`);
+        }
+      }
       try {
         if (!exists) {await plugin.call('fileManager', 'writeFile', args.path, "")}
         await plugin.call('fileManager', 'open', args.path)
