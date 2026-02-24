@@ -61,7 +61,7 @@ export class SlitherHandler extends BaseToolHandler {
       if (!compilationResult || !compilationResult.source || !compilationResult.source.sources) {
         return this.createErrorResult('No compilation result available for the specified file path');
       }
-      
+
       const flattened = await plugin.call('contractflattener', 'flattenContract', compilationResult.source, args.filePath, compilationResult.data, JSON.parse(compilationResult.input), false);
 
       console.log('Flattened contract source code:\n', flattened);

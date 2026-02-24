@@ -116,11 +116,11 @@ export class DeployContractHandler extends BaseToolHandler {
       try {
         const compilerContracts = await plugin.call('compilerArtefacts', 'getLastCompilationResult')
         txReturn = await plugin.call('blockchain', 'deployContractAndLibraries',
-            data,
-            args.constructorArgs ? args.constructorArgs : [],
-            null,
-            compilerContracts.getData().contracts
-          )
+          data,
+          args.constructorArgs ? args.constructorArgs : [],
+          null,
+          compilerContracts.getData().contracts
+        )
       } catch (e) {
         return this.createErrorResult(`Deployment error: ${e.message || e}`)
       }
