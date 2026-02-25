@@ -16,7 +16,9 @@ import {
   AccountInfo,
   ContractInteractionResult,
   RunScriptArgs,
-  RunScriptResult
+  RunScriptResult,
+  AddInstanceArgs,
+  AddInstanceResult
 } from '../types/mcpTools';
 import { Plugin } from '@remixproject/engine';
 import { getContractData } from '@remix-project/core-plugin'
@@ -917,6 +919,108 @@ export class SimulateTransactionHandler extends BaseToolHandler {
 }
 
 /**
+ * Add Instance Tool Handler
+ */
+export class AddInstanceHandler extends BaseToolHandler {
+  name = 'add_instance';
+  description = 'Add a new contract instance to the deployed contracts list';
+  inputSchema = {
+    type: 'object',
+    properties: {
+      contractAddress: {
+        type: 'string',
+        description: 'Contract address',
+        pattern: '^0x[a-fA-F0-9]{40}$'
+      },
+      abi: {
+        type: 'array',
+        description: 'Contract ABI',
+        items: {
+          type: 'object'
+        }
+      },
+      contractName: {
+        type: 'string',
+        description: 'Contract name'
+      },
+      contractData: {
+        type: 'object',
+        description: 'Additional contract data (optional)'
+      }
+    },
+    required: ['contractAddress', 'abi', 'contractName']
+  };
+
+  getPermissions(): string[] {
+    return ['deploy:write'];
+  }
+
+  validate(args: AddInstanceArgs): boolean | string {
+    const required = this.validateRequired(args, ['contractAddress', 'abi', 'contractName']);
+    if (required !== true) return required;
+
+    const types = this.validateTypes(args, {
+      contractAddress: 'string',
+      contractName: 'string'
+    });
+    if (types !== true) return types;
+
+    if (!args.contractAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return 'Invalid contract address format';
+    }
+
+    if (!Array.isArray(args.abi)) {
+      try {
+        args.abi = JSON.parse(args.abi as any);
+        if (!Array.isArray(args.abi)) {
+          return 'ABI must be an array';
+        }
+      } catch (e) {
+        return 'ABI must be an array or valid JSON string';
+      }
+    }
+
+    return true;
+  }
+
+  async execute(args: AddInstanceArgs, plugin: Plugin): Promise<IMCPToolResult> {
+    try {
+      await plugin.call('sidePanel', 'showContent', 'udapp');
+
+      let data
+      try {
+        const compilerAbstract = await plugin.call('compilerArtefacts', 'getArtefactsByContractName', args.contractName) as any;
+        data = getContractData(args.contractName, compilerAbstract)
+      } catch (e) {}
+            
+      // Add the instance to udappDeployedContracts
+      await plugin.call(
+        'udappDeployedContracts', 
+        'addInstance', 
+        args.contractAddress, 
+        args.abi, 
+        args.contractName, 
+        data || null
+      );
+
+      const result: AddInstanceResult = {
+        success: true,
+        contractAddress: args.contractAddress,
+        contractName: args.contractName,
+        message: `Successfully added contract instance ${args.contractName} at ${args.contractAddress}`
+      };
+
+      plugin.call('notification', 'toast', `Added contract instance: ${args.contractName}`);
+
+      return this.createSuccessResult(result);
+
+    } catch (error) {
+      return this.createErrorResult(`Failed to add contract instance: ${error.message}`);
+    }
+  }
+}
+
+/**
  * Create deployment and interaction tool definitions
  */
 export function createDeploymentTools(): RemixToolDefinition[] {
@@ -1008,6 +1112,14 @@ export function createDeploymentTools(): RemixToolDefinition[] {
       category: ToolCategory.DEPLOYMENT,
       permissions: ['transaction:simulate'],
       handler: new SimulateTransactionHandler()
+    },
+    {
+      name: 'add_instance',
+      description: 'Add a new contract instance to the deployed contracts list',
+      inputSchema: new AddInstanceHandler().inputSchema,
+      category: ToolCategory.DEPLOYMENT,
+      permissions: ['deploy:write'],
+      handler: new AddInstanceHandler()
     }
   ];
 }
