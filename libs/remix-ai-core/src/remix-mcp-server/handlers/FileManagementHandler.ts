@@ -25,11 +25,11 @@ import { Plugin } from '@remixproject/engine';
 export class FileReadHandler extends BaseToolHandler {
   name = 'file_read';
   description = `Read contents of a file
-  Returns an object with content (string) and metadata:
+  Returns an object with content (string) and metadata. Pay attention: to get the actual string value from the tool output you will have to do: JSON.parse(toolOutput.content[0].text).payload
   {
     success: boolean,
     path: string,
-    content: string,
+    payload: string,
     size: number
   }`
   inputSchema = {
@@ -69,7 +69,7 @@ export class FileReadHandler extends BaseToolHandler {
       const result: FileOperationResult = {
         success: true,
         path: args.path,
-        content: content,
+        payload: content,
         size: content.length
       }
       return this.createSuccessResult(result)
@@ -634,78 +634,88 @@ export class FileExistsHandler extends BaseToolHandler {
  * Create file management tool definitions
  */
 export function createFileManagementTools(): RemixToolDefinition[] {
+  const fileReadHandler = new FileReadHandler();
+  const fileWriteHandler = new FileWriteHandler();
+  const fileCreateHandler = new FileCreateHandler();
+  const fileDeleteHandler = new FileDeleteHandler();
+  const fileMoveHandler = new FileMoveHandler();
+  const fileCopyHandler = new FileCopyHandler();
+  const directoryListHandler = new DirectoryListHandler();
+  const fileExistsHandler = new FileExistsHandler();
+  const fileReplacerHandler = new FileReplacerHandler();
+
   return [
     {
-      name: 'file_read',
-      description: 'Read contents of a file',
-      inputSchema: new FileReadHandler().inputSchema,
+      name: fileReadHandler.name,
+      description: fileReadHandler.description,
+      inputSchema: fileReadHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:read'],
-      handler: new FileReadHandler()
+      permissions: fileReadHandler.getPermissions(),
+      handler: fileReadHandler
     },
     {
-      name: 'file_write',
-      description: 'Write content to a file',
-      inputSchema: new FileWriteHandler().inputSchema,
+      name: fileWriteHandler.name,
+      description: fileWriteHandler.description,
+      inputSchema: fileWriteHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:write'],
-      handler: new FileWriteHandler()
+      permissions: fileWriteHandler.getPermissions(),
+      handler: fileWriteHandler
     },
     {
-      name: 'file_create',
-      description: 'Create a new file or directory',
-      inputSchema: new FileCreateHandler().inputSchema,
+      name: fileCreateHandler.name,
+      description: fileCreateHandler.description,
+      inputSchema: fileCreateHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:create'],
-      handler: new FileCreateHandler()
+      permissions: fileCreateHandler.getPermissions(),
+      handler: fileCreateHandler
     },
     {
-      name: 'file_delete',
-      description: 'Delete a file or directory',
-      inputSchema: new FileDeleteHandler().inputSchema,
+      name: fileDeleteHandler.name,
+      description: fileDeleteHandler.description,
+      inputSchema: fileDeleteHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:delete'],
-      handler: new FileDeleteHandler()
+      permissions: fileDeleteHandler.getPermissions(),
+      handler: fileDeleteHandler
     },
     {
-      name: 'file_move',
-      description: 'Move or rename a file or directory',
-      inputSchema: new FileMoveHandler().inputSchema,
+      name: fileMoveHandler.name,
+      description: fileMoveHandler.description,
+      inputSchema: fileMoveHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:move'],
-      handler: new FileMoveHandler()
+      permissions: fileMoveHandler.getPermissions(),
+      handler: fileMoveHandler
     },
     {
-      name: 'file_copy',
-      description: 'Copy a file or directory',
-      inputSchema: new FileCopyHandler().inputSchema,
+      name: fileCopyHandler.name,
+      description: fileCopyHandler.description,
+      inputSchema: fileCopyHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:copy'],
-      handler: new FileCopyHandler()
+      permissions: fileCopyHandler.getPermissions(),
+      handler: fileCopyHandler
     },
     {
-      name: 'directory_list',
-      description: 'List contents of a directory',
-      inputSchema: new DirectoryListHandler().inputSchema,
+      name: directoryListHandler.name,
+      description: directoryListHandler.description,
+      inputSchema: directoryListHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:read'],
-      handler: new DirectoryListHandler()
+      permissions: directoryListHandler.getPermissions(),
+      handler: directoryListHandler
     },
     {
-      name: 'file_exists',
-      description: 'Check if a file or directory exists',
-      inputSchema: new FileExistsHandler().inputSchema,
+      name: fileExistsHandler.name,
+      description: fileExistsHandler.description,
+      inputSchema: fileExistsHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:read'],
-      handler: new FileExistsHandler()
+      permissions: fileExistsHandler.getPermissions(),
+      handler: fileExistsHandler
     },
     {
-      name: 'file_replace',
-      description: 'Replace content in a file',
-      inputSchema: new FileReplacerHandler().inputSchema,
+      name: fileReplacerHandler.name,
+      description: fileReplacerHandler.description,
+      inputSchema: fileReplacerHandler.inputSchema,
       category: ToolCategory.FILE_MANAGEMENT,
-      permissions: ['file:write'],
-      handler: new FileReplacerHandler()
+      permissions: fileReplacerHandler.getPermissions(),
+      handler: fileReplacerHandler
     }
   ];
 }
