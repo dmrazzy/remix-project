@@ -24,6 +24,7 @@ declare module 'nightwatch' {
     addAtAddressInstance(address: string, isValidFormat: boolean, isValidChecksum: boolean, isAbi?: boolean): NightwatchBrowser
     clearDeployedContracts(): NightwatchBrowser
     clearDeployedContract(index: number): NightwatchBrowser
+    clearTransactionsRecorder(): NightwatchBrowser
     modalFooterOKClick(id?: string): NightwatchBrowser
     clickInstance(index: number): NightwatchBrowser
     journalLastChildIncludes(val: string): NightwatchBrowser

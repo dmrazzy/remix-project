@@ -57,7 +57,7 @@ export const TransactionRecordCard = ({ deployment }: { deployment: Transaction 
 
   const handleClear = async (tx: Transaction) => {
     setShowKebabMenu(false)
-    await clearTransaction(plugin, tx)
+    await clearTransaction(plugin, tx, dispatch)
   }
 
   return (

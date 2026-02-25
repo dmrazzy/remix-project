@@ -54,8 +54,12 @@ function TransactionsPortraitView() {
         transactions: widgetState.recorderData.journal,
         abis: widgetState.recorderData._abis
       }
-
-      await plugin.call('fileManager', 'writeFile', scenarioInput, JSON.stringify(scenario, null, 2))
+      await plugin.call('fileManager', 'writeFile', scenarioInput, JSON.stringify(scenario, (_: string, value: any) => {
+        if (typeof value === 'bigint') {
+          return value.toString()
+        }
+        return value
+      }, 2))
 
       // Save the scenario path to remix.config.json
       let config: any = {}
@@ -70,8 +74,8 @@ function TransactionsPortraitView() {
       config.scenarios.lastSavedScenario = scenarioInput
 
       await plugin.call('fileManager', 'writeFile', 'remix.config.json', JSON.stringify(config, null, 2))
-
       await plugin.call('notification', 'toast', `Scenario saved to ${scenarioInput}`)
+      await plugin.call('fileManager', 'open', scenarioInput)
       dispatch({ type: 'SHOW_SAVE_DIALOG', payload: false })
     } catch (error) {
       console.error('Error saving scenario:', error)
@@ -121,7 +125,7 @@ function TransactionsPortraitView() {
         </div>
         { !showClearAllDialog && !showSaveDialog &&
           <div>
-            <button className='btn btn-primary btn-sm small p-1' style={{ fontSize: '0.6rem' }} onClick={handleSaveClick}>
+            <button data-id="save-transactions" className='btn btn-primary btn-sm small p-1' style={{ fontSize: '0.6rem' }} onClick={handleSaveClick}>
               <i className='fa-solid fa-floppy-disk'></i> Save
             </button>
             <button
@@ -177,6 +181,7 @@ function TransactionsPortraitView() {
               style={{ backgroundColor: 'var(--bs-body-bg)', color: themeQuality === 'dark' ? 'white' : 'black', flex: 1, padding: '0.75rem', paddingRight: '3.5rem', fontSize: '0.75rem' }}
             />
             <button
+              data-id="save-transaction-dialog-btn"
               className="btn btn-sm btn-primary"
               onClick={handleSaveScenario}
               style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', zIndex: 2, fontSize: '0.65rem', fontWeight: 'bold' }}

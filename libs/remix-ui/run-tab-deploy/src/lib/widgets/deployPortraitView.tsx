@@ -275,7 +275,7 @@ function DeployPortraitView() {
                         <div className="d-flex align-items-center justify-content-between w-100">
                           <div className='d-flex flex-column align-items-start'>
                             <div className="text-truncate" style={{ color: themeQuality === 'dark' ? 'white' : 'black' }}>
-                              <span>Contract</span>
+                              <span>{ (selectedContract?.name) || 'Contract' }</span>
                             </div>
                             <div style={{ color: 'var(--bs-tertiary-color)' }}>
                               <span className="small">{extractNameFromKey(selectedContract?.filePath) || 'No contract selected'}</span>
@@ -373,7 +373,7 @@ function DeployPortraitView() {
                 </div>
 
                 {widgetState.contracts.contractList.length > 0 && (
-                  <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black' } as React.CSSProperties} data-id="contractDropdownMenu">
+                  <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', '--theme-text-color': themeQuality === 'dark' ? 'white' : 'black', padding: 0 } as React.CSSProperties} data-id="contractDropdownMenu">
                     {widgetState.contracts.contractList.map((contract, index) => (
                       <Dropdown.Item key={`${contract.filePath}:${contract.name}`} className="d-flex align-items-center contract-dropdown-item-hover" onClick={() => dispatch({ type: 'SET_SELECTED_CONTRACT_INDEX', payload: index })} data-id={`contractDropdownItem-${contract.name}`}>
                         <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">

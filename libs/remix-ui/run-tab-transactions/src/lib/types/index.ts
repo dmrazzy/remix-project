@@ -19,7 +19,7 @@ export interface Transaction {
     name: string,
     parameters: any[]
     type: 'constructor' | 'function' | 'fallback' | 'receive'
-    value: string
+    value: bigint
     timestamp: number,
     targetAddress: string,
     status: string | number | boolean,

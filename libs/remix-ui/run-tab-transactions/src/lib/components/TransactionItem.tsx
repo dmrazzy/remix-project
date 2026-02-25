@@ -47,7 +47,7 @@ export const TransactionItem = ({ transaction }: { transaction: Transaction }) =
 
   const handleClear = async (tx: Transaction) => {
     setShowKebabMenu(false)
-    await clearTransaction(plugin, tx)
+    await clearTransaction(plugin, tx, dispatch)
   }
 
   return (
