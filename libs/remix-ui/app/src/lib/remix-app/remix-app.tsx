@@ -292,6 +292,13 @@ const RemixApp = (props: IRemixAppUi) => {
 
   const handleClose = useCallback(() => {}, [])
 
+  const handleSearch = useCallback(async (query: string) => {
+    if (props.app.remixAiAssistant.searchConversations) {
+      return await props.app.remixAiAssistant.searchConversations(query)
+    }
+    return []
+  }, [props.app.remixAiAssistant])
+
   return (
     //@ts-ignore
     <IntlProvider locale={locale.code} messages={locale.messages}>
@@ -320,6 +327,7 @@ const RemixApp = (props: IRemixAppUi) => {
                       onDeleteConversation={props.app.remixAiAssistant.deleteConversation}
                       onToggleArchived={handleToggleArchived}
                       onClose={handleClose}
+                      onSearch={handleSearch}
                       isFloating={false}
                       isMaximized={false}
                       panelWidth={floatingChatWidth}

@@ -14,6 +14,7 @@ interface FloatingChatHistoryProps {
   onDeleteConversation: (id: string) => void
   onToggleArchived: () => void
   onClose: () => void
+  onSearch?: (query: string) => Promise<ConversationMetadata[]>
   isFloating?: boolean
   isMaximized?: boolean
   panelWidth?: number | string
@@ -30,6 +31,7 @@ export const FloatingChatHistory: React.FC<FloatingChatHistoryProps> = ({
   onDeleteConversation,
   onToggleArchived,
   onClose,
+  onSearch,
   isFloating = false,
   isMaximized = false,
   panelWidth,
@@ -37,6 +39,7 @@ export const FloatingChatHistory: React.FC<FloatingChatHistoryProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [filteredConversations, setFilteredConversations] = useState<ConversationMetadata[]>([])
+  const [isSearching, setIsSearching] = useState(false)
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(currentConversationId)
   const defaultPanelWidth = '350px'
   const resolvedPanelWidth = panelWidth !== undefined
@@ -51,22 +54,36 @@ export const FloatingChatHistory: React.FC<FloatingChatHistoryProps> = ({
         : { minWidth: defaultPanelWidth, backgroundColor: 'transparent' }
 
   useEffect(() => {
-    let filtered = conversations
+    let cancelled = false
 
-    // Filter by archived status
-    filtered = filtered.filter(conv => conv.archived === showArchived)
+    const doFilter = async () => {
+      if (searchQuery.trim() && onSearch) {
+        setIsSearching(true)
+        try {
+          const results = await onSearch(searchQuery)
+          if (!cancelled) {
+            setFilteredConversations(results.filter(conv => conv.archived === showArchived))
+          }
+        } finally {
+          if (!cancelled) setIsSearching(false)
+        }
+        return
+      }
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(conv =>
-        conv.title.toLowerCase().includes(query) ||
-        conv.preview.toLowerCase().includes(query)
-      )
+      let filtered = conversations.filter(conv => conv.archived === showArchived)
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase()
+        filtered = filtered.filter(conv =>
+          conv.title.toLowerCase().includes(query) ||
+          conv.preview.toLowerCase().includes(query)
+        )
+      }
+      if (!cancelled) setFilteredConversations(filtered)
     }
 
-    setFilteredConversations(filtered)
-  }, [conversations, showArchived, searchQuery])
+    doFilter()
+    return () => { cancelled = true }
+  }, [conversations, showArchived, searchQuery, onSearch])
 
   useEffect(() => {
     setSelectedConversationId(currentConversationId)
@@ -100,7 +117,7 @@ export const FloatingChatHistory: React.FC<FloatingChatHistoryProps> = ({
               color: rgba(51, 52, 70, 0.5) !important;
             }
           `}</style>
-          <i className={`fas fa-search position-absolute`} style={{ left: '20px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, pointerEvents: 'none', color: theme.toLowerCase() === 'dark' ? '#FFF' : '#333446' }}></i>
+          <i className={`fas ${isSearching ? 'fa-spinner fa-spin' : 'fa-search'} position-absolute`} style={{ left: '20px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, pointerEvents: 'none', color: theme.toLowerCase() === 'dark' ? '#FFF' : '#333446' }}></i>
           <input
             type="text"
             className={`form-control ps-5 ${theme.toLowerCase() === 'dark' ? 'search-input-dark' : 'search-input-light'}`}
