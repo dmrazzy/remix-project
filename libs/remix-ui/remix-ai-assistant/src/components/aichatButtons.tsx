@@ -21,54 +21,12 @@ export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspa
     color: string,
     action: () => void
   }[] = [
-    // {
-    //   label: 'File',
-    //   icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} far fa-copy`,
-    //   color: 'green',
-    //   action: async () => {
-    //     sendPrompt('Create a file for me')
-    //     // plugin && await plugin.call('remixaiassistant', 'handleExternalMessage', 'Create a file for me')
-    //   }
-    // },
-    // {
-    //   label: 'Learn',
-    //   icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-brain`,
-    //   color: '',
-    //   action: () => {
-    //     sendPrompt('I would like to learn about something...')
-    //   }
-    // },
-    // {
-    //   label: 'Plan a project',
-    //   icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-list`,
-    //   color: '',
-    //   action: () => {
-    //     sendPrompt('Plan a new project')
-    //   }
-    // },
     {
       label: 'New workspace',
       icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-plus`,
       color: '',
       action: handleGenerateWorkspace
     },
-    // {
-    //   label: 'Deploy',
-    //   icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fakit fa-remixdeploy`,
-    //   color: '',
-    //   action: () => {
-    //     sendPrompt('Deploy a contract')
-    //   }
-    // },
-    // {
-    //   label: 'Generate dapp',
-    //   icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-jet-fighter`,
-    //   color: '',
-    //   action: () => {
-    //     sendPrompt('Create a Dapp')
-    //     console.log('Generate Dapp')
-    //   }
-    // }
   ]
 
   return (
@@ -79,7 +37,6 @@ export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspa
             key={`${starter.label}-${index}`}
             data-id={`remix-ai-assistant-starter-${starter.label}-${index}`}
             className={`mb-2 border-0 rounded-4 text-nowrap gap-2 btn ${theme?.toLowerCase() === 'dark' ? 'btn-dark' : 'btn-light text-light-emphasis'} `}
-            // style={{ backgroundColor: theme?.toLowerCase() === 'dark' ? 'btn btn-lg p-2 btn-light' : 'btn btn-lg p-2 btn-dark' }}
             onClick={starter.action}
           >
             <i className={`${starter.icon} me-1`}></i>
@@ -93,7 +50,6 @@ export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspa
             key={`${starter.label}-${index}`}
             data-id={`remix-ai-assistant-starter-${starter.label}-${index}`}
             className={`mb-2 border-0 rounded-4 text-nowrap gap-2 btn btn-light`}
-            // style={{ backgroundColor: theme?.toLowerCase() === 'dark' ? 'btn btn-lg p-2 btn-light' : 'btn btn-lg btn-dark p-2' }}
             onClick={() => {}}
           >
             <i className={`${starter.icon} me-1`}></i>

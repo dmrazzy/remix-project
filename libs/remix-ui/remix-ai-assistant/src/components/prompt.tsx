@@ -50,8 +50,6 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   setInput,
   isStreaming,
   handleSend,
-  showAssistantOptions,
-  assistantChoice,
   selectedModel,
   handleSetModel,
   handleGenerateWorkspace,
@@ -62,16 +60,13 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   maximizePanel,
   isMaximized,
   themeTracker,
-  handleOllamaModelSelection,
   ollamaModels,
   showModelSelector,
   stopRequest,
   setShowOllamaModelSelector,
   showOllamaModelSelector,
   selectedOllamaModel,
-  modelSelectorBtnRef,
-  setShowMenu,
-  showMenu
+  modelSelectorBtnRef
 }) => {
   const { trackMatomoEvent: baseTrackEvent } = useContext(TrackingContext)
   return (
@@ -179,34 +174,6 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
               scrollbarWidth: 'none'
             }}
           >
-
-            {/* <div className="d-flex">
-              {assistantChoice === 'ollama' && availableModels.length > 0 && (
-                <button
-                  onClick={handleSetModel}
-                  className="btn btn-sm small font-weight-light text-secondary mt-2 align-self-end border border-text rounded ms-2"
-                  ref={modelSelectorBtnRef}
-                  data-id="ollama-model-selector"
-                >
-                  {selectedOllamaModel || 'Select Model'}
-                  {'  '}
-                  <span className={showOllamaModelSelector ? "fa fa-caret-up" : "fa fa-caret-down"}></span>
-                </button>
-              )}
-              test
-            </div> */}
-            {/* <button className="btn d-flex rounded-4 justify-content-between align-items-center gap-2" style={{ backgroundColor: themeTracker && themeTracker.name.toLowerCase() === 'light' ? '#c7e8f1' :'#2b3b4d', color: themeTracker && themeTracker.name.toLowerCase() === 'light' ? '#1ea2aa' :'#2de7f3' }}>
-              <i className="far fa-copy me-1"></i>
-              <span>File</span>
-            </button> */}
-            {/* <button className={`btn fw-light rounded-4 text-nowrap ${themeTracker && themeTracker.name.toLowerCase() === 'light' ? 'btn-remix-light' : 'btn-remix-dark'}`}>
-              <i className="fas fa-brain me-1"></i>
-              <span>Learn</span>
-            </button>
-            <button className={`btn fw-light rounded-4 text-nowrap ${themeTracker && themeTracker.name.toLowerCase() === 'light' ? 'btn-remix-light' : 'btn-remix-dark'}`}>
-              <i className="fas fa-list me-1"></i>
-              <span className="text-nowrap">Plan a project</span>
-            </button> */}
             <button className={`btn fw-light rounded-4 text-nowrap ${themeTracker && themeTracker.name.toLowerCase() === 'light' ? 'btn-light text-light-emphasis' : 'btn-remix-dark'}`}
               onClick={handleGenerateWorkspace}>
               <i className="fas fa-plus me-1"></i>

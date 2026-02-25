@@ -56,19 +56,6 @@ const AiChatIntro: React.FC<AiChatIntroProps> = ({ sendPrompt, theme, plugin, ha
       <p className="mb-4" style={{ fontSize: '0.9rem' }}>
         What do you want to build today?
       </p>
-      {/* Dynamic Conversation Starters */}
-      {/* <div className="d-flex flex-column mt-3" style={{ maxWidth: '400px' }}>
-        {conversationStarters.map((starter, index) => (
-          <button
-            key={`${starter.level}-${index}`}
-            data-id={`remix-ai-assistant-starter-${starter.level}-${index}`}
-            className="btn btn-secondary mb-2 w-100 text-start"
-            onClick={() => sendPrompt(starter.question)}
-          >
-            {starter.question}
-          </button>
-        ))}
-      </div> */}
       <AiChatButtons theme={theme} plugin={plugin} sendPrompt={sendPrompt} handleGenerateWorkspace={handleGenerateWorkspace} />
     </div>
   )
