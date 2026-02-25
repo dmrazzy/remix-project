@@ -37,6 +37,7 @@
     "build": "node --max-old-space-size=4096 ./node_modules/.bin/nx build || node --max-old-space-size=4096 ./node_modules/.bin/nx build --skip-nx-cache",
     "test": "nx test",
     "lint": "nx lint",
+    "lint-fix": "node ./apps/remix-ide/ci/lint-targets-fix.js",
     "affected:apps": "nx affected:apps",
     "affected:libs": "nx affected:libs",
     "affected:build": "nx affected:build",

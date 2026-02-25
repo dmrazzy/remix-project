@@ -14,7 +14,7 @@ const profile = {
   name: 'editor',
   description: 'service - editor',
   version: packageJson.version,
-  methods: ['highlight', 'discardHighlight', 'clearAnnotations', 'addLineText', 'discardLineTexts', 'addAnnotation', 'gotoLine', 'revealRange', 'getCursorPosition', 'open', 'addModel','addErrorMarker', 'clearErrorMarkers', 'getText', 'getPositionAt', 'openReadOnly', 'showCustomDiff', 'clearAllBreakpoints'],
+  methods: ['highlight', 'discardHighlight', 'clearAnnotations', 'addLineText', 'discardLineTexts', 'addAnnotation', 'gotoLine', 'revealRange', 'getCursorPosition', 'open', 'addModel','addErrorMarker', 'clearErrorMarkers', 'getText', 'getPositionAt', 'openReadOnly', 'showCustomDiff', 'hasUnacceptedChanges', 'clearAllBreakpoints'],
 }
 
 export default class Editor extends Plugin {
@@ -514,6 +514,10 @@ export default class Editor extends Plugin {
 
   async showCustomDiff (file, content) {
     return this.api.showCustomDiff(file, content)
+  }
+
+  hasUnacceptedChanges () {
+    return this.api.hasUnacceptedChanges()
   }
 
   addModel(path, content) {

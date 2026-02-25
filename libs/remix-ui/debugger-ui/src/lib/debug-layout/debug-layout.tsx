@@ -196,43 +196,43 @@ export const DebugLayout = ({
     const txValue = tx?.value ? BigInt(tx.value).toString() + ' Wei' : '0 Wei'
 
     return (
-      <div className="global-variables-grid">
+      <div className="global-variables-grid" data-id="txDetails">
         {/* Row 1: Status | Tx Fee */}
         <div className="global-var-item">
           <span className="global-var-key">Status:</span>
-          <span className={`global-var-value tx-status ${status}`}>
+          <span className={`global-var-value tx-status ${status}`} data-id="txStatus">
             {status === 'success' ? 'Success' : 'Failed'}
           </span>
         </div>
         <div className="global-var-item">
           <span className="global-var-key">Tx Fee:</span>
-          <span className="global-var-value text-theme-contrast">{txFee}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txFee">{txFee}</span>
         </div>
 
         {/* Row 2: Block | Tx Type */}
         <div className="global-var-item">
           <span className="global-var-key">Block:</span>
-          <span className="global-var-value text-theme-contrast">{block?.number || 'N/A'}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txBlock">{block?.number || 'N/A'}</span>
         </div>
         <div className="global-var-item">
           <span className="global-var-key">Tx Type:</span>
-          <span className="global-var-value text-theme-contrast">{txType}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txType">{txType}</span>
         </div>
 
         {/* Row 3: Timestamp | Gas Price */}
         <div className="global-var-item">
           <span className="global-var-key">Timestamp:</span>
-          <span className="global-var-value text-theme-contrast">{timestamp}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txTimestamp">{timestamp}</span>
         </div>
         <div className="global-var-item">
           <span className="global-var-key">Gas Price:</span>
-          <span className="global-var-value text-theme-contrast">{gasPrice}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txGasPrice">{gasPrice}</span>
         </div>
 
         {/* Row 4: From | Gas Used */}
         <div className="global-var-item">
           <span className="global-var-key">From:</span>
-          <span className="global-var-value text-theme-contrast">
+          <span className="global-var-value text-theme-contrast" data-id="txFrom">
             {tx?.from ? formatAddress(tx.from) : 'N/A'}
             {tx?.from && (
               <CustomTooltip tooltipText={copyTooltips.from} tooltipId="from-address-tooltip" placement="top">
@@ -248,13 +248,13 @@ export const DebugLayout = ({
         </div>
         <div className="global-var-item">
           <span className="global-var-key">Gas Used:</span>
-          <span className="global-var-value text-theme-contrast">{gasUsed}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txGasUsed">{gasUsed}</span>
         </div>
 
         {/* Row 5: To | Tx Index */}
         <div className="global-var-item">
           <span className="global-var-key">To:</span>
-          <span className="global-var-value text-theme-contrast">
+          <span className="global-var-value text-theme-contrast" data-id="txTo">
             {formatAddress(tx?.to || receipt?.contractAddress || '') || 'N/A'}
             {(tx?.to || receipt?.contractAddress) && (
               <CustomTooltip tooltipText={copyTooltips.to} tooltipId="to-address-tooltip" placement="top">
@@ -270,23 +270,25 @@ export const DebugLayout = ({
         </div>
         <div className="global-var-item">
           <span className="global-var-key">Tx Index:</span>
-          <span className="global-var-value text-theme-contrast">{receipt?.transactionIndex !== undefined ? receipt.transactionIndex : 'N/A'}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txIndex">
+            {receipt?.transactionIndex !== undefined ? receipt.transactionIndex : (tx?.transactionIndex !== undefined ? tx.transactionIndex : 0)}
+          </span>
         </div>
 
         {/* Row 6: Function | Tx Nonce */}
         <div className="global-var-item">
           <span className="global-var-key">Function:</span>
-          <span className="global-var-value text-theme-contrast">{functionName}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txFunction">{functionName}</span>
         </div>
         <div className="global-var-item">
           <span className="global-var-key">Tx Nonce:</span>
-          <span className="global-var-value text-theme-contrast">{tx?.nonce !== undefined ? tx.nonce : 'N/A'}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txNonce">{tx?.nonce !== undefined ? tx.nonce : 'N/A'}</span>
         </div>
 
         {/* Row 7: Value | (empty) */}
         <div className="global-var-item">
           <span className="global-var-key">Value:</span>
-          <span className="global-var-value text-theme-contrast">{txValue}</span>
+          <span className="global-var-value text-theme-contrast" data-id="txValue">{txValue}</span>
         </div>
       </div>
     )
@@ -1065,7 +1067,12 @@ export const DebugLayout = ({
           style={{ cursor: 'pointer' }}
         >
           <h6 className="debug-section-title" data-id="callTraceHeader">
-            Call Trace (Step: {stepManager?.currentStepIndex ?? 0} / {(traceData && (traceData.traceLength - 1)) || 0})
+            Call Trace (Step: {(() => {
+              const maxStep = (traceData && (traceData.traceLength - 1)) || 0
+              const currentStep = stepManager?.currentStepIndex ?? 0
+              // Clamp currentStepIndex to valid range [0, maxStep]
+              return Math.max(0, Math.min(currentStep, maxStep))
+            })()} / {(traceData && (traceData.traceLength - 1)) || 0})
           </h6>
           <i className={`fas ${expandedSections.callTrace ? 'fa-chevron-down' : 'fa-chevron-right'}`} style={{ fontSize: '0.75rem', marginRight: '1rem', color: 'var(--bs-body-color)' }}></i>
         </div>

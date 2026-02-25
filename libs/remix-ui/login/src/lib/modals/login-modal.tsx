@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { AuthProvider } from '@remix-api'
 import { useAuth } from '../../../../app/src/lib/remix-app/context/auth-context'
 import { endpointUrls } from '@remix-endpoints-helper'
@@ -16,290 +16,325 @@ interface ProviderConfig {
   enabled: boolean
 }
 
+/** Mask email for display: user@example.com → us***@example.com */
+const maskEmail = (email: string): string => {
+  const atIdx = email.indexOf('@')
+  if (atIdx <= 0) return email
+  const local = email.slice(0, atIdx)
+  const domain = email.slice(atIdx)
+  const visible = local.slice(0, Math.min(2, local.length))
+  return `${visible}***${domain}`
+}
+
+/** Format seconds as m:ss */
+const formatTimer = (seconds: number): string => {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
 export const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   const { login, loading, error, dispatch } = useAuth()
   const [providers, setProviders] = useState<ProviderConfig[]>([])
   const [loadingProviders, setLoadingProviders] = useState(true)
-  const [showEmailInput, setShowEmailInput] = useState(false)
-  const [showOtpInput, setShowOtpInput] = useState(false)
-  const [emailValue, setEmailValue] = useState('')
-  const [otpValue, setOtpValue] = useState('')
 
+  // Email OTP flow
+  const [otpStep, setOtpStep] = useState<'idle' | 'code'>('idle')
+  const [emailValue, setEmailValue] = useState('')
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', ''])
+  const [emailSending, setEmailSending] = useState(false)
+  const [otpVerifying, setOtpVerifying] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [sendCooldown, setSendCooldown] = useState(0)
+  const [codeExpiresIn, setCodeExpiresIn] = useState(0)
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null)
+
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const emailInputRef = useRef<HTMLInputElement>(null)
+  const verifyingRef = useRef(false)
+
+  // Check for invite token in URL
+  const inviteToken = new URLSearchParams(window.location.search).get('invite_token') || undefined
+
+  // Is email provider enabled?
+  const emailEnabled = providers.some(p => p.id === 'email' && p.enabled)
+
+  // --- Countdown timers ---
+  useEffect(() => {
+    if (sendCooldown <= 0) return
+    const timer = setTimeout(() => setSendCooldown(c => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [sendCooldown])
+
+  useEffect(() => {
+    if (codeExpiresIn <= 0) return
+    const timer = setTimeout(() => setCodeExpiresIn(c => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [codeExpiresIn])
+
+  // --- Fetch providers ---
   useEffect(() => {
     const fetchSupportedProviders = async () => {
       try {
-        // Detect environment
         const baseUrl = endpointUrls.sso
-
         const response = await fetch(`${baseUrl}/providers`, {
           method: 'GET',
           headers: { 'Accept': 'application/json' }
         })
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch providers: ${response.status}`)
-        }
+        if (!response.ok) throw new Error(`Failed to fetch providers: ${response.status}`)
 
         const data = await response.json()
         console.log('[LoginModal] Supported providers from backend:', data)
 
-        // Map backend response to UI config
         const allProviders: ProviderConfig[] = [
-          {
-            id: 'google',
-            label: 'Google',
-            icon: <i className="fab fa-google"></i>,
-            description: 'Sign in with your Google account',
-            enabled: data.providers?.includes('google') ?? false
-          },
-          {
-            id: 'github',
-            label: 'GitHub',
-            icon: <i className="fab fa-github"></i>,
-            description: 'Sign in with your GitHub account',
-            enabled: true
-          },
-          {
-            id: 'discord',
-            label: 'Discord',
-            icon: <i className="fab fa-discord"></i>,
-            description: 'Sign in with your Discord account',
-            enabled: data.providers?.includes('discord') ?? false
-          },
-          {
-            id: 'siwe',
-            label: 'Connect Ethereum Wallet',
-            icon: <i className="fab fa-ethereum"></i>,
-            description: 'Sign in with MetaMask, Coinbase Wallet, or any Ethereum wallet',
-            enabled: data.providers?.includes('siwe') ?? false
-          },
-          {
-            id: 'email',
-            label: 'Email',
-            icon: <i className="fas fa-envelope"></i>,
-            description: 'Sign in with your email address',
-            enabled: true
-          },
-          {
-            id: 'apple',
-            label: 'Apple',
-            icon: <i className="fab fa-apple"></i>,
-            description: 'Sign in with your Apple ID',
-            enabled: data.providers?.includes('apple') ?? false
-          },
-          {
-            id: 'coinbase',
-            label: 'Coinbase',
-            icon: <i className="fas fa-coins"></i>,
-            description: 'Sign in with your Coinbase account',
-            enabled: data.providers?.includes('coinbase') ?? false
-          }
+          { id: 'google', label: 'Google', icon: <i className="fab fa-google"></i>, description: 'Sign in with your Google account', enabled: data.providers?.includes('google') ?? false },
+          { id: 'github', label: 'GitHub', icon: <i className="fab fa-github"></i>, description: 'Sign in with your GitHub account', enabled: true },
+          { id: 'discord', label: 'Discord', icon: <i className="fab fa-discord"></i>, description: 'Sign in with your Discord account', enabled: data.providers?.includes('discord') ?? false },
+          { id: 'siwe', label: 'Connect Ethereum Wallet', icon: <i className="fab fa-ethereum"></i>, description: 'Sign in with MetaMask, Coinbase Wallet, or any Ethereum wallet', enabled: data.providers?.includes('siwe') ?? false },
+          { id: 'email', label: 'Email', icon: <i className="fas fa-envelope"></i>, description: 'Sign in with your email address', enabled: data.providers?.includes('email') ?? false },
+          { id: 'apple', label: 'Apple', icon: <i className="fab fa-apple"></i>, description: 'Sign in with your Apple ID', enabled: data.providers?.includes('apple') ?? false },
+          { id: 'coinbase', label: 'Coinbase', icon: <i className="fas fa-coins"></i>, description: 'Sign in with your Coinbase account', enabled: data.providers?.includes('coinbase') ?? false },
         ]
 
-        // Only show enabled providers
         setProviders(allProviders.filter(p => p.enabled))
         setLoadingProviders(false)
       } catch (err) {
         console.error('[LoginModal] Failed to fetch providers:', err)
-        // Fallback to default providers if API fails
         setProviders([
-          {
-            id: 'google',
-            label: 'Google',
-            icon: <i className="fab fa-google"></i>,
-            description: 'Sign in with your Google account',
-            enabled: true
-          },
-          {
-            id: 'github',
-            label: 'GitHub',
-            icon: <i className="fab fa-github"></i>,
-            description: 'Sign in with your GitHub account',
-            enabled: true
-          },
-          {
-            id: 'discord',
-            label: 'Discord',
-            icon: <i className="fab fa-discord"></i>,
-            description: 'Sign in with your Discord account',
-            enabled: true
-          },
-          {
-            id: 'siwe',
-            label: 'Ethereum Wallet',
-            icon: <i className="fab fa-ethereum"></i>,
-            description: 'Sign in with MetaMask, Coinbase Wallet, or any Ethereum wallet',
-            enabled: true
-          },
-          {
-            id: 'email',
-            label: 'Email',
-            icon: <i className="fas fa-envelope"></i>,
-            description: 'Sign in with your email address',
-            enabled: true
-          }
+          { id: 'google', label: 'Google', icon: <i className="fab fa-google"></i>, description: 'Sign in with your Google account', enabled: true },
+          { id: 'github', label: 'GitHub', icon: <i className="fab fa-github"></i>, description: 'Sign in with your GitHub account', enabled: true },
+          { id: 'discord', label: 'Discord', icon: <i className="fab fa-discord"></i>, description: 'Sign in with your Discord account', enabled: true },
+          { id: 'siwe', label: 'Ethereum Wallet', icon: <i className="fab fa-ethereum"></i>, description: 'Sign in with MetaMask, Coinbase Wallet, or any Ethereum wallet', enabled: true },
+          { id: 'email', label: 'Email', icon: <i className="fas fa-envelope"></i>, description: 'Sign in with your email address', enabled: true },
         ])
         setLoadingProviders(false)
       }
     }
 
     fetchSupportedProviders()
-
-    // Cleanup function to reset state when modal unmounts
     return () => {
-      setShowEmailInput(false)
-      setShowOtpInput(false)
-      setEmailValue('')
-      setOtpValue('')
       dispatch({ type: 'CLEAR_ERROR' })
     }
   }, [dispatch])
 
+  // --- OAuth login handler ---
   const handleLogin = async (provider: AuthProvider) => {
-    if (provider === 'email') {
-      setShowEmailInput(true)
-      return
-    }
-
     try {
       await login(provider)
-      // Modal will auto-close via auth state change
     } catch (err) {
-      // Error is handled by context
       console.error('[LoginModal] Login failed:', err)
     }
   }
 
-  const handleEmailSubmit = async () => {
-    if (!emailValue.trim()) {
+  // --- Send verification code ---
+  const handleSendCode = async () => {
+    const email = emailValue.trim()
+    if (!email || emailSending || sendCooldown > 0) return
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address')
       return
     }
 
-    // TODO: Implement backend API call to send OTP
-    // try {
-    //   dispatch({ type: 'AUTH_START' })
+    setEmailSending(true)
+    setEmailError(null)
+    setAttemptsRemaining(null)
 
-    //   // Send OTP to email
-    //   const response = await fetch(`${endpointUrls.sso}/email/send-otp`, {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       'Accept': 'application/json'
-    //     },
-    //     body: JSON.stringify({ email: emailValue })
-    //   })
+    try {
+      const response = await fetch(`${endpointUrls.sso}/email/send-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          email,
+          ...(inviteToken && { invite_token: inviteToken })
+        })
+      })
 
-    //   if (!response.ok) {
-    //     const error = await response.json().catch(() => ({ error: 'Failed to send OTP' }))
-    //     throw new Error(error.error || 'Failed to send OTP to email')
-    //   }
+      const data = await response.json().catch(() => ({}))
 
-    //   // Show OTP screen
-    //   setShowOtpInput(true)
-    //   dispatch({ type: 'CLEAR_ERROR' })
-    // } catch (err: any) {
-    //   dispatch({ type: 'AUTH_FAILURE', payload: err.message || 'Failed to send OTP' })
-    //   console.error('[LoginModal] Failed to send OTP:', err)
-    // }
+      if (response.status === 429) {
+        setSendCooldown(data.retry_after || 60)
+        setEmailError('Please wait before requesting another code')
+        return
+      }
 
-    // For UI development: Just show OTP screen
-    setShowOtpInput(true)
-    dispatch({ type: 'CLEAR_ERROR' })
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send verification code')
+      }
+
+      // Success — transition to OTP view
+      setOtpStep('code')
+      setCodeExpiresIn(data.expires_in || 600)
+      setSendCooldown(60)
+      setOtpDigits(['', '', '', '', '', ''])
+      setEmailError(null)
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
+    } catch (err: any) {
+      setEmailError(err.message || 'Failed to send verification code')
+    } finally {
+      setEmailSending(false)
+    }
   }
 
-  const handleOtpSubmit = async () => {
-    if (!otpValue.trim() || otpValue.length !== 6) {
-      return
+  // --- Verify OTP code ---
+  const handleVerifyCode = async (code?: string) => {
+    if (verifyingRef.current) return
+    const otpCode = code || otpDigits.join('')
+    if (otpCode.length !== 6) return
+
+    verifyingRef.current = true
+    setOtpVerifying(true)
+    setEmailError(null)
+
+    try {
+      const response = await fetch(`${endpointUrls.sso}/email/verify-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: emailValue.trim(),
+          code: otpCode,
+          ...(inviteToken && { invite_token: inviteToken })
+        })
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (response.status === 429) {
+        setEmailError('Too many attempts. Please request a new code.')
+        setOtpDigits(['', '', '', '', '', ''])
+        setAttemptsRemaining(0)
+        return
+      }
+
+      if (response.status === 403) {
+        if (data.error === 'REGISTRATION_CLOSED') {
+          setEmailError('Registration is currently closed. Only existing users can sign in.')
+        } else if (data.error === 'ACCOUNT_BLOCKED') {
+          setEmailError('Your account has been blocked.')
+        } else {
+          setEmailError(data.message || data.error || 'Access denied')
+        }
+        return
+      }
+
+      if (!response.ok) {
+        if (data.attempts_remaining !== undefined) {
+          setAttemptsRemaining(data.attempts_remaining)
+        }
+        if (data.error?.includes('expired') || data.error?.includes('No valid code')) {
+          setEmailError('Code expired — please request a new one.')
+          setCodeExpiresIn(0)
+        } else {
+          setEmailError(data.error || 'Invalid verification code')
+        }
+        setOtpDigits(['', '', '', '', '', ''])
+        setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
+        return
+      }
+
+      // Success — store tokens and update auth state
+      if (data.token && data.user) {
+        localStorage.setItem('remix_access_token', data.token)
+        if (data.refreshToken) {
+          localStorage.setItem('remix_refresh_token', data.refreshToken)
+        }
+        localStorage.setItem('remix_user', JSON.stringify(data.user))
+
+        dispatch({
+          type: 'AUTH_SUCCESS',
+          payload: { user: data.user, token: data.token }
+        })
+        console.log('[LoginModal] Email OTP login successful')
+      } else {
+        throw new Error('Invalid response from server')
+      }
+    } catch (err: any) {
+      setEmailError(err.message || 'Verification failed')
+    } finally {
+      verifyingRef.current = false
+      setOtpVerifying(false)
+    }
+  }
+
+  // --- OTP digit input handlers ---
+  const handleOtpDigitChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return
+
+    const newDigits = [...otpDigits]
+    newDigits[index] = value.slice(-1)
+    setOtpDigits(newDigits)
+
+    // Auto-advance to next input
+    if (value && index < 5) {
+      otpInputRefs.current[index + 1]?.focus()
     }
 
-    // TODO: Implement backend API call to verify OTP
-    // try {
-    //   dispatch({ type: 'AUTH_START' })
-
-    //   // Verify OTP and get tokens
-    //   const response = await fetch(`${endpointUrls.sso}/email/verify-otp`, {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       'Accept': 'application/json'
-    //     },
-    //     credentials: 'include',
-    //     body: JSON.stringify({
-    //       email: emailValue,
-    //       otp: otpValue
-    //     })
-    //   })
-
-    //   if (!response.ok) {
-    //     const error = await response.json().catch(() => ({ error: 'Invalid OTP' }))
-    //     throw new Error(error.error || 'Invalid OTP code')
-    //   }
-
-    //   const result = await response.json()
-
-    //   // Store tokens and user in localStorage
-    //   if (result.accessToken && result.user) {
-    //     localStorage.setItem('remix_access_token', result.accessToken)
-    //     if (result.refreshToken) {
-    //       localStorage.setItem('remix_refresh_token', result.refreshToken)
-    //     }
-    //     localStorage.setItem('remix_user', JSON.stringify(result.user))
-
-    //     // Update auth state
-    //     dispatch({
-    //       type: 'AUTH_SUCCESS',
-    //       payload: { user: result.user, token: result.accessToken }
-    //     })
-
-    //     // Modal will auto-close via auth state change
-    //     console.log('[LoginModal] Email OTP login successful')
-    //   } else {
-    //     throw new Error('Invalid response from server')
-    //   }
-    // } catch (err: any) {
-    //   dispatch({ type: 'AUTH_FAILURE', payload: err.message || 'Invalid OTP code' })
-    //   console.error('[LoginModal] OTP verification failed:', err)
-    // }
-
-    // For UI development: Simulate successful login
-    console.log('[LoginModal] OTP submitted (UI only):', { email: emailValue, otp: otpValue })
-
-    // Create mock user and tokens for UI testing
-    const mockUser = {
-      sub: 'email_' + Date.now(),
-      email: emailValue,
-      provider: 'email' as const,
-      name: emailValue.split('@')[0]
+    // Auto-submit when all 6 digits filled
+    const fullCode = newDigits.join('')
+    if (fullCode.length === 6) {
+      handleVerifyCode(fullCode)
     }
-    const mockToken = 'mock_access_token_' + Date.now()
-    const mockRefreshToken = 'mock_refresh_token_' + Date.now()
+  }
 
-    // Store in localStorage (same as real login)
-    localStorage.setItem('remix_access_token', mockToken)
-    localStorage.setItem('remix_refresh_token', mockRefreshToken)
-    localStorage.setItem('remix_user', JSON.stringify(mockUser))
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus()
+    }
+    if (e.key === 'Enter') {
+      handleVerifyCode()
+    }
+  }
 
-    // Update auth state to trigger logged-in UI
-    dispatch({
-      type: 'AUTH_SUCCESS',
-      payload: { user: mockUser, token: mockToken }
-    })
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
 
-    console.log('[LoginModal] Mock email OTP login successful')
+    const newDigits = Array(6).fill('').map((_, i) => pasted[i] || '')
+    setOtpDigits(newDigits)
+
+    const focusIdx = Math.min(pasted.length, 5)
+    otpInputRefs.current[focusIdx]?.focus()
+
+    if (pasted.length === 6) {
+      handleVerifyCode(pasted)
+    }
+  }
+
+  const handleResendCode = () => {
+    if (sendCooldown > 0) return
+    setOtpDigits(['', '', '', '', '', ''])
+    setAttemptsRemaining(null)
+    setEmailError(null)
+    handleSendCode()
   }
 
   const handleBackToProviders = () => {
-    setShowEmailInput(false)
-    setShowOtpInput(false)
+    setOtpStep('idle')
     setEmailValue('')
-    setOtpValue('')
-  }
-
-  const handleTryAnotherEmail = () => {
-    setShowOtpInput(false)
-    setOtpValue('')
+    setOtpDigits(['', '', '', '', '', ''])
+    setEmailError(null)
+    setAttemptsRemaining(null)
+    setCodeExpiresIn(0)
+    setSendCooldown(0)
     dispatch({ type: 'CLEAR_ERROR' })
   }
+
+  const handleChangeEmail = () => {
+    setOtpStep('idle')
+    setOtpDigits(['', '', '', '', '', ''])
+    setEmailError(null)
+    setAttemptsRemaining(null)
+    setCodeExpiresIn(0)
+    setTimeout(() => emailInputRef.current?.focus(), 100)
+  }
+
+  // --- Providers excluding email (rendered as buttons) and SIWE (rendered separately) ---
+  const oauthProviders = providers.filter(p => p.id !== 'siwe' && p.id !== 'email')
+  const siweProvider = providers.find(p => p.id === 'siwe')
 
   return (
     <div
@@ -314,10 +349,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         <div className="modal-content d-flex flex-row overflow-hidden login-modal-content">
           {/* Left Section - 40% width */}
           <div className="d-flex flex-column justify-content-center align-items-center position-relative login-modal-left-section">
-            {/* Dark blue gradient overlay for better text readability */}
             <div className="position-absolute top-0 start-0 end-0 bottom-0 login-modal-gradient-overlay" />
-
-            {/* Content with higher z-index to appear above overlay */}
             <div className="text-start w-100 position-relative login-modal-content-wrapper">
               <ul className="list-unstyled p-0 m-0">
                 <li className="mb-4 d-flex align-items-center">
@@ -340,17 +372,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
           <div className="d-flex flex-column login-modal-right-section">
             <div className="modal-header border-0 flex-column align-items-start">
               <div className="d-flex w-100 align-items-center mb-2">
+                {otpStep === 'code' ? (
+                  <button
+                    className="btn btn-link p-0 me-2 text-dark text-decoration-none"
+                    onClick={handleBackToProviders}
+                    title="Back to sign in options"
+                  >
+                    <i className="fas fa-arrow-left"></i>
+                  </button>
+                ) : null}
                 <h5 className="modal-title mb-0">Remix IDE</h5>
                 <div className="close ms-auto login-modal-close-btn fs-5" data-id="loginModal" onClick={onClose}>
                   <i className="fas fa-times text-dark"></i>
                 </div>
               </div>
               <p className="text-muted mb-0 fs-small-medium">
-                Log in or register to unlock our wide range of features
+                {otpStep === 'code'
+                  ? 'Enter the verification code we sent to your email'
+                  : 'Log in or register to unlock our wide range of features'
+                }
               </p>
             </div>
-            <div className="modal-body flex-grow-1">
 
+            <div className="modal-body flex-grow-1">
               {loadingProviders ? (
                 <div className="text-center py-5">
                   <div className="spinner-border text-primary" role="status">
@@ -362,119 +406,113 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                 <div className="alert alert-warning" role="alert">
                   No authentication providers are currently available. Please try again later.
                 </div>
-              ) : showEmailInput && showOtpInput ? (
-                /* OTP Input View */
-                <div className="d-flex flex-column h-100">
-                  {/* Error container with fixed height to prevent layout shift */}
-                  <div className="login-modal-error-container">
-                    {error && (
-                      <div className="alert alert-danger mb-0" role="alert">
-                        <strong>Error:</strong> {error}
-                      </div>
-                    )}
+
+              ) : otpStep === 'code' ? (
+                /* ──────────────── OTP Verification View ──────────────── */
+                <div className="d-flex flex-column align-items-center">
+                  {/* Envelope icon */}
+                  <div className="login-modal-otp-icon-wrap mb-3">
+                    <i className="fas fa-envelope-open-text login-modal-otp-icon"></i>
                   </div>
 
-                  <div className="mb-4">
-                    <label htmlFor="otp-input" className="form-label text-muted fs-small-medium mb-2 fw-normal">
-                      Enter 6-digit OTP sent to <span className="fw-semibold text-dark">{emailValue}</span>
-                    </label>
-                    <input
-                      id="otp-input"
-                      type="text"
-                      className="form-control text-center fw-bold shadow-sm"
-                      placeholder="000000"
-                      maxLength={6}
-                      value={otpValue}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '')
-                        setOtpValue(value)
-                      }}
-                      onKeyDown={(e) => e.key === 'Enter' && handleOtpSubmit()}
-                      autoFocus
-                      style={{ letterSpacing: '0.5rem', fontSize: '1.25rem' }}
-                    />
-                    <small className="form-text text-muted d-block mt-2">
-                      Please check your email for the verification code
-                    </small>
+                  <h6 className="fw-semibold mb-1">Check your email</h6>
+                  <p className="text-muted fs-small-medium mb-4 text-center">
+                    We sent a 6-digit code to <span className="fw-semibold text-dark">{maskEmail(emailValue)}</span>
+                  </p>
+
+                  {/* Error / status messages */}
+                  {emailError && (
+                    <div className="alert alert-danger py-2 px-3 fs-small-medium w-100 mb-3" role="alert">
+                      {emailError}
+                    </div>
+                  )}
+
+                  {attemptsRemaining !== null && attemptsRemaining > 0 && !emailError?.includes('expired') && (
+                    <div className="text-warning fs-small mb-2">
+                      {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining
+                    </div>
+                  )}
+
+                  {/* 6-digit OTP inputs */}
+                  <div className="d-flex gap-2 mb-3 login-modal-otp-group" onPaste={handleOtpPaste}>
+                    {otpDigits.map((digit, i) => (
+                      <input
+                        key={i}
+                        ref={(el) => { otpInputRefs.current[i] = el }}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        className={`login-modal-otp-digit ${digit ? 'has-value' : ''}`}
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpDigitChange(i, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                        onFocus={(e) => e.target.select()}
+                        autoFocus={i === 0}
+                        disabled={otpVerifying}
+                      />
+                    ))}
                   </div>
 
+                  {/* Code expiry timer */}
+                  {codeExpiresIn > 0 && (
+                    <p className={`fs-small mb-3 ${codeExpiresIn <= 60 ? 'text-warning' : 'text-muted'}`}>
+                      <i className="fas fa-clock me-1"></i>
+                      Code expires in {formatTimer(codeExpiresIn)}
+                    </p>
+                  )}
+                  {codeExpiresIn === 0 && otpStep === 'code' && (
+                    <p className="fs-small text-danger mb-3">
+                      <i className="fas fa-exclamation-circle me-1"></i>
+                      Code expired
+                    </p>
+                  )}
+
+                  {/* Verify button (fallback for manual submit) */}
                   <button
-                    className="btn btn-primary w-100 d-flex align-items-center justify-content-center py-2 mb-3 shadow-sm"
-                    onClick={handleOtpSubmit}
-                    disabled={loading || otpValue.length !== 6}
+                    className="btn btn-primary w-100 d-flex align-items-center justify-content-center py-2 mb-3"
+                    onClick={() => handleVerifyCode()}
+                    disabled={otpVerifying || otpDigits.join('').length !== 6}
                   >
-                    <span className="fw-medium fs-medium">Verify OTP</span>
-                    {loading && (
-                      <div className="spinner-border spinner-border-sm text-white ms-2" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
+                    {otpVerifying ? (
+                      <>
+                        <div className="spinner-border spinner-border-sm text-white me-2" role="status">
+                          <span className="visually-hidden">Verifying...</span>
+                        </div>
+                        <span className="fw-medium fs-medium">Verifying...</span>
+                      </>
+                    ) : (
+                      <span className="fw-medium fs-medium">Verify Code</span>
                     )}
                   </button>
 
-                  <div className="text-center">
+                  {/* Resend / change email */}
+                  <div className="d-flex flex-column align-items-center gap-2">
+                    <p className="text-muted fs-small mb-0">
+                      Didn't receive it?{' '}
+                      {sendCooldown > 0 ? (
+                        <span className="text-muted">Resend in {sendCooldown}s</span>
+                      ) : (
+                        <button
+                          className="btn btn-link p-0 fs-small text-decoration-none fw-medium"
+                          onClick={handleResendCode}
+                          disabled={emailSending}
+                        >
+                          {emailSending ? 'Sending...' : 'Resend code'}
+                        </button>
+                      )}
+                    </p>
                     <button
-                      className="btn btn-link text-decoration-none text-muted p-0 fs-small-medium"
-                      onClick={handleTryAnotherEmail}
+                      className="btn btn-link p-0 fs-small text-decoration-none text-muted"
+                      onClick={handleChangeEmail}
                     >
-                      Try another email
+                      Use a different email
                     </button>
                   </div>
                 </div>
-              ) : showEmailInput ? (
-                /* Email Input View */
-                <div className="d-flex flex-column h-100">
-                  {/* Error container with fixed height to prevent layout shift */}
-                  <div className="login-modal-error-container">
-                    {error && (
-                      <div className="alert alert-danger mb-0" role="alert">
-                        <strong>Error:</strong> {error}
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="mb-4">
-                    <label htmlFor="email-input" className="form-label text-muted fs-small-medium mb-2 fw-normal">
-                      Email address
-                    </label>
-                    <input
-                      id="email-input"
-                      type="email"
-                      className="form-control shadow-sm"
-                      placeholder="Enter your email"
-                      value={emailValue}
-                      onChange={(e) => setEmailValue(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleEmailSubmit()}
-                      autoFocus
-                    />
-                    <small className="form-text text-muted d-block mt-2">
-                      We'll send you a verification code
-                    </small>
-                  </div>
-
-                  <button
-                    className="btn btn-primary w-100 d-flex align-items-center justify-content-center py-2 mb-3 shadow-sm"
-                    onClick={handleEmailSubmit}
-                    disabled={loading || !emailValue.trim()}
-                  >
-                    <span className="fw-medium fs-medium">Continue with Email</span>
-                    {loading && (
-                      <div className="spinner-border spinner-border-sm text-white ms-2" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    )}
-                  </button>
-
-                  <div className="text-center">
-                    <button
-                      className="btn btn-link text-decoration-none text-muted p-0 fs-small-medium"
-                      onClick={handleBackToProviders}
-                    >
-                      Choose another method
-                    </button>
-                  </div>
-                </div>
               ) : (
-                /* Provider Buttons View */
+                /* ──────────────── Providers View ──────────────── */
                 <div>
                   {error && (
                     <div className="alert alert-danger" role="alert">
@@ -482,36 +520,37 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                     </div>
                   )}
 
-                  {/* Ethereum Wallet - Primary button at top */}
-                  {providers.filter(p => p.id === 'siwe').map((provider) => (
+                  {/* Ethereum Wallet — Primary CTA */}
+                  {siweProvider && (
                     <button
-                      key={provider.id}
                       className="btn btn-primary w-100 d-flex align-items-center justify-content-center py-2 mb-3"
-                      onClick={() => handleLogin(provider.id)}
-                      disabled={loading || !provider.enabled}
+                      onClick={() => handleLogin(siweProvider.id)}
+                      disabled={loading || !siweProvider.enabled}
                     >
                       <span className="me-1 login-modal-provider-icon fs-medium">
-                        {provider.icon}
+                        {siweProvider.icon}
                       </span>
-                      <span className="fw-medium fs-medium">{provider.label}</span>
+                      <span className="fw-medium fs-medium">{siweProvider.label}</span>
                       {loading && (
                         <div className="spinner-border spinner-border-sm text-white ms-2" role="status">
                           <span className="visually-hidden">Loading...</span>
                         </div>
                       )}
                     </button>
-                  ))}
+                  )}
 
-                  {/* Divider with "or" text */}
-                  <div className="d-flex align-items-center my-4">
-                    <hr className="flex-grow-1" />
-                    <span className="px-3 text-muted">or</span>
-                    <hr className="flex-grow-1" />
-                  </div>
+                  {/* Divider */}
+                  {oauthProviders.length > 0 && (
+                    <div className="d-flex align-items-center my-4">
+                      <hr className="flex-grow-1" />
+                      <span className="px-3 text-muted">or</span>
+                      <hr className="flex-grow-1" />
+                    </div>
+                  )}
 
-                  {/* Other providers - Light buttons */}
+                  {/* OAuth provider buttons */}
                   <div className="d-flex flex-column gap-2">
-                    {providers.filter(p => p.id !== 'siwe').map((provider) => (
+                    {oauthProviders.map((provider) => (
                       <button
                         key={provider.id}
                         className="btn btn-light border-0 w-100 d-flex align-items-center justify-content-center py-2 no-hover-effect"
@@ -530,6 +569,61 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                       </button>
                     ))}
                   </div>
+
+                  {/* ── Email OTP inline section ── */}
+                  {emailEnabled && (
+                    <>
+                      <div className="d-flex align-items-center my-4">
+                        <hr className="flex-grow-1" />
+                        <span className="px-3 text-muted fs-small-medium">or continue with email</span>
+                        <hr className="flex-grow-1" />
+                      </div>
+
+                      {emailError && (
+                        <div className="alert alert-danger py-2 px-3 fs-small-medium mb-3" role="alert">
+                          {emailError}
+                        </div>
+                      )}
+
+                      <div className="login-modal-email-row">
+                        <div className="login-modal-email-input-wrap">
+                          <i className="fas fa-envelope login-modal-email-field-icon"></i>
+                          <input
+                            ref={emailInputRef}
+                            type="email"
+                            className="form-control login-modal-email-input"
+                            placeholder="you@example.com"
+                            value={emailValue}
+                            onChange={(e) => { setEmailValue(e.target.value); setEmailError(null) }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendCode()}
+                            disabled={emailSending}
+                          />
+                        </div>
+                        <button
+                          className="btn btn-primary login-modal-send-code-btn"
+                          onClick={handleSendCode}
+                          disabled={emailSending || !emailValue.trim() || sendCooldown > 0}
+                        >
+                          {emailSending ? (
+                            <div className="spinner-border spinner-border-sm text-white" role="status">
+                              <span className="visually-hidden">Sending...</span>
+                            </div>
+                          ) : sendCooldown > 0 ? (
+                            <span className="fs-small">{sendCooldown}s</span>
+                          ) : (
+                            <>
+                              Send Code <i className="fas fa-arrow-right ms-1"></i>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <p className="text-muted fs-small mt-2 mb-0 text-center">
+                        <i className="fas fa-lock me-1"></i>
+                        No password needed — we'll email you a one-time code
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
             </div>

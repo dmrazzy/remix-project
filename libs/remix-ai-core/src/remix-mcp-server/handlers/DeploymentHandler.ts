@@ -114,29 +114,15 @@ export class DeployContractHandler extends BaseToolHandler {
 
       let txReturn
       try {
-        txReturn = await new Promise(async (resolve, reject) => {
-          const callbacks = { continueCb: (error, continueTxExecution, cancelCb) => {
-            continueTxExecution()
-          }, promptCb: () => {}, statusCb: (error) => {
-          }, finalCb: (error, contractObject, address: string, txResult: TxResult) => {
-            if (error) reject(error)
-            resolve({ contractObject, address, txResult })
-          } }
-          const confirmationCb = (network, tx, gasEstimation, continueTxExecution, cancelCb) => {
-            continueTxExecution(null)
-          }
-          const compilerContracts = await plugin.call('compilerArtefacts', 'getLastCompilationResult')
-          plugin.call('blockchain', 'deployContractAndLibraries',
-            data,
-            args.constructorArgs ? args.constructorArgs : [],
-            null,
-            compilerContracts.getData().contracts,
-            callbacks,
-            confirmationCb
-          )
-        })
+        const compilerContracts = await plugin.call('compilerArtefacts', 'getLastCompilationResult')
+        txReturn = await plugin.call('blockchain', 'deployContractAndLibraries',
+          data,
+          args.constructorArgs ? args.constructorArgs : [],
+          null,
+          compilerContracts.getData().contracts
+        )
       } catch (e) {
-        return this.createErrorResult(`Deployment error: ${e.message || e}`);
+        return this.createErrorResult(`Deployment error: ${e.message || e}`)
       }
 
       const receipt = (txReturn.txResult.receipt)
@@ -504,7 +490,7 @@ export class GetDeployedContractsHandler extends BaseToolHandler {
 
   async execute(args: { network?: string }, plugin: Plugin): Promise<IMCPToolResult> {
     try {
-      const deployedContracts = await plugin.call('udapp', 'getAllDeployedInstances')
+      const deployedContracts = await plugin.call('udappDeployedContracts', 'getDeployedContracts')
       return this.createSuccessResult({
         success: true,
         contracts: deployedContracts,

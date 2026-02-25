@@ -142,6 +142,7 @@ export type EditorAPIType = {
   getPositionAt: (offset: number) => monacoTypes.IPosition
   showCustomDiff: (file: string, content: string) => Promise<void>
   clearAllBreakpoints: () => void
+  hasUnacceptedChanges: () => boolean
 }
 
 /* eslint-disable-next-line */
@@ -196,8 +197,8 @@ export const EditorUI = (props: EditorUIProps) => {
   \t\t\t\t\t\t\t\t${intl.formatMessage({ id: 'editor.importantLinks.text1' })}: https://remix.live/\n
   \t\t\t\t\t\t\t\t${intl.formatMessage({ id: 'editor.importantLinks.text2' })}: https://remix-ide.readthedocs.io/en/latest/\n
   \t\t\t\t\t\t\t\tGithub: https://github.com/ethereum/remix-project\n
-  \t\t\t\t\t\t\t\tDiscord: https://discord.gg/qhpCQGWkmf\n
-  \t\t\t\t\t\t\t\tMedium: https://medium.com/remix-ide\n
+  \t\t\t\t\t\t\t\tDiscord: https://discord.gg/9bw6pMWEAw\n
+  \t\t\t\t\t\t\t\tSubstack: https://ethereumremix.substack.com\n
   \t\t\t\t\t\t\t\tX: https://x.com/ethereumremix\n
   `
   const pasteCodeRef = useRef(false)
@@ -567,6 +568,19 @@ export const EditorUI = (props: EditorUIProps) => {
       currentDecorations: model.deltaDecorations(currentDecorations, decorations),
       registeredDecorations: newRegisteredDecorations,
     }
+  }
+
+  props.editorAPI.hasUnacceptedChanges = () => {
+    let found = false
+    if (disposedWidgets && Object.keys(disposedWidgets).length > 0) {
+      found = !!Object.keys(disposedWidgets).find(file => {
+        const widgets = disposedWidgets[file]
+        if (widgets && Object.keys(widgets).length > 0) {
+          return true
+        }
+      })
+    }
+    return !!found
   }
 
   props.editorAPI.keepDecorationsFor = (filePath: string, plugin: string, typeOfDecoration: string, registeredDecorations: any, currentDecorations: any) => {

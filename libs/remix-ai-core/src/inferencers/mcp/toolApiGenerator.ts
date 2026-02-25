@@ -15,10 +15,23 @@ export interface IMCPToolResult {
   isError?: boolean;
 }
 
+Pay attention that the result of callMCPTool is not a string but an object. 
+You need to extract the text content from the returned object to use it in subsequent tool calls or for output.
+If required, do JSON.parse on the text content to convert it into an object before using it in the next tool call.
+
+Example of correct usage:
+const toolReturnValue = (await callMCPTool('tool_name', { param1: 'value1' })).content[0].text
+
+Every tool returns a success or failed response following this schema:
+{
+  content: [{
+    type: 'text',
+    text: typeof content === 'string' ? content : JSON.stringify(content, replacer, 2)
+  }],
+  isError: false
+};
+
 Examples:
-// Reading files - returns string content directly
-const fileContent = await callMCPTool('file_read', { path: 'contract.sol' });
-const modified = fileContent.replace('old', 'new');
 
 // Multiple tasks 1
 const compiled = await callMCPTool('solidity_compile', { file: 'contract.sol' });

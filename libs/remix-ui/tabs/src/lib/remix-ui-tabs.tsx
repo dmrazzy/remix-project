@@ -28,6 +28,7 @@ export interface TabsUIProps {
   themeQuality: string
   maximize: boolean
   isDebugging?: boolean
+  canRunScenario: boolean
 }
 
 export interface Tab {
@@ -95,6 +96,7 @@ export const TabsUI = (props: TabsUIProps) => {
   tabs.current = props.tabs // we do this to pass the tabs list to the onReady callbacks
   const appContext = useContext(AppContext)
   const { trackMatomoEvent } = useContext(TrackingContext)
+  const canRunScenario = props.canRunScenario
 
   const compileSeq = useRef(0)
   const compileWatchdog = useRef<number | null>(null)
@@ -439,7 +441,29 @@ export const TabsUI = (props: TabsUIProps) => {
     props.plugin.on(compilerName, 'compilationFinished', onFinished)
   }
 
+  const handleRunScenario = async () => {
+    try {
+      const currentFile = await props.plugin.call('fileManager', 'getCurrentFile')
+      if (!currentFile) {
+        await props.plugin.call('notification', 'toast', 'No file selected.')
+        return
+      }
+      setCompileState('compiling')
+      await props.plugin.call('udappTransactions', 'runScenario', currentFile)
+      setCompileState('compiled')
+    } catch (error) {
+      console.error('Error running scenario:', error)
+      await props.plugin.call('notification', 'toast', `Error running scenario: ${error.message}`)
+      setCompileState('idle')
+    }
+  }
+
   const handleCompileClick = async () => {
+    if (canRunScenario) {
+      await handleRunScenario()
+      return
+    }
+
     setCompileState('compiling')
     trackMatomoEvent?.({
       category: 'editor',
@@ -585,7 +609,7 @@ export const TabsUI = (props: TabsUIProps) => {
     const currentFile = tabsState.name
 
     try {
-      const instances = await props.plugin.call('udapp', 'getAllDeployedInstances') || []
+      const instances = await props.plugin.call('udappDeployedContracts', 'getDeployedContracts') || []
 
       const currentFileName = currentFile.split('/').pop()
       const matchingInstances = instances.filter((inst: any) => {
@@ -739,7 +763,9 @@ export const TabsUI = (props: TabsUIProps) => {
   const shouldShowQuickDappBanner = tabsState.currentExt === 'sol' && bannerVisible
 
   let mainLabel = ''
-  if (tabsState.currentExt === 'sql') {
+  if (canRunScenario) {
+    mainLabel = compileState === 'compiling' ? 'Running...' : 'Run'
+  } else if (tabsState.currentExt === 'sql') {
     mainLabel = 'Run SQL'
   } else if (isVegaVisualization) {
     mainLabel = 'Generate Visualization'
@@ -830,7 +856,7 @@ export const TabsUI = (props: TabsUIProps) => {
 
       // Wait a bit for the panel to open and then send the debugging prompt
       setTimeout(async () => {
-        const message = 'Give me more info about current debugging session in Remix IDE'
+        const message = 'Give me more info about current debugging session'
         await props.plugin.call('remixAI', 'chatPipe', 'code_explaining', '', '', message)
       }, 500)
     } catch (err) {
@@ -838,6 +864,9 @@ export const TabsUI = (props: TabsUIProps) => {
     }
   }
 
+  if (canRunScenario) {
+    btnDisabled = compileState === 'compiling'
+  }
   return (
     <>
       <div

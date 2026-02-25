@@ -26,6 +26,8 @@ function EnvironmentPortraitView() {
   }
   const intl = useIntl()
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false)
+  const [isEnvironmentDropdownOpen, setIsEnvironmentDropdownOpen] = useState(false)
+  const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false)
   const [openKebabMenuId, setOpenKebabMenuId] = useState<string | null>(null)
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
   const [editingAlias, setEditingAlias] = useState<string>('')
@@ -329,12 +331,22 @@ function EnvironmentPortraitView() {
         {widgetState.fork.isVisible.resetUI && <ResetUI />}
         {!widgetState.fork.isVisible.forkUI && !widgetState.fork.isVisible.resetUI && (
           <div className="d-flex p-3 pt-0">
-            <Dropdown className="w-100">
+            <Dropdown className="w-100" show={isEnvironmentDropdownOpen} onToggle={(isOpen) => {
+              if (isOpen && isSubCategoryDropdownOpen) setIsSubCategoryDropdownOpen(false)
+              setIsEnvironmentDropdownOpen(isOpen)
+              if (!isOpen) setIsSubCategoryDropdownOpen(false)
+            }}>
               <Dropdown.Toggle
                 as={EnvironmentToggle}
                 data-id="settingsSelectEnvOptions"
                 className="w-100 d-inline-block border form-control"
-                environmentUI={<EnvCategoryUI />}
+                environmentUI={<EnvCategoryUI
+                  isOpen={isSubCategoryDropdownOpen}
+                  onToggle={(isOpen: boolean) => {
+                    setIsSubCategoryDropdownOpen(isOpen)
+                    if (isOpen) setIsEnvironmentDropdownOpen(false)
+                  }}
+                />}
                 style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}
               >
                 <div style={{ flexGrow: 1, overflow: 'hidden', display:'flex', justifyContent:'left' }}>
@@ -344,7 +356,7 @@ function EnvironmentPortraitView() {
                 </div>
               </Dropdown.Toggle>
 
-              <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', zIndex: 1 }}>
+              <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', zIndex: 1, padding: 0 }}>
                 {
                   uniqueDropdownItems.map((provider, index) => {
                     return (
@@ -426,13 +438,13 @@ function EnvironmentPortraitView() {
                 onDeleteAccount={handleDeleteAccount}
               />
 
-              <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }}>
+              <Dropdown.Menu as={CustomMenu} className="w-100 custom-dropdown-items overflow-hidden" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)', padding: 0 }}>
                 {
                   widgetState.accounts.defaultAccounts.map((account, index) => {
                     const accountId = `account-${index}`
                     return (
                       <div key={index}>
-                        <Dropdown.Item data-id={account.account} className="d-flex align-items-center justify-content-between p-1 m-1 account-item-hover" onClick={() => handleAccountSelection(account)} style={{ cursor: 'pointer' }}>
+                        <Dropdown.Item data-id={account.account} className="d-flex align-items-center justify-content-between py-1 px-2 account-item-hover" onClick={() => handleAccountSelection(account)} style={{ cursor: 'pointer' }}>
                           <div className='d-flex flex-column align-items-start'>
                             <div className="text-truncate text-dark d-flex align-items-center">
                               {editingAccountId === accountId ? (
