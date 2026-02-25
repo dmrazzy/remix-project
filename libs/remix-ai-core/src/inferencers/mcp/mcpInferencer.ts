@@ -872,9 +872,8 @@ Use this tool when you need:
    * Execute a tool call from the LLM
    */
   async executeToolForLLM(toolCall: IMCPToolCall, uiCallback?: any): Promise<IMCPToolResult> {
-    // Handle get_tool_schema requests
+    const toolName = toolCall.arguments?.tool_name;
     if (toolCall.name === 'get_tool_schema') {
-      const toolName = toolCall.arguments?.tool_name;
       if (!toolName || typeof toolName !== 'string') {
         return {
           content: [{
