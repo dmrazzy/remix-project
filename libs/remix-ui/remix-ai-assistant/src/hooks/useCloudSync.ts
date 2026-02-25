@@ -48,12 +48,10 @@ export const useCloudSync = ({
    */
   const pullFromCloud = useCallback(async () => {
     if (!storageManager || !syncEnabled) {
-      console.warn('Cloud sync not available or not enabled')
       return
     }
 
     if (!storageManager.isSyncEnabled()) {
-      console.warn('Storage manager sync not enabled')
       return
     }
 
@@ -69,7 +67,6 @@ export const useCloudSync = ({
       if (result && result.success) {
         setSyncStatus('synced')
         setLastSyncTime(result.timestamp)
-        console.log(`Pulled ${result.conversationsSynced} conversations from cloud`)
       } else {
         setSyncStatus('error')
         setSyncError(result?.errors?.join(', ') || 'Unknown sync error')
@@ -93,12 +90,11 @@ export const useCloudSync = ({
    */
   const pushToCloud = useCallback(async () => {
     if (!storageManager || !syncEnabled) {
-      console.warn('Cloud sync not available or not enabled')
       return
     }
 
     if (!storageManager.isSyncEnabled()) {
-      console.warn('Storage manager sync not enabled')
+      return
       return
     }
 
@@ -114,7 +110,6 @@ export const useCloudSync = ({
       if (result && result.success) {
         setSyncStatus('synced')
         setLastSyncTime(result.timestamp)
-        console.log(`Pushed ${result.conversationsSynced} conversations to cloud`)
       } else {
         setSyncStatus('error')
         setSyncError(result?.errors?.join(', ') || 'Unknown sync error')
@@ -125,7 +120,6 @@ export const useCloudSync = ({
       const errorMessage = err instanceof Error ? err.message : 'Failed to push to cloud'
       setSyncStatus('error')
       setSyncError(errorMessage)
-      console.error('Push to cloud failed:', err)
     } finally {
       if (isMountedRef.current) {
         setIsSyncing(false)
@@ -150,7 +144,6 @@ export const useCloudSync = ({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sync failed'
       setSyncError(errorMessage)
-      console.error('Sync failed:', err)
     }
   }, [storageManager, syncEnabled, pullFromCloud, pushToCloud])
 
@@ -160,7 +153,6 @@ export const useCloudSync = ({
   const enableSync = useCallback(() => {
     setSyncEnabled(true)
     setSyncStatus('idle')
-    console.log('Cloud sync enabled')
   }, [])
 
   /**
@@ -176,7 +168,6 @@ export const useCloudSync = ({
       syncTimerRef.current = null
     }
 
-    console.log('Cloud sync disabled')
   }, [])
 
   /**
@@ -191,12 +182,9 @@ export const useCloudSync = ({
     // Set up new timer
     syncTimerRef.current = setInterval(() => {
       if (syncEnabled && storageManager?.isSyncEnabled()) {
-        console.log('Background sync triggered')
         syncNow()
       }
     }, autoSyncInterval)
-
-    console.log(`Background sync started (interval: ${autoSyncInterval}ms)`)
   }, [syncEnabled, storageManager, autoSyncInterval, syncNow])
 
   /**
@@ -217,7 +205,6 @@ export const useCloudSync = ({
    */
   useEffect(() => {
     if (storageManager && syncEnabled && storageManager.isSyncEnabled()) {
-      console.log('Initial pull from cloud on mount')
       pullFromCloud()
     }
   }, []) // Only run on mount

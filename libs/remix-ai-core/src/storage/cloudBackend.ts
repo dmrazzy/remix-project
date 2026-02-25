@@ -60,7 +60,6 @@ export class S3ChatHistoryBackend implements IChatHistoryBackend {
         Bucket: this.bucketName
       }))
       this.isInitialized = true
-      console.log(`S3 backend initialized for bucket: ${this.bucketName}`)
 
       // Load message index (graceful failure)
       try {
@@ -379,7 +378,6 @@ export class S3ChatHistoryBackend implements IChatHistoryBackend {
         await this.setLastSyncTime(result.timestamp)
       }
 
-      console.log(`Push completed: ${result.conversationsSynced} conversations, ${result.messagesSynced} messages`)
     } catch (error) {
       result.errors?.push(error.message)
     }
@@ -423,7 +421,6 @@ export class S3ChatHistoryBackend implements IChatHistoryBackend {
       }
 
       result.success = true
-      console.log(`Pull completed: ${result.conversationsSynced} conversations, ${result.messagesSynced} messages`)
     } catch (error) {
       result.errors = [error.message]
     }

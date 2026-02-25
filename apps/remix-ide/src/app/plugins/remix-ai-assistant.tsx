@@ -236,7 +236,6 @@ export class RemixAIAssistant extends ViewPlugin {
       const archivedIds = await this.storageManager.autoArchiveOldConversations(threshold)
 
       if (archivedIds.length > 0) {
-        console.log(`Auto-archived ${archivedIds.length} conversations older than ${threshold} days`)
         await this.loadConversations()
       }
     } catch (error) {

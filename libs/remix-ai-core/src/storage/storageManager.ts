@@ -307,7 +307,6 @@ export class ChatHistoryStorageManager {
       if (result.success) {
         // Cloud backend will return data, we need to merge it
         // This is handled by the cloud backend's pull implementation
-        console.log(`Pulled ${result.conversationsSynced} conversations, ${result.messagesSynced} messages from cloud`)
       }
       return result
     } catch (error) {
@@ -335,7 +334,6 @@ export class ChatHistoryStorageManager {
       if (result.success) {
         // Clear sync queue on success
         this.syncQueue = []
-        console.log(`Synced ${result.conversationsSynced} conversations, ${result.messagesSynced} messages to cloud`)
       }
       return result
     } catch (error) {

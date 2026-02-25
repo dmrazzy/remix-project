@@ -51,7 +51,6 @@ interface AiChatPromptAreaForHistoryProps {
 
 export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHistoryProps) {
   const [showMenu, setShowMenu] = useState(false)
-  console.log('Rendering AiChatPromptAreaForHistory with messages:', props.messages)
   return (
     <section
       id="remix-ai-prompt-area"
