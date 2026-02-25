@@ -42,6 +42,7 @@ export interface RemixUiRemixAiAssistantProps {
   onArchiveConversation?: (id: string) => void
   onDeleteConversation?: (id: string) => void
   onToggleHistorySidebar?: () => void
+  onSearch?: (query: string) => Promise<ConversationMetadata[]>
 }
 export interface RemixUiRemixAiAssistantHandle {
   /** Programmatically send a prompt to the chat (returns after processing starts) */
@@ -956,6 +957,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             onDeleteConversation={props.onDeleteConversation || (() => {})}
             onToggleArchived={() => setShowArchivedConversations(!showArchivedConversations)}
             onClose={props.onToggleHistorySidebar || (() => {})}
+            onSearch={props.onSearch}
             isFloating={false}
             isMaximized={true}
             theme={themeTracker?.name}
@@ -1028,6 +1030,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                   onDeleteConversation={props.onDeleteConversation || (() => {})}
                   onToggleArchived={() => setShowArchivedConversations(!showArchivedConversations)}
                   onClose={props.onToggleHistorySidebar || (() => {})}
+                  onSearch={props.onSearch}
                   isFloating={false}
                   isMaximized={false}
                   theme={themeTracker?.name}

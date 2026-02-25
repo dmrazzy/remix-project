@@ -244,6 +244,35 @@ export class RemixAIAssistant extends ViewPlugin {
     }
   }
 
+  async searchConversations(query: string): Promise<ConversationMetadata[]> {
+    if (!this.storageManager || !query.trim()) return this.conversations
+
+    const lowerQuery = query.toLowerCase()
+    const results: ConversationMetadata[] = []
+
+    for (const conv of this.conversations) {
+      if (
+        conv.title.toLowerCase().includes(lowerQuery) ||
+        conv.preview.toLowerCase().includes(lowerQuery)
+      ) {
+        results.push(conv)
+        continue
+      }
+
+      // Search full message content
+      try {
+        const messages = await this.storageManager.getMessages(conv.id)
+        if (messages.some(msg => msg.content.toLowerCase().includes(lowerQuery))) {
+          results.push(conv)
+        }
+      } catch {
+        // Skip conversation if messages can't be loaded
+      }
+    }
+
+    return results
+  }
+
   onDeactivation() {}
 
   async makePluginCall(pluginName: string, methodName: string, payload: any) {
@@ -340,6 +369,7 @@ export class RemixAIAssistant extends ViewPlugin {
         onArchiveConversation={this.archiveConversation.bind(this)}
         onDeleteConversation={this.deleteConversation.bind(this)}
         onToggleHistorySidebar={this.toggleHistorySidebar.bind(this)}
+        onSearch={this.searchConversations.bind(this)}
       />
     )
   }

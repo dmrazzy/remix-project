@@ -14,6 +14,7 @@ interface ChatHistorySidebarProps {
   onDeleteConversation: (id: string) => void
   onToggleArchived: () => void
   onClose: () => void
+  onSearch?: (query: string) => Promise<ConversationMetadata[]>
   isFloating?: boolean
   isMaximized?: boolean
   theme?: string
@@ -29,30 +30,47 @@ export const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = ({
   onDeleteConversation,
   onToggleArchived,
   onClose,
+  onSearch,
   isFloating = false,
   isMaximized = false,
   theme = 'dark'
 }) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [filteredConversations, setFilteredConversations] = useState<ConversationMetadata[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
   useEffect(() => {
-    let filtered = conversations
+    let cancelled = false
 
-    // Filter by archived status
-    filtered = filtered.filter(conv => conv.archived === showArchived)
+    const doFilter = async () => {
+      if (searchQuery.trim() && onSearch) {
+        setIsSearching(true)
+        try {
+          const results = await onSearch(searchQuery)
+          if (!cancelled) {
+            setFilteredConversations(results.filter(conv => conv.archived === showArchived))
+          }
+        } finally {
+          if (!cancelled) setIsSearching(false)
+        }
+        return
+      }
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(conv =>
-        conv.title.toLowerCase().includes(query) ||
-        conv.preview.toLowerCase().includes(query)
-      )
+      // Local filter: archived status + title/preview
+      let filtered = conversations.filter(conv => conv.archived === showArchived)
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase()
+        filtered = filtered.filter(conv =>
+          conv.title.toLowerCase().includes(query) ||
+          conv.preview.toLowerCase().includes(query)
+        )
+      }
+      if (!cancelled) setFilteredConversations(filtered)
     }
 
-    setFilteredConversations(filtered)
-  }, [conversations, showArchived, searchQuery])
+    doFilter()
+    return () => { cancelled = true }
+  }, [conversations, showArchived, searchQuery, onSearch])
 
   const archivedCount = conversations.filter(c => c.archived).length
 
@@ -81,7 +99,7 @@ export const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = ({
 
         {/* Search Bar */}
         <div className="search-bar mb-2 p-1">
-          <i className="fas fa-search search-icon"></i>
+          <i className={`fas ${isSearching ? 'fa-spinner fa-spin' : 'fa-search'} search-icon`}></i>
           <input
             type="text"
             className="form-control search-input ps-4 "
