@@ -27,8 +27,9 @@ module.exports = {
 
     },
     'Should show hover over contract in editor #group1': function (browser: NightwatchBrowser) {
-        const path = "//*[contains(text(),'BallotHoverTest')]"
-        checkEditorHoverContent(browser, path, 'contract BallotHoverTest is BallotHoverTest')
+        browser.scrollToLine(10)
+        const path = "//*[@class='view-line' and contains(.,'contract') and contains(.,'BallotHoverTest')]//span//span[contains(.,'BallotHoverTest')]"
+        checkEditorHoverContent(browser, path, 'contract BallotHoverTest')
         checkEditorHoverContent(browser, path, 'contracts/3_BallotHover.sol 10:0')
         checkEditorHoverContent(browser, path, '@title Ballot')
     },
