@@ -82,7 +82,7 @@ export const UserMenuCompact: React.FC<UserMenuCompactProps> = ({
           <div className="user-menu-compact-info">
             <span className="user-menu-compact-name">{getUserDisplayName()}</span>
           </div>
-        )}        
+        )}
       </button>
       {showDropdown && (
         <>

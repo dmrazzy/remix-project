@@ -143,7 +143,7 @@ export class CodeExecutor {
             }
           } catch (e) {
             console.warn(`[MCP Code mode] - Failed to parse tool output content for tool "${name}":`, e)
-          }          
+          }
 
           self.toolCallRecords.push({
             name,

@@ -1003,14 +1003,14 @@ export class AddInstanceHandler extends BaseToolHandler {
         const compilerAbstract = await plugin.call('compilerArtefacts', 'getArtefactsByContractName', args.contractName) as any;
         data = getContractData(args.contractName, compilerAbstract)
       } catch (e) {}
-            
+
       // Add the instance to udappDeployedContracts
       await plugin.call(
-        'udappDeployedContracts', 
-        'addInstance', 
-        args.contractAddress, 
-        abi, 
-        args.contractName, 
+        'udappDeployedContracts',
+        'addInstance',
+        args.contractAddress,
+        abi,
+        args.contractName,
         data || null
       );
 
