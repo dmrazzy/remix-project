@@ -468,7 +468,7 @@ module.exports = {
       .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 205', 60000)
   },
 
-  'Should display owner state during contract creation #group6': function (browser: NightwatchBrowser) {
+  'Should update state during contract creation and function call #group6': function (browser: NightwatchBrowser) {
     browser
       .clickLaunchIcon('solidity')
       .testContracts('owner.sol', sources[7]['owner.sol'], ['Owner'])
