@@ -156,7 +156,7 @@ export interface RunScriptArgs {
 
 export interface AddInstanceArgs {
   contractAddress: string;
-  abi: any[];
+  abi: any[] | string;
   contractName: string;
 }
 
