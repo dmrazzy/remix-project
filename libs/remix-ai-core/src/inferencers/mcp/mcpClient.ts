@@ -561,7 +561,6 @@ export class MCPClient {
       }
 
       this.tools = response.result.tools || [];
-
       // Update cache
       this.toolListCache = {
         tools: this.tools,

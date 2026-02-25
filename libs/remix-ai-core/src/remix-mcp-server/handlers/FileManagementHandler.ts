@@ -14,7 +14,8 @@ import {
   FileMoveArgs,
   FileCopyArgs,
   DirectoryListArgs,
-  FileOperationResult
+  FileOperationResult,
+  FileReplacerArgs
 } from '../types/mcpTools';
 import { Plugin } from '@remixproject/engine';
 
@@ -23,7 +24,14 @@ import { Plugin } from '@remixproject/engine';
  */
 export class FileReadHandler extends BaseToolHandler {
   name = 'file_read';
-  description = 'Read contents of a file';
+  description = `Read contents of a file
+  Returns an object with content (string) and metadata:
+  {
+    success: boolean,
+    path: string,
+    content: string,
+    size: number
+  }`
   inputSchema = {
     type: 'object',
     properties: {
@@ -63,11 +71,77 @@ export class FileReadHandler extends BaseToolHandler {
         path: args.path,
         content: content,
         size: content.length
-      };
-
-      return this.createSuccessResult(result);
+      }
+      return this.createSuccessResult(result)
     } catch (error) {
-      return this.createErrorResult(`Failed to read file: ${error.message}`);
+      return this.createErrorResult(`Failed to read file: ${error.message}`)
+    }
+  }
+}
+
+/**
+ * File Read Tool Handler
+ */
+export class FileReplacerHandler extends BaseToolHandler {
+  name = 'file_replace';
+  description = `Replace content in a file`
+  inputSchema = {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'File path to replace content in'
+      },
+      regEx: {
+        type: 'string',
+        description: 'Regular expression pattern to match content to replace'
+      },
+      contentToReplace: {
+        type: 'string',
+        description: 'New content to replace with'
+      }
+    },
+    required: ['path', 'regEx', 'contentToReplace']
+  };
+
+  getPermissions(): string[] {
+    return ['file:write'];
+  }
+
+  validate(args: any): boolean | string {
+    const required = this.validateRequired(args, ['path', 'regEx', 'contentToReplace']);
+    if (required !== true) return required;
+
+    const types = this.validateTypes(args, { path: 'string', regEx: 'string', contentToReplace: 'string' });
+    if (types !== true) return types;
+
+    return true;
+  }
+
+  async execute(args: FileReplacerArgs, plugin: Plugin): Promise<IMCPToolResult> {
+    try {
+      const exists = await plugin.call('fileManager', 'exists', args.path)
+      if (!exists) {
+        return this.createErrorResult(`File not found: ${args.path}`);
+      }
+
+      const originContent = await plugin.call('fileManager', 'readFile', args.path)
+
+      const content = originContent.replace(new RegExp(args.regEx, 'g'), args.contentToReplace)
+
+      // make sure the LLM has actually updated the content if that is intended.
+      const cleanContent = typeof content === 'string' ? content : String(content)
+      if (cleanContent === originContent && originContent !== '') {
+        return this.createErrorResult(`File content is the same as the current content. No changes made to: ${args.path} . Is that intended? If not, makre sure the content you are passing is different from the existing content.`);
+      }
+      await plugin.call('editor', 'showCustomDiff', args.path, cleanContent)
+
+      const result: any = {
+        success: true
+      }
+      return this.createSuccessResult(result)
+    } catch (error) {
+      return this.createErrorResult(`Failed to replace content in file: ${error.message}`)
     }
   }
 }
@@ -77,7 +151,8 @@ export class FileReadHandler extends BaseToolHandler {
  */
 export class FileWriteHandler extends BaseToolHandler {
   name = 'file_write';
-  description = 'Write content to a file';
+  description = `Write content to a file.
+  Always wrap string with a backquote to avoid issues with special characters in the content and to ensure multiline content is properly handled.`
   inputSchema = {
     type: 'object',
     properties: {
@@ -119,6 +194,13 @@ export class FileWriteHandler extends BaseToolHandler {
   async execute(args: FileWriteArgs, plugin: Plugin): Promise<IMCPToolResult> {
     try {
       const exists = await plugin.call('fileManager', 'exists', args.path)
+      if (exists) {
+        const hasUnacceptedChanges = await plugin.call('editor', 'hasUnacceptedChanges')
+        console.log(`[FileWriteHandler] - File ${args.path} already exists. Checking for unaccepted changes: ${hasUnacceptedChanges}`);
+        if (hasUnacceptedChanges) {
+          return this.createErrorResult(`Project has unaccepted changes. Please review and accept/reject changes before overwriting.`);
+        }
+      }
       try {
         if (!exists) {await plugin.call('fileManager', 'writeFile', args.path, "")}
         await plugin.call('fileManager', 'open', args.path)
@@ -127,7 +209,12 @@ export class FileWriteHandler extends BaseToolHandler {
       }
       await new Promise(resolve => setTimeout(resolve, 1000))
 
+      // make sure the LLM has actually updated the content if that is intended.
+      const currentContent = await plugin.call('fileManager', 'readFile', args.path)
       const cleanContent = typeof args.content === 'string' ? args.content : String(args.content)
+      if (cleanContent === currentContent && currentContent !== '') {
+        return this.createErrorResult(`File content is the same as the current content. No changes made to: ${args.path} . Is that intended? If not, makre sure the content you are passing is different from the existing content.`);
+      }
       await plugin.call('editor', 'showCustomDiff', args.path, cleanContent)
 
       const result: FileOperationResult = {
@@ -611,6 +698,14 @@ export function createFileManagementTools(): RemixToolDefinition[] {
       category: ToolCategory.FILE_MANAGEMENT,
       permissions: ['file:read'],
       handler: new FileExistsHandler()
+    },
+    {
+      name: 'file_replace',
+      description: 'Replace content in a file',
+      inputSchema: new FileReplacerHandler().inputSchema,
+      category: ToolCategory.FILE_MANAGEMENT,
+      permissions: ['file:write'],
+      handler: new FileReplacerHandler()
     }
   ];
 }

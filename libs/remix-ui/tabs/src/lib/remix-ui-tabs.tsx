@@ -585,7 +585,7 @@ export const TabsUI = (props: TabsUIProps) => {
     const currentFile = tabsState.name
 
     try {
-      const instances = await props.plugin.call('udapp', 'getAllDeployedInstances') || []
+      const instances = await props.plugin.call('udappDeployedContracts', 'getDeployedContracts') || []
 
       const currentFileName = currentFile.split('/').pop()
       const matchingInstances = instances.filter((inst: any) => {
@@ -830,7 +830,7 @@ export const TabsUI = (props: TabsUIProps) => {
 
       // Wait a bit for the panel to open and then send the debugging prompt
       setTimeout(async () => {
-        const message = 'Give me more info about current debugging session in Remix IDE'
+        const message = 'Give me more info about current debugging session'
         await props.plugin.call('remixAI', 'chatPipe', 'code_explaining', '', '', message)
       }, 500)
     } catch (err) {

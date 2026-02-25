@@ -40,6 +40,8 @@ module.exports = {
       .debugTransaction(0)
       .pause(2000)
       .goToVMTraceStep(327)
+      .pause(500)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 327', 10000)
       .waitForElementVisible('*[data-id="stateLocalsContent"]')
       .pause(1000) // Wait for data to load
       // First expand "locals" to see variable names
@@ -86,6 +88,133 @@ module.exports = {
       .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 352', 60000)
   },
 
+  'Should display transaction details #group1': function (browser: NightwatchBrowser) {
+    // The debugger is already running from previous test
+    // Transaction details should be visible in the debugger view
+    browser
+      .waitForElementVisible('*[data-id="callTraceHeader"]', 10000)
+      .pause(2000) // Wait for transaction details to load
+      // Check if transaction details section exists
+      .waitForElementVisible('*[data-id="txDetails"]', 10000)
+      // Verify Status field
+      .waitForElementVisible('*[data-id="txStatus"]', 10000)
+      .waitForElementContainsText('*[data-id="txStatus"]', 'Failed')
+      // Verify Tx Fee is visible and not N/A
+      .waitForElementContainsText('*[data-id="txFee"]', '500940000000000 Wei')
+      // Verify Block number is visible
+      .waitForElementContainsText('*[data-id="txBlock"]', '2')
+      // Verify Tx Type is visible
+      .waitForElementContainsText('*[data-id="txType"]', 'Type 0')
+      // Verify Timestamp is visible
+      .waitForElementVisible('*[data-id="txTimestamp"]')
+      .getText('*[data-id="txTimestamp"]', (result) => {
+        const value = typeof result.value === 'string' ? result.value : ''
+        browser.assert.ok(value !== 'N/A' && value.length > 0, 'Timestamp should be displayed')
+      })
+      // Verify Gas Price is visible
+      .waitForElementContainsText('*[data-id="txGasPrice"]', '20000000000 Wei')
+      // Verify From address is visible
+      .waitForElementContainsText('*[data-id="txFrom"]', '0x5B38...ddC4')
+      // Verify Gas Used is visible
+      .waitForElementContainsText('*[data-id="txGasUsed"]', '25047')
+      // Verify To address is visible
+      .waitForElementContainsText('*[data-id="txTo"]', '0xd914...9138')
+      // Verify Tx Index is visible
+      .waitForElementContainsText('*[data-id="txIndex"]', '0')
+      // Verify Function name is visible
+      .waitForElementContainsText('*[data-id="txFunction"]', 'createProject')
+      // Verify Tx Nonce is visible
+      .waitForElementContainsText('*[data-id="txNonce"]', '1')
+      // Verify Value is visible
+      .waitForElementContainsText('*[data-id="txValue"]', '0 Wei')
+  },
+
+  'Should click Ask RemixAI while debugging and open assistant on right side #group1': function (browser: NightwatchBrowser) {
+    browser
+      // Step 1: Stop any existing debugger session
+      .perform((done) => {
+        browser.elements('css selector', '*[id="debuggerTransactionStartButtonContainer"]', (result) => {
+          if (Array.isArray(result.value) && result.value.length > 0) {
+            // Check if the stop button is visible (debugger is running)
+            browser.isVisible('*[id="debuggerTransactionStartButtonContainer"]', (visResult) => {
+              if (visResult.value === true) {
+                browser
+                  .click('*[id="debuggerTransactionStartButtonContainer"]')
+                  .pause(1000)
+                  .perform(() => done())
+              } else {
+                done()
+              }
+            })
+          } else {
+            done()
+          }
+        })
+      })
+      // Step 2: Open AI assistant and ensure it's on the left side
+      .clickLaunchIcon('remixaiassistant')
+      .waitForElementVisible('*[data-id="remix-ai-assistant"]', 10000)
+      .waitForElementPresent({
+        selector: "//*[@data-id='remix-ai-assistant-ready']",
+        locateStrategy: 'xpath',
+        timeout: 120000
+      })
+      .pause(500)
+      // Move assistant to left side if it's on the right
+      .perform((done) => {
+        browser.elements('css selector', '*[data-id="movePluginToLeft"]', (result) => {
+          if (Array.isArray(result.value) && result.value.length > 0) {
+            // Assistant is on right side, move it to left
+            browser
+              .click('*[data-id="movePluginToLeft"]')
+              .pause(1000)
+              .perform(() => done())
+          } else {
+            // Already on left side
+            done()
+          }
+        })
+      })
+      // Verify assistant is on the left side
+      .waitForElementVisible('*[data-id="movePluginToRight"]', 5000)
+      .waitForElementVisible('#side-panel', 5000) // Left panel should be visible
+      // Clear any existing chat
+      .assistantClearChat()
+      .pause(500)
+      // Step 3: Start a new debugging session
+      .clickLaunchIcon('udapp')
+      .clearConsole()
+      .clickFunction(0, 0, { types: 'string name, uint256 goal', values: '"test", 100' })
+      .pause(2000)
+      .debugTransaction(0)
+      .waitForElementVisible('*[data-id="callTraceHeader"]', 60000)
+      .pause(1000)
+      // Step 4: Click Ask RemixAI button while debugging
+      .waitForElementVisible('*[data-id="ask-remixai-action"]', 10000)
+      .click('*[data-id="ask-remixai-action"]')
+      .pause(2000) // Wait for the assistant to process and move to right side
+      // Step 5: Verify AI assistant is now on the right side panel
+      .waitForElementVisible('#right-side-panel', 10000) // Right side panel should be visible
+      .waitForElementVisible('*[data-id="movePluginToLeft"]', 10000) // Move to left button indicates it's on right side
+      .waitForElementVisible('*[data-id="remix-ai-assistant"]', 10000) // Assistant should be visible
+      .waitForElementPresent({
+        selector: "//*[@data-id='remix-ai-assistant-ready']",
+        locateStrategy: 'xpath',
+        timeout: 120000
+      })
+      .pause(1000) // Wait for the prompt to be sent
+      // Verify the correct prompt was sent to the AI assistant
+      .waitForElementVisible({
+        locateStrategy: 'xpath',
+        selector: '//div[contains(@class,"chat-bubble") and contains(.,"Give me more info about current debugging session")]'
+      }, 10000)
+      // Wait for AI to finish responding
+      .waitForElementPresent({
+        locateStrategy: 'xpath',
+        selector: "//*[@data-id='remix-ai-streaming' and @data-streaming='false']"
+      }, 60000) // Wait for streaming to complete
+  },
+
   'Should display solidity imported code while debugging github import #group2': function (browser: NightwatchBrowser) {
     browser
       .clearConsole()
@@ -106,8 +235,8 @@ module.exports = {
           'current displayed content is not from the ERC20 source code')
       })
       .goToVMTraceStep(10)
-      .pause(500)
-      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 10')
+      .pause(300)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 10', 10000)
   },
 
   'Should display correct source highlighting while debugging a contract which has ABIEncoderV2 #group2': function (browser: NightwatchBrowser) {
@@ -130,6 +259,8 @@ module.exports = {
       .waitForElementVisible('*[data-id="callTraceHeader"]')
       .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 131')
       .goToVMTraceStep(261)
+      .pause(500)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 261', 10000)
       .waitForElementPresent('.highlightLine8')
       /*
         for the test below:
@@ -141,7 +272,9 @@ module.exports = {
       */
 
       .goToVMTraceStep(265)
-      .pause(1000)
+      .pause(500)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 265', 10000)
+      .pause(500)
       .execute(function () {
         const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
         if (solidityLocals) {
@@ -152,47 +285,57 @@ module.exports = {
       .pause(500)
       .checkVariableDebug('soliditylocals', localVariable_step266_ABIEncoder) // locals should not be initiated at this point, only idAsk should
       .goToVMTraceStep(717)
-      .pause(1000)
+      .pause(500)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 717', 10000)
+      .pause(500)
 
       .checkVariableDebug('soliditylocals', localVariable_step717_ABIEncoder) // all locals should be initiated
       .clearTransactions()
   },
 
-  // TODO: will be improved
-  // 'Should load more solidity locals array #group3': function (browser: NightwatchBrowser) {
-  //   browser
-  //     .clickLaunchIcon('solidity')
-  //     .testContracts('locals.sol', sources[3]['locals.sol'], ['testLocals'])
-  //     .clickLaunchIcon('udapp')
-  //     .createContract('')
-  //     .pause(2000)
-  //     .clearConsole()
-  //     .clickInstance(0)
-  //     .clickFunction(0, 0)
-  //     .pause(2000)
-  //     .debugTransaction(0)
-  //     .waitForElementPresent('*[data-id="callTraceHeader"]')
-  //     .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 27')
-  //     .goToVMTraceStep(5453)
-  //     .waitForElementVisible('*[data-id="stateLocalsContent"]')
-  //     .pause(2000) // Wait longer for large array to process
-  //     // Expand "locals" first
-  //     .execute(function () {
-  //       const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
-  //       if (solidityLocals) {
-  //         const firstIcon = solidityLocals.querySelector('.json-expand-icon')
-  //         if (firstIcon) (firstIcon as any).click()
-  //       }
-  //     })
-  //     .pause(2000) // Wait longer for variables to render
-  //     // Expand the array variable to see its values
-  //     .waitForElementVisible('*[data-id="array-expand-icon"]', 20000)
-  //     .click('*[data-id="array-expand-icon"]')
-  //     .pause(500)
-  //     .waitForElementContainsText('[data-id="array-json-nested"]', '9', 60000)
-  //     .clearDeployedContracts()
-  //     .clearConsole().pause(2000)
-  // },
+  'Should load more solidity locals array #group3': function (browser: NightwatchBrowser) {
+    browser
+      .clickLaunchIcon('solidity')
+      .testContracts('locals.sol', sources[3]['locals.sol'], ['testLocals'])
+      .clickLaunchIcon('udapp')
+      .createContract('')
+      .pause(2000)
+      .clearConsole()
+      .clickInstance(0)
+      .clickFunction(0, 0)
+      .pause(2000)
+      .debugTransaction(0)
+      .waitForElementPresent('*[data-id="callTraceHeader"]', 60000)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step:', 60000)
+      .pause(1000)
+      // Use goToVMTraceStep which intelligently uses jumpTo method when available
+      // This avoids clicking 5453 times and instead uses stepManager.jumpTo(5453) directly
+      .goToVMTraceStep(5453)
+      .pause(2000)
+      // Verify we reached the correct step
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 5453', 10000)
+      .waitForElementVisible('*[data-id="stateLocalsContent"]', 10000)
+      .pause(2000) // Wait for large array to be processed and rendered
+      // Expand "locals" first to see variable names
+      .execute(function () {
+        const solidityLocals = document.querySelector('[data-id="solidityLocals"]')
+        if (solidityLocals) {
+          const firstIcon = solidityLocals.querySelector('.json-expand-icon')
+          if (firstIcon) (firstIcon as any).click()
+        }
+      })
+      .pause(2000) // Wait for variables to render
+      // Expand the array variable to see its values
+      .waitForElementVisible('*[data-id="array-expand-icon"]', 20000)
+      .click('*[data-id="array-expand-icon"]')
+      .pause(1000)
+      // Verify array content is displayed
+      .waitForElementContainsText('[data-id="array-json-nested"]', '9', 60000)
+      // Cleanup
+      .clearDeployedContracts()
+      .clearConsole()
+      .pause(1000)
+  },
 
   'Should debug using generated sources #group4': function (browser: NightwatchBrowser) {
     browser
@@ -211,6 +354,9 @@ module.exports = {
       .debugTransaction(0) // start debugging again with generated sources
       .pause(4000)
       .goToVMTraceStep(39)
+      .pause(500)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 39', 10000)
+      .pause(500)
       .getEditorValue((content) => {
         browser.assert.ok(content.indexOf('if slt(sub(dataEnd, headStart), 32)') !== -1, 'current displayed content is not a generated source')
       })
@@ -256,8 +402,8 @@ module.exports = {
       .pause(5000) // Wait for the API call to start debugging and open the panel      
       .waitForElementVisible('*[data-id="callTraceHeader"]')
       .goToVMTraceStep(154)
-      .pause(1000)
-      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 154', 60000)
+      .pause(500)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 154', 10000)
   },
 
   'Should start debugging using remix debug nodes (rinkeby) #group4': '' + function (browser: NightwatchBrowser) {
@@ -297,9 +443,7 @@ module.exports = {
       .checkVariableDebug('soliditystate', { number: { value: '0', type: 'uint256', constant: false, immutable: false } })
   },
 
-  // Commented out: "Go to Revert" button feature is not currently implemented
-  // TODO: Re-enable when the feature is available
-  /* 'Should debug reverted transactions #group5': function (browser: NightwatchBrowser) {
+  'Should debug reverted transactions and jump to revert #group5': function (browser: NightwatchBrowser) {
     browser
       .testContracts('reverted.sol', sources[6]['reverted.sol'], ['A', 'B', 'C'])
       .clickLaunchIcon('udapp')
@@ -308,17 +452,21 @@ module.exports = {
       .pause(500)
       .clickInstance(0)
       .clickFunction(0, 0)
+      .pause(2000)
       .debugTransaction(1)
       .waitForElementVisible('*[data-id="callTraceHeader"]', 60000)
-      .pause(2000) // Wait for trace to fully load
+      // Jump to Revert button should be visible when transaction has reverted
+      .waitForElementVisible('*[data-id="btnJumpToRevert"]', 10000)
+      // Go to some other step first
       .goToVMTraceStep(80)
       .pause(1000)
       .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 80', 60000)
-      .waitForElementVisible('*[data-id="debugGoToRevert"]', 60000)
-      .click('*[data-id="debugGoToRevert"]')
-      .pause(1000)
-      .waitForElementContainsText('*[data-id="asmitems"] div[selected="selected"]', '114 REVERT')
-  } */
+      // Now click Jump to Revert button
+      .click('*[data-id="btnJumpToRevert"]')
+      .pause(500)
+      // Verify we jumped to the revert step
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 205', 60000)
+  },
 }
 
 const sources = [
@@ -452,12 +600,7 @@ const sources = [
         }
         function callA() public {
             p = 123;
-            try b.callB() {
-
-            }
-            catch (bytes memory reason) {
-
-            }
+            b.callB();
         }
     }
 

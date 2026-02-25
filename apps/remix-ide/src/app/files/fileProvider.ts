@@ -94,9 +94,9 @@ export default class FileProvider {
   async get (path, cb, options = { encoding: 'utf8' }) {
     cb = cb || function () { /* do nothing. */ }
     path = this.getPathFromUrl(path) || path // ensure we actually use the normalized path from here
-    console.log('Getting content of ' + path)
+    // console.log('Getting content of ' + path)
     const unprefixedpath = this.removePrefix(path)
-    console.log('Unprefixed path: ' + unprefixedpath)
+    // console.log('Unprefixed path: ' + unprefixedpath)
     try {
       const content = await (window as any).remixFileSystem.readFile(unprefixedpath, options)
       if (cb) cb(null, content)
@@ -313,4 +313,3 @@ export default class FileProvider {
     return !!relative && relative.split(pathModule.sep)[0] !== '..'
   }
 }
-
