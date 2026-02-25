@@ -142,6 +142,7 @@ export type EditorAPIType = {
   getPositionAt: (offset: number) => monacoTypes.IPosition
   showCustomDiff: (file: string, content: string) => Promise<void>
   clearAllBreakpoints: () => void
+  hasUnacceptedChanges: () => boolean
 }
 
 /* eslint-disable-next-line */
@@ -567,6 +568,19 @@ export const EditorUI = (props: EditorUIProps) => {
       currentDecorations: model.deltaDecorations(currentDecorations, decorations),
       registeredDecorations: newRegisteredDecorations,
     }
+  }
+
+  props.editorAPI.hasUnacceptedChanges = () => {
+    let found = false
+    if (disposedWidgets && Object.keys(disposedWidgets).length > 0) {
+      found = !!Object.keys(disposedWidgets).find(file => {
+        const widgets = disposedWidgets[file]
+        if (widgets && Object.keys(widgets).length > 0) {
+          return true
+        }
+      })
+    }
+    return !!found
   }
 
   props.editorAPI.keepDecorationsFor = (filePath: string, plugin: string, typeOfDecoration: string, registeredDecorations: any, currentDecorations: any) => {
