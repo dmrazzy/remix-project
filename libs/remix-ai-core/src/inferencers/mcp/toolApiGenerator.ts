@@ -43,6 +43,8 @@ const files = ['contracts/Token.sol', 'contracts/NFT.sol', 'contracts/DAO.sol'];
 for (const file of files) {
   await callMCPTool('solidity_compile', { file: 'contracts/' + file });
 }
+
+Do not use remix.call(..) or any other method to interact with Remix, only use callMCPTool as described above.
 `;
   }
 

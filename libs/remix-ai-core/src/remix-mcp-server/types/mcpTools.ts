@@ -154,6 +154,12 @@ export interface RunScriptArgs {
   file: string
 }
 
+export interface AddInstanceArgs {
+  contractAddress: string;
+  abi: any[] | string;
+  contractName: string;
+}
+
 /**
  * Math utilities argument types
  */
@@ -240,7 +246,7 @@ export interface FileOperationResult {
   success: boolean;
   path: string;
   message?: string;
-  content?: string;
+  payload?: string;
   size?: number;
   lastModified?: string;
 }
@@ -272,6 +278,13 @@ export interface DeploymentResult {
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface RunScriptResult {}
+
+export interface AddInstanceResult {
+  success: boolean;
+  contractAddress: string;
+  contractName: string;
+  message?: string;
+}
 
 export interface ContractInteractionResult {
   success: boolean;
