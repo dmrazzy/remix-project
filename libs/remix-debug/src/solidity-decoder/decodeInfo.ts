@@ -304,7 +304,8 @@ function parseType (type, stateDefinitions, contractName, location) {
     int: int,
     uint: uint,
     mapping: mapping,
-    function: functionType
+    function: functionType,
+    ShortString: fixedByteArray
   }
   const currentType = typeClass(type)
   if (currentType === null) {
