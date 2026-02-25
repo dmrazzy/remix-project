@@ -295,8 +295,7 @@ module.exports = {
       .click('*[data-id="confirm-delete-one-btn"]')
       .pause(5000)
       .execute(function () {
-        // Re-focus quick-dapp-v2 tab (deleteWorkspace shifts mainPanel focus)
-        const tab = document.querySelector('[plugin="quick-dapp-v2"]') as HTMLElement
+        const tab = document.querySelector('[data-path="quick-dapp-v2"]') as HTMLElement
         if (tab) tab.click()
       })
       .pause(2000)
@@ -486,6 +485,11 @@ module.exports = {
       .waitForElementVisible('*[data-id="confirm-delete-all-btn"]', 5000)
       .click('*[data-id="confirm-delete-all-btn"]')
       .pause(5000)
+      .execute(function () {
+        const tab = document.querySelector('[data-path="quick-dapp-v2"]') as HTMLElement
+        if (tab) tab.click()
+      })
+      .pause(2000)
       .waitForElementVisible('*[data-id="quickdapp-getting-started"]', 30000)
       .assert.textContains('*[data-id="quickdapp-getting-started"]', 'Getting Started')
   },
@@ -598,7 +602,12 @@ module.exports = {
       .pause(1000)
       .waitForElementVisible('*[data-id="confirm-delete-one-btn"]', 5000)
       .click('*[data-id="confirm-delete-one-btn"]')
-      .pause(3000)
+      .pause(5000)
+      .execute(function () {
+        const tab = document.querySelector('[data-path="quick-dapp-v2"]') as HTMLElement
+        if (tab) tab.click()
+      })
+      .pause(2000)
       .waitForElementVisible('*[data-id="quickdapp-getting-started"]', 30000)
       .assert.textContains('*[data-id="quickdapp-getting-started"]', 'Getting Started')
       .end()
