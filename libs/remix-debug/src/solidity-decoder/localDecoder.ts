@@ -22,10 +22,16 @@ export async function solidityLocals (vmtraceIndex, internalTreeCall, stack, mem
       anonymousIncr++
     }
     try {
+      // Check if variableType is available before attempting to decode
+      if (!variable.slot.variableType) {
+        locals[name] = { error: '<type information not available>', type: variable.slot.variableName || 'unknown' }
+        continue
+      }
       locals[name] = await variable.slot.variableType.decodeFromStack(variable.position, stack, memory, storageResolver, calldata, cursor, variable.slot.variableType)
     } catch (e) {
-      console.log(e)
-      locals[name] = { error: '<decoding failed - ' + e.message + '>', type: variable && variable.slot.variableName && variable.slot.variableType.typeName || 'unknown' }
+      // Safely access typeName with null check
+      const typeName = variable?.slot?.variableType?.typeName || 'unknown'
+      locals[name] = { error: '<decoding failed - ' + e.message + '>', type: typeName }
     }
   }
   return locals
