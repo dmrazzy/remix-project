@@ -32,6 +32,7 @@ module.exports = {
       .clickFunction(1, 1)
       .clickFunction(1, 2)
       .waitForElementPresent('[data-id="contractItem-1"] > [data-id="udapp_tree_value"]')
+      .scrollInto('[data-id="contractItem-1"] > [data-id="udapp_tree_value"]')
       .getAddressAtPosition(1, (address) => {
         console.log('Test Recorder ' + address)
         addressRef = address
