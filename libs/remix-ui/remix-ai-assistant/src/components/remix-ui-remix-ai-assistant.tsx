@@ -616,6 +616,10 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     setInput('')
   }, [input, sendPrompt])
 
+  const handleCancel = useCallback(() => {
+    stopRequest()
+  }, [stopRequest])
+
   const handleSetAssistant = useCallback(() => {
     dispatchActivity('button', 'setAssistant')
     setShowAssistantOptions(prev => !prev)

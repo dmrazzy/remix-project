@@ -9,6 +9,7 @@ interface PromptDefaultProps {
   isStreaming: boolean
   handleSend: () => void
   themeTracker: any
+  handleCancel: () => void
 }
 
 export function PromptDefault(props: PromptDefaultProps) {

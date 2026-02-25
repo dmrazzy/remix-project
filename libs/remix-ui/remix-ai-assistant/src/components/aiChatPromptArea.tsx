@@ -164,6 +164,7 @@ export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
         ollamaModels={props.ollamaModels}
         selectedOllamaModel={props.selectedOllamaModel}
         modelSelectorBtnRef={props.modelSelectorBtnRef}
+        stopRequest={props.stopRequest}
       />
     </section>
   )

@@ -42,6 +42,7 @@ export interface PromptAreaProps {
   themeTracker: any
   setShowMenu?: React.Dispatch<React.SetStateAction<boolean>>
   showMenu?: boolean
+  stopRequest: () => void
 }
 
 export const PromptArea: React.FC<PromptAreaProps> = ({
@@ -64,7 +65,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   handleOllamaModelSelection,
   ollamaModels,
   showModelSelector,
-  setShowModelSelector,
+  stopRequest,
   setShowOllamaModelSelector,
   showOllamaModelSelector,
   selectedOllamaModel,
@@ -106,9 +107,9 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
             )}
           </div>
           <span
-            className="btn btn-sm small rounded-3 align-self-center fw-light"
+            className="btn btn-sm disabled small rounded-3 align-self-center fw-light"
             // eslint-disable-next-line no-constant-condition
-            style={{ backgroundColor: themeTracker && themeTracker?.name.toLowerCase() === 'dark' ? '#2b3b4d' : '#c6e8f1', color: themeTracker && themeTracker.name.toLowerCase() === 'light' ? '#1ea2aa' : '#2de7f3' }}
+            style={{ backgroundColor: themeTracker && themeTracker?.name.toLowerCase() === 'dark' ? '#2b3b4d' : '#c6e8f1', color: themeTracker && themeTracker.name.toLowerCase() === 'light' ? '#1ea2aa' : '#2de7f3', cursor: 'default' }}
           >
             <i className="fa fa-info-circle me-1"></i>
             AI beta
@@ -161,6 +162,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
               isStreaming={isStreaming}
               handleSend={handleSend}
               themeTracker={themeTracker}
+              handleCancel={stopRequest}
             /> : null }
             { isRecording ? <PromptActiveButtons
               handleRecordingStoppage={handleRecord}
@@ -168,6 +170,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
               handleSend={handleSend}
               isRecording={isRecording}
               themeTracker={themeTracker}
+              handleCancel={stopRequest}
             /> : null }
           </div>
 

@@ -161,8 +161,7 @@ export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHis
         handleOllamaModelSelection={props.handleOllamaModelSelection}
         ollamaModels={props.ollamaModels}
         selectedOllamaModel={props.selectedOllamaModel}
-        // setShowMenu={setShowMenu}
-        // showMenu={showMenu}
+        stopRequest={props.stopRequest}
         modelSelectorBtnRef={props.modelSelectorBtnRef}
       />
     </section>

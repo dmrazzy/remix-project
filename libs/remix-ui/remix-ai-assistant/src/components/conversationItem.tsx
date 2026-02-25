@@ -101,7 +101,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                   setShowMenu(false)
                 }}
               >
-                <i className="fas fa-trash me-2"></i>
+                <i className="fas fa-trash me-2 text-danger"></i>
                 Delete
               </button>
             </div>
