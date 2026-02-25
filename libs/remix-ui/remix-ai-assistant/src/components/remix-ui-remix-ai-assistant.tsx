@@ -105,7 +105,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     toggleRecording
   } = useAudioTranscription({
     model: 'whisper-v3',
-    onTranscriptionComplete: async (text) => {
+    onTranscriptionComplete: (text) => {
       // Check if transcription ends with "stop" (case-insensitive, with optional punctuation)
       const trimmedText = text.trim()
       const endsWithStop = /\bstop\b[\s.,!?;:]*$/i.test(trimmedText)
@@ -120,13 +120,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         }
         trackMatomoEvent({ category: 'ai', action: 'SpeechToTextPrompt', name: 'SpeechToTextPrompt', isClick: true })
       } else {
-        // Append transcription to the input box and execute the prompt
+        // Append transcription to the input box only
         setInput(prev => prev ? `${prev} ${text}`.trim() : text)
         if (trimmedText) {
-          await sendPrompt(trimmedText)
           trackMatomoEvent({ category: 'ai', action: 'SpeechToTextPrompt', name: 'SpeechToTextPrompt', isClick: true })
         }
-        // Focus the textarea
+        // Focus the textarea so user can review/edit before sending
         if (textareaRef.current) {
           textareaRef.current.focus()
         }

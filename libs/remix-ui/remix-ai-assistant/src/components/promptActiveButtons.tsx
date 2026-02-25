@@ -25,11 +25,11 @@ export function PromptActiveButtons(props: PromptActiveButtonsProps) {
       }}
       onClick={props.handleRecordingStoppage}
       >
-        <i className="fas fa-trash me-2 text-danger"></i>
+        <i className="fas fa-stop me-2 text-danger"></i>
       </button>
       <div>
-        <i className="fas fa-microphone" style={{ color: props.themeTracker && props.themeTracker.name === 'light' ? '#1ea2aa' : '#2de7f3' }}></i>
-        <PromptRecordingCounter isRecording={props.isRecording} />
+        <i className="fas fa-microphone me-3" style={{ color: props.themeTracker && props.themeTracker.name.toLowerCase() === 'light' ? '#1ea2aa' : '#2de7f3' }}></i>
+        <PromptRecordingCounter isRecording={props.isRecording} themeTracker={props.themeTracker} />
       </div>
       <PromptSubmitButton backgroundColor="#2de7f3" handleSend={props.handleSend} isStreaming={props.isStreaming} handleCancel={props.handleCancel}/>
     </div>
