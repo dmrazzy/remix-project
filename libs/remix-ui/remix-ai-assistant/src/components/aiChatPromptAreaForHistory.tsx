@@ -1,6 +1,7 @@
 import React, { Dispatch, useState } from 'react'
 import GroupListMenu from './contextOptMenu'
 import { PromptArea } from './prompt'
+import { ChatMessage } from '@remix/remix-ai-core'
 
 interface AiChatPromptAreaForHistoryProps {
   selectedModelId: unknown
@@ -45,15 +46,17 @@ interface AiChatPromptAreaForHistoryProps {
       showModelSelector: boolean
       modelAccess: any
       setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
+      messages: ChatMessage[]
 }
 
 export default function AiChatPromptAreaForHistory(props: AiChatPromptAreaForHistoryProps) {
   const [showMenu, setShowMenu] = useState(false)
+  console.log('Rendering AiChatPromptAreaForHistory with messages:', props.messages)
   return (
     <section
       id="remix-ai-prompt-area"
       className=""
-      style={{ flexShrink: 0, minHeight: '140px', backgroundColor: props.showHistorySidebar && props.isMaximized === false ? (props.themeTracker?.name.toLowerCase() === 'dark' ? '#222336' : '#eff1f5') : 'transparent' }}
+      style={{ flexShrink: 0, minHeight: '140px', backgroundColor: props.messages.length > 0 && (props.themeTracker?.name.toLowerCase() === 'dark' ? '#222336' : '#eff1f5') }}
       data-theme={props.themeTracker && props.themeTracker?.name.toLowerCase()}
     >
       {showMenu && (

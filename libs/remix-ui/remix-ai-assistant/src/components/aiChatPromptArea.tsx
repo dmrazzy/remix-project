@@ -2,6 +2,7 @@ import React, { Dispatch } from 'react'
 import GroupListMenu from './contextOptMenu'
 import { PromptArea } from './prompt'
 import { AiAssistantType } from '../types/componentTypes'
+import { ChatMessage } from '@remix/remix-ai-core'
 
 interface AiChatPromptAreaProps {
     selectedModelId: unknown
@@ -46,16 +47,18 @@ interface AiChatPromptAreaProps {
     showModelSelector: boolean
     modelAccess: any
     setShowModelSelector: React.Dispatch<React.SetStateAction<boolean>>
+    messages: ChatMessage[]
 }
 
 export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
   const [showMenu, setShowMenu] = React.useState(false)
+  console.log('Rendering AiChatPromptAreaForHistory with messages:', props.messages)
   {/* Prompt area - fixed at bottom */}
   return (
     <section
       id="remix-ai-prompt-area"
       className="ai-assistant-prompt-bg"
-      style={{ flexShrink: 0, minHeight: '140px', backgroundColor: props.showHistorySidebar && props.isMaximized === false ? (props.themeTracker?.name.toLowerCase() === 'dark' ? 'var(--bs-dark)' : 'var(--bs-light)') : 'transparent' }}
+      style={{ flexShrink: 0, minHeight: '140px', backgroundColor: props.messages.length > 0 && (props.themeTracker?.name.toLowerCase() === 'dark' ? '#222336' : '#eff1f5') }}
       data-theme={props.themeTracker && props.themeTracker?.name.toLowerCase()}
     >
       {props.showModelSelector && (
@@ -160,8 +163,6 @@ export default function AiChatPromptArea(props: AiChatPromptAreaProps) {
         handleOllamaModelSelection={props.handleOllamaModelSelection}
         ollamaModels={props.ollamaModels}
         selectedOllamaModel={props.selectedOllamaModel}
-        // setShowMenu={setShowMenu}
-        // showMenu={showMenu}
         modelSelectorBtnRef={props.modelSelectorBtnRef}
       />
     </section>

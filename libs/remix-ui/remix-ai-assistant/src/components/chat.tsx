@@ -91,10 +91,10 @@ export const ChatHistoryComponent: React.FC<ChatHistoryComponentProps> = ({
       ) : (
         messages.map(msg => {
           const bubbleClass =
-            msg.role === 'user' ? 'bubble-user bg-light' : 'bubble-assistant bg-light'
+            msg.role === 'user' ? 'bubble-user' : 'bubble-assistant'
 
           return (
-            <div key={msg.id} className="chat-row d-flex mb-2" style={{ minWidth: '90%' }}>
+            <div key={msg.id} className={`chat-row d-flex mb-2 ${msg.role === 'user' ? 'justify-content-end' : ''}`} style={{ minWidth: '90%' }}>
               {/* Avatar for assistant */}
               {msg.role === 'assistant' && (
                 <img
@@ -105,10 +105,15 @@ export const ChatHistoryComponent: React.FC<ChatHistoryComponentProps> = ({
               )}
 
               {/* Bubble */}
-              <div data-id="ai-response-chat-bubble-section" className="overflow-y-scroll" style={{ width: '90%' }}>
+              <div data-id="ai-response-chat-bubble-section" className={`overflow-y-scroll ${msg.role === 'assistant' ? 'me-3' : ''}`} style={{
+                width: '90%'
+              }}>
                 {/* Only render bubble if there's content OR not currently executing tools */}
                 {(msg.content || !msg.isExecutingTools) && (
-                  <div className={`chat-bubble p-2 rounded ${bubbleClass}`} data-id="ai-user-chat-bubble">
+                  <div
+                    className={`chat-bubble p-2 rounded ${bubbleClass}`}
+                    data-id="ai-user-chat-bubble"
+                  >
                     {msg.role === 'user' && (
                       <small className="text-uppercase fw-bold text-secondary d-block mb-1">
                         You

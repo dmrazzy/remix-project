@@ -960,7 +960,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
 
         {/* Maximized Mode: Always show chat area */}
         {props.isMaximized ? (
-          <div className="d-flex flex-column flex-grow-1 ai-assistant-bg always-show" style={{ overflow: 'hidden', minHeight: 0, backgroundColor: themeTracker?.name.toLowerCase() === 'dark' ? 'red' : 'var(--bs-light)' }} data-theme={themeTracker && themeTracker?.name.toLowerCase()}>
+          <div className={`d-flex flex-column flex-grow-1 always-show ${messages.length === 0 ? 'ai-assistant-bg' : ''}`} style={{ overflow: 'hidden', minHeight: 0, backgroundColor: messages.length > 0 ? (themeTracker?.name.toLowerCase() === 'dark' ? '#222336' : '#eff1f5') : undefined }} data-theme={themeTracker && themeTracker?.name.toLowerCase()}>
             <ChatHistoryHeading
               onNewChat={props.onNewConversation || (() => {})}
               onToggleHistory={props.onToggleHistorySidebar || (() => {})}
@@ -1032,7 +1032,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             </div>
           ) : (
             /* Show chat area when sidebar is closed */
-            <div className="d-flex flex-column flex-grow-1 ai-assistant-bg sideBarIsClosed" style={{ overflow: 'hidden', minHeight: 0, }} data-theme={themeTracker && themeTracker?.name.toLowerCase()}>
+            <div className={`d-flex flex-column flex-grow-1 sideBarIsClosed ${messages.length === 0 ? 'ai-assistant-bg' : ''}`} style={{ overflow: 'hidden', minHeight: 0, backgroundColor: messages.length > 0 ? (themeTracker?.name.toLowerCase() === 'dark' ? '#222336' : '#eff1f5') : undefined }} data-theme={themeTracker && themeTracker?.name.toLowerCase()}>
               <ChatHistoryHeading
                 onNewChat={props.onNewConversation || (() => {})}
                 onToggleHistory={props.onToggleHistorySidebar || (() => {})}
@@ -1066,122 +1066,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         )}
       </div>
 
-      {/* <section
-        id="remix-ai-prompt-area"
-        className="ai-assistant-prompt-bg"
-        style={{ flexShrink: 0, minHeight: '140px', backgroundColor: props.showHistorySidebar && isMaximized === false ? (themeTracker?.name.toLowerCase() === 'dark' ? 'var(--bs-dark)' : 'var(--bs-light)') : 'transparent' }}
-        data-theme={themeTracker && themeTracker?.name.toLowerCase()}
-      >
-        {showModelSelector && (
-          <div
-            className="pt-2 mb-2 z-3 bg-light border border-text position-fixed"
-            style={{ borderRadius: '8px', top: modelOpt.top, left: modelOpt.left, zIndex: 1000, minWidth: '300px', maxWidth: '400px' }}
-            ref={menuRef}
-          >
-            <div className="text-uppercase ms-2 mb-2 small">AI Model</div>
-            <GroupListMenu
-              setChoice={handleModelSelection}
-              setShowOptions={setShowModelSelector}
-              choice={selectedModelId}
-              groupList={AVAILABLE_MODELS
-                .filter(model => {
-                  // Check if user is logged in by checking for token
-                  const isLoggedIn = !!localStorage.getItem('remix_access_token')
-
-                  // If not logged in, only show models that don't require auth
-                  if (!isLoggedIn) {
-                    return !model.requiresAuth
-                  }
-
-                  // If logged in, only show models the user has access to
-                  return modelAccess.checkAccess(model.id)
-                })
-                .map(model => ({
-                  label: model.name,
-                  bodyText: model.description,
-                  icon: 'fa-solid fa-check',
-                  stateValue: model.id,
-                  dataId: `ai-model-${model.id.replace(/[^a-zA-Z0-9]/g, '-')}`
-                }))
-              }
-            />
-            {mcpEnabled && (
-              <div className="border-top mt-2 pt-2">
-                <div className="text-uppercase ms-2 mb-2 small">MCP Enhancement</div>
-                <div className="form-check ms-2 mb-2">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="mcpEnhancementToggle"
-                    checked={mcpEnhanced}
-                    onChange={(e) => setMcpEnhanced(e.target.checked)}
-                  />
-                  <label className="form-check-label small" htmlFor="mcpEnhancementToggle">
-                              Enable MCP context enhancement
-                  </label>
-                </div>
-                <div className="small text-muted ms-2">
-                            Adds relevant context from configured MCP servers to AI requests
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        {showOllamaModelSelector && selectedModel?.provider === 'ollama' && (
-          <div
-            className="pt-2 mb-2 z-3 bg-light border border-text w-75 position-absolute"
-            style={{ borderRadius: '8px' }}
-          >
-            <div className="text-uppercase ml-2 mb-2 small">Ollama Model</div>
-            <GroupListMenu
-              setChoice={handleOllamaModelSelection}
-              setShowOptions={setShowOllamaModelSelector}
-              choice={selectedOllamaModel}
-              groupList={ollamaModels.map(model => ({
-                label: model,
-                bodyText: `Use ${model} model`,
-                icon: 'fa-solid fa-check',
-                stateValue: model,
-                dataId: `ollama-model-${model.replace(/[^a-zA-Z0-9]/g, '-')}`
-              }))}
-            />
-          </div>
-        )}
-        <PromptArea
-          input={input}
-          maximizePanel={maximizePanel}
-          setInput={setInput}
-          isStreaming={isStreaming}
-          handleSend={handleSend}
-          handleSetModel={handleSetModel}
-          handleModelSelection={handleModelSelection}
-          handleGenerateWorkspace={handleGenerateWorkspace}
-          handleRecord={handleRecord}
-          isRecording={isRecording}
-          dispatchActivity={dispatchActivity}
-          modelBtnRef={modelBtnRef}
-          textareaRef={textareaRef}
-          isMaximized={isMaximized}
-          showAssistantOptions={showAssistantOptions}
-          assistantChoice={assistantChoice}
-          handleSetAssistant={handleSetAssistant}
-          themeTracker={themeTracker}
-          setShowOllamaModelSelector={setShowOllamaModelSelector}
-          showOllamaModelSelector={showOllamaModelSelector}
-          showModelSelector={showModelSelector}
-          setShowModelSelector={setShowModelSelector}
-          selectedModel={selectedModel}
-          handleOllamaModelSelection={handleOllamaModelSelection}
-          ollamaModels={ollamaModels}
-          selectedOllamaModel={selectedOllamaModel}
-          // setShowMenu={setShowMenu}
-          // showMenu={showMenu}
-          modelSelectorBtnRef={modelSelectorBtnRef}
-        />
-      </section> */}
-
       {
-        props.showHistorySidebar && props.isMaximized === false && props.conversations ? (
+        messages.length > 0 ? (
           <AiChatPromptAreaForHistory
             themeTracker={themeTracker}
             showHistorySidebar={props.showHistorySidebar || false}
@@ -1225,6 +1111,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             handleOllamaModelSelection={handleModelSelection}
             selectedOllamaModel={selectedOllamaModel}
             ollamaModels={ollamaModels}
+            messages={messages}
           />
         ) : (
           <AiChatPromptArea
@@ -1270,6 +1157,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             handleOllamaModelSelection={handleModelSelection}
             selectedOllamaModel={selectedOllamaModel}
             ollamaModels={ollamaModels}
+            messages={messages}
           />
         )
       }
