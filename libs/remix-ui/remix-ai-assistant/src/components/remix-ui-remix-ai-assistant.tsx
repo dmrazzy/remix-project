@@ -992,6 +992,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                 historyRef={historyRef}
                 theme={themeTracker?.name}
                 plugin={props.plugin}
+                handleGenerateWorkspace={handleGenerateWorkspace}
               />
             </section>
           </div>
@@ -1065,6 +1066,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                   historyRef={historyRef}
                   theme={themeTracker?.name}
                   plugin={props.plugin}
+                  handleGenerateWorkspace={handleGenerateWorkspace}
                 />
               </section>
             </div>

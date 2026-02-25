@@ -1,6 +1,7 @@
 import React from 'react'
 import { PromptSubmitButton } from './promptSubmitButton'
 import { PromptRecordingCounter } from './promptRecordingCounter'
+import { PromptStopButton } from './promptStopButton'
 
 interface PromptActiveButtonsProps {
   handleRecordingStoppage: () => void
@@ -31,7 +32,7 @@ export function PromptActiveButtons(props: PromptActiveButtonsProps) {
         <i className="fas fa-microphone me-3" style={{ color: props.themeTracker && props.themeTracker.name.toLowerCase() === 'light' ? '#1ea2aa' : '#2de7f3' }}></i>
         <PromptRecordingCounter isRecording={props.isRecording} themeTracker={props.themeTracker} />
       </div>
-      <PromptSubmitButton backgroundColor="#2de7f3" handleSend={props.handleSend} isStreaming={props.isStreaming} handleCancel={props.handleCancel}/>
+      <PromptStopButton backgroundColor={props.themeTracker && props.themeTracker.name.toLowerCase() === 'light' ? '#1ea2aa' : "#2de7f3"} isStreaming={props.isStreaming} handleCancel={props.handleCancel}/>
     </div>
   )
 }

@@ -11,7 +11,7 @@ export function PromptStopButton(props: PromptStopButtonProps) {
   return (
     <button
       className={`btn btn-sm ${props.isStreaming ? 'bg-danger' : ''}`}
-      style={{ backgroundColor: props.isStreaming ? undefined : props.backgroundColor }}
+      style={{ backgroundColor: props.isStreaming ? 'var(--bs-danger)' : props.backgroundColor }}
       data-id="remix-ai-composer-send-btn"
       onClick={() => {
         if (props.isStreaming) {
@@ -19,7 +19,7 @@ export function PromptStopButton(props: PromptStopButtonProps) {
         }
       }}
     >
-      <i className={"fa ${props.isStreaming ? 'fa-stop text-light"}></i>
+      <i className={`fa ${props.isStreaming ? 'fa-stop text-light' : ''}`}></i>
     </button>
   )
 }

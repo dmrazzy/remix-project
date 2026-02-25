@@ -4,9 +4,10 @@ interface AiChatButtonsProps {
   theme: string
   plugin?: any
   sendPrompt: (s: string) => void
+  handleGenerateWorkspace: () => void
 }
 
-export function AiChatButtons({ theme, plugin, sendPrompt }: AiChatButtonsProps) {
+export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspace }: AiChatButtonsProps) {
 
   const statusCallback = (status: string): Promise<void> => {
     console.log('status', status)
@@ -20,15 +21,15 @@ export function AiChatButtons({ theme, plugin, sendPrompt }: AiChatButtonsProps)
     color: string,
     action: () => void
   }[] = [
-    {
-      label: 'File',
-      icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} far fa-copy`,
-      color: 'green',
-      action: async () => {
-        sendPrompt('Create a file for me')
-        // plugin && await plugin.call('remixaiassistant', 'handleExternalMessage', 'Create a file for me')
-      }
-    },
+    // {
+    //   label: 'File',
+    //   icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} far fa-copy`,
+    //   color: 'green',
+    //   action: async () => {
+    //     sendPrompt('Create a file for me')
+    //     // plugin && await plugin.call('remixaiassistant', 'handleExternalMessage', 'Create a file for me')
+    //   }
+    // },
     // {
     //   label: 'Learn',
     //   icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-brain`,
@@ -49,9 +50,7 @@ export function AiChatButtons({ theme, plugin, sendPrompt }: AiChatButtonsProps)
       label: 'New workspace',
       icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-plus`,
       color: '',
-      action: () => {
-        sendPrompt('Create a new workspace')
-      }
+      action: handleGenerateWorkspace
     },
     // {
     //   label: 'Deploy',
