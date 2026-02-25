@@ -142,8 +142,7 @@ export class RemixAIAssistant extends ViewPlugin {
 
     try {
       const workspace = 'default' // Can be enhanced to get actual workspace name
-      this.currentConversationId = await this.storageManager.createConversation(workspace)
-      ChatHistory.setCurrentConversation(this.currentConversationId)
+      this.currentConversationId = await ChatHistory.startNewConversation(workspace)
 
       // Clear current messages
       this.history = []
@@ -189,8 +188,9 @@ export class RemixAIAssistant extends ViewPlugin {
         // Reload conversations
         await this.loadConversations()
 
-        // If we archived the current conversation, create a new one
+        // If we archived the current conversation, create a new one, clear AI chat history
         if (id === this.currentConversationId && !conversation.archived) {
+          ChatHistory.clearHistory()
           await this.newConversation()
         }
       }
