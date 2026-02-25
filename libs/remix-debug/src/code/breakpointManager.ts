@@ -1,7 +1,7 @@
 'use strict'
 
 import { EventManager } from '../eventManager'
-import { isJumpDestInstruction } from '../trace/traceHelper'
+import { isJumpDestInstruction, isContractCreation } from '../trace/traceHelper'
 import type { InternalCallTree } from '../solidity-decoder/internalCallTree'
 
 /**
@@ -144,18 +144,69 @@ export class BreakpointManager {
     * @return {Bool} return true if the given @arg fileIndex @arg line refers to a breakpoint
     */
   async hasBreakpointAtLine (fileIndex, line, contractAddress) {
-    const compResult = await this.solidityProxy.compilationResult(contractAddress)
-    const filename = Object.keys(compResult.data.contracts)[fileIndex]
-    if (!(filename && this.breakpoints[filename])) {
+    // For contract creation, pass null to get the main contract being deployed
+    const isCreation = isContractCreation(contractAddress)
+    const addressForCompilation = isCreation ? null : contractAddress
+    const compResult = await this.solidityProxy.compilationResult(addressForCompilation)
+    // Use sources instead of contracts to get the correct filename
+    // because breakpoints are set using source file names from the editor
+    const filename = Object.keys(compResult.data.sources)[fileIndex]
+
+    if (!filename) {
       return false
     }
-    const sources = this.breakpoints[filename]
-    for (const k in sources) {
-      const source = sources[k]
-      if (line === source.row) {
-        return true
+
+    // Try exact match first
+    if (this.breakpoints[filename]) {
+      const sources = this.breakpoints[filename]
+      for (const k in sources) {
+        const source = sources[k]
+        if (line === source.row) {
+          return true
+        }
       }
     }
+
+    // Try fuzzy match: check if any breakpoint filename matches this file
+    // This handles cases where editor uses .deps/npm/@openzeppelin/contracts@5.4.0/...
+    // but compiler uses @openzeppelin/contracts/...
+    for (const breakpointFilename in this.breakpoints) {
+      if (this.filenamesMatch(filename, breakpointFilename)) {
+        const sources = this.breakpoints[breakpointFilename]
+        for (const k in sources) {
+          const source = sources[k]
+          if (line === source.row) {
+            return true
+          }
+        }
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Check if two filenames refer to the same file
+   * Handles cases like:
+   * - .deps/npm/@openzeppelin/contracts@5.4.0/token/ERC20/ERC20.sol
+   * - @openzeppelin/contracts/token/ERC20/ERC20.sol
+   */
+  filenamesMatch (filename1, filename2) {
+    if (filename1 === filename2) return true
+
+    // Normalize paths by removing .deps/npm/ prefix and version suffix
+    const normalize = (path) => {
+      // Remove .deps/npm/ prefix
+      path = path.replace(/^\.deps\/npm\//, '')
+      // Remove version suffix like @5.4.0
+      path = path.replace(/@[\d.]+\//g, '/')
+      return path
+    }
+
+    const normalized1 = normalize(filename1)
+    const normalized2 = normalize(filename2)
+
+    return normalized1 === normalized2
   }
 
   /**
