@@ -985,6 +985,17 @@ export class AddInstanceHandler extends BaseToolHandler {
 
   async execute(args: AddInstanceArgs, plugin: Plugin): Promise<IMCPToolResult> {
     try {
+      let abi = args.abi
+      if (typeof args.abi === 'string') {
+        try {
+          abi = JSON.parse(args.abi)
+          if (!Array.isArray(abi)) {
+            return this.createErrorResult('ABI must be an array');
+          }
+        } catch (e) {
+          return this.createErrorResult('ABI must be a valid JSON string');
+        }
+      }
       await plugin.call('sidePanel', 'showContent', 'udapp');
 
       let data
@@ -998,7 +1009,7 @@ export class AddInstanceHandler extends BaseToolHandler {
         'udappDeployedContracts', 
         'addInstance', 
         args.contractAddress, 
-        args.abi, 
+        abi, 
         args.contractName, 
         data || null
       );
