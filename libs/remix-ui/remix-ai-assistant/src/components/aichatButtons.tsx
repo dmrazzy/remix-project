@@ -13,7 +13,7 @@ export function AiChatButtons({ theme, plugin, sendPrompt }: AiChatButtonsProps)
     plugin.call('remixaiassistant', 'handleExternalMessage', status)
     return Promise.resolve()
   }
-  const result = plugin?.call('remixAI' as any, 'basic_prompt', '')
+
   const btnList: {
     label: string,
     icon: string,
@@ -25,7 +25,6 @@ export function AiChatButtons({ theme, plugin, sendPrompt }: AiChatButtonsProps)
       icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} far fa-copy`,
       color: 'green',
       action: async () => {
-        // plugin && await plugin.call('remixAI' as any, 'basic_prompt', 'Create a file for me')
         sendPrompt('Create a file for me')
         // plugin && await plugin.call('remixaiassistant', 'handleExternalMessage', 'Create a file for me')
       }
