@@ -467,6 +467,33 @@ module.exports = {
       // Verify we jumped to the revert step
       .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 205', 60000)
   },
+
+  'Should display owner state during contract creation #group6': function (browser: NightwatchBrowser) {
+    browser
+      .clickLaunchIcon('solidity')
+      .testContracts('owner.sol', sources[7]['owner.sol'], ['Owner'])
+      .clickLaunchIcon('udapp')
+      .selectContract('Owner')
+      .pause(2000)
+      .clearConsole()
+      .createContract('')
+      .pause(2000)
+      // Debug the contract creation transaction (index 0)
+      .debugTransaction(0)
+      .waitForElementVisible('*[data-id="callTraceHeader"]', 60000)
+      .pause(2000)
+      .waitForElementVisible('*[data-id="solidityState"]')
+      .click('*[data-id="state-expand-icon"]')
+      .waitForElementVisible('*[data-id="owner-expand-icon"]')
+      .click('*[data-id="owner-expand-icon"]')
+      .waitForElementContainsText('[data-id="owner-json-nested"] [data-id="value-json-value"]', '0x0000000000000000000000000000000000000000', 10000)
+      .goToVMTraceStep(31)
+      .pause(1000)
+      .waitForElementContainsText('*[data-id="callTraceHeader"]', 'Step: 31', 10000)
+      .pause(1000)
+      .waitForElementContainsText('[data-id="owner-json-nested"] [data-id="value-json-value"]', '0x5B38DA6A701C568545DCFCB03FCB875F56BEDDC4', 10000)
+      .waitForElementContainsText('[data-id="owner-json-nested"] [data-id="type-json-value"]', 'address', 10000)
+  },
 }
 
 const sources = [
@@ -623,6 +650,25 @@ const sources = [
             p = 125;
         }
     }`
+    }
+  },
+  {
+    'owner.sol': {
+      content: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Owner {
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function changeOwner(address newOwner) public {
+        require(msg.sender == owner, "Only owner can change owner");
+        owner = newOwner;
+    }
+}`
     }
   }
 ]
