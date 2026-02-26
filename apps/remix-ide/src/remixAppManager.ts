@@ -93,7 +93,6 @@ let requiredModules = [
   'remixAI',
   'remixAID',
   'remixaiassistant',
-  'quick-dapp-v2',
   'topbar',
   'templateexplorermodal',
   'githubAuthHandler',
