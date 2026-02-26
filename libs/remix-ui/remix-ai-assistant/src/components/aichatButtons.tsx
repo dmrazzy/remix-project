@@ -50,19 +50,6 @@ export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspa
           </button>
         ))}
       </div>
-      <div className="d-flex justify-content-between w-100 overflow-x-auto">
-        {btnList.slice(3).map((starter, index) => (
-          <button
-            key={`${starter.label}-${index}`}
-            data-id={`remix-ai-assistant-starter-${starter.label}-${index}`}
-            className={`mb-2 border-0 rounded-4 text-nowrap gap-2 btn btn-light`}
-            onClick={() => {}}
-          >
-            <i className={`${starter.icon} me-1`}></i>
-            {starter.label}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }
