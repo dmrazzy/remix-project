@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface AiChatButtonsProps {
   theme: string
@@ -8,11 +8,84 @@ interface AiChatButtonsProps {
 }
 
 export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspace }: AiChatButtonsProps) {
+  const [currentFile, setCurrentFile] = useState<string | null>(null)
+  const [latestCompiledContract, setLatestCompiledContract] = useState<string | null>(null)
 
-  const statusCallback = (status: string): Promise<void> => {
-    console.log('status', status)
-    plugin.call('remixaiassistant', 'handleExternalMessage', status)
-    return Promise.resolve()
+  useEffect(() => {
+    if (!plugin) return
+
+    const updateState = async () => {
+      try {
+        const file = await plugin.call('fileManager', 'getCurrentFile')
+        setCurrentFile(file)
+      } catch (error) {
+        setCurrentFile(null)
+      }
+
+      try {
+        const compilationResult = await plugin.call('solidity', 'getCompilationResult')
+        if (compilationResult && compilationResult.data && compilationResult.data.contracts) {
+          const files = Object.keys(compilationResult.data.contracts)
+          if (files.length > 0) {
+            const firstFile = files[0]
+            const contracts = Object.keys(compilationResult.data.contracts[firstFile] || {})
+            if (contracts.length > 0) {
+              setLatestCompiledContract(contracts[0])
+            }
+          }
+        }
+      } catch (error) {
+      }
+    }
+
+    updateState()
+    const interval = setInterval(updateState, 2000)
+    return () => {
+      clearInterval(interval)
+    }
+  }, [plugin])
+
+  const handleReviewFile = () => {
+    if (currentFile) {
+      const fileName = currentFile.split('/').pop() || currentFile
+      sendPrompt(`Review the file ${fileName}`)
+    }
+  }
+
+  const handleDeployContract = () => {
+    if (latestCompiledContract) {
+      sendPrompt(`Deploy the ${latestCompiledContract} contract`)
+    }
+  }
+
+  const handleCreateERC20 = () => {
+    sendPrompt('Create an ERC20 token contract')
+  }
+
+  const dynamicButtons: {
+    label: string,
+    icon: string,
+    color: string,
+    action: () => void
+  }[] = []
+
+  if (currentFile) {
+    const fileName = currentFile.split('/').pop() || currentFile
+    dynamicButtons.push({
+      label: `Review ${fileName}`,
+      icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-search`,
+      color: '',
+      action: handleReviewFile
+    })
+  }
+
+  if (latestCompiledContract) {
+    dynamicButtons.push({
+      label: `Deploy ${latestCompiledContract}`,
+      icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-rocket`,
+      color: '',
+      action: handleDeployContract
+    })
   }
 
   const btnList: {
@@ -33,6 +106,7 @@ export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspa
       color: '',
       action: handleGenerateWorkspace
     },
+    ...dynamicButtons
   ]
 
   return (
