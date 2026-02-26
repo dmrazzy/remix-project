@@ -8,7 +8,10 @@ import { appInitialState, appReducer, AppAction } from './reducers';
 import { AppContext } from './contexts';
 import { DappManager } from './utils/DappManager';
 import { QuickDappV2PluginApi, DappConfig } from './types';
+import { endpointUrls } from '@remix-endpoints-helper';
 import './App.css';
+
+const QUICK_DAPP_FEATURE = 'dapp:quickdapp';
 
 // Helper to get network name from chainId
 function getNetworkName(chainId: string | number): string {
@@ -42,9 +45,51 @@ export function RemixUiQuickDappV2({ plugin }: RemixUiQuickDappV2Props): JSX.Ele
   const [isAppLoading, setIsAppLoading] = useState(true);
   const activeDappRef = useRef(appState.activeDapp);
 
+  // Permission gating state
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null); // null = checking
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   // DappManager now receives the plugin from props instead of a singleton
   const dappManager = useMemo(() => new DappManager(plugin as any), [plugin]);
   const dappManagerRef = useRef(dappManager);
+
+  // Check dapp:quickdapp permission on mount
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const token = typeof localStorage !== 'undefined'
+          ? localStorage.getItem('remix_access_token')
+          : null;
+
+        if (!token) {
+          setIsAuthenticated(false);
+          setHasAccess(false);
+          return;
+        }
+
+        const response = await fetch(endpointUrls.permissions, {
+          credentials: 'include',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setIsAuthenticated(true);
+          const feature = data.features?.[QUICK_DAPP_FEATURE];
+          setHasAccess(feature?.is_enabled === true);
+        } else {
+          setIsAuthenticated(false);
+          setHasAccess(false);
+        }
+      } catch (err) {
+        console.error('[QuickDapp] Permission check failed:', err);
+        setIsAuthenticated(false);
+        setHasAccess(false);
+      }
+    };
+
+    checkAccess();
+  }, []);
 
   useEffect(() => {
     dappsRef.current = appState.dapps;
@@ -62,6 +107,39 @@ export function RemixUiQuickDappV2({ plugin }: RemixUiQuickDappV2Props): JSX.Ele
     if (!plugin) return;
 
     const handleCreateDapp = async (payload: any) => {
+      // Permission gate: check dapp:quickdapp access before creating workspace
+      try {
+        const token = typeof localStorage !== 'undefined'
+          ? localStorage.getItem('remix_access_token')
+          : null;
+
+        if (!token) {
+          plugin.call('notification', 'toast', 'Please sign in to use QuickDapp V2. This feature is available to beta testers.');
+          return;
+        }
+
+        const permResponse = await fetch(endpointUrls.permissions, {
+          credentials: 'include',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (permResponse.ok) {
+          const permData = await permResponse.json();
+          const feature = permData.features?.[QUICK_DAPP_FEATURE];
+          if (!feature?.is_enabled) {
+            plugin.call('notification', 'toast', 'QuickDapp V2 is currently available to beta testers only. Please contact the Remix team to request access.');
+            return;
+          }
+        } else {
+          plugin.call('notification', 'toast', 'Unable to verify access. Please sign in and try again.');
+          return;
+        }
+      } catch (err) {
+        console.error('[QuickDapp] Permission check failed in handleCreateDapp:', err);
+        plugin.call('notification', 'toast', 'Unable to verify access. Please try again.');
+        return;
+      }
+
       dispatch({ type: 'SET_AI_LOADING', payload: true });
       dispatch({ type: 'SET_VIEW', payload: 'create' });
 
@@ -317,6 +395,35 @@ export function RemixUiQuickDappV2({ plugin }: RemixUiQuickDappV2Props): JSX.Ele
   };
 
   const renderContent = () => {
+    // Permission check: show loading while checking access
+    if (hasAccess === null) {
+      return (
+        <div className="d-flex flex-column justify-content-center align-items-center" style={{ height: '80vh' }}>
+          <i className="fas fa-spinner fa-spin fa-2x mb-3 text-primary"></i>
+          <p className="text-muted">Checking access...</p>
+        </div>
+      );
+    }
+
+    // Permission check: show access denied if user doesn't have dapp:quickdapp feature
+    if (!hasAccess) {
+      return (
+        <div className="d-flex flex-column justify-content-center align-items-center text-center px-4" style={{ height: '80vh' }}>
+          <i className="fas fa-lock fa-3x mb-3 text-warning"></i>
+          <h4 className="mb-2">Access Required</h4>
+          {isAuthenticated ? (
+            <p className="text-muted" style={{ maxWidth: '400px' }}>
+              QuickDapp V2 is currently available to beta testers only. Please contact the Remix team to request access.
+            </p>
+          ) : (
+            <p className="text-muted" style={{ maxWidth: '400px' }}>
+              Please sign in to access QuickDapp V2. This feature is available to beta testers.
+            </p>
+          )}
+        </div>
+      );
+    }
+
     if (isAppLoading || !locale.messages) {
       return (
         <div className="d-flex flex-column justify-content-center align-items-center" style={{ height: '80vh' }}>
