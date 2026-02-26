@@ -179,6 +179,7 @@ class AppComponent {
   statusBar: StatusBar
   topBar: Topbar
   templateExplorerModal: TemplateExplorerModalPlugin
+  remixAiAssistant: RemixAIAssistant
   settings: SettingsTab
   authPlugin: AuthPlugin
   s3StoragePlugin: S3StoragePlugin
@@ -364,8 +365,8 @@ class AppComponent {
 
     // ----------------- AI --------------------------------------
     const remixAI = new RemixAIPlugin()
-    const remixAiAssistant = new RemixAIAssistant()
     const quickDappV2 = new QuickDappV2()
+    this.remixAiAssistant = new RemixAIAssistant()
 
     // ----------------- import content service ------------------------
     const contentImport = new CompilerImports()
@@ -476,6 +477,7 @@ class AppComponent {
       resolutionIndex,
       this.themeModule,
       this.localeModule,
+      this.remixAiAssistant,
       editor,
       fileManager,
       compilerMetadataGenerator,
@@ -524,7 +526,6 @@ class AppComponent {
       templateSelection,
       scriptRunnerUI,
       remixAI,
-      remixAiAssistant,
       quickDappV2,
       walletConnect,
       amp,

@@ -5,9 +5,11 @@ import './panel.css'
 import { CustomTooltip, RenderIf, RenderIfNot } from '@remix-ui/helper'
 import { TrackingContext } from '@remix-ide/tracking'
 import { PluginPanelEvent } from '@remix-api'
+import { appActionTypes, AppContext } from '@remix-ui/app'
 
 export interface RemixPanelProps {
   plugins: Record<string, PluginRecord>,
+  sourcePlugin?: any
   pinView?: (profile: PluginRecord['profile'], view: PluginRecord['view']) => void,
   unPinView?: (profile: PluginRecord['profile']) => void,
   togglePanel?: () => void,
@@ -17,7 +19,9 @@ export interface RemixPanelProps {
 const RemixUIPanelHeader = (props: RemixPanelProps) => {
   const [plugin, setPlugin] = useState<PluginRecord>()
   const [toggleExpander, setToggleExpander] = useState<boolean>(false)
+  const [trackMaximize, setTrackMaximize] = useState<boolean>(false);
   const { trackMatomoEvent } = useContext(TrackingContext)
+  const appContext = useContext(AppContext)
 
   useEffect(() => {
     setToggleExpander(false)
@@ -67,6 +71,36 @@ const RemixUIPanelHeader = (props: RemixPanelProps) => {
       </section>
     )
   }
+
+  const RemixAiPanelHeading = () => {
+
+    return (
+      <section className="px-1 pt-2 pb-0 d-flex flex-row align-items-center">
+        <div className="bg-light rounded-4 p-3">
+          <i className="fa-kit fa-remixai fs-3"></i>
+        </div>
+        <div className="d-flex flex-column ms-4">
+          <h6>RemixAI Assistant</h6>
+          <div className="">AI code assistant for Remix IDE.</div>
+        </div>
+      </section>
+    )
+  }
+
+  useEffect(() => {
+    function handleMaximize() {
+      if (plugin?.profile.name.toLowerCase() === 'remixaiassistant') {
+        setTrackMaximize(props.isMaximized);
+        dispatchEvent(new CustomEvent('rightSidePanelMaximized', { detail: { isMaximized: props.isMaximized } }));
+      }
+    }
+
+    (props.sourcePlugin as any)?.on('rightSidePanel', 'rightSidePanelMaximized', handleMaximize);
+
+    return () => {
+      (props.sourcePlugin as any)?.off('rightSidePanel', 'rightSidePanelMaximized', handleMaximize);
+    }
+  }, [props.sourcePlugin, props.isMaximized, plugin?.profile.name, appContext])
 
   return (
     <header className="d-flex flex-column">

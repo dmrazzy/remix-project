@@ -271,7 +271,7 @@ export class RemixResourceProviderRegistry implements ResourceProviderRegistry {
     // Filter by tags
     if (query.tags && query.tags.length > 0) {
       filtered = filtered.filter(resource =>
-        query.tags!.some(tag =>
+        query.tags?.some(tag =>
           (resource as any).metadata?.tags?.includes(tag) ||
           resource.name.toLowerCase().includes(tag.toLowerCase()) ||
           resource.description?.toLowerCase().includes(tag.toLowerCase())
@@ -289,7 +289,7 @@ export class RemixResourceProviderRegistry implements ResourceProviderRegistry {
           ...(resource.annotations?.audience || [])
         ].join(' ').toLowerCase();
 
-        return query.keywords!.some(keyword =>
+        return query.keywords?.some(keyword =>
           searchText.includes(keyword.toLowerCase())
         );
       });
@@ -302,7 +302,7 @@ export class RemixResourceProviderRegistry implements ResourceProviderRegistry {
         if (!lastModified) return false;
 
         const date = new Date(lastModified);
-        return date >= query.dateRange!.from && date <= query.dateRange!.to;
+        return date >= query.dateRange?.from && date <= query.dateRange?.to;
       });
     }
 
@@ -312,8 +312,8 @@ export class RemixResourceProviderRegistry implements ResourceProviderRegistry {
         const size = (resource as any).metadata?.size;
         if (size === undefined) return true;
 
-        const withinMin = !query.size!.min || size >= query.size!.min;
-        const withinMax = !query.size!.max || size <= query.size!.max;
+        const withinMin = !query.size?.min || size >= query.size?.min;
+        const withinMax = !query.size?.max || size <= query.size?.max;
         return withinMin && withinMax;
       });
     }

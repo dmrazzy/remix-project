@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { CustomTooltip } from '@remix-ui/helper'
