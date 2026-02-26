@@ -497,7 +497,7 @@ module.exports = {
   // ──────────────────────────────────
   // Test G2-6: Verify Getting Started screen shows correct guidance after delete all
   // ──────────────────────────────────
-  'Should display Getting Started guidance with two options #group2': function (browser: NightwatchBrowser) {
+  'Should display Getting Started guidance with two options #group2': '' + function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="quickdapp-getting-started"]', 10000)
       .assert.textContains('*[data-id="quickdapp-getting-started"]', 'Getting Started')
