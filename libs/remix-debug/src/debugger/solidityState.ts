@@ -1,3 +1,4 @@
+import { timeStamp } from 'console'
 import { EventManager } from '../eventManager'
 import { decodeState } from '../solidity-decoder/stateDecoder'
 import { StorageViewer } from '../storage/storageViewer'
@@ -59,7 +60,7 @@ export class DebuggerSolidityState {
       if (this.stateVariablesByAddresses[address]) {
         return this.extractStateVariables(this.stateVariablesByAddresses[address], address)
       }
-      this.solidityProxy.extractStateVariablesAt(index, address).then((stateVars) => {
+      this.solidityProxy.extractStateVariablesAt(index).then((stateVars) => {
         this.stateVariablesByAddresses[address] = stateVars
         this.extractStateVariables(stateVars, address)
       }).catch((_error) => {

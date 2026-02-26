@@ -50,20 +50,12 @@ export class SolidityProxy {
     if (this.cache.contractObjectByAddress[address]) {
       return this.cache.contractObjectByAddress[address]
     }
-    const isCreation = isContractCreation(address)
     const code = await this.getCode(address)
-
-    // For contract creation, pass null to compilationResult so it returns the main contract
-    // being deployed (not a specific deployed address)
-    const addressForCompilation = isCreation ? null : address
-    const compilationResult = await this.compilationResult(addressForCompilation)
-
+    const compilationResult = await this.compilationResult(address)
     let contract
     if (compilationResult && compilationResult.data && compilationResult.data.contracts) {
       contract = contractObjectFromCode(compilationResult.data.contracts, code.bytecode, address)
-      if (contract) {
-        this.cache.contractObjectByAddress[address] = contract
-      }
+      this.cache.contractObjectByAddress[address] = contract
     }
     return contract
   }
@@ -75,33 +67,22 @@ export class SolidityProxy {
     * @return {Object} - returns state variables of @args address
     */
   async extractStatesDefinitions (address: string) {
-    // For contract creation, use null to get the main compilation result
-    const addressForCompilation = isContractCreation(address) ? null : address
-    const compilationResult = await this.compilationResult(addressForCompilation)
+    const compilationResult = await this.compilationResult(address)
     if (!compilationResult || !compilationResult.data) return null
-
-    // Use addressForCompilation for caching to ensure consistency
-    const cacheKey = addressForCompilation || address
-    if (!this.cache.contractDeclarations[cacheKey]) {
-      this.cache.contractDeclarations[cacheKey] = extractContractDefinitions(compilationResult.data.sources)
+    if (!this.cache.contractDeclarations[address]) {
+      this.cache.contractDeclarations[address] = extractContractDefinitions(compilationResult.data.sources)
     }
-    if (!this.cache.statesDefinitions[cacheKey]) {
-      this.cache.statesDefinitions[cacheKey] = extractStatesDefinitions(compilationResult.data.sources, this.cache.contractDeclarations[cacheKey])
+    if (!this.cache.statesDefinitions[address]) {
+      this.cache.statesDefinitions[address] = extractStatesDefinitions(compilationResult.data.sources, this.cache.contractDeclarations[address])
     }
-    return this.cache.statesDefinitions[cacheKey]
+    return this.cache.statesDefinitions[address]
   }
 
   async getLinearizedBaseContracts(address: string, id: number) {
-    // For contract creation, use null to get the main compilation result
-    const addressForCompilation = isContractCreation(address) ? null : address
-    const compilationResult = await this.compilationResult(addressForCompilation)
+    const compilationResult = await this.compilationResult(address)
     if (!compilationResult || !compilationResult.data) return null
-
-    // extractStatesDefinitions will handle the contract creation case
-    await this.extractStatesDefinitions(address)
-
-    const cacheKey = addressForCompilation || address
-    return getLinearizedBaseContracts(id, this.cache.contractDeclarations[cacheKey].contractsById)
+    this.extractStatesDefinitions(address)
+    return getLinearizedBaseContracts(id, this.cache.contractDeclarations[address].contractsById)
   }
 
   /**
@@ -111,38 +92,12 @@ export class SolidityProxy {
     * @param {String} address  - contract address
     * @return {Object} - returns state variables of @args contractName
     */
-  async extractStateVariables (contractName: string, address: string, shortName?: string, file?: string) {
-    // Try to use cached result first with exact name
-    if (this.cache.stateVariablesByContractName[contractName]) {
-      return this.cache.stateVariablesByContractName[contractName]
+  async extractStateVariables (contractName: string, address: string) {
+    if (!this.cache.stateVariablesByContractName[contractName]) {
+      const compilationResult = await this.compilationResult(address)
+      this.cache.stateVariablesByContractName[contractName] = extractStateVariables(contractName, compilationResult.data.sources)
     }
-
-    // For contract creation, use null to get the main compilation result
-    const addressForCompilation = isContractCreation(address) ? null : address
-    const compilationResult = await this.compilationResult(addressForCompilation)
-    if (!compilationResult || !compilationResult.data) {
-      return []
-    }
-
-    // Try exact match first
-    let stateVars = extractStateVariables(contractName, compilationResult.data.sources)
-
-    // If not found and we have shortName, try that
-    if ((!stateVars || stateVars.length === 0) && shortName) {
-      stateVars = extractStateVariables(shortName, compilationResult.data.sources)
-
-      // If still not found, try to find a key that ends with :shortName
-      if (!stateVars || stateVars.length === 0) {
-        const states = extractStatesDefinitions(compilationResult.data.sources, null)
-        const matchingKey = Object.keys(states).find(key => key.endsWith(':' + shortName))
-        if (matchingKey) {
-          stateVars = extractStateVariables(matchingKey, compilationResult.data.sources)
-        }
-      }
-    }
-
-    this.cache.stateVariablesByContractName[contractName] = stateVars
-    return stateVars
+    return this.cache.stateVariablesByContractName[contractName]
   }
 
   /**
@@ -154,10 +109,7 @@ export class SolidityProxy {
     */
   async extractStateVariablesAt (vmtraceIndex: number, address?: string) {
     const contract = await this.contractObjectAt(vmtraceIndex)
-    if (!contract) {
-      return []
-    }
-    return await this.extractStateVariables(contract.name, address, contract.shortName, contract.file)
+    return await this.extractStateVariables(contract.name, address)
   }
 
   /**
@@ -190,9 +142,7 @@ export class SolidityProxy {
    * @return {String} - filename
    */
   fileNameFromIndex (index, compilationResult) {
-    // Use sources instead of contracts to get the correct filename
-    // This ensures we get the actual source file names, not contract names
-    return Object.keys(compilationResult.sources)[index]
+    return Object.keys(compilationResult.contracts)[index]
   }
 }
 
@@ -202,11 +152,7 @@ function contractObjectFromCode (contracts, code, address) {
     for (const contract in contracts[file]) {
       const bytecode = isCreation ? contracts[file][contract].evm.bytecode.object : contracts[file][contract].evm.deployedBytecode.object
       if (util.compareByteCode(code, '0x' + bytecode)) {
-        // Return full contract name (file:contract) to properly match state variables
-        // This is important when contracts with the same name exist in different files due to imports
-        const fullName = file + ':' + contract
-        // Also return the contract name alone and file for fallback lookup
-        return { name: fullName, shortName: contract, file: file, contract: contracts[file][contract] }
+        return { name: contract, contract: contracts[file][contract] }
       }
     }
   }

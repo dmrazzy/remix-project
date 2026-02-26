@@ -338,10 +338,8 @@ function computeOffsets (types, stateDefinitions, contractName, location) {
     const variable = types[i]
     const type = parseType(variable.typeDescriptions.typeString, stateDefinitions, contractName, location)
     if (!type) {
-      console.warn('[computeOffsets] Unable to retrieve decode info for variable "' + variable.name + '" of type "' + variable.typeDescriptions.typeString + '", skipping this variable')
-      // Skip this variable instead of failing completely
-      // This allows other state variables to be decoded even if some types are unsupported
-      continue
+      console.log('unable to retrieve decode info of ' + variable.typeDescriptions.typeString)
+      return null
     }
     const immutable = variable.mutability === 'immutable'
     const hasStorageSlots = !immutable && !variable.constant

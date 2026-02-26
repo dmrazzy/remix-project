@@ -158,12 +158,14 @@ export const DebuggerUI = (props: DebuggerUIProps) => {
 
       // Listen for solidityState updates
       const updateSolidityState = (stateData) => {
+        console.log('[Debugger] solidityState event received:', stateData)
         setSolidityState(stateData)
       }
       state.debugger.vmDebuggerLogic.event.register('solidityState', updateSolidityState)
 
       // Listen for solidityLocals updates
       const updateSolidityLocals = (localsData) => {
+        console.log('[Debugger] solidityLocals event received:', localsData)
         setSolidityLocals(localsData)
       }
       state.debugger.vmDebuggerLogic.event.register('solidityLocals', updateSolidityLocals)
