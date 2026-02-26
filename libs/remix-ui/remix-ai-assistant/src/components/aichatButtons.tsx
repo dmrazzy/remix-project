@@ -22,6 +22,12 @@ export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspa
     action: () => void
   }[] = [
     {
+      label: 'File',
+      icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} far fa-copy`,
+      color: '',
+      action: () => sendPrompt('Create a new file')
+    },
+    {
       label: 'New workspace',
       icon: `${theme?.toLowerCase() === 'dark' ? 'text-remix-ai' : 'text-remix-ai-light'} fas fa-plus`,
       color: '',
