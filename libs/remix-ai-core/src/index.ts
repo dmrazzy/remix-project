@@ -26,7 +26,7 @@ export {
   ChatEntry, AIRequestType, ChatHistory, resetOllamaHostOnSettingsChange,
   mcpDefaultServersConfig,
   AIModel, AVAILABLE_MODELS, getDefaultModel, getModelById,
-  ChatHistoryStorageManager, IndexedDBChatHistoryBackend
+  ChatHistoryStorageManager, IndexedDBChatHistoryBackend,
   WeightedToolSelector, IChatMessage
 }
 
