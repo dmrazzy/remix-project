@@ -137,10 +137,7 @@ export class AIDappGenerator extends Plugin {
     try {
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json"
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -390,6 +387,20 @@ export class AIDappGenerator extends Plugin {
     return Number.isNaN(id) || id === 0 || id === 1337 || id === 31337 || id === 5777
   }
 
+  private getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    }
+    if (typeof localStorage !== 'undefined') {
+      const token = localStorage.getItem('remix_access_token')
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+    }
+    return headers
+  }
+
   private async validateAndRetryMissingFiles(
     pages: Record<string, string>,
     htmlContent: string,
@@ -431,10 +442,7 @@ export class AIDappGenerator extends Plugin {
     try {
       const response = await fetch(BACKEND_URL, {
         method: "POST",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json"
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({
           messages,
           systemPrompt,

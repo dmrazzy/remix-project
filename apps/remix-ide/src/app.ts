@@ -717,8 +717,7 @@ class AppComponent {
       'gistHandler',
       'compilerloader',
       'remixAI',
-      'remixaiassistant',
-      'quick-dapp-v2'
+      'remixaiassistant'
     ])
 
     await this.appManager.activatePlugin(['auth'])

@@ -152,7 +152,7 @@ export class SimpleToolSelector {
     return result
   }
 
-  private extractTokens(text: string): string[] {
+  extractTokens(text: string): string[] {
     const tokens = text.toLowerCase()
       .split(/[^a-z0-9]+/)
       .filter(token => token.length > 2) // Filter out short words
@@ -161,7 +161,7 @@ export class SimpleToolSelector {
     return tokens.filter(token => !stopWords.has(token))
   }
 
-  private scoreTool(
+  scoreTool(
     tool: IMCPTool,
     promptTokens: string[],
     fullPrompt: string
@@ -200,7 +200,7 @@ export class SimpleToolSelector {
     }
   }
 
-  private calculateTokenOverlap(promptTokens: string[], toolTokens: string[]): number {
+  calculateTokenOverlap(promptTokens: string[], toolTokens: string[]): number {
     if (promptTokens.length === 0 || toolTokens.length === 0) return 0
 
     let matches = 0

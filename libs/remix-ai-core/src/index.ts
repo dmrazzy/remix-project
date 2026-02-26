@@ -16,6 +16,7 @@ import { ChatCommandParser } from './helpers/chatCommandParser'
 import { mcpDefaultServersConfig } from './config/mcpDefaultServers'
 import { ChatHistoryStorageManager } from './storage/storageManager'
 import { IndexedDBChatHistoryBackend } from './storage/indexedDBBackend'
+import { WeightedToolSelector, IChatMessage } from './services/weightedToolSelector'
 export {
   ChatCommandParser,
   ModelType, ICompletions, IParams, IRemoteModel, buildChatPrompt,
@@ -26,6 +27,7 @@ export {
   mcpDefaultServersConfig,
   AIModel, AVAILABLE_MODELS, getDefaultModel, getModelById,
   ChatHistoryStorageManager, IndexedDBChatHistoryBackend
+  WeightedToolSelector, IChatMessage
 }
 
 export * from './types/types'

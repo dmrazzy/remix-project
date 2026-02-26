@@ -303,6 +303,28 @@ const switchNetwork = async (targetChainHex) => {
 };
 \`\`\`
 Show a **"Switch to [Network Name]"** button when the user is on the wrong chain.
+
+**Event Listener Pattern (mandatory — handle account/chain changes):**
+Use the stored \`rawProviderRef.current\` (already resolved) — **NEVER call \`__qdapp_getProvider()\` inside useEffect** (it returns a Promise and useEffect cannot be async):
+\`\`\`javascript
+useEffect(() => {
+  const rp = rawProviderRef.current;
+  if (!rp?.on) return;
+  const handleAccountsChanged = (accounts) => {
+    if (accounts.length === 0) disconnectWallet();
+    else setAccount(accounts[0]);
+  };
+  const handleChainChanged = (chainIdHex) => {
+    setChainId(parseInt(chainIdHex, 16));
+  };
+  rp.on('accountsChanged', handleAccountsChanged);
+  rp.on('chainChanged', handleChainChanged);
+  return () => {
+    rp.removeListener('accountsChanged', handleAccountsChanged);
+    rp.removeListener('chainChanged', handleChainChanged);
+  };
+}, [account]);
+\`\`\`
 `
   },
 
