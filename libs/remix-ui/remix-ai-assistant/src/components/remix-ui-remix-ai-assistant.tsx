@@ -103,6 +103,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const clearToolTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const uiToolCallbackRef = useRef<((isExecuting: boolean, toolName?: string, toolArgs?: Record<string, any>) => void) | null>(null)
   const wasInitializingRef = useRef(props.isInitializing)
+  const streamingAssistantIdRef = useRef<string | null>(null)
   if (props.isInitializing) wasInitializingRef.current = true
 
   // Audio transcription hook
@@ -308,6 +309,44 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   }, [props.plugin])
 
+  // Listen for streaming chunks from DeepAgent
+  useEffect(() => {
+    const handleStreamChunk = (chunk: string) => {
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? { ...m, content: m.content + chunk }
+              : m
+          )
+        )
+      }
+    }
+
+    const handleStreamComplete = (finalText: string) => {
+      // Save to chat history when streaming completes
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev => {
+          const userMsg = prev[prev.length - 2]
+          if (userMsg && userMsg.role === 'user' && finalText) {
+            Promise.resolve(ChatHistory.pushHistory(userMsg.content, finalText)).then(() => props.plugin.loadConversations())
+          }
+          return prev
+        })
+      }
+      setIsStreaming(false)
+      streamingAssistantIdRef.current = null
+    }
+
+    props.plugin.on('remixAI', 'onStreamResult', handleStreamChunk)
+    props.plugin.on('remixAI', 'onStreamComplete', handleStreamComplete)
+
+    return () => {
+      props.plugin.off('remixAI', 'onStreamResult')
+      props.plugin.off('remixAI', 'onStreamComplete')
+    }
+  }, [props.plugin])
+
   // bubble messages up to parent
   useEffect(() => {
     props.onMessagesChange?.(messages)
@@ -505,6 +544,36 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         const response = pending
           ? await props.plugin.call('remixAI', 'ProcessChatRequestBuffer', GenerationParams)
           : await props.plugin.call('remixAI', 'answer', trimmed, GenerationParams)
+
+        console.log('Received response from plugin:', response)
+
+        // Handle langchain/deepagent mode: response is plain text
+        if (typeof response === 'string') {
+          const assistantId = crypto.randomUUID()
+
+          // If response is empty, this is a streaming response
+          // Set up an empty message that will be filled by stream events
+          if (response === '' || response.length === 0) {
+            streamingAssistantIdRef.current = assistantId
+            setMessages(prev => [
+              ...prev,
+              { id: assistantId, role: 'assistant', content: '', timestamp: Date.now(), sentiment: 'none' }
+            ])
+            // Don't setIsStreaming(false) here - let the stream complete
+            // The streaming will continue via the onStreamResult event listener
+            return
+          }
+
+          // If response has content, it's the final non-streamed response
+          setMessages(prev => [
+            ...prev,
+            { id: assistantId, role: 'assistant', content: response, timestamp: Date.now(), sentiment: 'none' }
+          ])
+          Promise.resolve(ChatHistory.pushHistory(trimmed, response)).then(() => props.plugin.loadConversations())
+          setIsStreaming(false)
+          streamingAssistantIdRef.current = null
+          return
+        }
 
         const assistantId = crypto.randomUUID()
         setMessages(prev => [

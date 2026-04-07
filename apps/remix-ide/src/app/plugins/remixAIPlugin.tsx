@@ -3,7 +3,7 @@ import { Plugin } from '@remixproject/engine';
 import { trackMatomoEvent } from '@remix-api'
 import { RemoteInferencer, IRemoteModel, IParams, GenerationParams, AssistantParams, CodeExplainAgent, SecurityAgent, CompletionParams, OllamaInferencer, isOllamaAvailable, getBestAvailableModel, listModels } from '@remix/remix-ai-core';
 import { CodeCompletionAgent, ContractAgent, workspaceAgent, IContextType, mcpDefaultServersConfig, mcpBasicServersConfig } from '@remix/remix-ai-core';
-import { MCPInferencer } from '@remix/remix-ai-core';
+import { MCPInferencer, DeepAgentInferencer } from '@remix/remix-ai-core';
 import { IMCPServer, IMCPConnectionStatus } from '@remix/remix-ai-core';
 import { RemixMCPServer, createRemixMCPServer } from '@remix/remix-ai-core';
 import { AIModel, getDefaultModel, getModelById } from '@remix/remix-ai-core';
@@ -26,6 +26,7 @@ const profile = {
     'getSelectedModel', 'getModelAccess', 'getOllamaModels',
     'addMCPServer', 'removeMCPServer', 'getMCPConnectionStatus', 'getMCPResources', 'getMCPTools', 'executeMCPTool',
     'enableMCPEnhancement', 'disableMCPEnhancement', 'isMCPEnabled', 'getIMCPServers',
+    'enableDeepAgent', 'disableDeepAgent', 'isDeepAgentEnabled',
     'clearCaches', 'cancelRequest'
   ],
   events: [],
@@ -57,9 +58,43 @@ export class RemixAIPlugin extends Plugin {
   mcpInferencer: MCPInferencer | null = null
   mcpEnabled: boolean = false
   remixMCPServer: RemixMCPServer | null = null
+  deepAgentInferencer: DeepAgentInferencer | null = null
+  deepAgentEnabled: boolean = false
+  private deepAgentEventListenersSetup: boolean = false
 
   constructor() {
     super(profile)
+  }
+
+  private setupDeepAgentEventListeners() {
+    if (!this.deepAgentInferencer || this.deepAgentEventListenersSetup) {
+      return
+    }
+
+    const eventEmitter = this.deepAgentInferencer.getEventEmitter()
+
+    // Remove all existing listeners first to prevent duplicates
+    eventEmitter.removeAllListeners('onInference')
+    eventEmitter.removeAllListeners('onInferenceDone')
+    eventEmitter.removeAllListeners('onStreamResult')
+    eventEmitter.removeAllListeners('onStreamComplete')
+
+    // Set up fresh listeners
+    eventEmitter.on('onInference', () => {
+      this.isInferencing = true
+    })
+    eventEmitter.on('onInferenceDone', () => {
+      this.isInferencing = false
+    })
+    eventEmitter.on('onStreamResult', (chunk: string) => {
+      this.emit('onStreamResult', chunk)
+    })
+    eventEmitter.on('onStreamComplete', (finalText: string) => {
+      this.emit('onStreamComplete', finalText)
+    })
+
+    this.deepAgentEventListenersSetup = true
+    console.log('[RemixAI Plugin] DeepAgent event listeners set up')
   }
 
   private async getLocalizedMessage(key: string): Promise<string> {
@@ -116,6 +151,39 @@ export class RemixAIPlugin extends Plugin {
     this.on('auth', 'authStateChanged', async (authState: any) => {
       await this.refreshMCPServersOnAuthChange(authState);
     });
+
+    console.log('this.mcpInferencer. tools', await this.mcpInferencer?.getAllTools())
+
+    // Initialize DeepAgent if enabled (API key handled by proxy server)
+    const deepAgentEnabled = localStorage.getItem('deepagent_enabled') === 'true'
+
+    if (deepAgentEnabled && this.remixMCPServer) {
+      try {
+        console.log('[RemixAI Plugin] Initializing DeepAgent (using proxy for API key)...')
+        this.deepAgentInferencer = new DeepAgentInferencer(
+          this,
+          this.remixMCPServer.tools,
+          {
+            memoryBackend: (localStorage.getItem('deepagent_memory_backend') as 'state' | 'store') || 'store',
+            enableSubagents: true,
+            enablePlanning: true
+          },
+          this.remoteInferencer,
+          this.mcpInferencer // Pass MCPInferencer to gather external MCP client tools
+        )
+        await this.deepAgentInferencer.initialize()
+        this.deepAgentEnabled = true
+
+        // Set up DeepAgent event listeners for streaming (once only)
+        this.setupDeepAgentEventListeners()
+
+        console.log('[RemixAI Plugin] DeepAgent initialized successfully')
+      } catch (error) {
+        console.error('[RemixAI Plugin] Failed to initialize DeepAgent:', error)
+        this.deepAgentEnabled = false
+        this.deepAgentInferencer = null
+      }
+    }
   }
 
   async initialize(remoteModel?:IRemoteModel){
@@ -156,7 +224,9 @@ export class RemixAIPlugin extends Plugin {
   }
 
   async code_generation(prompt: string, params: IParams=CompletionParams): Promise<any> {
-    if (this.mcpEnabled && this.mcpInferencer){
+    if (this.deepAgentEnabled && this.deepAgentInferencer) {
+      return this.deepAgentInferencer.code_generation(prompt, params)
+    } else if (this.mcpEnabled && this.mcpInferencer){
       return this.mcpInferencer.code_generation(prompt, params)
     } else {
       return await this.remoteInferencer.code_generation(prompt, params)
@@ -177,7 +247,9 @@ export class RemixAIPlugin extends Plugin {
     // add workspace context
     newPrompt = !this.workspaceAgent.ctxFiles ? newPrompt : "Using the following context: ```\n" + this.workspaceAgent.ctxFiles + "```\n\n" + newPrompt
     let result
-    if (this.mcpEnabled && this.mcpInferencer){
+    if (this.deepAgentEnabled && this.deepAgentInferencer) {
+      result = await this.deepAgentInferencer.answer(newPrompt, params, this.workspaceAgent.ctxFiles || '')
+    } else if (this.mcpEnabled && this.mcpInferencer){
       return this.mcpInferencer.answer(prompt, params)
     } else {
       result = await this.remoteInferencer.answer(newPrompt)
@@ -188,7 +260,9 @@ export class RemixAIPlugin extends Plugin {
 
   async code_explaining(prompt: string, context: string, params: IParams=GenerationParams): Promise<any> {
     let result
-    if (this.mcpEnabled && this.mcpInferencer){
+    if (this.deepAgentEnabled && this.deepAgentInferencer) {
+      result = await this.deepAgentInferencer.code_explaining(prompt, context, params)
+    } else if (this.mcpEnabled && this.mcpInferencer){
       return this.mcpInferencer.code_explaining(prompt, context, params)
     } else {
       result = await this.remoteInferencer.code_explaining(prompt, context, params)
@@ -670,6 +744,72 @@ export class RemixAIPlugin extends Plugin {
     return this.mcpServers;
   }
 
+  async enableDeepAgent(): Promise<void> {
+    try {
+      if (!this.remixMCPServer) {
+        throw new Error('RemixMCPServer not initialized')
+      }
+
+      console.log('[RemixAI Plugin] Enabling DeepAgent (API key handled by proxy)...')
+
+      // Create or reinitialize DeepAgentInferencer
+      this.deepAgentInferencer = new DeepAgentInferencer(
+        this,
+        this.remixMCPServer.tools,
+        {
+          memoryBackend: (localStorage.getItem('deepagent_memory_backend') as 'state' | 'store') || 'store',
+          enableSubagents: true,
+          enablePlanning: true
+        },
+        this.remoteInferencer,
+        this.mcpInferencer
+      )
+
+      await this.deepAgentInferencer.initialize()
+
+      // Set up event listeners (centralized method prevents duplicates)
+      this.deepAgentEventListenersSetup = false // Reset flag
+      this.setupDeepAgentEventListeners()
+
+      this.deepAgentEnabled = true
+
+      // Store settings
+      localStorage.setItem('deepagent_enabled', 'true')
+
+      console.log('[RemixAI Plugin] DeepAgent enabled successfully')
+    } catch (error) {
+      console.error('[RemixAI Plugin] Failed to enable DeepAgent:', error)
+      this.deepAgentEnabled = false
+      this.deepAgentInferencer = null
+      throw error
+    }
+  }
+
+  async disableDeepAgent(): Promise<void> {
+    console.log('[RemixAI Plugin] Disabling DeepAgent...')
+
+    if (this.deepAgentInferencer) {
+      // Remove all event listeners before closing
+      const eventEmitter = this.deepAgentInferencer.getEventEmitter()
+      eventEmitter.removeAllListeners()
+
+      await this.deepAgentInferencer.close()
+    }
+
+    this.deepAgentEnabled = false
+    this.deepAgentInferencer = null
+    this.deepAgentEventListenersSetup = false
+
+    // Store settings
+    localStorage.setItem('deepagent_enabled', 'false')
+
+    console.log('[RemixAI Plugin] DeepAgent disabled')
+  }
+
+  isDeepAgentEnabled(): boolean {
+    return this.deepAgentEnabled
+  }
+
   clearCaches(){
     if (this.mcpInferencer){
       this.mcpInferencer.resetResourceCache()
@@ -677,7 +817,9 @@ export class RemixAIPlugin extends Plugin {
   }
 
   cancelRequest(): void {
-    if (this.mcpEnabled && this.mcpInferencer) {
+    if (this.deepAgentEnabled && this.deepAgentInferencer) {
+      this.deepAgentInferencer.cancelRequest()
+    } else if (this.mcpEnabled && this.mcpInferencer) {
       this.mcpInferencer.cancelRequest()
     } else if (this.remoteInferencer) {
       (this.remoteInferencer as RemoteInferencer).cancelRequest()
@@ -807,6 +949,45 @@ export class RemixAIPlugin extends Plugin {
         if (enabledServers.length > 0) {
           await this.mcpInferencer.connectAllServers();
           this.emit('mcpServersLoaded');
+        }
+
+        const deepAgentEnabled = localStorage.getItem('deepagent_enabled') === 'true'
+
+        if (deepAgentEnabled && this.remixMCPServer) {
+          try {
+            console.log('[RemixAI Plugin] Reinitializing DeepAgent after MCP server reset...')
+
+            // Clean up old instance first
+            if (this.deepAgentInferencer) {
+              const eventEmitter = this.deepAgentInferencer.getEventEmitter()
+              eventEmitter.removeAllListeners()
+              await this.deepAgentInferencer.close()
+            }
+
+            this.deepAgentInferencer = new DeepAgentInferencer(
+              this,
+              this.remixMCPServer.tools,
+              {
+                memoryBackend: (localStorage.getItem('deepagent_memory_backend') as 'state' | 'store') || 'store',
+                enableSubagents: true,
+                enablePlanning: true
+              },
+              this.remoteInferencer,
+              this.mcpInferencer // Pass MCPInferencer to gather external MCP client tools
+            )
+            await this.deepAgentInferencer.initialize()
+            this.deepAgentEnabled = true
+
+            // Set up event listeners (reset flag first)
+            this.deepAgentEventListenersSetup = false
+            this.setupDeepAgentEventListeners()
+
+            console.log('[RemixAI Plugin] DeepAgent reinitialized successfully')
+          } catch (error) {
+            console.error('[RemixAI Plugin] Failed to reinitialize DeepAgent:', error)
+            this.deepAgentEnabled = false
+            this.deepAgentInferencer = null
+          }
         }
       }
     } catch (error) {
