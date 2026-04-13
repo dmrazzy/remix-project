@@ -331,6 +331,16 @@ export function RemixUiTopbar() {
   }, [global.fs.browser.workspaces, global.fs.browser.workspaces.length])
 
   useEffect(() => {
+    const handleWorkspaceChanged = () => updateMenuItems()
+    plugin.on('filePanel', 'workspaceDeleted', handleWorkspaceChanged)
+    plugin.on('filePanel', 'workspaceCreated', handleWorkspaceChanged)
+    return () => {
+      plugin.off('filePanel', 'workspaceDeleted')
+      plugin.off('filePanel', 'workspaceCreated')
+    }
+  }, [])
+
+  useEffect(() => {
     plugin.on('theme', 'themeChanged', (theme) => {
       setCurrentTheme(theme)
     })
@@ -672,6 +682,7 @@ export function RemixUiTopbar() {
               className="ms-2"
               onEnableCloud={() => enableCloud()}
               onDisableCloud={() => disableCloud()}
+              theme={currentTheme?.quality}
             />)}
           {showCloudLoginModal && <LoginModal onClose={() => setShowCloudLoginModal(false)} plugin={plugin} />}
         </div>
@@ -767,6 +778,7 @@ export function RemixUiTopbar() {
                 logOutOfGithub={logOutOfGithub}
                 publishToGist={publishToGist}
                 loginWithGitHub={loginWithGitHub}
+                theme={currentTheme?.quality}
               />
             </div>
 

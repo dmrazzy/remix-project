@@ -161,7 +161,8 @@ export class ApiClient implements IApiClient {
         const errorData = data as any
         
         // Handle 401 Unauthorized - attempt token refresh and retry
-        if (response.status === 401 && !options.skipTokenRefresh) {
+        // Only attempt refresh if we had a token in the first place
+        if (response.status === 401 && !options.skipTokenRefresh && this.token) {
           const newToken = await this.refreshToken()
           if (newToken) {
             // Retry the request with new token

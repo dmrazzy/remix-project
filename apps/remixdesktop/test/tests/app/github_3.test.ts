@@ -124,7 +124,6 @@ const tests = {
       .pause(1000)
       .click('*[data-id="saveGitHubCredentials"]')
       .pause(1000)
-      .modalFooterOKClick('github-credentials-error')
   },
   'check the commits panel for pagination #group3': function (browser: NightwatchBrowser) {
     browser

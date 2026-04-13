@@ -21,6 +21,8 @@
 
 .login-modal-left-section {
   width: 40%;
+  flex-shrink: 0;
+  overflow: hidden;
   background-image: url('https://raw.githubusercontent.com/remix-project-org/remix-dynamics/refs/heads/live/images/illusion.svg');
   background-size: cover;
   background-position: center;
@@ -44,9 +46,12 @@
 }
 
 .login-modal-list-text {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   color: #7dd3fc;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .login-modal-right-section {

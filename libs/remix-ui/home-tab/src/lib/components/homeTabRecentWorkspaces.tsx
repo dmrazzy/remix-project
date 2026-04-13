@@ -100,6 +100,8 @@ function HomeTabRecentWorkspaces({ plugin }: HomeTabFileProps) {
     }
     setLoadingWorkspace(null)
   }
+  // This needs to be refactored to be compatible with cloud workspaces
+  return null
 
   return (
     <div className="justify-content-start d-flex flex-column my-5" id="hTFileSection">

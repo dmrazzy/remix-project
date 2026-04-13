@@ -4,7 +4,7 @@
  * Covers all user-lifecycle and engagement events:
  * - Auth: login, logout, provider selection
  * - User menu: dropdown actions (clone, gist, github, bug report, feature request, docs, theme)
- * - Cloud workspaces: save, backup, restore, enable, encryption, autosave
+ * - Cloud Workspaces: save, backup, restore, enable, encryption, autosave
  * - Walkthrough: start, complete, search
  * - Notifications: open, action, dismiss, mark read
  * - Feedback: open panel, close panel

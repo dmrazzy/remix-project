@@ -1,6 +1,7 @@
 import React from 'react'
 import { InviteValidateResponse, InviteRedeemResponse, InviteTokenAction } from '@remix-api'
 import { LoginButton } from '@remix-ui/login'
+import BetaJoinModal from './beta-join-modal'
 import './invite-overlay.css'
 
 export interface InviteState {
@@ -73,6 +74,13 @@ export const InviteOverlay: React.FC<InviteOverlayProps> = ({
 
   // --- Success state ---
   if (redeemResult?.success) {
+    // For beta invites, show the beta-reel modal instead of the generic success modal
+    if (inviteType === 'beta_program' && plugin) {
+      plugin.call('helpPlugin', 'showModal', 'beta-reel').catch(() => {})
+      onClose()
+      return null
+    }
+
     const walkthroughAction = validation.actions?.find(a => a.type === 'walkthrough')
     return (
       <SuccessModal
@@ -88,7 +96,8 @@ export const InviteOverlay: React.FC<InviteOverlayProps> = ({
   // --- Main invite modal (type-based) ---
   if (inviteType === 'beta_program') {
     return (
-      <BetaProgramInviteModal
+      <BetaJoinModal
+        open={true}
         token={token}
         validation={validation}
         isAuthenticated={isAuthenticated}
@@ -275,7 +284,7 @@ const SuccessModal: React.FC<{
                 <>
                   <p className="invite-modal-success-message" style={{ fontSize: '0.92rem', lineHeight: 1.6 }}>
                     You've been selected to join the <strong>Remix v2 Private Beta Testing Program</strong>!
-                    You are now part of an exclusive group of developers who will shape the future of Remix.
+                    You are now part of an exclusive group of builders who will shape the future of Remix.
                   </p>
                   <div className="invite-modal-section">
                     <h6 className="invite-modal-section-label">WHAT'S NOW UNLOCKED FOR YOU</h6>
@@ -290,7 +299,7 @@ const SuccessModal: React.FC<{
                       </div>
                       <div className="invite-modal-perk">
                         <i className="fas fa-palette invite-modal-perk-icon"></i>
-                        <span>QuickDapp Builder</span>
+                        <span>QuickDApp Builder</span>
                       </div>
                       <div className="invite-modal-perk">
                         <i className="fas fa-rocket invite-modal-perk-icon"></i>
@@ -303,8 +312,8 @@ const SuccessModal: React.FC<{
                       <i className="fas fa-star" style={{ color: '#f59e0b' }}></i>
                     </div>
                     <div className="invite-modal-walkthrough-text">
-                      <strong>You're special!</strong>
-                      <span>As a beta tester your feedback will directly influence the product. Thank you for helping us build the future of Remix!</span>
+                      <strong>You're needed here!</strong>
+                      <span>As a Beta Tester your feedback will directly influence the product. Thank you for helping us build the future of Remix!</span>
                     </div>
                   </div>
                 </>
@@ -349,160 +358,6 @@ const SuccessModal: React.FC<{
     </div>
   )
 }
-
-/* ==================== Beta Program Invite Modal ==================== */
-
-const BetaProgramInviteModal: React.FC<{
-  token: string
-  validation: InviteValidateResponse
-  isAuthenticated: boolean
-  redeeming: boolean
-  error: string | null
-  onRedeem: (token: string) => Promise<InviteRedeemResponse>
-  onClose: () => void
-  plugin?: any
-}> = ({ token, validation, isAuthenticated, redeeming, error, onRedeem, onClose, plugin }) => (
-  <div className="invite-overlay" onClick={onClose}>
-    <div className="invite-modal-dialog invite-modal-dialog--wide" onClick={e => e.stopPropagation()}>
-      <div className="invite-modal-card">
-        {/* Left swirl panel */}
-        <div className="invite-modal-left invite-modal-left--beta">
-          <div className="invite-modal-left-gradient invite-modal-left-gradient--beta" />
-          <div className="invite-modal-left-content">
-            <div className="invite-modal-hero-icon">
-              <i className="fas fa-flask"></i>
-            </div>
-            <h3 className="invite-modal-hero-title">Remix Beta</h3>
-            <p className="invite-modal-hero-subtitle">
-              You've been accepted to
-              <strong> Remix v2 Private Beta Testing Program</strong>! Get ready to explore powerful new features and help shape the future of Remix.
-            </p>
-          </div>
-        </div>
-
-        {/* Right content panel */}
-        <div className="invite-modal-right">
-          <div className="invite-modal-right-header">
-            <div>
-              <h5>{validation.name || 'Beta Program'}</h5>
-              <p className="invite-modal-muted mb-0">
-                {validation.description || 'Join our exclusive beta testing program'}
-              </p>
-            </div>
-            <button className="invite-modal-close-btn" onClick={onClose}>
-              <i className="fas fa-times"></i>
-            </button>
-          </div>
-
-          <div className="invite-modal-right-body">
-            {/* What's New */}
-            <div className="invite-modal-section">
-              <h6 className="invite-modal-section-label">WHAT'S NEW IN THE BETA?</h6>
-              <p className="invite-modal-muted" style={{ fontSize: '0.82rem', marginBottom: '0.6rem' }}>
-                As a beta tester, you'll be the first to experiment with:
-              </p>
-              <ul className="invite-modal-benefits">
-                <li>
-                  <div className="invite-modal-benefit-dot invite-modal-benefit-dot--teal"></div>
-                  <div>
-                    <strong>Full Agentic RemixAI</strong>
-                    <span>New connected APIs and advanced AI capabilities</span>
-                  </div>
-                </li>
-                <li>
-                  <div className="invite-modal-benefit-dot invite-modal-benefit-dot--cyan"></div>
-                  <div>
-                    <strong>User Accounts, Cloud Storage &amp; Chat History</strong>
-                    <span>Persistent workspace and conversation data across devices</span>
-                  </div>
-                </li>
-                <li>
-                  <div className="invite-modal-benefit-dot invite-modal-benefit-dot--blue"></div>
-                  <div>
-                    <strong>QuickDapp</strong>
-                    <span>AI-assisted front-end builder with decentralized hosting for dApps and Base mini-apps</span>
-                  </div>
-                </li>
-                <li>
-                  <div className="invite-modal-benefit-dot invite-modal-benefit-dot--teal"></div>
-                  <div>
-                    <strong>Huge UI Updates</strong>
-                    <span>Deploy &amp; Run overhaul and the new AI-assisted Debugger</span>
-                  </div>
-                </li>
-              </ul>
-            </div>
-
-            {/* Why Join */}
-            <div className="invite-modal-section">
-              <h6 className="invite-modal-section-label">WHY JOIN?</h6>
-              <p className="invite-modal-muted" style={{ fontSize: '0.82rem', lineHeight: 1.55 }}>
-                You'll get early access to these powerful new tools and play a direct role in shaping the future of Remix.
-                Testing involves both using the tool as usual and trying out the new features.
-              </p>
-              <p className="invite-modal-muted" style={{ fontSize: '0.82rem', lineHeight: 1.55 }}>
-                You can share your comments and suggestions directly in the app, through a dedicated Discord channel,
-                and by completing a form provided at the end of the testing period.
-              </p>
-              <p className="invite-modal-muted" style={{ fontSize: '0.82rem', lineHeight: 1.55, marginBottom: 0 }}>
-                The program is expected to last about a month, and we will provide comprehensive documentation to support you.
-                You are free to leave the program at any time.
-              </p>
-            </div>
-
-            {/* Meta badges */}
-            <div className="invite-modal-meta">
-              {validation.expires_at && (
-                <span className="invite-modal-meta-badge">
-                  <i className="fas fa-clock me-1"></i>
-                  {formatExpiry(validation.expires_at)}
-                </span>
-              )}
-              {validation.uses_remaining != null && (
-                <span className="invite-modal-meta-badge">
-                  <i className="fas fa-ticket-alt me-1"></i>
-                  {validation.uses_remaining} left
-                </span>
-              )}
-            </div>
-
-            {error && (
-              <div className="invite-modal-error">
-                <i className="fas fa-exclamation-triangle me-2"></i>
-                {error}
-              </div>
-            )}
-          </div>
-
-          <div className="invite-modal-right-footer">
-            {isAuthenticated ? (
-              <button
-                className="btn invite-modal-btn-primary invite-modal-btn--glow w-100"
-                data-id="invite-join-beta-btn"
-                onClick={() => onRedeem(token)}
-                disabled={redeeming}
-              >
-                {redeeming ? (
-                  <><i className="fas fa-spinner fa-spin me-2"></i>Activating...</>
-                ) : (
-                  <><i className="fas fa-rocket me-2"></i>Join the Beta</>
-                )}
-              </button>
-            ) : (
-              <div className="w-100">
-                <p className="invite-modal-muted text-center mb-3">
-                  <i className="fas fa-lock me-1"></i>
-                  Sign in to activate this invite
-                </p>
-                <LoginButton className="btn-lg w-100" plugin={plugin} />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-)
 
 /* ==================== Default Invite Modal ==================== */
 

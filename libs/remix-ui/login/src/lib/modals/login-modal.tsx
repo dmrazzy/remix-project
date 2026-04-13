@@ -3,6 +3,7 @@ import { AuthProvider, InviteValidateResponse, AccessPolicyResponse, ACCESS_POLI
 import { useAuth } from '../../../../app/src/lib/remix-app/context/auth-context'
 import { AppContext } from '../../../../app/src/lib/remix-app/context/context'
 import { endpointUrls } from '@remix-endpoints-helper'
+import { Registry } from '@remix-project/remix-lib'
 import './login-modal.css'
 
 interface LoginModalProps {
@@ -52,10 +53,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, plugin }) => {
   })
   const [accessPolicyLoading, setAccessPolicyLoading] = useState(true)
 
-  // Invite token handling
+  // Invite token handling – read from Registry (set early by app.ts) so the
+  // token is available even after other plugins strip it from the URL.
   const [inviteToken, setInviteToken] = useState<string | undefined>(() => {
+    try {
+      const entry = Registry.getInstance().get('inviteToken')
+      if (entry && entry.api) return entry.api as string
+
+    } catch {}
+    // Fallback: read directly from URL
     const params = new URLSearchParams(window.location.search)
-    // Support both ?invite=TOKEN and ?invite_token=TOKEN
     return params.get('invite') || params.get('invite_token') || undefined
   })
   const [inviteValidation, setInviteValidation] = useState<InviteValidateResponse | null>(null)
@@ -856,33 +863,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, plugin }) => {
                       </div>
                       <span className="text-muted fs-small-medium">Validating invite code...</span>
                     </div>
-                  )}
-
-                  {inviteToken && inviteValidation && !inviteValidating && (
-                    inviteValidation.valid ? (
-                      <div className="alert alert-success py-2 px-3 fs-small-medium mb-3" role="alert">
-                        <i className="fas fa-gift me-2"></i>
-                        <strong>{inviteValidation.name || 'Invite'}</strong>
-                        {inviteValidation.description && (
-                          <span className="d-block mt-1">{inviteValidation.description}</span>
-                        )}
-                        {inviteValidation.actions && inviteValidation.actions.length > 0 && (
-                          <ul className="list-unstyled mb-0 mt-1">
-                            {inviteValidation.actions.map((action, i) => (
-                              <li key={i} className="fs-small">
-                                <i className="fas fa-check me-1 text-success"></i>
-                                {action.description}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="alert alert-warning py-2 px-3 fs-small-medium mb-3" role="alert">
-                        <i className="fas fa-exclamation-triangle me-2"></i>
-                        {inviteValidation.error || 'This invite link is invalid or expired.'}
-                      </div>
-                    )
                   )}
 
                   {/* Invite code input for invite_only mode */}

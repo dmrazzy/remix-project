@@ -34,7 +34,7 @@ import { WalkthroughService } from './walkthroughService'
 
 import { OffsetToLineColumnConverter, CompilerMetadata, CompilerArtefacts, FetchAndCompile, CompilerImports, GistHandler, AmpPlugin, ChartJsPlugin } from '@remix-project/core-plugin'
 
-import { Registry } from '@remix-project/remix-lib'
+import { Registry, AppLifecycle, LifecyclePlugin, all } from '@remix-project/remix-lib'
 import { ConfigPlugin } from './app/plugins/config'
 import { StoragePlugin } from './app/plugins/storage'
 import { StorageMonitorPlugin } from './app/plugins/storage-monitor'
@@ -52,6 +52,8 @@ import { AuthPlugin } from './app/plugins/auth-plugin'
 import { InvitationManagerPlugin } from './app/plugins/invitation-manager-plugin'
 import { MembershipRequestPlugin } from './app/plugins/membership-request-plugin'
 import { BetaCornerWidgetPlugin } from './app/plugins/beta-corner-widget-plugin'
+import { NudgePlugin } from './app/plugins/nudge-plugin'
+import { HelpPlugin } from '@remix-ui/modal-help'
 import { AccountPlugin } from './app/plugins/account-plugin'
 import { RemixGuidePlugin } from './app/plugins/remixGuide'
 import { TemplatesPlugin } from './app/plugins/remix-templates'
@@ -180,7 +182,11 @@ class AppComponent {
   invitationManager: InvitationManagerPlugin
   membershipRequest: MembershipRequestPlugin
   betaCornerWidget: BetaCornerWidgetPlugin
+  nudgePlugin: NudgePlugin
+  helpPlugin: HelpPlugin
   accountPlugin: AccountPlugin
+  lifecycle: AppLifecycle
+  lifecyclePlugin: LifecyclePlugin
   params: any
   desktopClientMode: boolean
 
@@ -202,9 +208,38 @@ class AppComponent {
       name: 'platform'
     })
     this.appManager = new RemixAppManager()
+    this.lifecycle = new AppLifecycle({ debug: false })
+    this.lifecyclePlugin = new LifecyclePlugin(this.lifecycle)
+    Registry.getInstance().put({ api: this.lifecycle, name: 'lifecycle' })
     this.queryParams = new QueryParams()
     this.params = this.queryParams.get()
     this.desktopClientMode = this.params && this.params.activate && this.params.activate.split(',').includes('desktopClient')
+
+    // Capture invite token from URL params or hash early, before any plugin strips it
+    const urlParams = new URLSearchParams(window.location.search)
+    let inviteToken = urlParams.get('invite') || urlParams.get('invite_token') || null
+    if (!inviteToken) {
+      const hashMatch = window.location.hash.match(/[#&]invite=([A-Za-z0-9_-]+)/)
+      if (hashMatch) inviteToken = hashMatch[1]
+    }
+    if (inviteToken) {
+      Registry.getInstance().put({ api: inviteToken, name: 'inviteToken' })
+
+      // Clean invite params from URL now that they're stored in the Registry
+      urlParams.delete('invite')
+      urlParams.delete('invite_token')
+      const newSearch = urlParams.toString()
+
+      // Remove invite=TOKEN from hash, then ensure remaining hash is well-formed
+      let cleanHash = window.location.hash
+        .replace(/([#&])invite=[A-Za-z0-9_-]+&?/, '$1') // remove invite param
+        .replace(/[#&]$/, '') // trim trailing # or &
+      if (cleanHash && !cleanHash.startsWith('#')) cleanHash = '#' + cleanHash
+
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + cleanHash
+      window.history.replaceState(null, '', newUrl)
+    }
+
     this._components = {} as Components
     // setup storage
     const configStorage = new Storage('config-v0.8:')
@@ -469,6 +504,7 @@ class AppComponent {
     const txRunnerPlugin = new TxRunnerPlugin()
 
     this.engine.register([
+      this.lifecyclePlugin,
       txRunnerPlugin,
       permissionHandler,
       this.layout,
@@ -637,6 +673,8 @@ class AppComponent {
     this.invitationManager = new InvitationManagerPlugin()
     this.membershipRequest = new MembershipRequestPlugin()
     this.betaCornerWidget = new BetaCornerWidgetPlugin()
+    this.nudgePlugin = new NudgePlugin({ debug: false })
+    this.helpPlugin = new HelpPlugin()
     const feedbackPlugin = new FeedbackPlugin()
 
     this.engine.register([
@@ -654,6 +692,8 @@ class AppComponent {
       this.invitationManager,
       this.membershipRequest,
       this.betaCornerWidget,
+      this.nudgePlugin,
+      this.helpPlugin,
       this.accountPlugin,
       feedbackPlugin
     ])
@@ -669,12 +709,20 @@ class AppComponent {
   }
 
   async activate() {
+    // Boot the lifecycle state machine
+    this.lifecycle.send({ type: 'BOOT' })
 
     try {
       this.engine.register(await this.appManager.registeredPlugins())
     } catch (e) {
       console.log("couldn't register iframe plugins", e.message)
     }
+
+    // Signal that all plugins are registered with the engine
+    this.lifecycle.send({ type: 'PLUGINS_REGISTERED' })
+
+    // Activate lifecycle plugin first so other plugins can call it
+    await this.appManager.activatePlugin(['lifecycle'])
     if (isElectron()) {
       await this.appManager.activatePlugin(['fs'])
     }
@@ -730,115 +778,140 @@ class AppComponent {
     await this.appManager.activatePlugin(['invitationManager'])
     await this.appManager.activatePlugin(['membershipRequest'])
     await this.appManager.activatePlugin(['betaCornerWidget'])
+    await this.appManager.activatePlugin(['nudgePlugin'])
     await this.appManager.activatePlugin(['account'])
     await this.appManager.activatePlugin(['notificationCenter'])
     await this.appManager.activatePlugin(['feedback'])
     await this.appManager.activatePlugin(['settings'])
 
-    await this.appManager.activatePlugin(['storage', 'storageMonitor', 'search', 'compileAndRun', 'dgitApi', 'dgit'])
+    await this.appManager.activatePlugin(['storage', 'storageMonitor', 'search', 'compileAndRun', 'dgitApi', 'dgit', 'helpPlugin'])
     await this.appManager.activatePlugin(['solidity-script', 'remix-templates'])
 
     if (isElectron()) {
       await this.appManager.activatePlugin(['isogit', 'electronconfig', 'electronTemplates', 'xterm', 'ripgrep', 'appUpdater', 'slither', 'foundry', 'hardhat', 'circom', 'githubAuthHandler']) // 'remixAID'
     }
 
+    // ─── Lifecycle event bridges ────────────────────────────────────
+    // Forward plugin events into the lifecycle state machine so guards can react to them.
+
     this.appManager.on(
       'filePanel',
       'workspaceInitializationCompleted',
       async () => {
-        // for e2e tests
-        const loadedElement = document.createElement('span')
-        loadedElement.setAttribute('data-id', 'workspaceloaded')
-        document.body.appendChild(loadedElement)
-        await this.appManager.registerContextMenuItems()
+        this.lifecycle.send({ type: 'WORKSPACE_INITIALIZED' })
       }
     )
+
+    // Workspace initialized guard: create DOM marker for E2E tests + register context menus
+    this.lifecycle.when('WORKSPACE_INITIALIZED', async () => {
+      const loadedElement = document.createElement('span')
+      loadedElement.setAttribute('data-id', 'workspaceloaded')
+      document.body.appendChild(loadedElement)
+      await this.appManager.registerContextMenuItems()
+    })
+
     await this.appManager.activatePlugin(['solidity-script'])
     await this.appManager.activatePlugin(['filePanel'])
 
-    // Set workspace after initial activation
+    // Forward editor mount into lifecycle
     this.appManager.on('editor', 'editorMounted', () => {
-      // Preload prettier and plugins to improve first-format performance
+      this.lifecycle.send({ type: 'EDITOR_MOUNTED' })
+    })
+
+    // Editor mounted guard: preload prettifier
+    this.lifecycle.when('EDITOR_MOUNTED', () => {
       this.appManager.call('codeFormatter', 'preloadPrettier').catch((e) => {
         console.log('Failed to preload code formatter:', e)
       })
+    })
 
-      const restorePinnedPlugin = () => {
-        const lastPinned = localStorage.getItem('pinnedPlugin')
-
-        if (lastPinned) {
-          try {
-            this.appManager.call('sidePanel', 'pinView', JSON.parse(lastPinned))
-          } catch (e) {
-            console.error('Failed to restore pinned plugin:', e)
-          }
-        }
-      }
-
-      if (Array.isArray(this.workspace)) {
-        this.appManager
-          .activatePlugin(this.workspace)
-          .then(async () => {
-            try {
-              if (this.params.deactivate) {
-                await this.appManager.deactivatePlugin(this.params.deactivate.split(','))
-              }
-            } catch (e) {
-              console.log(e)
-            }
-            if (this.params.code && (!this.params.activate || this.params.activate.split(',').includes('solidity'))) {
-              // if code is given in url we focus on solidity plugin
-              this.menuicons.select('solidity')
-            } else {
-              // If plugins are loaded from the URL params, we focus on the last one.
-              if (this.appManager.pluginLoader.current === 'queryParams' && this.workspace.length > 0) {
-                this.menuicons.select(this.workspace[this.workspace.length - 1])
-              } else {
-                this.appManager.call('tabs', 'focus', 'home')
-              }
-            }
-
-            if (this.params.call) {
-              const callDetails = this.params.call.split('//')
-              if (callDetails.length > 1) {
-                this.appManager.call('notification', 'toast', `initiating ${callDetails[0]} and calling "${callDetails[1]}" ...`)
-                // @todo(remove the timeout when activatePlugin is on 0.3.0)
-                this.track({ category: 'App', action: 'queryParams-calls', name: this.params.call, isClick: false })
-                //@ts-ignore
-                await this.appManager.call(...callDetails).catch(console.error)
-              }
-            }
-
-            if (this.params.calls) {
-              const calls = this.params.calls.split('///')
-
-              // call all functions in the list, one after the other
-              for (const call of calls) {
-                this.track({ category: 'App', action: 'queryParams-calls', name: call, isClick: false })
-                const callDetails = call.split('//')
-                if (callDetails.length > 1) {
-                  this.appManager.call('notification', 'toast', `initiating ${callDetails[0]} and calling "${callDetails[1]}" ...`)
-
-                  // @todo(remove the timeout when activatePlugin is on 0.3.0)
-                  try {
-                    //@ts-ignore
-                    await this.appManager.call(...callDetails)
-                  } catch (e) {
-                    console.error(e)
-                  }
-                }
-              }
-            }
-          }).finally(restorePinnedPlugin)
-          .catch((e) => {
-            console.error(e)
-          })
-      } else {
-        restorePinnedPlugin()
-      }
+    // App loaded guard: fires when both editor is mounted AND workspace is initialized
+    this.lifecycle.when(all('EDITOR_MOUNTED', 'WORKSPACE_INITIALIZED'), () => {
+      this.lifecycle.send({ type: 'APP_LOADED' })
       const loadedElement = document.createElement('span')
       loadedElement.setAttribute('data-id', 'apploaded')
       document.body.appendChild(loadedElement)
+
+      // Fire lifecycle event into nudge engine so context-aware rules can activate
+      this.appManager.call('nudgePlugin', 'fire', 'lifecycle:APP_LOADED').catch(() => {})
+    })
+
+    // Editor mounted: activate workspace plugins, then signal readiness
+    this.lifecycle.when('EDITOR_MOUNTED', () => {
+      if (Array.isArray(this.workspace)) {
+        this.appManager
+          .activatePlugin(this.workspace)
+          .then(() => {
+            this.lifecycle.send({ type: 'WORKSPACE_PLUGINS_ACTIVATED' })
+          })
+          .catch((e) => {
+            console.error(e)
+            // Signal anyway so query param handling isn't permanently blocked
+            this.lifecycle.send({ type: 'WORKSPACE_PLUGINS_ACTIVATED' })
+          })
+      } else {
+        this.lifecycle.send({ type: 'WORKSPACE_PLUGINS_ACTIVATED' })
+      }
+    })
+
+    // Query params & UI restoration: wait for workspace ready + plugins activated
+    // This guarantees the filesystem, file tree, and workspace plugins are all
+    // initialized before we run any query-param-driven actions.
+    this.lifecycle.when(all('WORKSPACE_PLUGINS_ACTIVATED', 'WORKSPACE_INITIALIZED'), async () => {
+      // Restore pinned plugin
+      const lastPinned = localStorage.getItem('pinnedPlugin')
+      if (lastPinned) {
+        try {
+          this.appManager.call('sidePanel', 'pinView', JSON.parse(lastPinned))
+        } catch (e) {
+          console.error('Failed to restore pinned plugin:', e)
+        }
+      }
+
+      try {
+        if (this.params.deactivate) {
+          await this.appManager.deactivatePlugin(this.params.deactivate.split(','))
+        }
+      } catch (e) {
+        console.log(e)
+      }
+
+      if (this.params.code && (!this.params.activate || this.params.activate.split(',').includes('solidity'))) {
+        this.menuicons.select('solidity')
+      } else {
+        if (this.appManager.pluginLoader.current === 'queryParams' && this.workspace.length > 0) {
+          this.menuicons.select(this.workspace[this.workspace.length - 1])
+        } else {
+          this.appManager.call('tabs', 'focus', 'home')
+        }
+      }
+
+      if (this.params.call) {
+        const callDetails = this.params.call.split('//')
+        if (callDetails.length > 1) {
+          this.appManager.call('notification', 'toast', `initiating ${callDetails[0]} and calling "${callDetails[1]}" ...`)
+          this.track({ category: 'App', action: 'queryParams-calls', name: this.params.call, isClick: false })
+          //@ts-ignore
+          await this.appManager.call(...callDetails).catch(console.error)
+        }
+      }
+
+      if (this.params.calls) {
+        const calls = this.params.calls.split('///')
+        for (const call of calls) {
+          this.track({ category: 'App', action: 'queryParams-calls', name: call, isClick: false })
+          const callDetails = call.split('//')
+          if (callDetails.length > 1) {
+            this.appManager.call('notification', 'toast', `initiating ${callDetails[0]} and calling "${callDetails[1]}" ...`)
+            try {
+              //@ts-ignore
+              await this.appManager.call(...callDetails)
+            } catch (e) {
+              console.error(e)
+            }
+          }
+        }
+      }
     })
 
     this.appManager.on('rightSidePanel', 'pinnedPlugin', (pluginProfile) => {

@@ -59,7 +59,7 @@ export interface CloudState {
   userId: string | null
   /** True while the initial cloud workspace list is loading */
   loading: boolean
-  /** Cloud workspaces retrieved from the Workspace API */
+  /** Cloud Workspaces retrieved from the Workspace API */
   cloudWorkspaces: CloudWorkspace[]
   /** UUID of the currently active cloud workspace (null in legacy mode) */
   activeWorkspaceId: string | null

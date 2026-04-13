@@ -118,8 +118,8 @@ const tests = {
         locateStrategy: 'xpath',
         timeout: 120000
       })
-      .waitForElementVisible('*[data-id="remix-ai-workspace-generate"]')
-      .click('*[data-id="remix-ai-workspace-generate"]')
+      .waitForElementVisible('*[data-id="remix-ai-assistant-starter-1"]')
+      .click('*[data-id="remix-ai-assistant-starter-1"]')
       .waitForElementVisible('*[data-id="generate-workspaceModalDialogModalBody-react"]')
       .click('*[data-id="modalDialogCustomTextarea"]')
       .setValue('*[data-id="modalDialogCustomTextarea"]', 'a simple ERC20 contract')

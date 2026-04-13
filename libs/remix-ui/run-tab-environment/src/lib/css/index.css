@@ -172,6 +172,10 @@
     cursor: pointer;
   }
 
+  .env-toggle:hover {
+    background-color: var(--custom-onsurface-layer-3) !important;
+  }
+
   .env-toggle-content {
     flex-grow: 1;
     overflow: hidden;
@@ -187,6 +191,10 @@
 
   .account-toggle {
     background-color: var(--custom-onsurface-layer-2);
+  }
+
+  .account-toggle:hover {
+    background-color: var(--custom-onsurface-layer-3) !important;
   }
 
   .account-balance-color {

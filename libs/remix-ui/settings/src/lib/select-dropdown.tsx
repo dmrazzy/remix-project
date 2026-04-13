@@ -18,7 +18,7 @@ const SelectDropdown = ({ value, options, name, dispatch }: SelectDropdownProps)
     dispatch({ type: 'SET_LOADING', payload: { name: name } })
     if (name === 'theme') {
       const themeModule = Registry.getInstance().get('themeModule').api
-      const theme = themeModule.getThemes().find((theme) => theme.name === value)
+      const theme = themeModule.getThemes().find((theme: any) => theme.name === value)
 
       if (theme) {
         themeModule.switchTheme(theme.name)

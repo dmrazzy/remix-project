@@ -401,6 +401,7 @@ jobs:
                   fi
       - run:
           name: Run E2E shard (self-split)
+          no_output_timeout: 12m
           command: |
             # If running in vertical mode (parallelism=1 matrix), force shard env; otherwise let CircleCI provide them
             if [ "<< parameters.vertical_mode >>" = "true" ]; then
@@ -527,6 +528,7 @@ jobs:
             echo "Failed list (raw):"; cat failed-basenames.txt || true
       - run:
           name: Rerun only failed tests
+          no_output_timeout: 12m
           command: |
             if [ ! -s failed-basenames.txt ]; then
               echo "No failing tests to rerun. Exiting."; exit 0; fi

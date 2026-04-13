@@ -3,6 +3,7 @@ import React from 'react'
 import { InviteOverlay, InviteState } from '@remix-ui/invites'
 import { PluginViewWrapper } from '@remix-ui/helper'
 import { InviteValidateResponse, InviteRedeemResponse } from '@remix-api'
+import { Registry } from '@remix-project/remix-lib'
 import * as packageJson from '../../../../../package.json'
 
 const profile = {
@@ -274,21 +275,21 @@ export class InvitationManagerPlugin extends Plugin {
    * Supports: ?invite=TOKEN, ?invite_token=TOKEN, and #invite=TOKEN
    */
   private async checkUrlForInvite(): Promise<void> {
-    // Check query params first (?invite= or ?invite_token=)
-    const params = new URLSearchParams(window.location.search)
-    const queryToken = params.get('invite') || params.get('invite_token')
+    // Read invite token from Registry (set early by app.ts) so it survives URL
+    // param cleanup.  Fall back to reading from the URL directly.
+    let queryToken: string | null = null
+    try {
+      const entry = Registry.getInstance().get('inviteToken')
+      this.log('[InvitationManager] Invite token from Registry on URL check:', entry)
+      if (entry && entry.api) queryToken = entry.api as string
+    } catch {}
+    if (!queryToken) {
+      const params = new URLSearchParams(window.location.search)
+      queryToken = params.get('invite') || params.get('invite_token')
+    }
 
     if (queryToken) {
-      this.log('[InvitationManager] Found invite token in query params:', queryToken)
 
-      // Clean URL — remove invite params from query string
-      params.delete('invite')
-      params.delete('invite_token')
-      const newSearch = params.toString()
-      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash
-      window.history.replaceState(null, '', newUrl)
-
-      // Show the invite modal
       await this.showInvite(queryToken)
       return
     }

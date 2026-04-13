@@ -28,7 +28,7 @@ module.exports = {
     browser.addFile('Untitled3.sol', sources[2]['Untitled3.sol'])
       .clickLaunchIcon('solidity')
       .click('[data-id="compilerContainerCompileBtn"]')
-      .waitForElementContainsText('*[data-id="compiledErrors"]', 'not found', 10000)
+      .waitForElementContainsText('*[data-id="compiledErrors"]', 'No such file or directory', 10000)
       .waitForElementContainsText('*[data-id="compiledErrors"]', 'Untitled11.sol', 10000)
 
   },

@@ -71,16 +71,9 @@ module.exports = {
 
     'Should show invite overlay and click Sign In #group1': function (browser: NightwatchBrowser) {
         browser
-            // The invite overlay should now be visible with a Sign In / login button
-            .waitForElementVisible({
-                selector: '//div[contains(@class, "invite-modal-right-footer")]//button[@data-id="login-button"]',
-                locateStrategy: 'xpath',
-                timeout: 15000
-            })
-            .click({
-                selector: '//div[contains(@class, "invite-modal-right-footer")]//button[@data-id="login-button"]',
-                locateStrategy: 'xpath'
-            })
+            // The BetaJoinModal should now be visible with a Sign In button
+            .waitForElementVisible('*[data-id="invite-sign-in-btn"]', 15000)
+            .click('*[data-id="invite-sign-in-btn"]')
             .pause(2000)
     },
 
@@ -103,8 +96,9 @@ module.exports = {
         browser
             .waitForElementVisible('*[data-id="invite-join-beta-btn"]', 15000)
             .click('*[data-id="invite-join-beta-btn"]')
-            .waitForElementVisible('*[data-id="invite-get-started-btn"]', 15000)
-            .click('*[data-id="invite-get-started-btn"]')
+            // After redeem succeeds, the BetaJoinModal closes
+            .waitForElementNotPresent('*[data-id="invite-join-beta-btn"]', 15000)
+            .pause(3000)
     },
 
     'Should show the user as logged in with test provider #group1': function (browser: NightwatchBrowser) {

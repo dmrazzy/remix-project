@@ -43,7 +43,6 @@ module.exports = {
       .setValue('*[data-id="gitubUsername"]', 'git')
       .setValue('*[data-id="githubEmail"]', 'git@example.com')
       .click('*[data-id="saveGitHubCredentials"]')
-      .modalFooterOKClick('github-credentials-error')
       .pause(2000)
   },
   'clone a repo #group1 #group2 #group3 #group4': function (browser: NightwatchBrowser) {

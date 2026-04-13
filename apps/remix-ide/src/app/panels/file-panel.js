@@ -291,7 +291,8 @@ export default class Filepanel extends ViewPlugin {
 
   saveRecent(workspaceName) {
     if (typeof workspaceName !== 'string') return
-    if (workspaceName === 'code-sample') return
+    // Don't save temporary code-sample workspaces to recent list
+    if (/^code-sample(-[a-z0-9]{8})?$/.test(workspaceName)) return
     if (!localStorage.getItem('recentWorkspaces')) {
       localStorage.setItem('recentWorkspaces', JSON.stringify([ { name: workspaceName, timestamp: Date.now() } ]))
     } else {

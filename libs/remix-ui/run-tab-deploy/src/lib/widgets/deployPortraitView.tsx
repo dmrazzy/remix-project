@@ -290,7 +290,7 @@ function DeployPortraitView() {
             <div className="d-flex pb-3">
               <Dropdown className="w-100">
                 <div className='d-flex align-items-center justify-content-between'>
-                  <Dropdown.Toggle as={AddressToggle} className="w-100 d-inline-block border form-control" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }} data-id="contractDropdownToggle">
+                  <Dropdown.Toggle as={AddressToggle} className="w-100 d-inline-block border form-control deploy-address-toggle" style={{ backgroundColor: 'var(--custom-onsurface-layer-2)' }} data-id="contractDropdownToggle">
                     <div className="d-flex align-items-center">
                       <div className="me-auto text-nowrap text-truncate overflow-hidden font-sm w-100">
                         <div className="d-flex align-items-center justify-content-between w-100">

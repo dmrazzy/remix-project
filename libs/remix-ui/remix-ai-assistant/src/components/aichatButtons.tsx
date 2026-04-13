@@ -208,8 +208,8 @@ export function AiChatButtons({ theme, plugin, sendPrompt, handleGenerateWorkspa
       <div className="d-flex flex-row flex-wrap gap-1 justify-content-center">
         {btnList.map((starter, index) => (
           <button
-            key={`${starter.label}-${index}`}
-            data-id={`remix-ai-assistant-starter-${starter.label}-${index}`}
+            key={index}
+            data-id={`remix-ai-assistant-starter-${index}`}
             className={`mb-2 border-0 rounded-4 text-nowrap gap-2 btn ${theme?.toLowerCase() === 'dark' ? 'btn-dark' : 'btn-light text-light-emphasis'} `}
             onClick={starter.action}
           >

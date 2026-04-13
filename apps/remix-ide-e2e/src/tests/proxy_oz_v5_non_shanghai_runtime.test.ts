@@ -6,7 +6,10 @@ let firstProxyAddress: string
 let lastProxyAddress: string
 let shortenedFirstAddress: string
 let shortenedLastAddress: string
-module.exports = {
+
+module.exports = {}
+
+const test = {
   '@disabled': true,
   before: function (browser: NightwatchBrowser, done: VoidFunction) {
     init(browser, done)

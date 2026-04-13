@@ -446,13 +446,15 @@ export const RemixUiSettings = (props: RemixUiSettingsProps) => {
             <div
               className="flex-column bg-transparent p-0 px-3 remix-settings-sidebar overflow-auto flex-shrink-0"
               style={{ width: '25em', minWidth: '16em', height: '100%' }}
+              data-id="settings-sidebar-nav"
             >
-              <ul className="list-unstyled">
+              <ul className="list-unstyled" data-id="settings-sidebar-nav-ul">
                 {filteredSections.map((section, index) => (
                   <li
                     className={`nav-item ${index !== filteredSections.length - 1 ? 'border-bottom' : ''} px-0 py-3 ${selected === section.key ? state.themeQuality.name === 'dark' ? 'active text-white' : 'active text-black' : 'text-secondary'}`}
                     key={index}
                     style={{ cursor: 'pointer' }}
+                    data-id={`settings-sidebar-${section.key}-li`}
                   >
                     <a
                       data-id={`settings-sidebar-${section.key}`}
@@ -462,8 +464,8 @@ export const RemixUiSettings = (props: RemixUiSettingsProps) => {
                         setFilteredSection(section)
                       }}
                     >
-                      <h5 className={`fw-semibold mb-2 ${selected === section.key ? state.themeQuality.name === 'dark' ? 'active text-white' : 'active text-black' : 'text-secondary'}`} style={{ fontSize: '1.1rem' }}><FormattedMessage id={section.label} /></h5>
-                      {selected !== section.key && <span style={{ fontSize: '0.85rem' }}><FormattedMessage id={section.description} /></span>}
+                      <h5 className={`fw-semibold mb-2 ${selected === section.key ? state.themeQuality.name === 'dark' ? 'active text-white' : 'active text-black' : 'text-secondary'}`} style={{ fontSize: '1.1rem' }} data-id={`settings-sidebar-${section.key}-h5`}><FormattedMessage id={section.label} /></h5>
+                      {selected !== section.key && <span style={{ fontSize: '0.85rem' }} data-id={`settings-sidebar-${section.key}-description`}><FormattedMessage id={section.description} /></span>}
                     </a>
                   </li>
                 ))}

@@ -283,8 +283,8 @@ const RequestFormModal: React.FC<{
               <div>
                 <h5>Remix v2 Private Beta Testing Program Enrollment</h5>
                 <p className="invite-modal-muted mb-0">
-                  Get early access to new Remix premium AI features, big updates to Deploy &amp; Run, and the new AI-assisted Debugger.
-                  Your participation as a beta tester will directly influence and help shape the future of Remix.
+                  Get early access to new premium RemixAI features, big updates to Deploy &amp; Run, and the new AI-assisted Debugger.
+                  Your participation as a Beta Tester will directly influence and help shape the future of Remix.
                   After this program ends, some features in this release will become part of Remix's paid subscription levels.
                 </p>
               </div>
@@ -295,7 +295,7 @@ const RequestFormModal: React.FC<{
 
             <div className="invite-modal-right-body">
               <form onSubmit={handleSubmit}>
-                {/* Q1: Have you used AI features? */}
+                {/* Q1: Have you used RemixAI features? */}
                 <div className="invite-modal-section">
                   <h6 className="invite-modal-section-label">
                     Have you used the AI features in Remix? <span className="text-danger">*</span>
@@ -347,7 +347,7 @@ const RequestFormModal: React.FC<{
                       <i className="fas fa-gift"></i>
                     </div>
                     <div className="invite-modal-walkthrough-text">
-                      <strong>Beta tester perk</strong>
+                      <strong>Beta Tester Perk</strong>
                       <span>Beta testers will get significant product discounts after this program concludes.</span>
                     </div>
                   </div>
@@ -397,7 +397,7 @@ const RequestFormModal: React.FC<{
                     />
                     <span>
                       I agree to receive email updates about the Remix v2 Private Beta Testing Program,
-                      including access invitations and product announcements. You can unsubscribe at any time. <span className="text-danger">*</span>
+                      including access invitations and product announcements. I can unsubscribe at any time. <span className="text-danger">*</span>
                     </span>
                   </label>
                 </div>

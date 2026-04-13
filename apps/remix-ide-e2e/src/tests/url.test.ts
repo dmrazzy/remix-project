@@ -65,7 +65,7 @@ module.exports = {
       .click('[for="autoCompile"]') // back to True in the local storage
       .assert.containsText('*[data-id="compilerContainerCompileBtn"]', 'contract-76747f6e19.sol')
       .clickLaunchIcon('filePanel')
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .getEditorValue((content) => {
         browser.assert.ok(content && content.indexOf(
           'https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol') !== -1,
@@ -82,7 +82,7 @@ module.exports = {
         selector: `//li[@data-id="treeViewLitreeViewItemethereum/remix-project/apps/remix-ide/contracts/app/solidity/mode.sol"]`,
         locateStrategy: 'xpath'
       })
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .getEditorValue((content) => {
         browser.assert.ok(content && content.indexOf(
           'proposals.length = _numProposals;') !== -1,
@@ -95,7 +95,7 @@ module.exports = {
       .url('http://127.0.0.1:8080/#address=0xdac17f958d2ee523a2206206994597c13d831ec7')
       .refreshPage()
       .pause(2000)
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemTetherToken.sol"]')
       .click('*[data-id="treeViewLitreeViewItemTetherToken.sol"]')
       .getEditorValue((content) => {
@@ -110,7 +110,7 @@ module.exports = {
       .url('http://127.0.0.1:8080/#address=0xdAC17F958D2ee523a2206206994597C13D831ec7&blockscout=eth.blockscout.com')
       .refreshPage()
       .pause(7000)
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .assert.elementPresent('*[data-id="treeViewLitreeViewItemeth.blockscout.com/0xdAC17F958D2ee523a2206206994597C13D831ec7/TetherToken.sol"]')
       .getEditorValue((content) => {
         browser.assert.ok(content && content.indexOf(
@@ -124,7 +124,7 @@ module.exports = {
       .url('http://127.0.0.1:8080/#address=0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9&blockscout=eth.blockscout.com')
       .refreshPage()
       .pause(7000)
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .assert.elementPresent('*[data-id="treeViewLitreeViewItemcontracts"]')
       .assert.elementPresent('*[data-id="treeViewLitreeViewItemcontracts/open-zeppelin"]')
       .assert.elementPresent('*[data-id="treeViewLitreeViewItemcontracts/open-zeppelin/Address.sol"]')
@@ -153,7 +153,7 @@ module.exports = {
         selector: `//li[@data-id="treeViewLitreeViewItemethereum/remix-project/apps/remix-ide/contracts/app/solidity/mode.sol"]`,
         locateStrategy: 'xpath'
       })
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .getEditorValue((content) => {
         browser.assert.ok(content && content.indexOf(
           'proposals.length = _numProposals;') !== -1,
@@ -161,12 +161,9 @@ module.exports = {
       })
       .url('http://127.0.0.1:8080') // refresh without loading the code sample
       .pause(2000)
-      .currentWorkspaceIs('default_workspace')
-      .execute(() => {
-        return document.querySelector('[data-id="dropdown-item-code-sample"]') === null
-      }, [], (result) => {
-        browser.assert.ok((result as any).value, 'sample template has not be persisted.') // code-sample should not be kept.
-      })
+      // With the new persistent workspace behavior, code-sample workspaces are kept
+      // and the workspace remains as 'code-sample-' instead of switching to 'default_workspace'
+      .currentWorkspaceIs('code-sample-')
   },
 
   'Should load the code from URL & code params with special character #group1': function (browser: NightwatchBrowser) {
@@ -180,7 +177,7 @@ module.exports = {
         selector: `//li[@data-id="treeViewLitreeViewItemcontract-89b91e9381.sol"]`,
         locateStrategy: 'xpath'
       })
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .waitForElementVisible({
         selector: '//*[@id="editorView"]',
         locateStrategy: 'xpath'
@@ -192,12 +189,9 @@ module.exports = {
       })
       .url('http://127.0.0.1:8080') // refresh without loading the code sample
       .pause(2000)
-      .currentWorkspaceIs('default_workspace')
-      .execute(() => {
-        return document.querySelector('[data-id="dropdown-item-code-sample"]') === null
-      }, [], (result) => {
-        browser.assert.ok((result as any).value, 'sample template has not be persisted.') // code-sample should not be kept.
-      })
+      // With the new persistent workspace behavior, code-sample workspaces are kept
+      // and the workspace remains as 'code-sample-' instead of switching to 'default_workspace'
+      .currentWorkspaceIs('code-sample-')
   },
 
   'Should load the code with remaps URL parameter #group1': function (browser: NightwatchBrowser) {
@@ -209,9 +203,10 @@ module.exports = {
 
       .waitForElementVisible('[data-id="compilerContainerCompileBtn"]')
       .clickLaunchIcon('filePanel')
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemremappings.txt"]')
       .click('*[data-id="treeViewLitreeViewItemremappings.txt"]')
+      .pause(500) // Wait for editor to load remappings.txt content
       .getEditorValue((content) => {
         browser.assert.ok(content && content.indexOf(
           '@openzeppelin/contracts/=https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/') !== -1,
@@ -225,6 +220,11 @@ module.exports = {
         selector: `//li[contains(@data-id, "treeViewLitreeViewItemcontract-") and contains(@data-id, ".sol")]`,
         locateStrategy: 'xpath'
       })
+      .waitForElementVisible({
+        selector: '//*[@id="editorView"]',
+        locateStrategy: 'xpath'
+      })
+      .pause(500) // Wait for editor content to fully load
       .getEditorValue((content) => {
         browser.assert.ok(content && content.indexOf(
           '@openzeppelin/contracts/token/ERC20/ERC20.sol') !== -1,
@@ -243,7 +243,7 @@ module.exports = {
         selector: `//li[@data-id="treeViewLitreeViewItemcontract-e0bf950259.sol"]`,
         locateStrategy: 'xpath'
       })
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .waitForElementVisible({
         selector: '//*[@id="editorView"]',
         locateStrategy: 'xpath'
@@ -260,12 +260,9 @@ module.exports = {
       })
       .url('http://127.0.0.1:8080') // refresh without loading the code sample
       .pause(2000)
-      .currentWorkspaceIs('default_workspace')
-      .execute(() => {
-        return document.querySelector('[data-id="dropdown-item-code-sample"]') === null
-      }, [], (result) => {
-        browser.assert.ok((result as any).value, 'sample template has not be persisted.') // code-sample should not be kept.
-      })
+      // With the new persistent workspace behavior, code-sample workspaces are kept
+      // and the workspace remains as 'code-sample-' instead of switching to 'default_workspace'
+      .currentWorkspaceIs('code-sample-')
   },
 
   'Should load the code from language & code params #group1': function (browser: NightwatchBrowser) {
@@ -277,7 +274,7 @@ module.exports = {
 
       .clickLaunchIcon('filePanel')
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemcontract-eaa022e37e.yul"]')
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .openFile('contract-eaa022e37e.yul')
       .getEditorValue((content) => {
         console.log(content)
@@ -380,7 +377,7 @@ module.exports = {
     browser
       .url('http://127.0.0.1:8080/#optimize=false&runs=200&url=https://raw.githubusercontent.com/EthVM/evm-source-verification/main/contracts/1/0x011e5846975c6463a8c6337eecf3cbf64e328884/input.json')
       .refreshPage()
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .waitForElementVisible('*[data-id="treeViewDivtreeViewItem@openzeppelin/contracts/access/AccessControl.sol"]')
       .openFile('contracts')
       .openFile('contracts/governance')
@@ -402,7 +399,7 @@ module.exports = {
       .url('http://127.0.0.1:8080/#ghfolder=https://github.com/ethereum/remix-project/tree/master/apps/remix-ide/contracts/hardhat')
       .refreshPage()
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemcontracts"]', 40000)
-      .currentWorkspaceIs('code-sample')
+      .currentWorkspaceIs('code-sample-')
       .openFile('contracts')
       // .openFile('contracts/Lock.sol')
       .waitForElementVisible('*[data-id="treeViewLitreeViewItemcontracts/Lock.sol"]')

@@ -4,6 +4,7 @@ import { trackMatomoEvent } from '@remix-api'
 import { QueryParams } from '@remix-project/remix-lib'
 import { IframePlugin } from '@remixproject/engine-web'
 import { Registry } from '@remix-project/remix-lib'
+import type { AppLifecycle } from '@remix-project/remix-lib'
 import { RemixNavigator } from './types'
 import { Profile } from '@remixproject/plugin-utils'
 
@@ -115,7 +116,10 @@ let requiredModules = [
   'udappDeployedContracts',
   'udappTransactions',
   'txRunner',
-  'betaCornerWidget'
+  'betaCornerWidget',
+  'lifecycle',
+  'nudgePlugin',
+  'helpPlugin'
 ]
 
 // dependentModules shouldn't be manually activated (e.g hardhat is activated by remixd)
@@ -191,7 +195,8 @@ export function isNative(name) {
     'udappDeploy',
     'udappDeployedContracts',
     'udappTransactions',
-    'txRunner'
+    'txRunner',
+    'lifecycle'
   ]
   return nativePlugins.includes(name) || requiredModules.includes(name) || isInjectedProvider(name) || isVM(name) || isScriptRunner(name)
 }
@@ -291,6 +296,16 @@ export class RemixAppManager extends BaseRemixAppManager {
     this.event.emit('activate', plugin)
     this.emit('activate', plugin)
     if (!this.isRequired(plugin.name)) trackMatomoEvent(this, { category: 'pluginManager', action: 'activate', name: plugin.name, isClick: true })
+
+    // Forward to lifecycle state machine
+    try {
+      const lifecycle = Registry.getInstance().get('lifecycle')
+      if (lifecycle?.api) {
+        (lifecycle.api as AppLifecycle).send({ type: 'PLUGIN_ACTIVATED', name: plugin.name })
+      }
+    } catch (e) {
+      // lifecycle not yet registered — safe to ignore during early boot
+    }
   }
 
   getAll() {
@@ -310,6 +325,16 @@ export class RemixAppManager extends BaseRemixAppManager {
     )
     this.event.emit('deactivate', plugin)
     trackMatomoEvent(this, { category: 'pluginManager', action: 'deactivate', name: plugin.name, isClick: true })
+
+    // Forward to lifecycle state machine
+    try {
+      const lifecycle = Registry.getInstance().get('lifecycle')
+      if (lifecycle?.api) {
+        (lifecycle.api as AppLifecycle).send({ type: 'PLUGIN_DEACTIVATED', name: plugin.name })
+      }
+    } catch (e) {
+      // lifecycle not yet registered — safe to ignore
+    }
   }
 
   isDependent(name: string): boolean {

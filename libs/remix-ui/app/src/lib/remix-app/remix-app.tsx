@@ -482,6 +482,7 @@ const RemixApp = (props: IRemixAppUi) => {
               {props.app.invitationManager.render()}
               {props.app.membershipRequest.render()}
               {showBetaTestRegisterWidget && props.app.betaCornerWidget.render()}
+              {props.app.nudgePlugin && props.app.nudgePlugin.render()}
             </AppProvider>
           </AuthProvider>
         </onLineContext.Provider>

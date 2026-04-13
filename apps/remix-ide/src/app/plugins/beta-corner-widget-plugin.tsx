@@ -5,6 +5,10 @@ import { useAuth } from '@remix-ui/app'
 import * as packageJson from '../../../../../package.json'
 import './beta-corner-widget.css'
 
+declare global {
+  interface Window { __IS_E2E_TEST__?: boolean }
+}
+
 /* ─── Constants ─── */
 
 const DEBUG = false
@@ -230,8 +234,8 @@ export class BetaCornerWidgetPlugin extends Plugin {
     )
   }
 
-  render(): JSX.Element {
-    if (window['__IS_E2E_TEST__']) {
+  render(): JSX.Element | null {
+    if (window.__IS_E2E_TEST__) {
       return null // Don't render the widget at all during E2E tests to avoid flakiness
     }
     return (

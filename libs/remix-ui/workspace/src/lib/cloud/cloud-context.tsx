@@ -25,15 +25,18 @@ import {
 interface CloudProviderProps {
   children: React.ReactNode
   plugin: any // the filePanel plugin, needed to listen for auth events
+  debug?: boolean
 }
 
 /**
  * Wires the auth plugin events to the cloud store.
  * Place this high in the workspace React tree (e.g. around FileSystemProvider).
  */
-export const CloudProvider: React.FC<CloudProviderProps> = ({ children, plugin }) => {
+export const CloudProvider: React.FC<CloudProviderProps> = ({ children, plugin, debug = false }) => {
   const pluginRef = useRef(plugin)
   pluginRef.current = plugin
+  const debugRef = useRef(debug)
+  debugRef.current = debug
 
   // ── Listen for auth state changes ──
 
@@ -41,7 +44,7 @@ export const CloudProvider: React.FC<CloudProviderProps> = ({ children, plugin }
     if (!pluginRef.current) return
 
     const handleAuthStateChanged = async (authState: { isAuthenticated: boolean; user: any; token: string }) => {
-      console.log('[CloudProvider:handleAuthStateChanged] isAuthenticated=', authState.isAuthenticated, 'isCloudMode=', cloudStore.isCloudMode)
+      if (debugRef.current) console.log('[CloudProvider:handleAuthStateChanged] isAuthenticated=', authState.isAuthenticated, 'isCloudMode=', cloudStore.isCloudMode)
       if (authState.isAuthenticated) {
         // Mark as authenticated so the cloud toggle becomes enabled.
         // Cloud mode is NOT activated here — the user must click the toggle.
@@ -51,7 +54,7 @@ export const CloudProvider: React.FC<CloudProviderProps> = ({ children, plugin }
         try {
           await disableCloud()
         } catch (err) {
-          console.error('[CloudProvider] Failed to disable cloud on logout:', err)
+          if (debugRef.current) console.error('[CloudProvider] Failed to disable cloud on logout:', err)
         }
         cloudStore.exitCloudMode() // full reset including isAuthenticated
       }
@@ -63,7 +66,7 @@ export const CloudProvider: React.FC<CloudProviderProps> = ({ children, plugin }
     ;(async () => {
       try {
         const isAuth = await pluginRef.current.call('auth', 'isAuthenticated')
-        console.log('[CloudProvider] Initial isAuthenticated =', isAuth)
+        if (debugRef.current) console.log('[CloudProvider] Initial isAuthenticated =', isAuth)
         if (isAuth) {
           cloudStore.setAuthenticated(true)
         }

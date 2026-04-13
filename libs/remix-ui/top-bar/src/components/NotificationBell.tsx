@@ -215,7 +215,7 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
   }
 
   return (
-    <div className={`notification-bell-container ${className}`} ref={dropdownRef}>
+    <div data-id="notification-bell-container" className={`notification-bell-container ${className}`} ref={dropdownRef}>
       <CustomTooltip placement="bottom" tooltipText="Notifications">
         <span
           className="notification-bell-icon"

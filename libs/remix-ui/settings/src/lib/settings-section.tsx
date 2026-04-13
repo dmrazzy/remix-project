@@ -107,7 +107,7 @@ export const SettingsSectionUI: React.FC<SettingsSectionUIProps> = ({ plugin, se
   }
 
   const handleButtonClick = (buttonOptions: ButtonOptions) => {
-    if (buttonOptions.action === 'link') {
+    if (buttonOptions && buttonOptions.action === 'link') {
       window.open(buttonOptions.link, '_blank')
     }
   }
@@ -194,7 +194,7 @@ export const SettingsSectionUI: React.FC<SettingsSectionUIProps> = ({ plugin, se
                           <div className="ms-auto">
                             {option.type === 'toggle' && <ToggleSwitch id={option.name} isOn={toggleValue} onClick={() => handleToggle(option.name)} disabled = {option.name === "matomo-analytics" ? true : false}/>}
                             {option.type === 'select' && <div style={{ minWidth: '110px' }}><SelectDropdown value={selectValue} options={option.selectOptions} name={option.name} dispatch={dispatch as any} /></div>}
-                            {option.type === 'button' && <button className="btn btn-secondary btn-sm" onClick={() => handleButtonClick(option.buttonOptions)}><FormattedMessage id={option.buttonOptions.label} /></button>}
+                            {option.type === 'button' && <button className="btn btn-secondary btn-sm" onClick={() => handleButtonClick(option.buttonOptions)}><FormattedMessage id={option.buttonOptions?.label} /></button>}
                             {option.type === 'custom' && option.customComponent === 'mcpServerManager' && <span></span>}
                             {option.type === 'custom' && option.customComponent === 'profileSection' && <span></span>}
                             {option.type === 'custom' && option.customComponent === 'creditsBalance' && <span></span>}
@@ -238,7 +238,7 @@ export const SettingsSectionUI: React.FC<SettingsSectionUIProps> = ({ plugin, se
                       }
                       {option.toggleUIDescription && toggleValue && <span className="text-secondary mt-1">{option.toggleUIDescription}</span>}
                       {option.toggleUIOptions && toggleValue && option.toggleUIOptions.map((toggleOption, toggleOptionIndex) => {
-                        const isLastOption = toggleOptionIndex === option.toggleUIOptions.length - 1
+                        const isLastOption = toggleOptionIndex === (option.toggleUIOptions as any).length - 1
                         const inputValue = state[toggleOption.name] && typeof state[toggleOption.name].value === 'string' ? state[toggleOption.name].value as string : ''
 
                         return state[toggleOption.name] && (

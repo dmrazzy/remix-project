@@ -18,7 +18,6 @@ export class BaseProvider extends Plugin implements IProvider {
   id: number
   constructor(id) {
     const p = { ...profile, ...{ name: 'base-provider-' + id, displayName: 'Base Wallet Provider - ' + id } }
-    console.log(p)
     super(p)
     this.id = id
   }

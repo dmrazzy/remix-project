@@ -25,6 +25,8 @@ export { ICompilerApi, ConfigurationSettings, iSolJsonBinData, iSolJsonBinDataBu
 export { QueryParams } from './query-params'
 export { VMexecutionResult } from './execution/txRunnerVM'
 export { Registry } from './registry'
+export { AppLifecycle, EventGuard, LifecyclePlugin, NudgeEngine, all, any, sequence, deserializeCondition } from './state-machine'
+export type { LifecycleEvent, Condition, ConditionInput, SerializedCondition, BootPhase, NudgeRule, NudgeAction, SerializedNudgeRule } from './state-machine'
 /*
  * A type that represents a `0x`-prefixed hex string.
  */

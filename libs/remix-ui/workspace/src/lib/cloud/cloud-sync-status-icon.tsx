@@ -135,6 +135,7 @@ interface CloudToggleProps {
   /** Called when the user toggles cloud OFF */
   onDisableCloud: () => void
   className?: string
+  theme?: 'light' | 'dark'
 }
 
 /**
@@ -148,6 +149,7 @@ export const CloudToggle: React.FC<CloudToggleProps> = ({
   onEnableCloud,
   onDisableCloud,
   className = '',
+  theme = 'dark'
 }) => {
   const { isCloudMode, isAuthenticated, loading, activeWorkspaceId, syncStatus, workspaceQueueBusy } = useCloudStore()
 
@@ -165,7 +167,7 @@ export const CloudToggle: React.FC<CloudToggleProps> = ({
 
   const iconColor = isOn
     ? syncProps?.color
-    : 'var(--bs-white)'
+    : theme === 'dark' ? '#f9fafe' : '#222336'
 
   const handleClick = useCallback(() => {
     if (isDisabled) return
@@ -190,7 +192,7 @@ export const CloudToggle: React.FC<CloudToggleProps> = ({
     <CustomTooltip placement="bottom" tooltipText={tooltipText}>
       <button
         data-id="cloud-toggle"
-        className={`d-inline-flex align-items-center border-0 p-0 ${className}`}
+        className={`d-inline-flex align-items-center border-0 p-0 text-theme-contrast ${className}`}
         style={{
           background: 'transparent',
           cursor: isDisabled ? 'not-allowed' : 'pointer',

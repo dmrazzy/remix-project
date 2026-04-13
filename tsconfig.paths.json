@@ -73,6 +73,9 @@
             "@remix-ui/modal-dialog": [
               "libs/remix-ui/modal-dialog/src/index.ts"
             ],
+            "@remix-ui/modal-help": [
+              "libs/remix-ui/modal-help/src/index.ts"
+            ],
             "@remix-ui/panel": [
               "libs/remix-ui/panel/src/index.ts"
             ],

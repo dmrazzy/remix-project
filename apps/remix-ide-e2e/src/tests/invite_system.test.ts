@@ -45,16 +45,9 @@ module.exports = {
     },
     'look at the beta invite system #group1': function (browser: NightwatchBrowser) {
         browser
-            // Wait for the invite modal's "Sign In" button and click it
-            .waitForElementVisible({
-                selector: '//div[contains(@class, "invite-modal-right-footer")]//button[@data-id="login-button"]',
-                locateStrategy: 'xpath',
-                timeout: 15000
-            })
-            .click({
-                selector: '//div[contains(@class, "invite-modal-right-footer")]//button[@data-id="login-button"]',
-                locateStrategy: 'xpath'
-            })
+            // Wait for the BetaJoinModal's "Sign In" button and click it
+            .waitForElementVisible('*[data-id="invite-sign-in-btn"]', 15000)
+            .click('*[data-id="invite-sign-in-btn"]')
             .pause(2000)
     },
 
@@ -79,12 +72,12 @@ module.exports = {
 
     'Should click Join Beta on the invite modal #group1': function (browser: NightwatchBrowser) {
         browser
-            // Wait for the "Join the Beta" button in the invite modal footer
+            // Wait for the "Join the Beta" button in the BetaJoinModal
             .waitForElementVisible('*[data-id="invite-join-beta-btn"]', 15000)
             .click('*[data-id="invite-join-beta-btn"]')
-            // After redeem succeeds, the success modal shows — click "Let's Start!"
-            .waitForElementVisible('*[data-id="invite-get-started-btn"]', 15000)
-            .click('*[data-id="invite-get-started-btn"]')
+            // After redeem succeeds, the BetaJoinModal closes
+            .waitForElementNotPresent('*[data-id="invite-join-beta-btn"]', 15000)
+            .pause(3000)
     },
 
     'Should show the user as logged in with test provider #group1': function (browser: NightwatchBrowser) {

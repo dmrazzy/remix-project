@@ -510,11 +510,12 @@ module.exports = {
       .setValue('*[data-id="gitubUsername"]', 'git')
       .setValue('*[data-id="githubEmail"]', 'git@example.com')
       .click('*[data-id="saveGitHubCredentials"]')
-      .modalFooterOKClick('github-credentials-error')
+
   },
   'check source control panel #group5': function (browser: NightwatchBrowser) {
     browser
       .waitForElementVisible('*[data-id="sourcecontrol-panel"]')
+      .pause(1000)
       .click('*[data-id="sourcecontrol-panel"]')
       .waitForElementVisible({
         selector: "//*[@data-status='new-untracked' and @data-file='/tests/MyToken_test_test.sol']",

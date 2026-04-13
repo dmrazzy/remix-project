@@ -68,7 +68,6 @@ const tests = {
             .pause(1000)
             .click('*[data-id="saveGitHubCredentials"]')
             .pause(1000)
-            .modalFooterOKClick('github-credentials-error')
 
     },
 

@@ -28,8 +28,8 @@ export const mcpBasicServersConfig: MCPDefaultServersConfig = {
       timeout: 30000
     },
     {
-      name: 'Thegraph API',
-      description: 'Thegraph API (subgraph and token API',
+      name: 'The Graph API',
+      description: 'The Graph API (Subgraph and token API)',
       transport: 'http',
       url: endpointUrls.mcpCorsProxy + '/thegraph/mcp',
       autoStart: true,

@@ -15,7 +15,7 @@ const profile = {
 
 export class AuthPlugin extends Plugin {
   /** Set to true to enable verbose console.log output for debugging */
-  private static DEBUG = true
+  private static DEBUG = false
 
   private apiClient: ApiClient
   private ssoApi: SSOApiService
@@ -659,6 +659,7 @@ export class AuthPlugin extends Plugin {
         user: result.user,
         token: result.accessToken
       })
+      this.call('nudgePlugin', 'fire', 'user:logged_in')
 
       // If logged in via GitHub, bridge the provider token to dgit config
       if (result.user.provider === 'github' && result.providerToken) {
@@ -921,7 +922,12 @@ export class AuthPlugin extends Plugin {
       const refreshToken = localStorage.getItem('remix_refresh_token')
       if (!refreshToken) {
         console.warn('[AuthPlugin] No refresh token available, logging out')
-        await this.logout()
+        // Only call logout if we still have stored auth data to clear,
+        // otherwise we'd re-emit authStateChanged and trigger listeners again
+        const hasStoredAuth = !!localStorage.getItem('remix_access_token') || !!localStorage.getItem('remix_user')
+        if (hasStoredAuth) {
+          await this.logout()
+        }
         return null
       }
 
@@ -1871,6 +1877,7 @@ export class AuthPlugin extends Plugin {
       user: authUser,
       token: access_token
     })
+    this.call('nudgePlugin', 'fire', 'user:logged_in')
 
     // Fetch credits after login
     this.refreshCredits().catch(console.error)

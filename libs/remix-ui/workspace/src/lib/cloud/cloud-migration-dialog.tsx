@@ -17,6 +17,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ModalDialog } from '@remix-ui/modal-dialog'
 import {
   discoverLocalWorkspaces,
@@ -590,7 +591,7 @@ export const CloudMigrationDialog: React.FC<CloudMigrationDialogProps> = ({
               <strong>{summary.done}</strong> migrated successfully
               {summary.failed > 0 && <>, <strong className="text-danger">{summary.failed}</strong> failed</>}
               {summary.skipped > 0 && <>, <strong>{summary.skipped}</strong> skipped</>}
-              {summary.done > 0 && <span className="text-muted"> — your cloud workspaces are ready to use.</span>}
+              {summary.done > 0 && <span className="text-muted"> — your Cloud Workspaces are ready to use.</span>}
             </span>
           </div>
         )}
@@ -605,6 +606,7 @@ export const CloudMigrationDialog: React.FC<CloudMigrationDialogProps> = ({
     case 'loading':
       return 'Loading…'
     case 'select':
+      if (items.length === 0) return 'Close'
       return selectedCount > 0
         ? `Migrate ${selectedCount} workspace${selectedCount !== 1 ? 's' : ''}`
         : 'Migrate'
@@ -621,12 +623,13 @@ export const CloudMigrationDialog: React.FC<CloudMigrationDialogProps> = ({
   }
 
   const getOkFn = () => {
+    if (phase === 'select' && items.length === 0) return handleHide
     if (phase === 'select' && selectedCount > 0) return startMigration
     if (phase === 'done') return handleHide
     return undefined
   }
 
-  return (
+  return createPortal(
     <ModalDialog
       id="cloud-migration-dialog"
       title={
@@ -641,13 +644,14 @@ export const CloudMigrationDialog: React.FC<CloudMigrationDialogProps> = ({
       okLabel={getOkLabel()}
       okFn={getOkFn()}
       okBtnClass={phase === 'done' ? 'btn-success' : (phase === 'migrating' ? 'btn-secondary disabled' : 'btn-primary')}
-      cancelLabel={phase === 'migrating' ? undefined : (phase === 'done' ? undefined : 'Skip')}
+      cancelLabel={phase === 'migrating' || phase === 'done' || (phase === 'select' && items.length === 0) ? undefined : 'Skip'}
       cancelFn={phase === 'migrating' ? undefined : handleHide}
       showCancelIcon={phase !== 'migrating'}
       modalParentClass="modal-dialog-centered"
       donotHideOnOkClick={phase === 'select' || phase === 'migrating'}
-      preventBlur={phase === 'migrating'}
-    />
+      preventBlur={true}
+    />,
+    document.body
   )
 }
 

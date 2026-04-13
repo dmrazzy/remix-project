@@ -4869,11 +4869,6 @@
   resolved "https://registry.yarnpkg.com/@fortawesome/fontawesome-common-types/-/fontawesome-common-types-6.5.1.tgz#fdb1ec4952b689f5f7aa0bffe46180bb35490032"
   integrity sha512-GkWzv+L6d2bI5f/Vk6ikJ9xtl7dfXtoRu3YGE6nq0p/FFqA1ebMOAWg3XgRyb0I6LYyYkiAo+3/KrwuBp8xG7A==
 
-"@fortawesome/fontawesome-free@^5.8.1":
-  version "5.15.4"
-  resolved "https://registry.yarnpkg.com/@fortawesome/fontawesome-free/-/fontawesome-free-5.15.4.tgz#ecda5712b61ac852c760d8b3c79c96adca5554e5"
-  integrity sha512-eYm8vijH/hpzr/6/1CJ/V/Eb1xQFW2nnUKArb3z+yUWv7HTwj6M7SP957oMjfZjAHU6qpoNc2wQvIxBLWYa/Jg==
-
 "@fortawesome/fontawesome-svg-core@^6.5.1":
   version "6.5.1"
   resolved "https://registry.yarnpkg.com/@fortawesome/fontawesome-svg-core/-/fontawesome-svg-core-6.5.1.tgz#9d56d46bddad78a7ebb2043a97957039fcebcf0a"
@@ -35768,6 +35763,11 @@ xregexp@^5.1.1:
   integrity sha512-6hGgEMCGhqCTFEJbqmWrNIPqfpdirdGWkqshu7fFZddmTSfgv5Sn9D2SaKloR79s5VUiUlpwzg3CM3G6D3VIlw==
   dependencies:
     "@babel/runtime-corejs3" "^7.26.9"
+
+xstate@^5:
+  version "5.29.0"
+  resolved "https://registry.yarnpkg.com/xstate/-/xstate-5.29.0.tgz#32ea2615822a1e8b57e61b2317df97840d340755"
+  integrity sha512-p0hiOPhhBgXn29t18zDScaN95+y1MAu1Pz5Z2IduCuOUh+d3RqJO7fmexbuQ6rlwFNgYFeXvFsFeiuiAiH3mhg==
 
 xtend@^4.0.0, xtend@^4.0.1, xtend@^4.0.2, xtend@~4.0.0, xtend@~4.0.1:
   version "4.0.2"

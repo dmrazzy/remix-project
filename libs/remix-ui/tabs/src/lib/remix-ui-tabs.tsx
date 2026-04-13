@@ -732,8 +732,12 @@ export const TabsUI = (props: TabsUIProps) => {
           cancelLabel: 'Cancel',
           okFn: async () => {
             if (getFormData) {
-              const formData = await getFormData()
-              resolve(formData)
+              try {
+                const formData = await getFormData()
+                resolve(formData)
+              } catch (e) {
+                reject(e)
+              }
             } else {
               reject(new Error('Form data not initialized'))
             }
