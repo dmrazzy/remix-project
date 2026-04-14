@@ -264,16 +264,15 @@ export class RemixFilesystemBackend {
 
       for (const name of Object.keys(files)) {
         if (!files[name].isDirectory) {
-          const content = await this.plugin.call('fileManager', 'readFile', `${targetPath}/${name}`)
+          const content = await this.plugin.call('fileManager', 'readFile', name)
           const lines = content.split('\n')
           lines.forEach((line, index) => {
             if (regex.test(line)) {
-              results.push({ file: `${targetPath}/${name}`, line: index + 1, text: line })
+              results.push({ file: name, line: index + 1, text: line })
             }
           })
         }
       }
-
       return results
     } catch (error) {
       throw new Error(`Failed to grep directory ${path || 'cwd'} with pattern "${pattern}": ${error.message}`)
