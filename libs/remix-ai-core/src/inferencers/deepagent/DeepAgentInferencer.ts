@@ -121,12 +121,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         tools: this.tools,
         model: this.model,
         systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
-        skills: [".skills/"],
-        interruptOn: {
-          read_file: true,
-          write_file: true,
-          delete_file: true,
-        },
+        skills: ["skills/"],
         checkpointer
       }
 

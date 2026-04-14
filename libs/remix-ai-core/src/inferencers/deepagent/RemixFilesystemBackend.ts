@@ -72,12 +72,14 @@ export class RemixFilesystemBackend {
     }
   }
 
-  async read(file_path: string, offset: number, limit: number): Promise<string | { error: string }> {
+  async read(file_path: string, offset?: number, limit?: number): Promise<string | { error: string }> {
     try {
       const content = await this.read_file(file_path)
       if (typeof content !== 'string') {
         return content
       }
+      if (offset === undefined) offset = 0
+      if (limit === undefined) limit = content.length
       return content.substring(offset, offset + limit)
     } catch (error) {
       return { error: `Failed to read file ${file_path} with offset and limit: ${error.message}` }
