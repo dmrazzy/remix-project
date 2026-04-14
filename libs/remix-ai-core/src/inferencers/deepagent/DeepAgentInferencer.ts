@@ -26,6 +26,7 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { GenerationParams } from '../../types/models'
 import { buildChatPrompt } from '../../prompts/promptBuilder'
+import { MemorySaver } from "@langchain/langgraph";
 
 /**
  * DeepAgentInferencer integrates LangChain DeepAgent with Remix IDE
@@ -111,13 +112,22 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         await this.memoryBackend.init()
       }
 
+      const checkpointer = new MemorySaver();
+
       // Create DeepAgent configuration
       console.log('[DeepAgentInferencer] Setting up agent configuration...')
       const agentConfig: any = {
         backend: this.filesystemBackend,
         tools: this.tools,
         model: this.model,
-        systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT
+        systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
+        skills: [".skills/"],
+        interruptOn: {
+          read_file: true,
+          write_file: true,
+          delete_file: true,
+        },
+        checkpointer
       }
 
       // Configure specialized subagents
@@ -388,7 +398,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           messages: langchainMessages
         },
         {
-          version: 'v2'
+          version: 'v2',
+          configurable: {
+            thread_id: `remix-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+          }
         }
       )
 
