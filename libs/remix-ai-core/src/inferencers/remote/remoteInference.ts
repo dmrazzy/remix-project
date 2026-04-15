@@ -22,16 +22,18 @@ export class RemoteInferencer implements ICompletions, IGeneration {
     this.event = new EventEmitter()
   }
 
-  protected sanitizePromptByteSize(prompt: string, provider?: string): string {
-    // Provider-specific max byte limits
+  protected getProviderByteLimit(provider?: string): number {
     const providerLimits: Record<string, number> = {
       'mistralai': 70000,
       'anthropic': 70000,
       'openai': 70000
     };
 
-    // Get max bytes based on provider, default to 70KB
-    const maxBytes = provider ? (providerLimits[provider.toLowerCase()] || 70000) : 70000;
+    return provider ? (providerLimits[provider.toLowerCase()] || 70000) : 70000;
+  }
+
+  protected sanitizePromptByteSize(prompt: string, provider?: string): string {
+    const maxBytes = this.getProviderByteLimit(provider);
 
     const encoder = new TextEncoder();
     const promptBytes = encoder.encode(prompt); // rough estimation, real size might be 10% more
@@ -54,9 +56,45 @@ export class RemoteInferencer implements ICompletions, IGeneration {
     return trimmedPrompt;
   }
 
+  protected buildPromptWithChatHistory(prompt: string, chatHistory: Array<{ role: string; content: string }>, provider?: string): string {
+    if (!Array.isArray(chatHistory) || chatHistory.length === 0) {
+      return this.sanitizePromptByteSize(prompt, provider);
+    }
+
+    const encoder = new TextEncoder();
+    const maxBytes = this.getProviderByteLimit(provider);
+    const historyPrefix = "Use the previous conversation as context for the current request.\n\nPrevious conversation:\n";
+    const currentPromptPrefix = "\n\nCurrent user request:\n";
+    const formattedHistory = chatHistory.map((message) => {
+      const speaker = message.role === 'assistant' ? 'Assistant' : 'User';
+      return `${speaker}: ${message.content}`;
+    });
+
+    let startIndex = 0;
+    while (startIndex <= formattedHistory.length) {
+      const historySection = formattedHistory.slice(startIndex).join('\n\n');
+      const candidatePrompt = `${historyPrefix}${historySection}${currentPromptPrefix}${prompt}`;
+      if (encoder.encode(candidatePrompt).length <= maxBytes) {
+        if (startIndex > 0) {
+          console.warn(
+            `[RemoteInferencer] Embedded history exceeded ${maxBytes} bytes for provider '${provider || 'default'}'. ` +
+            `Trimmed ${startIndex} oldest message entries before sending.`
+          );
+        }
+        return candidatePrompt;
+      }
+
+      startIndex += Math.min(2, formattedHistory.length - startIndex || 1);
+    }
+
+    return this.sanitizePromptByteSize(prompt, provider);
+  }
+
   async _makeRequest(payload, rType:AIRequestType){
     this.event.emit("onInference")
     const requestURL = rType === AIRequestType.COMPLETION ? this.completion_url : this.api_url
+    const historyPrompt = payload.originalPrompt || payload.prompt
+    delete payload.originalPrompt
 
     // Sanitize prompt in payload if it exists
     if (payload.prompt) {
@@ -81,6 +119,7 @@ export class RemoteInferencer implements ICompletions, IGeneration {
         if (result.status === 200) {
           if (result.data?.error) return result.data?.error
           const resultText = result.data.generatedText
+          ChatHistory.pushHistory(historyPrompt, resultText)
           return resultText
         } else {
           return defaultErrorMessage
@@ -104,6 +143,8 @@ export class RemoteInferencer implements ICompletions, IGeneration {
 
   async _streamInferenceRequest(payload, rType:AIRequestType){
     let resultText = ""
+    const historyPrompt = payload.originalPrompt || payload.prompt
+    delete payload.originalPrompt
 
     // Sanitize prompt in payload if it exists
     if (payload.prompt) {
@@ -146,7 +187,7 @@ export class RemoteInferencer implements ICompletions, IGeneration {
             } else {
               // stream generation is complete
               resultText = resultText + parsedData.generatedText
-              ChatHistory.pushHistory(payload.prompt, resultText)
+              ChatHistory.pushHistory(historyPrompt, resultText)
               return parsedData.generatedText
             }
           }
@@ -194,11 +235,18 @@ export class RemoteInferencer implements ICompletions, IGeneration {
   }
 
   async answer(prompt, options:IParams=GenerationParams): Promise<any> {
-    if (!options.toolsMessages) {
-      options.chatHistory = buildChatPrompt()
+    const payloadOptions = { ...options }
+    let promptWithHistory = prompt
+
+    if (!payloadOptions.toolsMessages) {
+      const chatHistory = buildChatPrompt()
+      promptWithHistory = this.buildPromptWithChatHistory(prompt, chatHistory, payloadOptions.provider)
     }
-    const payload = { 'prompt': prompt, "endpoint":"answer", ...options }
-    if (options.stream_result) return this._streamInferenceRequest(payload, AIRequestType.GENERAL)
+
+    delete payloadOptions.chatHistory
+
+    const payload = { 'prompt': promptWithHistory, originalPrompt: prompt, "endpoint":"answer", ...payloadOptions }
+    if (payloadOptions.stream_result) return this._streamInferenceRequest(payload, AIRequestType.GENERAL)
     else return this._makeRequest(payload, AIRequestType.GENERAL)
   }
 

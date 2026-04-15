@@ -5,6 +5,7 @@ import { HandleOllamaResponse } from "../../helpers/streamHandler";
 import { sanitizeCompletionText } from "../../helpers/textSanitizer";
 import { FIMModelManager } from "./fimModelConfig";
 import { buildChatPrompt } from "../../prompts/promptBuilder";
+import { ChatHistory } from "../../prompts/chat";
 import {
   CONTRACT_PROMPT,
   WORKSPACE_PROMPT,
@@ -506,7 +507,7 @@ export class OllamaInferencer extends RemoteInferencer implements ICompletions, 
 
   async answer(prompt: string, options: IParams = GenerationParams): Promise<any> {
     trackMatomoEvent('ai', 'remixAI', `ollama_chat_answer:model:${this.model_name}|stream:${!!options.stream_result}|tools:${!!options.tools}`);
-    const chatHistory = buildChatPrompt()
+    const chatHistory = buildChatPrompt(ChatHistory.queueSize)
     const payload = this._buildPayload(prompt, options, CHAT_PROMPT, chatHistory);
     if (options.stream_result) {
       return await this._streamInferenceRequest(payload, AIRequestType.GENERAL);

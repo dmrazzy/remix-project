@@ -4,7 +4,7 @@ import { ChatHistoryStorageManager } from "../storage/storageManager"
 export abstract class ChatHistory{
 
   private static chatEntries:ChatEntry[] = []
-  static queueSize:number = 7 // change the queue size wrt the GPU size
+  static queueSize:number = 7 // change the queue size wrt the GPU size legacy recent-context window for consumers that request capped history
   private static storage: ChatHistoryStorageManager | null = null
   private static currentConversationId: string | null = null
 
@@ -56,10 +56,12 @@ export abstract class ChatHistory{
     const messages = await this.storage.getMessages(id)
     this.currentConversationId = id
 
-    // Rebuild chatEntries from last N messages for context
+    // Rebuild chatEntries from the full stored conversation so callers can
+    // decide later whether to use the entire thread or only a recent window.
     this.chatEntries = []
-    const contextMessages = messages.slice(-this.queueSize)
-
+    if (this.queueSize === 0) return // zero means no history context
+    const startIdx = messages[0]?.role === 'assistant' ? 1 : 0 // Ensure we start with a user message
+    const contextMessages = messages.slice(startIdx) // Skip the first message if it's an assistant message without a preceding user message
     // Convert messages to ChatEntry tuples (prompt, result pairs)
     for (let i = 0; i < contextMessages.length; i += 2) {
       const userMsg = contextMessages[i]
@@ -77,25 +79,18 @@ export abstract class ChatHistory{
   public static pushHistory(prompt, result): Promise<void> | undefined {
     if (result === "" || !result) return // do not allow empty assistant message due to nested stream handles on toolcalls
 
-    // Check if an entry with the same prompt already exists
-    const existingEntryIndex = this.chatEntries.findIndex(entry => entry[0] === prompt)
+    const lastEntry = this.chatEntries[this.chatEntries.length - 1]
+    if (lastEntry && lastEntry[0] === prompt && lastEntry[1] === result) {
+      return
+    }
 
-    if (existingEntryIndex !== -1) {
-      // Only update the in-memory context — do NOT write to DB again.
-      // Calling persistMessages unconditionally here was the root cause of duplicate
-      // DB entries (different IDs, same title) when the same prompt was repeated.
-      this.chatEntries[existingEntryIndex][1] = result
-    } else {
-      const chat:ChatEntry = [prompt, result]
-      this.chatEntries.push(chat)
-      if (this.chatEntries.length > this.queueSize){this.chatEntries.shift()}
+    const chat:ChatEntry = [prompt, result]
+    this.chatEntries.push(chat)
 
-      // Persist to storage only for new (non-duplicate) entries
-      if (this.storage && this.currentConversationId) {
-        return this.persistMessages(prompt, result).catch(err => {
-          console.error('Failed to persist chat history:', err)
-        })
-      }
+    if (this.storage && this.currentConversationId) {
+      return this.persistMessages(prompt, result).catch(err => {
+        console.error('Failed to persist chat history:', err)
+      })
     }
   }
 

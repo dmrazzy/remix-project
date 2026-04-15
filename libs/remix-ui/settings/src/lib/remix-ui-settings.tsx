@@ -432,7 +432,7 @@ export const RemixUiSettings = (props: RemixUiSettingsProps) => {
       <div className="container-fluid bg-light h-100 d-flex flex-column">
         <div className='pt-5'></div>
         <div className='d-flex flex-row pb-4 gap-4'>
-          <div data-id="settings-sidebar-header" className="ps-3 remix-settings-sidebar" style={{ width: '24em' }}>
+          <div data-id="settings-sidebar-header" className="ps-3 remix-settings-sidebar" style={{ flex: '1 1 0', minWidth: '8em', maxWidth: '18em' }}>
             <h3 className={`fw-semibold ${state.themeQuality.name === 'dark' ? 'text-white' : 'text-black'}`} style={{ fontSize: '1.5rem' }}><FormattedMessage id="settings.displayName" /></h3>
           </div>
           <div className='d-flex flex-grow-1 remix-settings-search' style={{ maxWidth: '53.5em', minHeight: '4em' }}>
@@ -444,8 +444,8 @@ export const RemixUiSettings = (props: RemixUiSettingsProps) => {
           <div className="d-flex align-items-stretch flex-fill gap-4" style={{ minHeight: 0, overflow: 'hidden' }}>
             {/* Sidebar */}
             <div
-              className="flex-column bg-transparent p-0 px-3 remix-settings-sidebar overflow-auto flex-shrink-0"
-              style={{ width: '25em', minWidth: '16em', height: '100%' }}
+              className="flex-column bg-transparent p-0 px-3 remix-settings-sidebar overflow-auto"
+              style={{ flex: '1 1 0', minWidth: '8em', maxWidth: '18em', height: '100%' }}
               data-id="settings-sidebar-nav"
             >
               <ul className="list-unstyled" data-id="settings-sidebar-nav-ul">
@@ -464,8 +464,7 @@ export const RemixUiSettings = (props: RemixUiSettingsProps) => {
                         setFilteredSection(section)
                       }}
                     >
-                      <h5 className={`fw-semibold mb-2 ${selected === section.key ? state.themeQuality.name === 'dark' ? 'active text-white' : 'active text-black' : 'text-secondary'}`} style={{ fontSize: '1.1rem' }} data-id={`settings-sidebar-${section.key}-h5`}><FormattedMessage id={section.label} /></h5>
-                      {selected !== section.key && <span style={{ fontSize: '0.85rem' }} data-id={`settings-sidebar-${section.key}-description`}><FormattedMessage id={section.description} /></span>}
+                      <h5 className={`fw-semibold mb-2 ${selected === section.key ? state.themeQuality.name === 'dark' ? 'active text-white' : 'active text-black' : 'text-secondary'}`} style={{ fontSize: '1rem' }} data-id={`settings-sidebar-${section.key}-h5`}><FormattedMessage id={section.label} /></h5>
                     </a>
                   </li>
                 ))}
@@ -473,8 +472,8 @@ export const RemixUiSettings = (props: RemixUiSettingsProps) => {
             </div>
             {/* Main Content */}
             <div
-              className="flex-column p-0 flex-grow-1 flex-shrink-1 mw-50"
-              style={{ minWidth: 0, flexBasis: '27.3em', height: '100%' }}
+              className="flex-column p-0"
+              style={{ flex: '3 1 0', minWidth: 0, height: '100%' }}
             >
               <div className="remix-settings-main h-100 overflow-auto" style={{ maxWidth: '53.5em' }}>
                 <SettingsSectionUI plugin={props.plugin} section={filteredSection} state={settingsState} dispatch={dispatch} />

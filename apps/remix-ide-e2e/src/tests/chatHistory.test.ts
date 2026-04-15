@@ -562,4 +562,143 @@ module.exports = {
       .waitForElementVisible('*[data-id="no-conversations-msg"]', 5000)
       .assert.textContains('*[data-id="no-conversations-msg"]', 'No')
   },
+
+  'Should embed loaded history into the prompt sent to the AI endpoint for long conversations #group4': function (browser: NightwatchBrowser) {
+    // Static UUID so we can target the conversation item by data-id after reload
+    const convId = 'b0e1f2a3-c4d5-6789-abcd-ef0123456789'
+
+    browser
+      .clickLaunchIcon('remixaiassistant')
+      .waitForElementPresent({
+        selector: "//*[@data-id='remix-ai-assistant-ready']",
+        locateStrategy: 'xpath',
+        timeout: 60000
+      })
+      .executeAsync(function (convId, done) {
+        const request = indexedDB.open('RemixAIChatHistory', 1)
+        request.onerror = () => done(false)
+        request.onsuccess = () => {
+          const db = request.result
+          const now = Date.now()
+          const messages = []
+          for (let i = 0; i < 8; i++) {
+            messages.push({
+              id: convId + '-user-' + i,
+              role: 'user',
+              content: 'User question number ' + (i + 1),
+              timestamp: now + (i * 2),
+              conversationId: convId
+            })
+            messages.push({
+              id: convId + '-assistant-' + i,
+              role: 'assistant',
+              content: 'Assistant answer number ' + (i + 1),
+              timestamp: now + (i * 2) + 1,
+              conversationId: convId
+            })
+          }
+          const tx = db.transaction(['conversations', 'messages'], 'readwrite')
+          tx.objectStore('conversations').put({
+            id: convId,
+            title: 'Off-by-one regression test conversation',
+            preview: 'User question number 1',
+            createdAt: now,
+            updatedAt: now,
+            lastAccessedAt: now,
+            messageCount: 16,
+            archived: false
+          })
+          const msgStore = tx.objectStore('messages')
+          messages.forEach(function (m) { msgStore.put(m) })
+          tx.oncomplete = function () { done(true) }
+          tx.onerror = function () { done(false) }
+        }
+        request.onupgradeneeded = function (event: any) {
+          const db = event.target.result
+          if (!db.objectStoreNames.contains('conversations')) {
+            const store = db.createObjectStore('conversations', { keyPath: 'id' })
+            store.createIndex('createdAt', 'createdAt', { unique: false })
+            store.createIndex('archived', 'archived', { unique: false })
+            store.createIndex('lastAccessedAt', 'lastAccessedAt', { unique: false })
+          }
+          if (!db.objectStoreNames.contains('messages')) {
+            const msgStore = db.createObjectStore('messages', { keyPath: 'id' })
+            msgStore.createIndex('conversationId', 'conversationId', { unique: false })
+            msgStore.createIndex('timestamp', 'timestamp', { unique: false })
+          }
+        }
+      }, [convId], function (result) {
+        browser.assert.equal(result.value, true, '8-pair (16-message) conversation seeded into IndexedDB')
+      })
+      .refreshPage()
+      .clickLaunchIcon('remixaiassistant')
+      .waitForElementPresent({
+        selector: "//*[@data-id='remix-ai-assistant-ready']",
+        locateStrategy: 'xpath',
+        timeout: 60000
+      })
+      .execute(function () {
+        const originalFetch = window.fetch;
+        (window as any)._capturedPrompt = undefined
+        window.fetch = function (input, init) {
+          if (init && init.body && typeof init.body === 'string') {
+            try {
+              const body = JSON.parse(init.body)
+              if (typeof body.prompt === 'string') {
+                (window as any)._capturedPrompt = body.prompt
+              }
+            } catch (e) { /* non-JSON body, ignore */ }
+          }
+          return originalFetch.call(this, input, init)
+        }
+      })
+      // Open history sidebar and load the seeded conversation
+      .waitForElementVisible('*[data-id="toggle-history-btn"]')
+      .click('*[data-id="toggle-history-btn"]')
+      .pause(1000)
+      .waitForElementVisible(`*[data-id="conversation-item-${convId}"]`, 5000)
+      .click(`*[data-id="conversation-item-${convId}"]`)
+      .pause(1000)
+      // Send a new message to trigger the AI fetch request
+      .waitForElementVisible('*[data-id="remix-ai-prompt-input"]')
+      .setValue('*[data-id="remix-ai-prompt-input"]', 'What was the last thing we discussed?')
+      .click('*[data-id="remix-ai-composer-send-btn"]')
+      .waitForElementPresent({
+        selector: "//*[@data-id='remix-ai-streaming' and @data-streaming='false']",
+        locateStrategy: 'xpath',
+        timeout: 120000
+      })
+      .pause()
+      // Assert: the intercepted prompt explicitly embeds the seeded conversation.
+      .execute(function () {
+        return (window as any)._capturedPrompt
+      }, [], function (result) {
+        const prompt = result.value as string
+        browser
+          .assert.ok(
+            typeof prompt === 'string' && prompt.length > 0,
+            'Prompt sent to AI is captured'
+          )
+          .assert.ok(
+            prompt.includes('Previous conversation:'),
+            'Prompt contains the embedded conversation header'
+          )
+          .assert.ok(
+            prompt.includes('User: User question number 1'),
+            'Prompt contains the oldest seeded user message'
+          )
+          .assert.ok(
+            prompt.includes('Assistant: Assistant answer number 8'),
+            'Prompt contains the newest seeded assistant message'
+          )
+          .assert.ok(
+            prompt.includes('Current user request:'),
+            'Prompt contains the current request section after the embedded history'
+          )
+          .assert.ok(
+            prompt.includes('What was the last thing we discussed?'),
+            'Prompt contains the current user request content'
+          )
+      })
+  },
 }

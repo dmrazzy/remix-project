@@ -97,7 +97,7 @@ export const DebugLayout = ({
   React.useEffect(() => {
     if (registerEvent) {
       registerEvent('traceManagerStackUpdate', (stack: any) => {
-        setStackData(stack)
+        setStackData([...stack].reverse())
       })
 
       registerEvent('traceManagerMemoryUpdate', (memory: any) => {

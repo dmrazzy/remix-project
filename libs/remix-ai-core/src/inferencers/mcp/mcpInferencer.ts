@@ -20,6 +20,7 @@ import { ToolApiGenerator } from "./toolApiGenerator";
 import { MCPClient } from "./mcpClient";
 import { WeightedToolSelector, IChatMessage } from "../../services/weightedToolSelector";
 import { buildChatPrompt } from "../../prompts/promptBuilder";
+import { ChatHistory } from "../../prompts/chat";
 
 // Helper function to track events using MatomoManager instance
 function trackMatomoEvent(category: string, action: string, name: string) {
@@ -387,7 +388,7 @@ export class MCPInferencer extends RemoteInferencer implements ICompletions, IGe
     const enrichedPrompt = mcpContext ? `${mcpContext}\n\n${prompt}` : prompt;
 
     // Add available tools to the request in LLM format (with prompt for tool selection)
-    const llmFormattedTools = await this.getToolsForLLMRequest(options.provider, prompt, buildChatPrompt());
+    const llmFormattedTools = await this.getToolsForLLMRequest(options.provider, prompt, buildChatPrompt(ChatHistory.queueSize));
     const enhancedOptions = {
       ...options,
       tools: llmFormattedTools.length > 0 ? llmFormattedTools : undefined,
