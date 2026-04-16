@@ -24,9 +24,56 @@ import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
-import { GenerationParams } from '../../types/models'
+import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { buildChatPrompt } from '../../prompts/promptBuilder'
 import { MemorySaver } from "@langchain/langgraph";
+
+// Initialize AsyncLocalStorage for browser environment
+// This MUST be done before any LangChain operations
+const initializeAsyncLocalStorage = () => {
+  // Create a proper AsyncLocalStorage implementation for browser
+  const storeStack: any[] = []
+  const browserAsyncLocalStorage = {
+    run<T>(store: any, callback: () => T): T {
+      storeStack.push(store)
+      try {
+        const result = callback()
+        if (result && typeof (result as any).then === 'function') {
+          return (result as any).finally(() => { storeStack.pop() })
+        }
+        storeStack.pop()
+        return result
+      } catch (error) {
+        storeStack.pop()
+        throw error
+      }
+    },
+    getStore() {
+      return storeStack.length > 0 ? storeStack[storeStack.length - 1] : undefined
+    },
+    enterWith(store: any) {
+      storeStack.push(store)
+    },
+    exit<T>(callback: () => T): T {
+      const prev = storeStack.pop()
+      try {
+        return callback()
+      } finally {
+        if (prev !== undefined) storeStack.push(prev)
+      }
+    },
+    disable() {
+      storeStack.length = 0
+    }
+  }
+
+  // Initialize LangChain's global AsyncLocalStorage singleton
+  AsyncLocalStorageProviderSingleton.initializeGlobalInstance(browserAsyncLocalStorage)
+  console.log('[DeepAgentInferencer] Initialized AsyncLocalStorage for browser environment')
+}
+
+// Initialize immediately when module loads
+initializeAsyncLocalStorage()
 
 /**
  * DeepAgentInferencer integrates LangChain DeepAgent with Remix IDE
@@ -158,10 +205,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.log('[DeepAgentInferencer] DeepAgent instance created successfully', this.agent)
 
       console.log('[DeepAgentInferencer] Initialized successfully')
-    } catch (error) {
+    } catch (error: any) {
       console.error('[DeepAgentInferencer] Initialization failed:', error)
       throw new DeepAgentError(
-        `Failed to initialize DeepAgent: ${error.message}`,
+        `Failed to initialize DeepAgent: ${error?.message || error}`,
         DeepAgentErrorType.INITIALIZATION_FAILED,
         error
       )
@@ -462,9 +509,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
       console.log('[DeepAgentInferencer] Stream complete, full response length:', fullResponse.length)
       return fullResponse
-    } catch (error) {
+    } catch (error: any) {
       console.error('[DeepAgentInferencer] Error during agent execution:', error)
-      if (error.name === 'AbortError') {
+      if (error?.name === 'AbortError') {
         throw new DeepAgentError(
           'Request cancelled by user',
           DeepAgentErrorType.UNKNOWN
