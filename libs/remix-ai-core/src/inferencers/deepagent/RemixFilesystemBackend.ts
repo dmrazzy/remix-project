@@ -72,12 +72,14 @@ export class RemixFilesystemBackend {
     }
   }
 
-  async read(file_path: string, offset: number, limit: number): Promise<string | { error: string }> {
+  async read(file_path: string, offset?: number, limit?: number): Promise<string | { error: string }> {
     try {
       const content = await this.read_file(file_path)
       if (typeof content !== 'string') {
         return content
       }
+      if (offset === undefined) offset = 0
+      if (limit === undefined) limit = content.length
       return content.substring(offset, offset + limit)
     } catch (error) {
       return { error: `Failed to read file ${file_path} with offset and limit: ${error.message}` }
@@ -262,16 +264,15 @@ export class RemixFilesystemBackend {
 
       for (const name of Object.keys(files)) {
         if (!files[name].isDirectory) {
-          const content = await this.plugin.call('fileManager', 'readFile', `${targetPath}/${name}`)
+          const content = await this.plugin.call('fileManager', 'readFile', name)
           const lines = content.split('\n')
           lines.forEach((line, index) => {
             if (regex.test(line)) {
-              results.push({ file: `${targetPath}/${name}`, line: index + 1, text: line })
+              results.push({ file: name, line: index + 1, text: line })
             }
           })
         }
       }
-
       return results
     } catch (error) {
       throw new Error(`Failed to grep directory ${path || 'cwd'} with pattern "${pattern}": ${error.message}`)
