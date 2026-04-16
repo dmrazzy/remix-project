@@ -84,6 +84,7 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.removeAllListeners('onInferenceDone')
     eventEmitter.removeAllListeners('onStreamResult')
     eventEmitter.removeAllListeners('onStreamComplete')
+    eventEmitter.removeAllListeners('onToolCall')
 
     // Set up fresh listeners
     eventEmitter.on('onInference', () => {
@@ -97,6 +98,9 @@ export class RemixAIPlugin extends Plugin {
     })
     eventEmitter.on('onStreamComplete', (finalText: string) => {
       this.emit('onStreamComplete', finalText)
+    })
+    eventEmitter.on('onToolCall', (data: { toolName: string; toolInput?: any; toolOutput?: any; status: 'start' | 'end' }) => {
+      this.emit('onToolCall', data)
     })
 
     this.deepAgentEventListenersSetup = true

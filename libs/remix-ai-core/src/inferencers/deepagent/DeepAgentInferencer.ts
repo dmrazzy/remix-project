@@ -172,24 +172,26 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         checkpointer
       }
 
-      // Configure specialized subagents
-      // if (this.config.enableSubagents) {
-      //   agentConfig.subagents = {
-      //     'Security Auditor': {
-      //       systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
-      //       model: this.model,
-      //       tools: this.tools,
-      //       backend: this.filesystemBackend
-      //     },
-      //     'Code Reviewer': {
-      //       systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
-      //       model: this.model,
-      //       tools: this.tools,
-      //       backend: this.filesystemBackend
-      //     }
-      //   }
-      //   console.log('[DeepAgentInferencer] Configured 2 specialized subagents: Security Auditor, Code Reviewer')
-      // }
+      // Configure specialized subagents (array format expected by deepagents)
+      if (this.config.enableSubagents) {
+        agentConfig.subagents = [
+          {
+            name: 'Security Auditor',
+            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: this.tools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Code Reviewer',
+            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: this.tools,
+            backend: this.filesystemBackend
+          }
+        ]
+        console.log('[DeepAgentInferencer] Configured 2 specialized subagents: Security Auditor, Code Reviewer')
+      }
 
       // Add store if configured
       console.log('[DeepAgentInferencer] Memory backend:', this.memoryBackend ? 'Enabled' : 'Disabled')
@@ -323,7 +325,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
       // Handle the response asynchronously
       responsePromise.then(response => {
-        console.log('[DeepAgentInferencer] Answer response complete:', response)
         // Emit completion event with final response for chat history
         this.event.emit('onStreamComplete', response)
         this.event.emit('onInferenceDone')
@@ -451,7 +452,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       let finalMessageFromChain = ''
       for await (const event of eventStream) {
         const eventType = event.event
-        // console.log(`[DeepAgentInferencer] Received event: ${eventType}`, event)
 
         // Handle different event types from the stream
         if (eventType === 'on_chat_model_stream') {
@@ -491,12 +491,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             }
           }
         } else if (eventType === 'on_tool_start') {
-          // Tool execution started
+          // Tool execution started - emit onToolCall event
           const toolName = event.name
-          console.log('onStreamResult', `\n[Using tool: ${toolName}]\n\n\n`)
+          const toolInput = event.data?.input || {}
+          console.log('[DeepAgentInferencer] Tool call started:', toolName, toolInput)
+          this.event.emit('onToolCall', { toolName, toolInput, status: 'start' })
         } else if (eventType === 'on_tool_end') {
           // Tool execution completed
           const toolName = event.name
+          const toolOutput = event.data?.output
+          console.log('[DeepAgentInferencer] Tool call ended:', toolName)
+          this.event.emit('onToolCall', { toolName, toolOutput, status: 'end' })
         }
       }
 

@@ -338,12 +338,41 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       streamingAssistantIdRef.current = null
     }
 
+    // Handle tool call events from DeepAgent
+    const handleToolCall = (data: { toolName: string; toolInput?: any; toolOutput?: any; status: 'start' | 'end' }) => {
+      console.log('[RemixAI Assistant] Tool call event:', data)
+      const assistantId = streamingAssistantIdRef.current
+      if (!assistantId) return
+
+      if (data.status === 'start') {
+        setMessages(prev =>
+          prev.map(m => (m.id === assistantId ? {
+            ...m,
+            isExecutingTools: true,
+            executingToolName: data.toolName,
+            executingToolArgs: data.toolInput
+          } : m))
+        )
+      } else {
+        setMessages(prev =>
+          prev.map(m => (m.id === assistantId ? {
+            ...m,
+            isExecutingTools: false,
+            executingToolName: undefined,
+            executingToolArgs: undefined
+          } : m))
+        )
+      }
+    }
+
     props.plugin.on('remixAI', 'onStreamResult', handleStreamChunk)
     props.plugin.on('remixAI', 'onStreamComplete', handleStreamComplete)
+    props.plugin.on('remixAI', 'onToolCall', handleToolCall)
 
     return () => {
       props.plugin.off('remixAI', 'onStreamResult')
       props.plugin.off('remixAI', 'onStreamComplete')
+      props.plugin.off('remixAI', 'onToolCall')
     }
   }, [props.plugin])
 
