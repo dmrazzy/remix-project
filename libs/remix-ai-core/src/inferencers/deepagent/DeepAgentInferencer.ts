@@ -39,7 +39,6 @@ interface ModelSelection {
 }
 
 // Initialize AsyncLocalStorage for browser environment
-// This MUST be done before any LangChain operations
 const initializeAsyncLocalStorage = () => {
   // Create a proper AsyncLocalStorage implementation for browser
   const storeStack: any[] = []
@@ -242,18 +241,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     switch (provider) {
     case 'mistralai': {
-      // Map system model IDs to Mistral API model names
-      // Available system IDs: 'mistral-medium-latest', 'codestral-latest'
-      const mistralModelMap: Record<string, string> = {
-        'mistral-medium-latest': 'mistral-medium-latest',
-        'codestral-latest': 'codestral-latest'
-      }
-      const mistralModel = mistralModelMap[modelId] || 'mistral-medium-latest'
-
-      console.log(`[DeepAgentInferencer] Creating MistralAI model: ${mistralModel}`)
+      console.log(`[DeepAgentInferencer] Creating MistralAI model: ${modelId}`)
       return new ChatMistralAI({
         apiKey: 'proxy-handled',
-        model: mistralModel,
+        model: modelId,
         temperature: 0.7,
         maxTokens: 4096,
         streaming: true,
@@ -263,18 +254,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     case 'anthropic':
     default: {
-      // Map system model IDs to Anthropic API model names
-      // Available system IDs: 'claude-sonnet-4-6', 'claude-opus-4-6'
-      const anthropicModelMap: Record<string, string> = {
-        'claude-sonnet-4-6': 'claude-sonnet-4-6',
-        'claude-opus-4-6': 'claude-opus-4-20250514'
-      }
-      const anthropicModel = anthropicModelMap[modelId] || 'claude-sonnet-4-6'
-
-      console.log(`[DeepAgentInferencer] Creating Anthropic model: ${anthropicModel}`)
+      console.log(`[DeepAgentInferencer] Creating Anthropic model: ${modelId}`)
       return new ChatAnthropic({
         apiKey: 'proxy-handled',
-        model: anthropicModel,
+        model: modelId,
         temperature: 0.7,
         maxTokens: 4096,
         streaming: true,
