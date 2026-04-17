@@ -22,11 +22,21 @@ import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
 
 // Import LangChain modules
 import { ChatAnthropic } from '@langchain/anthropic'
+import { ChatMistralAI } from '@langchain/mistralai'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
+import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { buildChatPrompt } from '../../prompts/promptBuilder'
 import { MemorySaver } from "@langchain/langgraph";
+
+// Model provider types
+type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
+
+interface ModelSelection {
+  provider: ModelProvider
+  modelId: string
+}
 
 // Initialize AsyncLocalStorage for browser environment
 // This MUST be done before any LangChain operations
@@ -88,18 +98,26 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private tools: DynamicStructuredTool[] = []
   private currentAbortController: AbortController | null = null
   private fallbackInferencer: any = null
-  private model: ChatAnthropic | null = null
+  private model: BaseChatModel | null = null
+  private modelSelection: ModelSelection
 
   constructor(
     plugin: Plugin,
     toolRegistry: ToolRegistry,
     config?: Partial<IDeepAgentConfig>,
     fallbackInferencer?: any,
-    mcpInferencer?: any
+    mcpInferencer?: any,
+    modelSelection?: ModelSelection
   ) {
     this.plugin = plugin
     this.event = new EventEmitter()
     this.fallbackInferencer = fallbackInferencer
+
+    // Store model selection (default to mistral-medium-latest which is the system default)
+    this.modelSelection = modelSelection || {
+      provider: 'mistralai',
+      modelId: 'mistral-medium-latest'
+    }
 
     // Default configuration (API key handled by proxy)
     this.config = {
@@ -129,29 +147,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       const { createDeepAgent } = await import('deepagents')
 
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
+      console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
 
       // Always use proxy server - API key is handled server-side
-      // Use absolute URL for the proxy (webpack dev server proxies /api/langchain to localhost:4000)
       const proxyUrl = 'http://localhost:4000'
 
-      const modelConfig: any = {
-        apiKey: 'proxy-handled', // Proxy server adds the real API key
-        model: 'claude-sonnet-4-5-20250929',
-        temperature: 0.7,
-        maxTokens: 4096,
-        streaming: true,
-        clientOptions: {
-          baseURL: proxyUrl
-        }
-      }
+      // Create the appropriate model based on provider selection
+      this.model = this.createModelInstance(proxyUrl)
 
-      console.log('[DeepAgentInferencer] Using proxy server:', proxyUrl)
-
-      this.model = new ChatAnthropic(modelConfig)
-
-      // Don't create model instance here - let deepagents handle it internally
-      // This avoids dynamic loading issues in the browser
-      console.log('[DeepAgentInferencer] Model will be initialized by deepagents')
+      console.log(`[DeepAgentInferencer] Created ${this.modelSelection.provider} model: ${this.modelSelection.modelId}`)
 
       // Initialize memory backend if enabled
       if (this.config.memoryBackend === 'store') {
@@ -227,6 +231,58 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     } catch (error) {
       console.warn('[DeepAgentInferencer] Failed to initialize tools:', error)
       this.tools = []
+    }
+  }
+
+  /**
+   * Create the appropriate model instance based on provider selection
+   */
+  private createModelInstance(proxyUrl: string): BaseChatModel {
+    const { provider, modelId } = this.modelSelection
+
+    switch (provider) {
+    case 'mistralai': {
+      // Map system model IDs to Mistral API model names
+      // Available system IDs: 'mistral-medium-latest', 'codestral-latest'
+      const mistralModelMap: Record<string, string> = {
+        'mistral-medium-latest': 'mistral-medium-latest',
+        'codestral-latest': 'codestral-latest'
+      }
+      const mistralModel = mistralModelMap[modelId] || 'mistral-medium-latest'
+
+      console.log(`[DeepAgentInferencer] Creating MistralAI model: ${mistralModel}`)
+      return new ChatMistralAI({
+        apiKey: 'proxy-handled',
+        model: mistralModel,
+        temperature: 0.7,
+        maxTokens: 4096,
+        streaming: true,
+        serverURL: `${proxyUrl}/mistral`
+      })
+    }
+
+    case 'anthropic':
+    default: {
+      // Map system model IDs to Anthropic API model names
+      // Available system IDs: 'claude-sonnet-4-6', 'claude-opus-4-6'
+      const anthropicModelMap: Record<string, string> = {
+        'claude-sonnet-4-6': 'claude-sonnet-4-6',
+        'claude-opus-4-6': 'claude-opus-4-20250514'
+      }
+      const anthropicModel = anthropicModelMap[modelId] || 'claude-sonnet-4-6'
+
+      console.log(`[DeepAgentInferencer] Creating Anthropic model: ${anthropicModel}`)
+      return new ChatAnthropic({
+        apiKey: 'proxy-handled',
+        model: anthropicModel,
+        temperature: 0.7,
+        maxTokens: 4096,
+        streaming: true,
+        clientOptions: {
+          baseURL: proxyUrl
+        }
+      })
+    }
     }
   }
 

@@ -178,6 +178,7 @@ export class RemixAIPlugin extends Plugin {
     if (deepAgentEnabled && this.remixMCPServer) {
       try {
         console.log('[RemixAI Plugin] Initializing DeepAgent with mcpInferencer:', !!this.mcpInferencer);
+        console.log('[RemixAI Plugin] Using model for DeepAgent:', this.selectedModel.provider, this.selectedModelId);
         this.deepAgentInferencer = new DeepAgentInferencer(
           this,
           this.remixMCPServer.tools,
@@ -187,7 +188,8 @@ export class RemixAIPlugin extends Plugin {
             enablePlanning: true
           },
           this.remoteInferencer,
-          this.mcpInferencer // Pass MCPInferencer to gather external MCP client tools
+          this.mcpInferencer, // Pass MCPInferencer to gather external MCP client tools
+          { provider: this.selectedModel.provider as 'anthropic' | 'mistralai', modelId: this.selectedModelId } // Pass selected model
         )
         await this.deepAgentInferencer.initialize()
         this.deepAgentEnabled = true
@@ -587,6 +589,41 @@ export class RemixAIPlugin extends Plugin {
       await this.mcpInferencer.connectAllServers();
     }
 
+    // Reinitialize DeepAgent if enabled and model changed
+    if (this.deepAgentEnabled && this.deepAgentInferencer && this.remixMCPServer && previousModelId !== modelId) {
+      console.log('[RemixAI Plugin] Model changed, reinitializing DeepAgent with new model:', model.provider, modelId);
+      try {
+        // Clean up old instance
+        const eventEmitter = this.deepAgentInferencer.getEventEmitter();
+        eventEmitter.removeAllListeners();
+        await this.deepAgentInferencer.close();
+
+        // Create new instance with updated model
+        this.deepAgentInferencer = new DeepAgentInferencer(
+          this,
+          this.remixMCPServer.tools,
+          {
+            memoryBackend: (localStorage.getItem('deepagent_memory_backend') as 'state' | 'store') || 'store',
+            enableSubagents: true,
+            enablePlanning: true
+          },
+          this.remoteInferencer,
+          this.mcpInferencer,
+          { provider: model.provider as 'anthropic' | 'mistralai', modelId: modelId }
+        );
+        await this.deepAgentInferencer.initialize();
+
+        // Reset and set up event listeners
+        this.deepAgentEventListenersSetup = false;
+        this.setupDeepAgentEventListeners();
+
+        console.log('[RemixAI Plugin] DeepAgent reinitialized with new model successfully');
+      } catch (error) {
+        console.error('[RemixAI Plugin] Failed to reinitialize DeepAgent on model change:', error);
+        // Keep DeepAgent enabled but log the error
+      }
+    }
+
     // Emit event for UI updates
     this.emit('modelChanged', modelId)
   }
@@ -786,6 +823,7 @@ export class RemixAIPlugin extends Plugin {
       }
 
       // Create or reinitialize DeepAgentInferencer
+      console.log('[RemixAI Plugin] Using model for DeepAgent:', this.selectedModel.provider, this.selectedModelId);
       this.deepAgentInferencer = new DeepAgentInferencer(
         this,
         this.remixMCPServer.tools,
@@ -795,7 +833,8 @@ export class RemixAIPlugin extends Plugin {
           enablePlanning: true
         },
         this.remoteInferencer,
-        this.mcpInferencer
+        this.mcpInferencer,
+        { provider: this.selectedModel.provider as 'anthropic' | 'mistralai', modelId: this.selectedModelId }
       )
 
       await this.deepAgentInferencer.initialize()
@@ -1070,6 +1109,7 @@ export class RemixAIPlugin extends Plugin {
               await this.deepAgentInferencer.close()
             }
 
+            console.log('[RemixAI Plugin] Using model for DeepAgent:', this.selectedModel.provider, this.selectedModelId);
             this.deepAgentInferencer = new DeepAgentInferencer(
               this,
               this.remixMCPServer.tools,
@@ -1079,7 +1119,8 @@ export class RemixAIPlugin extends Plugin {
                 enablePlanning: true
               },
               this.remoteInferencer,
-              this.mcpInferencer // Pass MCPInferencer to gather external MCP client tools
+              this.mcpInferencer, // Pass MCPInferencer to gather external MCP client tools
+              { provider: this.selectedModel.provider as 'anthropic' | 'mistralai', modelId: this.selectedModelId }
             )
             await this.deepAgentInferencer.initialize()
             this.deepAgentEnabled = true
