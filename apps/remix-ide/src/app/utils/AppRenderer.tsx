@@ -9,6 +9,7 @@ import { createRoot, Root } from 'react-dom/client';
 import { TrackingProvider } from '../contexts/TrackingContext';
 import { Preload } from '../components/preload';
 import { GitHubPopupCallback } from '../pages/GitHubPopupCallback';
+import { DesktopAuthCallback } from '../pages/DesktopAuthCallback';
 import { TrackingFunction } from './TrackingFunction';
 
 export interface RenderAppOptions {
@@ -33,6 +34,12 @@ export function renderApp(options: RenderAppOptions): Root | null {
     root.render(
       <TrackingProvider trackingFunction={trackingFunction}>
         <GitHubPopupCallback />
+      </TrackingProvider>
+    );
+  } else if (window.location.hash.includes('desktop_auth=')) {
+    root.render(
+      <TrackingProvider trackingFunction={trackingFunction}>
+        <DesktopAuthCallback />
       </TrackingProvider>
     );
   } else {

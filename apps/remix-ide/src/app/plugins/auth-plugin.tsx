@@ -506,8 +506,83 @@ export class AuthPlugin extends Plugin {
     return (val !== undefined ? val : defaultValue) as T
   }
 
+  private isDesktop(): boolean {
+    return typeof window !== 'undefined' && (window as any).electronAPI !== undefined
+  }
+
+  /**
+   * Desktop login flow: opens the web IDE in the user's browser, user authenticates there,
+   * and tokens are sent back to desktop via the remix:// custom protocol.
+   */
+  private async loginViaDesktopBridge(): Promise<void> {
+    this.log('[AuthPlugin] Initiating desktop login via web bridge')
+
+    // Call the desktop auth handler plugin to open the browser
+    await this.call('desktopAuthHandler' as any, 'login')
+
+    // Listen for the auth result from the desktop auth handler
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup()
+        reject(new Error('Desktop login timed out. Please try again.'))
+      }, 10 * 60 * 1000) // 10 minute timeout
+
+      const handleSuccess = (data: { accessToken: string; refreshToken: string; user: any }) => {
+        cleanup()
+
+        // Store tokens in localStorage
+        localStorage.setItem('remix_access_token', data.accessToken)
+        localStorage.setItem('remix_refresh_token', data.refreshToken)
+        localStorage.setItem('remix_user', JSON.stringify(data.user))
+
+        // Schedule proactive refresh
+        this.scheduleRefresh(data.accessToken)
+
+        // Emit auth state change
+        this.emit('authStateChanged', {
+          isAuthenticated: true,
+          user: data.user,
+          token: data.accessToken
+        })
+
+        // If logged in via GitHub, bridge the provider token
+        if (data.user.provider === 'github') {
+          this.fetchGitHubToken().catch(console.error)
+        }
+
+        // Fetch credits after login
+        this.refreshCredits().catch(console.error)
+
+        this.log('[AuthPlugin] Desktop login successful')
+        resolve()
+      }
+
+      const handleFailure = (data: { error: string }) => {
+        cleanup()
+        reject(new Error(data.error || 'Desktop login failed'))
+      }
+
+      const cleanup = () => {
+        clearTimeout(timeout)
+        this.off('desktopAuthHandler' as any, 'onAuthSuccess')
+        this.off('desktopAuthHandler' as any, 'onAuthFailure')
+      }
+
+      this.on('desktopAuthHandler' as any, 'onAuthSuccess', handleSuccess)
+      this.on('desktopAuthHandler' as any, 'onAuthFailure', handleFailure)
+    })
+  }
+
   async login(provider: AuthProviderType): Promise<void> {
     try {
+      this.log('[AuthPlugin] Starting login for:', provider)
+
+      // In Electron (desktop), use the desktop auth handler to open browser
+      if (this.isDesktop()) {
+        await this.loginViaDesktopBridge()
+        return
+      }
+
       this.log('[AuthPlugin] Starting popup-based login for:', provider)
 
       // Get pending invite token to pass through login flow
@@ -1076,6 +1151,19 @@ export class AuthPlugin extends Plugin {
     // This ensures AuthContext (which polls for activation) never sees
     // stale/unvalidated tokens in localStorage.
     await this.validateAndRestoreSession()
+
+    // After session validation, check if there's a pending desktop auth flow.
+    // This handles the case where the user was redirected from the DesktopAuthCallback
+    // page to sign in first, and now needs to be sent back to authorize the desktop app.
+    if (!this.isDesktop()) {
+      const pendingDesktopState = sessionStorage.getItem('remix_desktop_auth_state')
+      if (pendingDesktopState && localStorage.getItem('remix_access_token')) {
+        sessionStorage.removeItem('remix_desktop_auth_state')
+        // Redirect back to the desktop auth callback page
+        window.location.hash = `desktop_auth=${pendingDesktopState}`
+        window.location.reload()
+      }
+    }
   }
 
   /**
