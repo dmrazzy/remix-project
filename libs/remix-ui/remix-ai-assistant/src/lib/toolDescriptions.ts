@@ -5,7 +5,6 @@ export interface ToolExecutionInfo {
 
 export function getToolExecutionMessage(toolInfo: ToolExecutionInfo): string {
   const { toolName, arguments: args } = toolInfo
-  console.log(`[ToolExecutionInfo] Generating message for tool: ${toolName} with arguments: ${JSON.stringify(args)}`)
 
   switch (toolName) {
   // Compilation tools
