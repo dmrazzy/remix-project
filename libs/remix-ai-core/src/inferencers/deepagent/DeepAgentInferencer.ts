@@ -14,7 +14,8 @@ import {
   SECURITY_ANALYSIS_PROMPT,
   CODE_EXPLANATION_PROMPT,
   SECURITY_AUDITOR_SUBAGENT_PROMPT,
-  CODE_REVIEWER_SUBAGENT_PROMPT
+  CODE_REVIEWER_SUBAGENT_PROMPT,
+  FRONTEND_SPECIALIST_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
@@ -191,9 +192,16 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             model: this.model,
             tools: this.tools,
             backend: this.filesystemBackend
+          },
+          {
+            name: 'Frontend Specialist',
+            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: this.tools,
+            backend: this.filesystemBackend
           }
         ]
-        console.log('[DeepAgentInferencer] Configured 2 specialized subagents: Security Auditor, Code Reviewer')
+        console.log('[DeepAgentInferencer] Configured 3 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist')
       }
 
       // Add store if configured
