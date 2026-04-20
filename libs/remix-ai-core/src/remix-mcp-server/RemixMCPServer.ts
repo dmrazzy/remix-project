@@ -51,6 +51,7 @@ import { createTutorialsTools } from './handlers/TutorialsHandler';
 import { createAmpTools } from './handlers/AmpHandler';
 import { createMathUtilsTools } from './handlers/MathUtilsHandler';
 import { createFoundryHardhatTools } from './handlers/FoundryHardhatHandler';
+import { createSkillLoaderTool } from './handlers/SkillLoaderHandler';
 
 // Import resource providers
 import { ProjectResourceProvider } from './providers/ProjectResourceProvider';
@@ -856,6 +857,11 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
       const chartJsTools = createChartJsTools();
       this._tools.registerBatch(chartJsTools);
       */
+
+      // Register Skill Loader tool
+      const skillLoaderTool = createSkillLoaderTool();
+      this._tools.register(skillLoaderTool);
+
       const totalTools = this._tools.list().length;
 
     } catch (error) {
