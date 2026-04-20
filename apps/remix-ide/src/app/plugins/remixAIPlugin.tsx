@@ -85,6 +85,10 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.removeAllListeners('onStreamResult')
     eventEmitter.removeAllListeners('onStreamComplete')
     eventEmitter.removeAllListeners('onToolCall')
+    eventEmitter.removeAllListeners('onSubagentStart')
+    eventEmitter.removeAllListeners('onSubagentComplete')
+    eventEmitter.removeAllListeners('onTaskStart')
+    eventEmitter.removeAllListeners('onTaskComplete')
 
     // Set up fresh listeners
     eventEmitter.on('onInference', () => {
@@ -93,14 +97,26 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.on('onInferenceDone', () => {
       this.isInferencing = false
     })
-    eventEmitter.on('onStreamResult', (chunk: string) => {
-      this.emit('onStreamResult', chunk)
+    eventEmitter.on('onStreamResult', (data: string | { content: string; isIntermediate: boolean; source?: string }) => {
+      this.emit('onStreamResult', data)
     })
     eventEmitter.on('onStreamComplete', (finalText: string) => {
       this.emit('onStreamComplete', finalText)
     })
     eventEmitter.on('onToolCall', (data: { toolName: string; toolInput?: any; toolOutput?: any; status: 'start' | 'end' }) => {
       this.emit('onToolCall', data)
+    })
+    eventEmitter.on('onSubagentStart', (data: { id: string; name: string; task: string; status: string }) => {
+      this.emit('onSubagentStart', data)
+    })
+    eventEmitter.on('onSubagentComplete', (data: { id: string; name: string; status: string; duration: number }) => {
+      this.emit('onSubagentComplete', data)
+    })
+    eventEmitter.on('onTaskStart', (data: { id: string; name: string; status: string }) => {
+      this.emit('onTaskStart', data)
+    })
+    eventEmitter.on('onTaskComplete', (data: { id: string; name: string; status: string }) => {
+      this.emit('onTaskComplete', data)
     })
 
     this.deepAgentEventListenersSetup = true

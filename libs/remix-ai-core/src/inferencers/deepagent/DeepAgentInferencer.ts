@@ -365,18 +365,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         ]
       }
       console.log('[DeepAgentInferencer] Running answer with messages:')
-
-      // Return empty string immediately to signal streaming mode
-      // The actual content will be streamed via onStreamResult events
       const responsePromise = this.runAgent(messages, params)
 
-      // Handle the response asynchronously
       responsePromise.then(response => {
-        // Emit completion event with final response for chat history
         this.event.emit('onStreamComplete', response)
         this.event.emit('onInferenceDone')
       }).catch(error => {
-        console.error('[DeepAgentInferencer] Answer error:', error)
+        if (error?.name === 'AbortError' || error?.message?.includes('cancelled')) {
+          console.log('[DeepAgentInferencer] Answer request was cancelled')
+        } else {
+          console.error('[DeepAgentInferencer] Answer error:', error)
+        }
         this.event.emit('onInferenceDone')
       })
 
@@ -467,6 +466,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private async runAgent(messages: any[], params: IParams): Promise<string> {
     // Create abort controller for cancellation
     this.currentAbortController = new AbortController()
+    let fullResponse = ''
 
     try {
       // Filter out system messages - they're already set during agent creation
@@ -477,11 +477,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           if (msg.role === 'assistant') return new AIMessage(msg.content)
           return new HumanMessage(msg.content)
         })
-
-      let fullResponse = ''
       console.log('[DeepAgentInferencer] Running agent with messages (streaming enabled)', this.agent)
 
-      // Use streamEvents() for token-level streaming as per LangChain DeepAgent docs
+      // Tracking state for subagents and intermediate/final answers
+      let isIntermediatePhase = true
+      const activeSubagents: Map<string, { name: string; startTime: number }> = new Map()
+      let previousRunId: string | null = null
+
       // https://docs.langchain.com/oss/python/deepagents/streaming
       const eventStream = this.agent.streamEvents(
         {
@@ -491,22 +493,75 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           version: 'v2',
           configurable: {
             thread_id: `remix-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
-          }
+          },
+          subgraphs: true, // Enable subgraph/subagent visibility
+          signal: this.currentAbortController?.signal // Pass abort signal for cancellation
         }
       )
 
       // Process stream events
       let finalMessageFromChain = ''
       for await (const event of eventStream) {
+        if (this.currentAbortController?.signal.aborted) {
+          console.log('[DeepAgentInferencer] Request cancelled, breaking out of stream loop')
+          this.event.emit('onStreamComplete', fullResponse)
+          break
+        }
+
         const eventType = event.event
+
+        if (eventType === 'on_chain_start') {
+          console.log('[DeepAgentInferencer] Chain started:', event)
+          const runName = event.name || ''
+          const tags = event.tags || []
+
+          if (runName.includes('subagent') || tags.includes('subagent')) {
+            console.log(`[DeepAgentInferencer] Detected subagent start: ${runName} with tags: ${tags.join(', ')}`)
+            const subagentName = event.metadata?.subagent_name || runName
+            activeSubagents.set(event.run_id, { name: subagentName, startTime: Date.now() })
+
+            this.event.emit('onSubagentStart', {
+              id: event.run_id,
+              name: subagentName,
+              task: event.data?.input?.task || 'Processing...',
+              status: 'running'
+            })
+          }
+
+          if (runName.includes('plan') || tags.includes('planning')) {
+            console.log(`[DeepAgentInferencer] Detected planning event: ${runName} with tags: ${tags.join(', ')}`)
+            this.event.emit('onTaskStart', {
+              id: event.run_id,
+              name: event.name || 'Planning',
+              status: 'started'
+            })
+          }
+
+          if (runName === 'final_response' || tags.includes('final')) {
+            console.log(`[DeepAgentInferencer] Detected transition to final response: ${runName} with tags: ${tags.join(', ')}`)
+            isIntermediatePhase = false
+          }
+        }
+
+        if (eventType === 'on_chain_end' && activeSubagents.has(event.run_id)) {
+          console.log(`[DeepAgentInferencer] Detected subagent completion: ${event.name} with run_id: ${event.run_id}`)
+          const subagent = activeSubagents.get(event.run_id)!
+          const duration = Date.now() - subagent.startTime
+
+          this.event.emit('onSubagentComplete', {
+            id: event.run_id,
+            name: subagent.name,
+            status: 'completed',
+            duration
+          })
+          activeSubagents.delete(event.run_id)
+        }
 
         // Handle different event types from the stream
         if (eventType === 'on_chat_model_stream') {
-          // Token-level streaming from the LLM - this is the actual text streaming
+          console.log(`[DeepAgentInferencer] Received on_chat_model_stream event with data:`, event)
           const chunk = event.data?.chunk
           if (chunk?.content) {
-            // console.log(`[DeepAgentInferencer] Received token chunk:`, chunk.content)
-
             // Extract delta content - handle different response formats
             let deltaContent = ''
             if (typeof chunk.content === 'string') {
@@ -520,21 +575,31 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
               }
             }
 
-            // console.log(`[DeepAgentInferencer] Extracted delta:`, deltaContent)
             if (deltaContent) {
+              const currentRunId = event.run_id
+              if (previousRunId !== null && previousRunId !== currentRunId) {
+                deltaContent = '\n \n---\n' + deltaContent
+              }
+              previousRunId = currentRunId
+
               fullResponse += deltaContent
-              // Emit incremental delta for streaming display
-              this.event.emit('onStreamResult', deltaContent)
+              this.event.emit('onStreamResult', {
+                content: deltaContent,
+                isIntermediate: isIntermediatePhase,
+                source: event.metadata?.langgraph_node || 'agent'
+              })
+              console.log('deltaContent:', deltaContent)
+              console.log('run_id:', event.run_id)
             }
           }
         } else if (eventType === 'on_chain_end') {
+          console.log(`[DeepAgentInferencer] Chain ended: ${event.name}, checking for final message in chain output`)
           // Store final response but don't overwrite accumulated chunks
           const output = event.data?.output
           if (output?.messages && output.messages.length > 0) {
             const lastMessage = output.messages[output.messages.length - 1]
             if (lastMessage.content && typeof lastMessage.content === 'string') {
               finalMessageFromChain = lastMessage.content
-              // console.log('[DeepAgentInferencer] Chain end - final message length:', finalMessageFromChain.length)
             }
           }
         } else if (eventType === 'on_tool_start') {
@@ -562,13 +627,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.log('[DeepAgentInferencer] Stream complete, full response length:', fullResponse.length)
       return fullResponse
     } catch (error: any) {
-      console.error('[DeepAgentInferencer] Error during agent execution:', error)
-      if (error?.name === 'AbortError') {
-        throw new DeepAgentError(
-          'Request cancelled by user',
-          DeepAgentErrorType.UNKNOWN
-        )
+      if (error?.name === 'AbortError' || this.currentAbortController?.signal.aborted) {
+        console.log('[DeepAgentInferencer] Request cancelled by user')
+        return fullResponse
       }
+      console.error('[DeepAgentInferencer] Error during agent execution:', error)
       throw error
     } finally {
       this.currentAbortController = null
@@ -625,8 +688,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   cancelRequest(): void {
     if (this.currentAbortController) {
+      console.log('[DeepAgentInferencer] Cancelling request...')
       this.currentAbortController.abort()
       this.currentAbortController = null
+      this.event.emit('onInferenceDone')
     }
   }
 

@@ -15,6 +15,11 @@ export interface ChatMessage {
   isExecutingTools?: boolean
   executingToolName?: string
   executingToolArgs?: Record<string, any>
+  currentTask?: string
+  taskStatus?: 'running' | 'completed'
+  activeSubagent?: string
+  subagentTask?: string
+  isIntermediateContent?: boolean
 }
 
 /**
