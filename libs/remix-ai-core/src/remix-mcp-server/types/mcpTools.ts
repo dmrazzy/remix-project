@@ -266,7 +266,10 @@ export interface ImportProjectArgs {
  */
 export interface LoadSkillArgs {
   skill_id: string;
-  endpoint?: string;
+}
+
+export interface ListSkillsArgs {
+  // No parameters needed
 }
 
 /**
@@ -402,6 +405,18 @@ export interface LoadSkillResult extends FileOperationResult {
   skill_description: string;
   files_created: string[];
   total_files: number;
+}
+
+export interface SkillInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface ListSkillsResult {
+  success: boolean;
+  skills: SkillInfo[];
+  total_skills: number;
 }
 
 export interface RemixToolDefinition extends IMCPTool {
