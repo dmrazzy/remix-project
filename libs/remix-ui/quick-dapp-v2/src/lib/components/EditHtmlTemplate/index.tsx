@@ -648,6 +648,7 @@ window.addEventListener('unhandledrejection', function(e) {
                 onClick={() => setShowVmTips(!showVmTips)}
                 style={{ fontSize: '0.85rem' }}
                 title="VM Deployment Information"
+                data-id="vm-deployment-btn"
               >
                 <i className="fas fa-exclamation-triangle me-1"></i>
                 {showVmTips ? 'Hide VM Info' : 'VM Info'}
