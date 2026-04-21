@@ -9,7 +9,7 @@ export function getToolExecutionMessage(toolInfo: ToolExecutionInfo): string {
   switch (toolName) {
   // Compilation tools
   case 'solidity_compile':
-    return `Compiling Solidity contract in ${args?.file}`
+    return `Compiling Solidity contract`
 
   case 'get_compilation_result':
     return 'Getting compilation results'

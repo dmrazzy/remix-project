@@ -311,12 +311,16 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
 
   // Listen for streaming chunks from DeepAgent
   useEffect(() => {
-    const handleStreamChunk = (chunk: string) => {
+    // Handle stream chunks - supports both legacy string format and new object format
+    const handleStreamChunk = (data: string | { content: string; isIntermediate?: boolean; source?: string }) => {
+      const chunk = typeof data === 'string' ? data : data.content
+      const isIntermediate = typeof data === 'object' ? data.isIntermediate : false
+
       if (streamingAssistantIdRef.current) {
         setMessages(prev =>
           prev.map(m =>
             m.id === streamingAssistantIdRef.current
-              ? { ...m, content: m.content + chunk }
+              ? { ...m, content: m.content + chunk, isIntermediateContent: isIntermediate }
               : m
           )
         )
@@ -338,12 +342,105 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       streamingAssistantIdRef.current = null
     }
 
+    // Handle tool call events from DeepAgent
+    const handleToolCall = (data: { toolName: string; toolInput?: any; toolOutput?: any; status: 'start' | 'end' }) => {
+      console.log('[RemixAI Assistant] Tool call event:', data)
+      const assistantId = streamingAssistantIdRef.current
+      if (!assistantId) return
+
+      if (data.status === 'start') {
+        setMessages(prev =>
+          prev.map(m => (m.id === assistantId ? {
+            ...m,
+            isExecutingTools: true,
+            executingToolName: data.toolName,
+            executingToolArgs: data.toolInput
+          } : m))
+        )
+      } else {
+        setMessages(prev =>
+          prev.map(m => (m.id === assistantId ? {
+            ...m,
+            isExecutingTools: false,
+            executingToolName: undefined,
+            executingToolArgs: undefined
+          } : m))
+        )
+      }
+    }
+
+    // Handle subagent start events
+    const handleSubagentStart = (data: { id: string; name: string; task: string; status: string }) => {
+      console.log('[RemixAI Assistant] Subagent started:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? { ...m, activeSubagent: data.name, subagentTask: data.task }
+              : m
+          )
+        )
+      }
+    }
+
+    // Handle subagent complete events
+    const handleSubagentComplete = (data: { id: string; name: string; status: string; duration: number }) => {
+      console.log('[RemixAI Assistant] Subagent completed:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? { ...m, activeSubagent: undefined, subagentTask: undefined }
+              : m
+          )
+        )
+      }
+    }
+
+    // Handle task start events
+    const handleTaskStart = (data: { id: string; name: string; status: string }) => {
+      console.log('[RemixAI Assistant] Task started:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? { ...m, currentTask: data.name, taskStatus: 'running' }
+              : m
+          )
+        )
+      }
+    }
+
+    // Handle task complete events
+    const handleTaskComplete = (data: { id: string; name: string; status: string }) => {
+      console.log('[RemixAI Assistant] Task completed:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? { ...m, currentTask: undefined, taskStatus: 'completed' }
+              : m
+          )
+        )
+      }
+    }
+
     props.plugin.on('remixAI', 'onStreamResult', handleStreamChunk)
     props.plugin.on('remixAI', 'onStreamComplete', handleStreamComplete)
+    props.plugin.on('remixAI', 'onToolCall', handleToolCall)
+    props.plugin.on('remixAI', 'onSubagentStart', handleSubagentStart)
+    props.plugin.on('remixAI', 'onSubagentComplete', handleSubagentComplete)
+    props.plugin.on('remixAI', 'onTaskStart', handleTaskStart)
+    props.plugin.on('remixAI', 'onTaskComplete', handleTaskComplete)
 
     return () => {
       props.plugin.off('remixAI', 'onStreamResult')
       props.plugin.off('remixAI', 'onStreamComplete')
+      props.plugin.off('remixAI', 'onToolCall')
+      props.plugin.off('remixAI', 'onSubagentStart')
+      props.plugin.off('remixAI', 'onSubagentComplete')
+      props.plugin.off('remixAI', 'onTaskStart')
+      props.plugin.off('remixAI', 'onTaskComplete')
     }
   }, [props.plugin])
 
@@ -420,6 +517,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       }
 
       uiToolCallbackRef.current = null
+      streamingAssistantIdRef.current = null
       setMessages(prev => {
         const cleanedMessages = prev
           .filter(m => {
@@ -431,7 +529,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             ...m,
             isExecutingTools: false,
             executingToolName: undefined,
-            executingToolArgs: undefined
+            executingToolArgs: undefined,
+            activeSubagent: undefined,
+            subagentTask: undefined,
+            currentTask: undefined,
+            taskStatus: undefined,
+            isIntermediateContent: undefined
           }))
 
         return [

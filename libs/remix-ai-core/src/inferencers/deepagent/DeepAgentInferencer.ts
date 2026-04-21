@@ -14,7 +14,8 @@ import {
   SECURITY_ANALYSIS_PROMPT,
   CODE_EXPLANATION_PROMPT,
   SECURITY_AUDITOR_SUBAGENT_PROMPT,
-  CODE_REVIEWER_SUBAGENT_PROMPT
+  CODE_REVIEWER_SUBAGENT_PROMPT,
+  FRONTEND_SPECIALIST_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
@@ -22,11 +23,67 @@ import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
 
 // Import LangChain modules
 import { ChatAnthropic } from '@langchain/anthropic'
+import { ChatMistralAI } from '@langchain/mistralai'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
-import { GenerationParams } from '../../types/models'
+import { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { buildChatPrompt } from '../../prompts/promptBuilder'
 import { MemorySaver } from "@langchain/langgraph";
+
+// Model provider types
+type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
+
+interface ModelSelection {
+  provider: ModelProvider
+  modelId: string
+}
+
+// Initialize AsyncLocalStorage for browser environment
+const initializeAsyncLocalStorage = () => {
+  // Create a proper AsyncLocalStorage implementation for browser
+  const storeStack: any[] = []
+  const browserAsyncLocalStorage = {
+    run<T>(store: any, callback: () => T): T {
+      storeStack.push(store)
+      try {
+        const result = callback()
+        if (result && typeof (result as any).then === 'function') {
+          return (result as any).finally(() => { storeStack.pop() })
+        }
+        storeStack.pop()
+        return result
+      } catch (error) {
+        storeStack.pop()
+        throw error
+      }
+    },
+    getStore() {
+      return storeStack.length > 0 ? storeStack[storeStack.length - 1] : undefined
+    },
+    enterWith(store: any) {
+      storeStack.push(store)
+    },
+    exit<T>(callback: () => T): T {
+      const prev = storeStack.pop()
+      try {
+        return callback()
+      } finally {
+        if (prev !== undefined) storeStack.push(prev)
+      }
+    },
+    disable() {
+      storeStack.length = 0
+    }
+  }
+
+  // Initialize LangChain's global AsyncLocalStorage singleton
+  AsyncLocalStorageProviderSingleton.initializeGlobalInstance(browserAsyncLocalStorage)
+  console.log('[DeepAgentInferencer] Initialized AsyncLocalStorage for browser environment')
+}
+
+// Initialize immediately when module loads
+initializeAsyncLocalStorage()
 
 /**
  * DeepAgentInferencer integrates LangChain DeepAgent with Remix IDE
@@ -41,18 +98,26 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private tools: DynamicStructuredTool[] = []
   private currentAbortController: AbortController | null = null
   private fallbackInferencer: any = null
-  private model: ChatAnthropic | null = null
+  private model: BaseChatModel | null = null
+  private modelSelection: ModelSelection
 
   constructor(
     plugin: Plugin,
     toolRegistry: ToolRegistry,
     config?: Partial<IDeepAgentConfig>,
     fallbackInferencer?: any,
-    mcpInferencer?: any
+    mcpInferencer?: any,
+    modelSelection?: ModelSelection
   ) {
     this.plugin = plugin
     this.event = new EventEmitter()
     this.fallbackInferencer = fallbackInferencer
+
+    // Store model selection (default to mistral-medium-latest which is the system default)
+    this.modelSelection = modelSelection || {
+      provider: 'mistralai',
+      modelId: 'mistral-medium-latest'
+    }
 
     // Default configuration (API key handled by proxy)
     this.config = {
@@ -82,29 +147,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       const { createDeepAgent } = await import('deepagents')
 
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
+      console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
 
       // Always use proxy server - API key is handled server-side
-      // Use absolute URL for the proxy (webpack dev server proxies /api/langchain to localhost:4000)
       const proxyUrl = 'http://localhost:4000'
 
-      const modelConfig: any = {
-        apiKey: 'proxy-handled', // Proxy server adds the real API key
-        model: 'claude-sonnet-4-5-20250929',
-        temperature: 0.7,
-        maxTokens: 4096,
-        streaming: true,
-        clientOptions: {
-          baseURL: proxyUrl
-        }
-      }
+      // Create the appropriate model based on provider selection
+      this.model = this.createModelInstance(proxyUrl)
 
-      console.log('[DeepAgentInferencer] Using proxy server:', proxyUrl)
-
-      this.model = new ChatAnthropic(modelConfig)
-
-      // Don't create model instance here - let deepagents handle it internally
-      // This avoids dynamic loading issues in the browser
-      console.log('[DeepAgentInferencer] Model will be initialized by deepagents')
+      console.log(`[DeepAgentInferencer] Created ${this.modelSelection.provider} model: ${this.modelSelection.modelId}`)
 
       // Initialize memory backend if enabled
       if (this.config.memoryBackend === 'store') {
@@ -125,24 +176,33 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         checkpointer
       }
 
-      // Configure specialized subagents
-      // if (this.config.enableSubagents) {
-      //   agentConfig.subagents = {
-      //     'Security Auditor': {
-      //       systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
-      //       model: this.model,
-      //       tools: this.tools,
-      //       backend: this.filesystemBackend
-      //     },
-      //     'Code Reviewer': {
-      //       systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
-      //       model: this.model,
-      //       tools: this.tools,
-      //       backend: this.filesystemBackend
-      //     }
-      //   }
-      //   console.log('[DeepAgentInferencer] Configured 2 specialized subagents: Security Auditor, Code Reviewer')
-      // }
+      // Configure specialized subagents (array format expected by deepagents)
+      if (this.config.enableSubagents) {
+        agentConfig.subagents = [
+          {
+            name: 'Security Auditor',
+            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: this.tools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Code Reviewer',
+            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: this.tools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Frontend Specialist',
+            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: this.tools,
+            backend: this.filesystemBackend
+          }
+        ]
+        console.log('[DeepAgentInferencer] Configured 3 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist')
+      }
 
       // Add store if configured
       console.log('[DeepAgentInferencer] Memory backend:', this.memoryBackend ? 'Enabled' : 'Disabled')
@@ -158,10 +218,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.log('[DeepAgentInferencer] DeepAgent instance created successfully', this.agent)
 
       console.log('[DeepAgentInferencer] Initialized successfully')
-    } catch (error) {
+    } catch (error: any) {
       console.error('[DeepAgentInferencer] Initialization failed:', error)
       throw new DeepAgentError(
-        `Failed to initialize DeepAgent: ${error.message}`,
+        `Failed to initialize DeepAgent: ${error?.message || error}`,
         DeepAgentErrorType.INITIALIZATION_FAILED,
         error
       )
@@ -178,6 +238,42 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     } catch (error) {
       console.warn('[DeepAgentInferencer] Failed to initialize tools:', error)
       this.tools = []
+    }
+  }
+
+  /**
+   * Create the appropriate model instance based on provider selection
+   */
+  private createModelInstance(proxyUrl: string): BaseChatModel {
+    const { provider, modelId } = this.modelSelection
+
+    switch (provider) {
+    case 'mistralai': {
+      console.log(`[DeepAgentInferencer] Creating MistralAI model: ${modelId}`)
+      return new ChatMistralAI({
+        apiKey: 'proxy-handled',
+        model: modelId,
+        temperature: 0.7,
+        maxTokens: 4096,
+        streaming: true,
+        serverURL: `${proxyUrl}/mistral`
+      })
+    }
+
+    case 'anthropic':
+    default: {
+      console.log(`[DeepAgentInferencer] Creating Anthropic model: ${modelId}`)
+      return new ChatAnthropic({
+        apiKey: 'proxy-handled',
+        model: modelId,
+        temperature: 0.7,
+        maxTokens: 4096,
+        streaming: true,
+        clientOptions: {
+          baseURL: proxyUrl
+        }
+      })
+    }
     }
   }
 
@@ -269,19 +365,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         ]
       }
       console.log('[DeepAgentInferencer] Running answer with messages:')
-
-      // Return empty string immediately to signal streaming mode
-      // The actual content will be streamed via onStreamResult events
       const responsePromise = this.runAgent(messages, params)
 
-      // Handle the response asynchronously
       responsePromise.then(response => {
-        console.log('[DeepAgentInferencer] Answer response complete:', response)
-        // Emit completion event with final response for chat history
         this.event.emit('onStreamComplete', response)
         this.event.emit('onInferenceDone')
       }).catch(error => {
-        console.error('[DeepAgentInferencer] Answer error:', error)
+        if (error?.name === 'AbortError' || error?.message?.includes('cancelled')) {
+          console.log('[DeepAgentInferencer] Answer request was cancelled')
+        } else {
+          console.error('[DeepAgentInferencer] Answer error:', error)
+        }
         this.event.emit('onInferenceDone')
       })
 
@@ -372,6 +466,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private async runAgent(messages: any[], params: IParams): Promise<string> {
     // Create abort controller for cancellation
     this.currentAbortController = new AbortController()
+    let fullResponse = ''
 
     try {
       // Filter out system messages - they're already set during agent creation
@@ -383,10 +478,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           return new HumanMessage(msg.content)
         })
 
-      let fullResponse = ''
-      console.log('[DeepAgentInferencer] Running agent with messages (streaming enabled)', this.agent)
+      // Tracking state for subagents and intermediate/final answers
+      let isIntermediatePhase = true
+      const activeSubagents: Map<string, { name: string; startTime: number }> = new Map()
+      let previousRunId: string | null = null
 
-      // Use streamEvents() for token-level streaming as per LangChain DeepAgent docs
       // https://docs.langchain.com/oss/python/deepagents/streaming
       const eventStream = this.agent.streamEvents(
         {
@@ -396,23 +492,70 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           version: 'v2',
           configurable: {
             thread_id: `remix-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
-          }
+          },
+          subgraphs: true, // Enable subgraph/subagent visibility
+          signal: this.currentAbortController?.signal // Pass abort signal for cancellation
         }
       )
 
       // Process stream events
       let finalMessageFromChain = ''
       for await (const event of eventStream) {
+        if (this.currentAbortController?.signal.aborted) {
+          this.event.emit('onStreamComplete', fullResponse)
+          break
+        }
+
         const eventType = event.event
-        // console.log(`[DeepAgentInferencer] Received event: ${eventType}`, event)
+
+        if (eventType === 'on_chain_start') {
+          const runName = event.name || ''
+          const tags = event.tags || []
+
+          if (runName.includes('subagent') || tags.includes('subagent')) {
+            const subagentName = event.metadata?.subagent_name || runName
+            activeSubagents.set(event.run_id, { name: subagentName, startTime: Date.now() })
+            console.log(`[DeepAgentInferencer] Subagent started: ${subagentName} (run_id: ${event.run_id})`)
+
+            this.event.emit('onSubagentStart', {
+              id: event.run_id,
+              name: subagentName,
+              task: event.data?.input?.task || 'Processing...',
+              status: 'running'
+            })
+          }
+
+          if (runName.includes('plan') || tags.includes('planning')) {
+            console.log(`[DeepAgentInferencer] Planning phase started (run_id: ${event.run_id})`)
+            this.event.emit('onTaskStart', {
+              id: event.run_id,
+              name: event.name || 'Planning',
+              status: 'started'
+            })
+          }
+
+          if (runName === 'final_response' || tags.includes('final')) {
+            isIntermediatePhase = false
+          }
+        }
+
+        if (eventType === 'on_chain_end' && activeSubagents.has(event.run_id)) {
+          const subagent = activeSubagents.get(event.run_id)!
+          const duration = Date.now() - subagent.startTime
+
+          this.event.emit('onSubagentComplete', {
+            id: event.run_id,
+            name: subagent.name,
+            status: 'completed',
+            duration
+          })
+          activeSubagents.delete(event.run_id)
+        }
 
         // Handle different event types from the stream
         if (eventType === 'on_chat_model_stream') {
-          // Token-level streaming from the LLM - this is the actual text streaming
           const chunk = event.data?.chunk
           if (chunk?.content) {
-            // console.log(`[DeepAgentInferencer] Received token chunk:`, chunk.content)
-
             // Extract delta content - handle different response formats
             let deltaContent = ''
             if (typeof chunk.content === 'string') {
@@ -426,30 +569,42 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
               }
             }
 
-            // console.log(`[DeepAgentInferencer] Extracted delta:`, deltaContent)
             if (deltaContent) {
+              const currentRunId = event.run_id
+              if (previousRunId !== null && previousRunId !== currentRunId) {
+                deltaContent = '\n \n---\n' + deltaContent
+              }
+              previousRunId = currentRunId
+
               fullResponse += deltaContent
-              // Emit incremental delta for streaming display
-              this.event.emit('onStreamResult', deltaContent)
+              this.event.emit('onStreamResult', {
+                content: deltaContent,
+                isIntermediate: isIntermediatePhase,
+                source: event.metadata?.langgraph_node || 'agent'
+              })
             }
           }
         } else if (eventType === 'on_chain_end') {
-          // Store final response but don't overwrite accumulated chunks
           const output = event.data?.output
           if (output?.messages && output.messages.length > 0) {
             const lastMessage = output.messages[output.messages.length - 1]
             if (lastMessage.content && typeof lastMessage.content === 'string') {
               finalMessageFromChain = lastMessage.content
-              // console.log('[DeepAgentInferencer] Chain end - final message length:', finalMessageFromChain.length)
             }
           }
         } else if (eventType === 'on_tool_start') {
-          // Tool execution started
+          // Tool execution started - emit onToolCall event
           const toolName = event.name
-          console.log('onStreamResult', `\n[Using tool: ${toolName}]\n\n\n`)
+          const toolInput = event.data?.input || {}
+          console.log('[DeepAgentInferencer] Tool call started:', toolName, toolInput)
+          this.event.emit('onToolCall', { toolName, toolInput, status: 'start' })
         } else if (eventType === 'on_tool_end') {
           // Tool execution completed
           const toolName = event.name
+          const toolOutput = event.data?.output
+          console.log('[DeepAgentInferencer] Tool call ended:', toolName)
+          // let the tool callback for while
+          //this.event.emit('onToolCall', { toolName, toolOutput, status: 'end' })
         }
       }
 
@@ -462,17 +617,16 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
       console.log('[DeepAgentInferencer] Stream complete, full response length:', fullResponse.length)
       return fullResponse
-    } catch (error) {
-      console.error('[DeepAgentInferencer] Error during agent execution:', error)
-      if (error.name === 'AbortError') {
-        throw new DeepAgentError(
-          'Request cancelled by user',
-          DeepAgentErrorType.UNKNOWN
-        )
+    } catch (error: any) {
+      if (error?.name === 'AbortError' || this.currentAbortController?.signal.aborted) {
+        console.log('[DeepAgentInferencer] Request cancelled by user')
+        return fullResponse
       }
+      console.error('[DeepAgentInferencer] Error during agent execution:', error)
       throw error
     } finally {
       this.currentAbortController = null
+      this.event.emit('onToolCall', { toolName:'', toolInput:'', status: 'end' })
     }
   }
 
@@ -526,8 +680,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   cancelRequest(): void {
     if (this.currentAbortController) {
+      console.log('[DeepAgentInferencer] Cancelling request...')
       this.currentAbortController.abort()
       this.currentAbortController = null
+      this.event.emit('onInferenceDone')
     }
   }
 

@@ -61,6 +61,37 @@ export interface IDeepAgentStreamResponse {
 }
 
 /**
+ * Task streaming event for tracking task progress
+ */
+export interface ITaskStreamEvent {
+  id: string
+  name: string
+  description?: string
+  status: 'started' | 'progress' | 'completed' | 'failed'
+  progress?: number
+}
+
+/**
+ * Subagent streaming event for tracking subagent execution
+ */
+export interface ISubagentStreamEvent {
+  id: string
+  name: string
+  task?: string
+  status: 'started' | 'running' | 'completed' | 'failed'
+  duration?: number
+}
+
+/**
+ * Content streaming event with intermediate/final distinction
+ */
+export interface IContentStreamEvent {
+  content: string
+  isIntermediate: boolean
+  source?: string
+}
+
+/**
  * DeepAgent error types
  */
 export enum DeepAgentErrorType {

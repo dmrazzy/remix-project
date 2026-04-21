@@ -110,7 +110,7 @@ export const ChatHistoryComponent: React.FC<ChatHistoryComponentProps> = ({
                       </small>
                     )}
 
-                    <div className="aiMarkup lh-base text-wrap">
+                    <div className={`aiMarkup lh-base text-wrap ${msg.isIntermediateContent ? 'text-muted' : ''}`}>
                       {msg.role === 'assistant' ? (
                         RemixMarkdownViewer(theme, msg.content)
                       ) : (
@@ -149,6 +149,22 @@ export const ChatHistoryComponent: React.FC<ChatHistoryComponentProps> = ({
                         })
                         : 'Executing tools...'}
                     </span>
+                  </div>
+                )}
+
+                {/* Subagent Activity Indicator */}
+                {msg.role === 'assistant' && msg.activeSubagent && (
+                  <div className="subagent-indicator text-info small mb-2">
+                    <i className="fa fa-robot fa-spin me-2"></i>
+                    <span><strong>{msg.activeSubagent}</strong>: {msg.subagentTask}</span>
+                  </div>
+                )}
+
+                {/* Task Activity Indicator */}
+                {msg.role === 'assistant' && msg.currentTask && msg.taskStatus === 'running' && (
+                  <div className="task-indicator text-secondary small mb-2">
+                    <i className="fa fa-tasks fa-pulse me-2"></i>
+                    <span>{msg.currentTask}</span>
                   </div>
                 )}
 

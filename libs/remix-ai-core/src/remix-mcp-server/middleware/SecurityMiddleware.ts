@@ -283,7 +283,7 @@ export class SecurityMiddleware extends BaseMiddleware {
     }
 
     // Check file type restrictions
-    console.log(`[SecurityMiddleware] Validating file type for call: ${args.type}`);
+    console.log(`[SecurityMiddleware] Validating file type for call: ${args}`);
     if (args.type === 'directory') {
       console.log(`[SecurityMiddleware] Directory operations are allowed without file type checks.`);
       return { allowed: true, risk: 'low' };

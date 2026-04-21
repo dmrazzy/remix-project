@@ -84,6 +84,11 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.removeAllListeners('onInferenceDone')
     eventEmitter.removeAllListeners('onStreamResult')
     eventEmitter.removeAllListeners('onStreamComplete')
+    eventEmitter.removeAllListeners('onToolCall')
+    eventEmitter.removeAllListeners('onSubagentStart')
+    eventEmitter.removeAllListeners('onSubagentComplete')
+    eventEmitter.removeAllListeners('onTaskStart')
+    eventEmitter.removeAllListeners('onTaskComplete')
 
     // Set up fresh listeners
     eventEmitter.on('onInference', () => {
@@ -92,11 +97,26 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.on('onInferenceDone', () => {
       this.isInferencing = false
     })
-    eventEmitter.on('onStreamResult', (chunk: string) => {
-      this.emit('onStreamResult', chunk)
+    eventEmitter.on('onStreamResult', (data: string | { content: string; isIntermediate: boolean; source?: string }) => {
+      this.emit('onStreamResult', data)
     })
     eventEmitter.on('onStreamComplete', (finalText: string) => {
       this.emit('onStreamComplete', finalText)
+    })
+    eventEmitter.on('onToolCall', (data: { toolName: string; toolInput?: any; toolOutput?: any; status: 'start' | 'end' }) => {
+      this.emit('onToolCall', data)
+    })
+    eventEmitter.on('onSubagentStart', (data: { id: string; name: string; task: string; status: string }) => {
+      this.emit('onSubagentStart', data)
+    })
+    eventEmitter.on('onSubagentComplete', (data: { id: string; name: string; status: string; duration: number }) => {
+      this.emit('onSubagentComplete', data)
+    })
+    eventEmitter.on('onTaskStart', (data: { id: string; name: string; status: string }) => {
+      this.emit('onTaskStart', data)
+    })
+    eventEmitter.on('onTaskComplete', (data: { id: string; name: string; status: string }) => {
+      this.emit('onTaskComplete', data)
     })
 
     this.deepAgentEventListenersSetup = true
@@ -148,7 +168,13 @@ export class RemixAIPlugin extends Plugin {
       // Connect to enabled servers for status tracking
       const enabledServers = this.mcpServers.filter((s: IMCPServer) => s.enabled);
       if (enabledServers.length > 0) {
+        const waitPromise = this.waitForMCPServersReady();
         await this.mcpInferencer.connectAllServers();
+        console.log('[RemixAI Plugin] connectAllServers() completed, now waiting for all servers to fully connect...');
+
+        // Wait for all connection events to be received
+        await waitPromise;
+        console.log('[RemixAI Plugin] All MCP servers fully connected');
         this.emit('mcpServersLoaded');
       }
     }
@@ -158,14 +184,17 @@ export class RemixAIPlugin extends Plugin {
       await this.refreshMCPServersOnAuthChange(authState);
     });
 
-    console.log('this.mcpInferencer. tools', await this.mcpInferencer?.getAllTools())
+    const allTools = await this.mcpInferencer?.getAllTools();
+    console.log('[RemixAI Plugin] MCP tools available after wait:', allTools);
 
     // Initialize DeepAgent if enabled (API key handled by proxy server)
-    const deepAgentEnabled = localStorage.getItem('deepagent_enabled') === 'true'
+    const deepAgentEnabled = true // localStorage.getItem('deepagent_enabled') === 'true'
+    console.log('[RemixAI Plugin] DeepAgent enabled in localStorage:', deepAgentEnabled);
 
     if (deepAgentEnabled && this.remixMCPServer) {
       try {
-        console.log('[RemixAI Plugin] Initializing DeepAgent (using proxy for API key)...')
+        console.log('[RemixAI Plugin] Initializing DeepAgent with mcpInferencer:', !!this.mcpInferencer);
+        console.log('[RemixAI Plugin] Using model for DeepAgent:', this.selectedModel.provider, this.selectedModelId);
         this.deepAgentInferencer = new DeepAgentInferencer(
           this,
           this.remixMCPServer.tools,
@@ -175,7 +204,8 @@ export class RemixAIPlugin extends Plugin {
             enablePlanning: true
           },
           this.remoteInferencer,
-          this.mcpInferencer // Pass MCPInferencer to gather external MCP client tools
+          this.mcpInferencer, // Pass MCPInferencer to gather external MCP client tools
+          { provider: this.selectedModel.provider as 'anthropic' | 'mistralai', modelId: this.selectedModelId } // Pass selected model
         )
         await this.deepAgentInferencer.initialize()
         this.deepAgentEnabled = true
@@ -575,6 +605,41 @@ export class RemixAIPlugin extends Plugin {
       await this.mcpInferencer.connectAllServers();
     }
 
+    // Reinitialize DeepAgent if enabled and model changed
+    if (this.deepAgentEnabled && this.deepAgentInferencer && this.remixMCPServer && previousModelId !== modelId) {
+      console.log('[RemixAI Plugin] Model changed, reinitializing DeepAgent with new model:', model.provider, modelId);
+      try {
+        // Clean up old instance
+        const eventEmitter = this.deepAgentInferencer.getEventEmitter();
+        eventEmitter.removeAllListeners();
+        await this.deepAgentInferencer.close();
+
+        // Create new instance with updated model
+        this.deepAgentInferencer = new DeepAgentInferencer(
+          this,
+          this.remixMCPServer.tools,
+          {
+            memoryBackend: (localStorage.getItem('deepagent_memory_backend') as 'state' | 'store') || 'store',
+            enableSubagents: true,
+            enablePlanning: true
+          },
+          this.remoteInferencer,
+          this.mcpInferencer,
+          { provider: model.provider as 'anthropic' | 'mistralai', modelId: modelId }
+        );
+        await this.deepAgentInferencer.initialize();
+
+        // Reset and set up event listeners
+        this.deepAgentEventListenersSetup = false;
+        this.setupDeepAgentEventListeners();
+
+        console.log('[RemixAI Plugin] DeepAgent reinitialized with new model successfully');
+      } catch (error) {
+        console.error('[RemixAI Plugin] Failed to reinitialize DeepAgent on model change:', error);
+        // Keep DeepAgent enabled but log the error
+      }
+    }
+
     // Emit event for UI updates
     this.emit('modelChanged', modelId)
   }
@@ -768,7 +833,13 @@ export class RemixAIPlugin extends Plugin {
 
       console.log('[RemixAI Plugin] Enabling DeepAgent (API key handled by proxy)...')
 
+      // Ensure MCP servers are fully ready before creating DeepAgent
+      if (this.mcpInferencer) {
+        await this.waitForMCPServersReady();
+      }
+
       // Create or reinitialize DeepAgentInferencer
+      console.log('[RemixAI Plugin] Using model for DeepAgent:', this.selectedModel.provider, this.selectedModelId);
       this.deepAgentInferencer = new DeepAgentInferencer(
         this,
         this.remixMCPServer.tools,
@@ -778,7 +849,8 @@ export class RemixAIPlugin extends Plugin {
           enablePlanning: true
         },
         this.remoteInferencer,
-        this.mcpInferencer
+        this.mcpInferencer,
+        { provider: this.selectedModel.provider as 'anthropic' | 'mistralai', modelId: this.selectedModelId }
       )
 
       await this.deepAgentInferencer.initialize()
@@ -903,7 +975,9 @@ export class RemixAIPlugin extends Plugin {
 
           const enabledServers = this.mcpServers.filter((s: IMCPServer) => s.enabled);
           if (enabledServers.length > 0) {
+            const waitPromise = this.waitForMCPServersReady();
             await this.mcpInferencer.connectAllServers();
+            await waitPromise;
             this.emit('mcpServersLoaded');
             console.log('[RemixAI Plugin] MCP servers refreshed and connected');
           }
@@ -941,6 +1015,75 @@ export class RemixAIPlugin extends Plugin {
     }
   }
 
+  /**
+   * Waits for all enabled MCP servers to emit their connection events (connected or errored).
+   * This ensures all external MCP tools are available before DeepAgentInferencer is instantiated.
+   */
+  private waitForMCPServersReady(timeout: number = 30000): Promise<void> {
+    const mcpInferencer = this.mcpInferencer;
+    if (!mcpInferencer) return Promise.resolve();
+
+    const enabledServers = this.mcpServers.filter(s => s.enabled);
+    if (enabledServers.length === 0) return Promise.resolve();
+
+    // Track which servers we're waiting for (excluding Remix IDE Server which is internal)
+    const serversToWaitFor = enabledServers.filter(s => s.name !== 'Remix IDE Server');
+    if (serversToWaitFor.length === 0) return Promise.resolve();
+
+    console.log(`[RemixAI Plugin] Waiting for ${serversToWaitFor.length} external MCP servers to connect:`, serversToWaitFor.map(s => s.name));
+
+    return new Promise<void>((resolve) => {
+      const connectedServers = new Set<string>();
+      const erroredServers = new Set<string>();
+
+      const checkComplete = () => {
+        const totalResolved = connectedServers.size + erroredServers.size;
+        console.log(`[RemixAI Plugin] MCP servers progress: ${totalResolved}/${serversToWaitFor.length} (${connectedServers.size} connected, ${erroredServers.size} errored)`);
+
+        if (totalResolved >= serversToWaitFor.length) {
+          console.log(`[RemixAI Plugin] All ${serversToWaitFor.length} external MCP servers resolved`);
+          cleanup();
+          resolve();
+        }
+      };
+
+      const onConnected = (serverName: string) => {
+        if (serversToWaitFor.some(s => s.name === serverName)) {
+          connectedServers.add(serverName);
+          console.log(`[RemixAI Plugin] waitForMCPServersReady: "${serverName}" connected`);
+          checkComplete();
+        }
+      };
+
+      const onError = (serverName: string, _error: Error) => {
+        if (serversToWaitFor.some(s => s.name === serverName)) {
+          erroredServers.add(serverName);
+          console.log(`[RemixAI Plugin] waitForMCPServersReady: "${serverName}" errored`);
+          checkComplete();
+        }
+      };
+
+      const cleanup = () => {
+        mcpInferencer.event.off('mcpServerConnected', onConnected);
+        mcpInferencer.event.off('mcpServerError', onError);
+        clearTimeout(timeoutId);
+      };
+
+      const timeoutId = setTimeout(() => {
+        const missing = serversToWaitFor
+          .filter(s => !connectedServers.has(s.name) && !erroredServers.has(s.name))
+          .map(s => s.name);
+        console.warn(`[RemixAI Plugin] Timeout waiting for MCP servers. Missing: ${missing.join(', ')}`);
+        cleanup();
+        resolve();
+      }, timeout);
+
+      // Listen for connection events
+      mcpInferencer.event.on('mcpServerConnected', onConnected);
+      mcpInferencer.event.on('mcpServerError', onError);
+    });
+  }
+
   private async resetMCPServersToDefault(): Promise<void> {
     try {
       this.mcpServers = [...mcpDefaultServersConfig.defaultServers];
@@ -963,7 +1106,9 @@ export class RemixAIPlugin extends Plugin {
 
         const enabledServers = this.mcpServers.filter((s: IMCPServer) => s.enabled);
         if (enabledServers.length > 0) {
+          const waitPromise = this.waitForMCPServersReady();
           await this.mcpInferencer.connectAllServers();
+          await waitPromise;
           this.emit('mcpServersLoaded');
         }
 
@@ -980,6 +1125,7 @@ export class RemixAIPlugin extends Plugin {
               await this.deepAgentInferencer.close()
             }
 
+            console.log('[RemixAI Plugin] Using model for DeepAgent:', this.selectedModel.provider, this.selectedModelId);
             this.deepAgentInferencer = new DeepAgentInferencer(
               this,
               this.remixMCPServer.tools,
@@ -989,7 +1135,8 @@ export class RemixAIPlugin extends Plugin {
                 enablePlanning: true
               },
               this.remoteInferencer,
-              this.mcpInferencer // Pass MCPInferencer to gather external MCP client tools
+              this.mcpInferencer, // Pass MCPInferencer to gather external MCP client tools
+              { provider: this.selectedModel.provider as 'anthropic' | 'mistralai', modelId: this.selectedModelId }
             )
             await this.deepAgentInferencer.initialize()
             this.deepAgentEnabled = true
