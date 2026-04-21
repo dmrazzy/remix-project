@@ -477,7 +477,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           if (msg.role === 'assistant') return new AIMessage(msg.content)
           return new HumanMessage(msg.content)
         })
-      console.log('[DeepAgentInferencer] Running agent with messages (streaming enabled)', this.agent)
 
       // Tracking state for subagents and intermediate/final answers
       let isIntermediatePhase = true
@@ -503,7 +502,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       let finalMessageFromChain = ''
       for await (const event of eventStream) {
         if (this.currentAbortController?.signal.aborted) {
-          console.log('[DeepAgentInferencer] Request cancelled, breaking out of stream loop')
           this.event.emit('onStreamComplete', fullResponse)
           break
         }
@@ -511,14 +509,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         const eventType = event.event
 
         if (eventType === 'on_chain_start') {
-          console.log('[DeepAgentInferencer] Chain started:', event)
           const runName = event.name || ''
           const tags = event.tags || []
 
           if (runName.includes('subagent') || tags.includes('subagent')) {
-            console.log(`[DeepAgentInferencer] Detected subagent start: ${runName} with tags: ${tags.join(', ')}`)
             const subagentName = event.metadata?.subagent_name || runName
             activeSubagents.set(event.run_id, { name: subagentName, startTime: Date.now() })
+            console.log(`[DeepAgentInferencer] Subagent started: ${subagentName} (run_id: ${event.run_id})`)
 
             this.event.emit('onSubagentStart', {
               id: event.run_id,
@@ -529,7 +526,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           }
 
           if (runName.includes('plan') || tags.includes('planning')) {
-            console.log(`[DeepAgentInferencer] Detected planning event: ${runName} with tags: ${tags.join(', ')}`)
+            console.log(`[DeepAgentInferencer] Planning phase started (run_id: ${event.run_id})`)
             this.event.emit('onTaskStart', {
               id: event.run_id,
               name: event.name || 'Planning',
@@ -538,13 +535,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           }
 
           if (runName === 'final_response' || tags.includes('final')) {
-            console.log(`[DeepAgentInferencer] Detected transition to final response: ${runName} with tags: ${tags.join(', ')}`)
             isIntermediatePhase = false
           }
         }
 
         if (eventType === 'on_chain_end' && activeSubagents.has(event.run_id)) {
-          console.log(`[DeepAgentInferencer] Detected subagent completion: ${event.name} with run_id: ${event.run_id}`)
           const subagent = activeSubagents.get(event.run_id)!
           const duration = Date.now() - subagent.startTime
 
@@ -559,7 +554,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
         // Handle different event types from the stream
         if (eventType === 'on_chat_model_stream') {
-          console.log(`[DeepAgentInferencer] Received on_chat_model_stream event with data:`, event)
           const chunk = event.data?.chunk
           if (chunk?.content) {
             // Extract delta content - handle different response formats
@@ -588,13 +582,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
                 isIntermediate: isIntermediatePhase,
                 source: event.metadata?.langgraph_node || 'agent'
               })
-              console.log('deltaContent:', deltaContent)
-              console.log('run_id:', event.run_id)
             }
           }
         } else if (eventType === 'on_chain_end') {
-          console.log(`[DeepAgentInferencer] Chain ended: ${event.name}, checking for final message in chain output`)
-          // Store final response but don't overwrite accumulated chunks
           const output = event.data?.output
           if (output?.messages && output.messages.length > 0) {
             const lastMessage = output.messages[output.messages.length - 1]
