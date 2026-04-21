@@ -660,7 +660,7 @@ window.addEventListener('unhandledrejection', function(e) {
               disabled={isAiUpdating}
               data-id="update-with-ai-btn"
             >
-              <i className="fas fa-robot me-1"></i> 
+              <i className="fas fa-robot me-1"></i>
               {showChatBox ? 'Hide AI Chat' : 'Update with AI'}
             </Button>
             <Button
@@ -688,7 +688,7 @@ window.addEventListener('unhandledrejection', function(e) {
       <div className="flex-grow-1 position-relative" style={{ overflow: 'hidden' }}>
         <div className="container-fluid pt-3 h-100">
           <Row className="m-0 h-100">
-            <Col xs={12} lg={8} className="pe-lg-3 d-flex flex-column qd-main-col">              
+            <Col xs={12} lg={8} className="pe-lg-3 d-flex flex-column qd-main-col">
               <Row className="flex-grow-1 mb-3">
                 <Col xs={12} className="d-flex flex-column h-100">
                   {showChatBox && (
