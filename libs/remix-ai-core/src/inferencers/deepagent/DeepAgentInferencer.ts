@@ -603,7 +603,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           const toolName = event.name
           const toolOutput = event.data?.output
           console.log('[DeepAgentInferencer] Tool call ended:', toolName)
-          this.event.emit('onToolCall', { toolName, toolOutput, status: 'end' })
+          // let the tool callback for while
+          //this.event.emit('onToolCall', { toolName, toolOutput, status: 'end' })
         }
       }
 
@@ -625,6 +626,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       throw error
     } finally {
       this.currentAbortController = null
+      this.event.emit('onToolCall', { toolName:'', toolInput:'', status: 'end' })
     }
   }
 
