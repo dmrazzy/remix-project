@@ -74,6 +74,7 @@
   "home.gistTooltip": "Open Gist repo",
   "home.newFileTooltip": "Add a new file to a Workspace",
   "home.createNewWorkspace": "Create a new Workspace",
+  "home.loadSkills": "Choose AI Skills",
   "home.startLearning": "Start Learning",
   "home.exploreAllPlugins": "Explore all plugins",
   "home.maintainedByRemix": "Maintained by Remix",

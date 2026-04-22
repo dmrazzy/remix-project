@@ -1,0 +1,180 @@
+.skills-explorer-modal-background {
+  position: fixed;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.skills-explorer-modal-container {
+  border-radius: 10px;
+  display: flex;
+  box-shadow: 0 0 5px 5px rgba(0, 0, 0, 0.1);
+  flex-direction: column;
+  width: 70%;
+  max-width: 1000px;
+  min-width: 600px;
+  max-height: 90vh;
+}
+
+.skills-explorer-modal-close-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.skills-explorer-modal-close-button {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+}
+
+.skills-explorer-modal-close-button:hover,
+.skills-explorer-modal-close-button:focus,
+.skills-explorer-modal-close-button:active,
+.skills-explorer-modal-close-button:disabled,
+.skills-explorer-modal-close-button:focus-visible {
+  background-color: transparent;
+}
+
+.skills-explorer-modal-search-input {
+  background-image: url('search-icon.svg');
+  background-position: 10px 8px;
+  background-repeat: no-repeat;
+  color: var(--bs-light);
+}
+
+.skills-explorer-container {
+  padding: 1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.category-title {
+  color: #667;
+  padding-bottom: 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+
+.category-description {
+  color: #667;
+  font-size: 0.9rem;
+}
+
+.skill-card {
+  width: calc(50% - 12px);
+  min-width: 280px;
+  max-width: 400px;
+  height: auto;
+  min-height: 120px;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.skill-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  border-color: #667 !important;
+}
+
+.card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.card-description {
+  font-size: 0.8rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.card-body {
+  flex: 1;
+}
+
+/* ========== Responsive Media Queries ========== */
+
+/* Responsive modal sizing */
+@media (max-width: 768px) {
+  .skills-explorer-modal-container {
+    min-width: 600px;
+    width: 95%;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .skills-explorer-modal-container {
+    width: 80%;
+    max-width: 800px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .skills-explorer-modal-container {
+    width: 80%;
+    max-width: 1000px;
+  }
+}
+
+/* Skill cards: 1→2→3 column progression */
+@media (max-width: 768px) {
+  .skill-card {
+    width: 100%;
+    min-width: 250px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .skill-card {
+    width: calc(50% - 12px);
+    min-width: 280px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .skill-card {
+    width: calc(33.333% - 16px);
+    min-width: 300px;
+    max-width: 400px;
+  }
+}
+
+/* Skills container responsive height */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .skills-explorer-container {
+    max-height: 500px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .skills-explorer-container {
+    max-height: 550px;
+  }
+}
+
+/* Step-specific sizing */
+.confirm-skill-step,
+.downloading-skill-step {
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skills-explorer-modal-container:has(.confirm-skill-step),
+.skills-explorer-modal-container:has(.downloading-skill-step) {
+  height: 500px;
+  max-height: 500px;
+}
