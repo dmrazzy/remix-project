@@ -89,6 +89,12 @@ export class BetaCornerWidgetPlugin extends Plugin {
   /* ─── Lifecycle ─── */
 
   async onActivation(): Promise<void> {
+    // Disable the plugin behavior in E2E runs to avoid invite-modal flakiness.
+    if (window.__IS_E2E_TEST__) {
+      this.renderComponent()
+      return
+    }
+
     // Don't bother listening if already permanently dismissed or already beta
     if (this.state.dismissed || await this.hasBetaAccess()) {
       this.renderComponent()
@@ -162,6 +168,8 @@ export class BetaCornerWidgetPlugin extends Plugin {
   }
 
   private async showWidget(): Promise<void> {
+    if (window.__IS_E2E_TEST__) return
+
     // Never show widget or invite modal when beta access is already present.
     if (await this.hasBetaAccess()) {
       this.autoDismiss()
