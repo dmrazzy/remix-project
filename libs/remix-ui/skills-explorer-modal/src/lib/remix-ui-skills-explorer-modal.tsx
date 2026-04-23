@@ -53,11 +53,11 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
         console.warn(`[SkillsExplorer] Skipping invalid skill object:`, skill)
         continue
       }
-      
+      const description = skill.description?.startsWith('>') ? skill.description.slice(1) : skill.description || ''
       skills.push({
         id: skill.id,
         name: skill.name,
-        description: skill.description || ''
+        description: description
       })
     }
 
