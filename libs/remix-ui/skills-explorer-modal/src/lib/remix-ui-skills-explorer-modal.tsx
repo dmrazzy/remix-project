@@ -104,7 +104,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
         setLoading(true)
         setError(null)
         try {
-          const skillsUrl = 'http://localhost:9005/skills' // endpointUrls.mcpCorsProxy + '/ethskills/skills'
+          const skillsUrl = endpointUrls.mcpCorsProxy + '/ethskills/skills'
           const skillsList = await fetchSkillsList(skillsUrl)
           setSkills(skillsList)
         } catch (err) {
@@ -138,7 +138,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
     
     try {
       // Fetch skill data from remote endpoint
-      const skillUrl = 'http://localhost:9005/skills/' + selectedSkill.id
+      const skillUrl = endpointUrls.mcpCorsProxy + `/ethskills/skills/${selectedSkill.id}`
       const skillData = await fetchSkillData(skillUrl)
 
       // Create skill directory
