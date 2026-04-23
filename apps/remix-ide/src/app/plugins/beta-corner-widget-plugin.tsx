@@ -95,12 +95,6 @@ export class BetaCornerWidgetPlugin extends Plugin {
       return
     }
 
-    // If app config provides an auto_invite_token, route the user directly to
-    // the invitation flow instead of showing the corner widget.
-
-
-
-
     // Listen for dev-activity events via the plugin engine (proper namespaced listeners)
     this.on('fileManager', 'fileSaved', () => this.addScore(1))
     this.on('solidity', 'compilationFinished', () => this.addScore(3))
