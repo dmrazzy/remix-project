@@ -909,15 +909,32 @@ export class AuthPlugin extends Plugin {
 
     // Update API clients with current token
     if (token) {
-      this.apiClient.setToken(token)
-      // Update other API services too
-      this.creditsApi.setToken(token)
-      this.permissionsApi.setToken(token)
-      this.billingApi.setToken(token)
-      this.inviteApi.setToken(token)
+      this.applyAuthTokenToApiClients(token)
+    } else {
+      // Keep in-memory clients in sync with storage so stale Bearer headers
+      // are never sent after logout or manual token removal.
+      this.clearAuthTokenFromApiClients()
     }
 
     return token
+  }
+
+  private applyAuthTokenToApiClients(token: string): void {
+    this.apiClient.setToken(token)
+    this.creditsApi.setToken(token)
+    this.permissionsApi.setToken(token)
+    this.billingApi.setToken(token)
+    this.inviteApi.setToken(token)
+  }
+
+  private clearAuthTokenFromApiClients(): void {
+    this.apiClient.setToken(null)
+    // Api service wrappers expose setToken(string). Empty string clears
+    // Authorization because ApiClient only sends Bearer when token is truthy.
+    this.creditsApi.setToken('')
+    this.permissionsApi.setToken('')
+    this.billingApi.setToken('')
+    this.inviteApi.setToken('')
   }
 
   /**
@@ -1229,6 +1246,7 @@ export class AuthPlugin extends Plugin {
     localStorage.removeItem('remix_access_token')
     localStorage.removeItem('remix_refresh_token')
     localStorage.removeItem('remix_user')
+    this.clearAuthTokenFromApiClients()
     this.clearRefreshTimer()
   }
 

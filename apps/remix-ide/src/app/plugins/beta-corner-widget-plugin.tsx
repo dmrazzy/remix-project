@@ -90,7 +90,7 @@ export class BetaCornerWidgetPlugin extends Plugin {
 
   async onActivation(): Promise<void> {
     // Don't bother listening if already permanently dismissed or already beta
-    if (this.state.dismissed || hasExistingBetaToken()) {
+    if (this.state.dismissed || await this.hasBetaAccess()) {
       this.renderComponent()
       return
     }
@@ -111,16 +111,16 @@ export class BetaCornerWidgetPlugin extends Plugin {
     this.on('membershipRequest', 'requestApproved', () => this.autoDismiss())
 
     // Hide when a beta invite is redeemed through the invitation system
-    this.on('invitationManager' as any, 'inviteRedeemed', (data: any) => {
+    this.on('invitationManager' as any, 'inviteRedeemed', async () => {
       // Any successful invite redemption could grant beta — re-check token
-      if (hasExistingBetaToken()) {
+      if (await this.hasBetaAccess()) {
         this.autoDismiss()
       }
     })
 
     // Hide when auth state changes and the user now has beta access
-    this.on('auth' as any, 'authStateChanged', () => {
-      if (hasExistingBetaToken()) {
+    this.on('auth' as any, 'authStateChanged', async () => {
+      if (await this.hasBetaAccess()) {
         this.autoDismiss()
       }
     })
@@ -168,6 +168,12 @@ export class BetaCornerWidgetPlugin extends Plugin {
   }
 
   private async showWidget(): Promise<void> {
+    // Never show widget or invite modal when beta access is already present.
+    if (await this.hasBetaAccess()) {
+      this.autoDismiss()
+      return
+    }
+
     const autoInviteToken = await this.call('auth' as any, 'getAppConfigValue', 'auto_invite_token', '')
     console.log('Retrieved auto_invite_token from appConfig:', autoInviteToken)
     if (autoInviteToken && typeof autoInviteToken === 'string' && autoInviteToken.trim() !== '') {
@@ -189,6 +195,21 @@ export class BetaCornerWidgetPlugin extends Plugin {
     this.shown = true
     this.state = { ...this.state, visible: true }
     this.renderComponent()
+  }
+
+  private async hasBetaAccess(): Promise<boolean> {
+    if (hasExistingBetaToken()) return true
+
+    try {
+      const isAuthenticated = await this.call('auth' as any, 'isAuthenticated')
+      if (!isAuthenticated) return false
+
+      const permissions = await this.call('auth' as any, 'getAllPermissions')
+      const groups = permissions?.feature_groups || []
+      return groups.some((g: any) => g?.name === 'beta')
+    } catch {
+      return false
+    }
   }
 
   /** Auto-hide after the user submits a request or gets approved */
