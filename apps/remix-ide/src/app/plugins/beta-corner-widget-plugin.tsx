@@ -11,7 +11,7 @@ declare global {
 
 /* ─── Constants ─── */
 
-const DEBUG = true
+const DEBUG = false
 const log = (...args: any[]) => { if (DEBUG) console.log('[BetaCornerWidget]', ...args) }
 
 const DISMISSED_KEY = 'remix_beta_corner_dismissed'
