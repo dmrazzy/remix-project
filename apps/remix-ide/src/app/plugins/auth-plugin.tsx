@@ -15,7 +15,7 @@ const profile = {
 
 export class AuthPlugin extends Plugin {
   /** Set to true to enable verbose console.log output for debugging */
-  private static DEBUG = false
+  private static DEBUG = true
 
   private apiClient: ApiClient
   private ssoApi: SSOApiService
@@ -453,6 +453,7 @@ export class AuthPlugin extends Plugin {
   async getAppConfig(): Promise<AppConfig> {
     try {
       if (this.cachedAppConfig) {
+        console.log('[AuthPlugin] Returning cached app config', this.cachedAppConfig)
         return this.cachedAppConfig
       }
 
@@ -502,8 +503,14 @@ export class AuthPlugin extends Plugin {
    */
   async getAppConfigValue<T extends string | number | boolean>(key: string, defaultValue: T): Promise<T> {
     const config = await this.getAppConfig()
-    const val = config[key]
-    return (val !== undefined ? val : defaultValue) as T
+    let val: any
+    if (Array.isArray(config)) {
+      const entry = (config as any[]).find((c) => c && c.key === key)
+      val = entry?.value
+    } else if (config && typeof config === 'object') {
+      val = (config as any)[key]
+    }
+    return (val !== undefined && val !== null ? val : defaultValue) as T
   }
 
   async login(provider: AuthProviderType): Promise<void> {
