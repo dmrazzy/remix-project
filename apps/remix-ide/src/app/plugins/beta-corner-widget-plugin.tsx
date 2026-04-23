@@ -26,7 +26,7 @@ const TOKEN_STORAGE_KEY = 'remix_anonymous_request_tokens'
  * The widget surfaces once the score reaches ACTIVITY_THRESHOLD **and** at least
  * MIN_SESSION_MS have elapsed (so it never flash-appears on first load).
  */
-const ACTIVITY_THRESHOLD = 6
+const ACTIVITY_THRESHOLD = 10
 const MIN_SESSION_MS = 5_000 // 5 seconds minimum
 
 /* ─── Plugin profile ─── */
