@@ -8,6 +8,7 @@ import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
 import { RemixFilesystemBackend } from './RemixFilesystemBackend'
 import { createRemixTools } from './RemixToolAdapter'
+import { ToolSelector } from './ToolSelector'
 import {
   REMIX_DEEPAGENT_SYSTEM_PROMPT,
   SOLIDITY_CODE_GENERATION_PROMPT,
@@ -96,6 +97,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private filesystemBackend: RemixFilesystemBackend
   private memoryBackend: DeepAgentMemoryBackend | null = null
   private tools: DynamicStructuredTool[] = []
+  private toolSelector: ToolSelector | null = null
   private currentAbortController: AbortController | null = null
   private fallbackInferencer: any = null
   private model: BaseChatModel | null = null
@@ -135,6 +137,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     // Initialize tools (with external MCP clients if available)
     this.initializeTools(toolRegistry, mcpInferencer)
+    
+    this.toolSelector = new ToolSelector()
   }
 
   /**
@@ -165,11 +169,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
       const checkpointer = new MemorySaver();
 
+      // Build tool index for selection
+      if (this.toolSelector && this.tools.length > 0) {
+        await this.toolSelector.buildToolIndex(this.tools)
+        console.log(`[DeepAgentInferencer] Built tool index with ${this.toolSelector.getStats().totalTools} tools`)
+      }
+
       // Create DeepAgent configuration
       console.log('[DeepAgentInferencer] Setting up agent configuration...')
       const agentConfig: any = {
         backend: this.filesystemBackend,
-        tools: this.tools,
+        tools: this.tools, // Will be replaced with selected tools per query
         model: this.model,
         systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
         skills: ["skills/"],
@@ -469,6 +479,25 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     let fullResponse = ''
 
     try {
+      // Get user prompt for tool selection - use the latest user message
+      const userMessages = messages.filter(msg => msg.role === 'user')
+      const userPrompt = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : ''
+      
+      // Select relevant tools for this query
+      let selectedTools = this.tools
+      if (this.toolSelector && this.toolSelector.isReady()) {
+        selectedTools = await this.toolSelector.getRelevantTools(userPrompt, 5, true)
+        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools for prompt: "${userPrompt.slice(0, 50)}..."`)
+      } else {
+        console.log(`[DeepAgentInferencer] Tool selector not ready, using all ${this.tools.length} tools`)
+      }
+      
+      // Recreate agent with selected tools if needed
+      if (selectedTools.length !== this.tools.length) {
+        console.log('[DeepAgentInferencer] Recreating agent with selected tools...')
+        await this.recreateAgentWithTools(selectedTools)
+      }
+
       // Filter out system messages - they're already set during agent creation
       const langchainMessages = messages
         .filter(msg => msg.role !== 'system')
@@ -601,7 +630,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         } else if (eventType === 'on_tool_end') {
           // Tool execution completed
           const toolName = event.name
-          const toolOutput = event.data?.output
           console.log('[DeepAgentInferencer] Tool call ended:', toolName)
           // let the tool callback for while
           //this.event.emit('onToolCall', { toolName, toolOutput, status: 'end' })
@@ -627,6 +655,67 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     } finally {
       this.currentAbortController = null
       this.event.emit('onToolCall', { toolName:'', toolInput:'', status: 'end' })
+    }
+  }
+
+  /**
+   * Recreate agent with selected tools
+   */
+  private async recreateAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
+    try {
+      const { createDeepAgent } = await import('deepagents')
+      
+      const checkpointer = new MemorySaver()
+      
+      // Create agent configuration with selected tools
+      const agentConfig: any = {
+        backend: this.filesystemBackend,
+        tools: selectedTools,
+        model: this.model,
+        systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
+        skills: ["skills/"],
+        checkpointer
+      }
+
+      // Configure specialized subagents with selected tools
+      if (this.config.enableSubagents) {
+        agentConfig.subagents = [
+          {
+            name: 'Security Auditor',
+            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: selectedTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Code Reviewer',
+            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: selectedTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Frontend Specialist',
+            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: selectedTools,
+            backend: this.filesystemBackend
+          }
+        ]
+      }
+
+      // Add memory store if configured
+      if (this.memoryBackend) {
+        agentConfig.store = this.memoryBackend
+      }
+
+      // Recreate the agent
+      this.agent = createDeepAgent(agentConfig)
+      
+      console.log(`[DeepAgentInferencer] Recreated agent with ${selectedTools.length} selected tools`)
+    } catch (error) {
+      console.error('[DeepAgentInferencer] Failed to recreate agent with selected tools:', error)
+      // Continue with existing agent if recreation fails
     }
   }
 
@@ -696,6 +785,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
     this.agent = null
     this.model = null
+    this.toolSelector = null
   }
 
   /**
@@ -720,5 +810,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       return await this.memoryBackend.getStats()
     }
     return null
+  }
+
+  /**
+   * Get tool selector statistics
+   */
+  getToolSelectorStats(): any {
+    if (this.toolSelector) {
+      return this.toolSelector.getStats()
+    }
+    return { totalTools: 0, initialized: false, categories: {} }
   }
 }
