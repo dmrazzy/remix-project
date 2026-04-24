@@ -5,6 +5,7 @@
 
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { Document } from '@langchain/core/documents'
+import { z } from 'zod'
 
 // Fallback type definitions for optional embeddings
 interface EmbeddingsInterface {
@@ -218,6 +219,56 @@ export class ToolSelector {
   }
 
   /**
+   * Generate system prompt addition with information about non-selected tools
+   */
+  generateToolInventoryPrompt(selectedTools: DynamicStructuredTool[]): string {
+    const selectedToolNames = new Set(selectedTools.map(t => t.name))
+    const nonSelectedTools = this.toolDocuments
+      .filter(td => !selectedToolNames.has(td.tool.name))
+      .map(td => td.tool)
+
+    if (nonSelectedTools.length === 0) {
+      return ""
+    }
+
+    const toolCategories: Record<string, Array<{name: string, description: string}>> = {}
+    
+    // Group non-selected tools by category
+    for (const tool of nonSelectedTools) {
+      const category = this.categorizeToolFromName(tool.name)
+      if (!toolCategories[category]) {
+        toolCategories[category] = []
+      }
+      toolCategories[category].push({
+        name: tool.name,
+        description: tool.description
+      })
+    }
+
+    let prompt = "\n\n## ADDITIONAL AVAILABLE TOOLS\n"
+    prompt += "These tools are available but not currently loaded. You can use them in two ways:\n"
+    prompt += "1. Use 'get_tool_schema' to understand their schema\n"
+    prompt += "2. Use 'call_tool' to execute them directly with proper arguments\n\n"
+
+    for (const [category, tools] of Object.entries(toolCategories)) {
+      if (tools.length > 0) {
+        prompt += `### ${category.charAt(0).toUpperCase() + category.slice(1)} Tools:\n`
+        for (const tool of tools) {
+          prompt += `- **${tool.name}**: ${tool.description}\n`
+        }
+        prompt += "\n"
+      }
+    }
+
+    prompt += "Examples:\n"
+    prompt += "- To understand a tool: get_tool_schema({\"toolName\": \"tool_name_here\"})\n"
+    prompt += "- To call a tool directly: call_tool({\"toolName\": \"tool_name_here\", \"arguments\": {\"param1\": \"value1\"}})\n"
+    
+    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools`)
+    return prompt
+  }
+
+  /**
    * Analyze conversation flow and extract intent patterns
    */
   private analyzeConversationFlow(messages: any[]): ConversationAnalysis {
@@ -408,6 +459,78 @@ export class ToolSelector {
   }
 
   /**
+   * Create meta-tool for getting tool schemas
+   */
+  private createGetToolSchemaTool(): DynamicStructuredTool {
+    const DynamicStructuredTool = require('@langchain/core/tools').DynamicStructuredTool
+    
+    return new DynamicStructuredTool({
+      name: 'get_tool_schema',
+      description: 'Get the schema and description of any available tool by name. Use this to understand how to call tools that are not currently loaded.',
+      schema: z.object({
+        toolName: z.string().describe('Name of the tool to get schema for')
+      }),
+      func: async (input: { toolName: string }) => {
+        const tool = this.toolDocuments.find((td: ToolDocument) => td.tool.name === input.toolName)
+        if (!tool) {
+          const availableTools = this.toolDocuments.map(td => td.tool.name).join(', ')
+          return `Tool '${input.toolName}' not found. Available tools: ${availableTools}`
+        }
+        
+        return JSON.stringify({
+          name: tool.tool.name,
+          description: tool.tool.description,
+          schema: tool.tool.schema,
+          category: tool.document.metadata.category
+        }, null, 2)
+      }
+    })
+  }
+
+  /**
+   * Create meta-tool for calling any available tool
+   */
+  private createCallToolMetaTool(): DynamicStructuredTool {
+    const DynamicStructuredTool = require('@langchain/core/tools').DynamicStructuredTool
+    
+    return new DynamicStructuredTool({
+      name: 'call_tool',
+      description: 'Call any available tool by name with the provided arguments. Use get_tool_schema first to understand the required arguments.',
+      schema: z.object({
+        toolName: z.string().describe('Name of the tool to call'),
+        arguments: z.record(z.string(), z.any()).describe('Arguments to pass to the tool as a JSON object')
+      }),
+      func: async (input: { toolName: string; arguments: Record<string, any> }) => {
+        const toolDoc = this.toolDocuments.find((td: ToolDocument) => td.tool.name === input.toolName)
+        if (!toolDoc) {
+          const availableTools = this.toolDocuments.map(td => td.tool.name).join(', ')
+          return `Error: Tool '${input.toolName}' not found. Available tools: ${availableTools}`
+        }
+        
+        try {
+          // Call the actual tool with provided arguments
+          // Note: Validation is handled by the tool itself
+          let validatedArgs = input.arguments
+          
+          // Call the actual tool
+          console.log(`[ToolSelector] Calling tool '${input.toolName}' with args:`, validatedArgs)
+          const result = await toolDoc.tool.func(validatedArgs)
+          
+          return `Tool '${input.toolName}' executed successfully. Result: ${result}`
+        } catch (error: any) {
+          console.error(`[ToolSelector] Error calling tool '${input.toolName}':`, error)
+          
+          if (error.name === 'ZodError') {
+            return `Error: Invalid arguments for tool '${input.toolName}'. ${error.message}. Use get_tool_schema to see the correct argument format.`
+          }
+          
+          return `Error calling tool '${input.toolName}': ${error.message || error}`
+        }
+      }
+    })
+  }
+
+  /**
    * Get essential tools that should always be available
    */
   private getEssentialTools(): DynamicStructuredTool[] {
@@ -417,9 +540,15 @@ export class ToolSelector {
       'read_file'
     ]
 
-    return this.toolDocuments
+    const essentialTools = this.toolDocuments
       .filter(td => essentialToolNames.includes(td.tool.name))
       .map(td => td.tool)
+    
+    // Add the meta-tools
+    essentialTools.push(this.createGetToolSchemaTool())
+    essentialTools.push(this.createCallToolMetaTool())
+    
+    return essentialTools
   }
 
   /**

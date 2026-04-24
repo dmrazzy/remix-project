@@ -495,7 +495,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         
         const userMessages = messages.filter(msg => msg.role === 'user')
         const latestPrompt = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : ''
-        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools (latest: "${latestPrompt.slice(0, 50)}...")`)
+        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools (5 context + meta-tools) (latest: "${latestPrompt.slice(0, 50)}...")`)
       } else {
         console.log(`[DeepAgentInferencer] Tool selector not ready, using all ${this.tools.length} tools`)
       }
@@ -685,26 +685,29 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         checkpointer
       }
 
-      // Configure specialized subagents with selected tools
+      // Configure specialized subagents with selected tools and enhanced prompts
       if (this.config.enableSubagents) {
+        const toolInventoryPrompt = this.toolSelector ? 
+          this.toolSelector.generateToolInventoryPrompt(selectedTools) : ""
+        
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
-            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
+            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
             tools: selectedTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Code Reviewer',
-            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
+            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
             tools: selectedTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Frontend Specialist',
-            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
+            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
             tools: selectedTools,
             backend: this.filesystemBackend
@@ -716,6 +719,14 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       if (this.memoryBackend) {
         agentConfig.store = this.memoryBackend
       }
+
+      // Generate enhanced system prompt with tool inventory
+      let enhancedSystemPrompt = REMIX_DEEPAGENT_SYSTEM_PROMPT
+      if (this.toolSelector) {
+        const toolInventoryPrompt = this.toolSelector.generateToolInventoryPrompt(selectedTools)
+        enhancedSystemPrompt += toolInventoryPrompt
+      }
+      agentConfig.systemPrompt = enhancedSystemPrompt
 
       // Recreate the agent
       this.agent = createDeepAgent(agentConfig)
