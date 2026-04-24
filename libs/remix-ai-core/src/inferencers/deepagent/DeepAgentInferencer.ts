@@ -479,15 +479,23 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     let fullResponse = ''
 
     try {
-      // Get user prompt for tool selection - use the latest user message
-      const userMessages = messages.filter(msg => msg.role === 'user')
-      const userPrompt = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : ''
-      
-      // Select relevant tools for this query
+      // Select relevant tools for this query using conversation context
       let selectedTools = this.tools
       if (this.toolSelector && this.toolSelector.isReady()) {
-        selectedTools = await this.toolSelector.getRelevantTools(userPrompt, 5, true)
-        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools for prompt: "${userPrompt.slice(0, 50)}..."`)
+        // Choose tool selection method based on conversation length
+        if (messages.length > 6) {
+          // Use advanced analysis for longer conversations
+          selectedTools = await this.toolSelector.getRelevantToolsAdvanced(messages, 5, true)
+          console.log(`[DeepAgentInferencer] Using advanced conversation analysis for ${messages.length} messages`)
+        } else {
+          // Use simple context for shorter conversations
+          selectedTools = await this.toolSelector.getRelevantToolsWithContext(messages, 5, true)
+          console.log(`[DeepAgentInferencer] Using simple conversation context for ${messages.length} messages`)
+        }
+        
+        const userMessages = messages.filter(msg => msg.role === 'user')
+        const latestPrompt = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : ''
+        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools (latest: "${latestPrompt.slice(0, 50)}...")`)
       } else {
         console.log(`[DeepAgentInferencer] Tool selector not ready, using all ${this.tools.length} tools`)
       }
