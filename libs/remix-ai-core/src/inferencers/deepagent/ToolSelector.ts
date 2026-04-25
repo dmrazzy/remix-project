@@ -219,12 +219,46 @@ export class ToolSelector {
   }
 
   /**
+   * Get Etherscan-specific tools for the Etherscan subagent
+   */
+  getEtherscanTools(): DynamicStructuredTool[] {
+    const etherscanTools = this.toolDocuments
+      .filter(td => {
+        // Check if tool comes from Etherscan MCP server
+        const description = td.tool.description.toLowerCase()
+        return description.includes('[etherscan]') || 
+               td.tool.name.toLowerCase().includes('etherscan') ||
+               description.includes('etherscan')
+      })
+      .map(td => td.tool)
+
+    console.log(`[ToolSelector] Found ${etherscanTools.length} Etherscan tools`)
+    return etherscanTools
+  }
+
+  /**
+   * Filter out Etherscan tools from a tool list
+   */
+  filterOutEtherscanTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
+    const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
+    const filteredTools = tools.filter(tool => !etherscanToolNames.has(tool.name))
+    
+    console.log(`[ToolSelector] Filtered out ${tools.length - filteredTools.length} Etherscan tools from main agent`)
+    return filteredTools
+  }
+
+  /**
    * Generate system prompt addition with information about non-selected tools
    */
   generateToolInventoryPrompt(selectedTools: DynamicStructuredTool[]): string {
     const selectedToolNames = new Set(selectedTools.map(t => t.name))
+    const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
+    
     const nonSelectedTools = this.toolDocuments
-      .filter(td => !selectedToolNames.has(td.tool.name))
+      .filter(td => 
+        !selectedToolNames.has(td.tool.name) && 
+        !etherscanToolNames.has(td.tool.name) // Exclude Etherscan tools
+      )
       .map(td => td.tool)
 
     if (nonSelectedTools.length === 0) {
@@ -264,7 +298,7 @@ export class ToolSelector {
     prompt += "- To understand a tool: get_tool_schema({\"toolName\": \"tool_name_here\"})\n"
     prompt += "- To call a tool directly: call_tool({\"toolName\": \"tool_name_here\", \"arguments\": {\"param1\": \"value1\"}})\n"
     
-    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools`)
+    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools (Etherscan tools excluded)`)
     return prompt
   }
 
