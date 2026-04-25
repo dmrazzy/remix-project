@@ -18,7 +18,8 @@ import {
   CODE_REVIEWER_SUBAGENT_PROMPT,
   FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
   ETHERSCAN_SUBAGENT_PROMPT,
-  THEGRAPH_SUBAGENT_PROMPT
+  THEGRAPH_SUBAGENT_PROMPT,
+  ALCHEMY_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
@@ -199,6 +200,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           this.toolSelector.getEtherscanTools() : []
         const theGraphTools = this.toolSelector ? 
           this.toolSelector.getTheGraphTools() : []
+        const alchemyTools = this.toolSelector ? 
+          this.toolSelector.getAlchemyTools() : []
         
         // Filter out specialist tools from main tools for other subagents
         const mainTools = this.toolSelector ? 
@@ -239,9 +242,16 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             model: this.model,
             tools: theGraphTools,
             backend: this.filesystemBackend
+          },
+          {
+            name: 'Alchemy Specialist',
+            systemPrompt: ALCHEMY_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: alchemyTools,
+            backend: this.filesystemBackend
           }
         ]
-        console.log(`[DeepAgentInferencer] Configured 5 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools)`)
+        console.log(`[DeepAgentInferencer] Configured 6 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       // Add store if configured
@@ -728,6 +738,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           this.toolSelector.getEtherscanTools() : []
         const theGraphTools = this.toolSelector ? 
           this.toolSelector.getTheGraphTools() : []
+        const alchemyTools = this.toolSelector ? 
+          this.toolSelector.getAlchemyTools() : []
         
         agentConfig.subagents = [
           {
@@ -764,10 +776,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             model: this.model,
             tools: theGraphTools,
             backend: this.filesystemBackend
+          },
+          {
+            name: 'Alchemy Specialist',
+            systemPrompt: ALCHEMY_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: alchemyTools,
+            backend: this.filesystemBackend
           }
         ]
         
-        console.log(`[DeepAgentInferencer] Configured 5 subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools)`)
+        console.log(`[DeepAgentInferencer] Configured 6 subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       // Add memory store if configured

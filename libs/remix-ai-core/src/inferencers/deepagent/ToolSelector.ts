@@ -259,6 +259,24 @@ export class ToolSelector {
   }
 
   /**
+   * Get Alchemy-specific tools for the Alchemy subagent
+   */
+  getAlchemyTools(): DynamicStructuredTool[] {
+    const alchemyTools = this.toolDocuments
+      .filter(td => {
+        // Check if tool comes from Alchemy MCP server
+        const description = td.tool.description.toLowerCase()
+        return description.includes('[alchemy]') || 
+               td.tool.name.toLowerCase().includes('alchemy') ||
+               description.includes('alchemy')
+      })
+      .map(td => td.tool)
+
+    console.log(`[ToolSelector] Found ${alchemyTools.length} Alchemy tools`)
+    return alchemyTools
+  }
+
+  /**
    * Filter out Etherscan tools from a tool list
    */
   filterOutEtherscanTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
@@ -281,19 +299,32 @@ export class ToolSelector {
   }
 
   /**
-   * Filter out both Etherscan and TheGraph tools from a tool list
+   * Filter out Alchemy tools from a tool list
+   */
+  filterOutAlchemyTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
+    const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
+    const filteredTools = tools.filter(tool => !alchemyToolNames.has(tool.name))
+    
+    console.log(`[ToolSelector] Filtered out ${tools.length - filteredTools.length} Alchemy tools from main agent`)
+    return filteredTools
+  }
+
+  /**
+   * Filter out all specialist tools (Etherscan, TheGraph, Alchemy) from a tool list
    */
   filterOutSpecialistTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
     const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
+    const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
     
     const filteredTools = tools.filter(tool => 
       !etherscanToolNames.has(tool.name) && 
-      !theGraphToolNames.has(tool.name)
+      !theGraphToolNames.has(tool.name) &&
+      !alchemyToolNames.has(tool.name)
     )
     
     const removedCount = tools.length - filteredTools.length
-    console.log(`[ToolSelector] Filtered out ${removedCount} specialist tools (Etherscan + TheGraph) from main agent`)
+    console.log(`[ToolSelector] Filtered out ${removedCount} specialist tools (Etherscan + TheGraph + Alchemy) from main agent`)
     return filteredTools
   }
 
@@ -304,12 +335,15 @@ export class ToolSelector {
     const selectedToolNames = new Set(selectedTools.map(t => t.name))
     const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
-    console.log(theGraphToolNames, etherscanToolNames)
+    const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
+    console.log('Specialist tools:', { theGraphToolNames, etherscanToolNames, alchemyToolNames })
+    
     const nonSelectedTools = this.toolDocuments
       .filter(td => 
         !selectedToolNames.has(td.tool.name) && 
         !etherscanToolNames.has(td.tool.name) && // Exclude Etherscan tools
-        !theGraphToolNames.has(td.tool.name) // Exclude TheGraph tools
+        !theGraphToolNames.has(td.tool.name) && // Exclude TheGraph tools
+        !alchemyToolNames.has(td.tool.name) // Exclude Alchemy tools
       )
       .map(td => td.tool)
 
@@ -350,7 +384,7 @@ export class ToolSelector {
     prompt += "- To understand a tool: get_tool_schema({\"toolName\": \"tool_name_here\"})\n"
     prompt += "- To call a tool directly: call_tool({\"toolName\": \"tool_name_here\", \"arguments\": {\"param1\": \"value1\"}})\n"
     
-    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools (Etherscan + TheGraph tools excluded)`)
+    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools (Etherscan + TheGraph + Alchemy tools excluded)`)
     return prompt
   }
 
