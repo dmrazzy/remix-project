@@ -17,7 +17,8 @@ import {
   SECURITY_AUDITOR_SUBAGENT_PROMPT,
   CODE_REVIEWER_SUBAGENT_PROMPT,
   FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
-  ETHERSCAN_SUBAGENT_PROMPT
+  ETHERSCAN_SUBAGENT_PROMPT,
+  THEGRAPH_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
@@ -176,15 +177,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         console.log(`[DeepAgentInferencer] Built tool index with ${this.toolSelector.getStats().totalTools} tools`)
       }
 
-      // Filter out Etherscan tools from main agent
+      // Filter out specialist tools from main agent
       const mainAgentTools = this.toolSelector ? 
-        this.toolSelector.filterOutEtherscanTools(this.tools) : this.tools
+        this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
       
       // Create DeepAgent configuration
       console.log('[DeepAgentInferencer] Setting up agent configuration...')
       const agentConfig: any = {
         backend: this.filesystemBackend,
-        tools: mainAgentTools, // Etherscan tools filtered out for main agent
+        tools: mainAgentTools, // Specialist tools filtered out for main agent
         model: this.model,
         systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
         skills: ["skills/"],
@@ -193,13 +194,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
       // Configure specialized subagents (array format expected by deepagents)
       if (this.config.enableSubagents) {
-        // Get Etherscan tools for the Etherscan subagent
+        // Get specialist tools for dedicated subagents
         const etherscanTools = this.toolSelector ? 
           this.toolSelector.getEtherscanTools() : []
+        const theGraphTools = this.toolSelector ? 
+          this.toolSelector.getTheGraphTools() : []
         
-        // Filter out Etherscan tools from main tools for other subagents
+        // Filter out specialist tools from main tools for other subagents
         const mainTools = this.toolSelector ? 
-          this.toolSelector.filterOutEtherscanTools(this.tools) : this.tools
+          this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
         
         agentConfig.subagents = [
           {
@@ -229,9 +232,16 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             model: this.model,
             tools: etherscanTools,
             backend: this.filesystemBackend
+          },
+          {
+            name: 'TheGraph Specialist',
+            systemPrompt: THEGRAPH_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: theGraphTools,
+            backend: this.filesystemBackend
           }
         ]
-        console.log(`[DeepAgentInferencer] Configured 4 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} Etherscan tools)`)
+        console.log(`[DeepAgentInferencer] Configured 5 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools)`)
       }
 
       // Add store if configured
@@ -513,12 +523,12 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           console.log(`[DeepAgentInferencer] Using simple conversation context for ${messages.length} messages`)
         }
         
-        // Filter out Etherscan tools from main agent (they go to Etherscan subagent)
-        selectedTools = this.toolSelector.filterOutEtherscanTools(selectedTools)
+        // Filter out specialist tools from main agent (they go to specialist subagents)
+        selectedTools = this.toolSelector.filterOutSpecialistTools(selectedTools)
         
         const userMessages = messages.filter(msg => msg.role === 'user')
         const latestPrompt = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : ''
-        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools (5 context + meta-tools, Etherscan excluded) (latest: "${latestPrompt.slice(0, 50)}...")`)
+        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools (5 context + meta-tools, specialist tools excluded) (latest: "${latestPrompt.slice(0, 50)}...")`)
       } else {
         console.log(`[DeepAgentInferencer] Tool selector not ready, using all ${this.tools.length} tools`)
       }
@@ -713,9 +723,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         const toolInventoryPrompt = this.toolSelector ? 
           this.toolSelector.generateToolInventoryPrompt(selectedTools) : ""
         
-        // Get Etherscan tools for the Etherscan subagent
+        // Get specialist tools for dedicated subagents
         const etherscanTools = this.toolSelector ? 
           this.toolSelector.getEtherscanTools() : []
+        const theGraphTools = this.toolSelector ? 
+          this.toolSelector.getTheGraphTools() : []
         
         agentConfig.subagents = [
           {
@@ -745,10 +757,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             model: this.model,
             tools: etherscanTools,
             backend: this.filesystemBackend
+          },
+          {
+            name: 'TheGraph Specialist',
+            systemPrompt: THEGRAPH_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: theGraphTools,
+            backend: this.filesystemBackend
           }
         ]
         
-        console.log(`[DeepAgentInferencer] Configured 4 subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} Etherscan tools)`)
+        console.log(`[DeepAgentInferencer] Configured 5 subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools)`)
       }
 
       // Add memory store if configured

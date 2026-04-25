@@ -237,6 +237,28 @@ export class ToolSelector {
   }
 
   /**
+   * Get TheGraph-specific tools for the TheGraph subagent
+   */
+  getTheGraphTools(): DynamicStructuredTool[] {
+    const theGraphTools = this.toolDocuments
+      .filter(td => {
+        // Check if tool comes from TheGraph MCP server
+        const description = td.tool.description.toLowerCase()
+        return description.includes('[the graph api]') || 
+               description.includes('[thegraph]') ||
+               td.tool.name.toLowerCase().includes('thegraph') ||
+               td.tool.name.toLowerCase().includes('graph') ||
+               description.includes('thegraph') ||
+               description.includes('subgraph') ||
+               description.includes('graphql')
+      })
+      .map(td => td.tool)
+
+    console.log(`[ToolSelector] Found ${theGraphTools.length} TheGraph tools`)
+    return theGraphTools
+  }
+
+  /**
    * Filter out Etherscan tools from a tool list
    */
   filterOutEtherscanTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
@@ -248,16 +270,46 @@ export class ToolSelector {
   }
 
   /**
+   * Filter out TheGraph tools from a tool list
+   */
+  filterOutTheGraphTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
+    const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
+    const filteredTools = tools.filter(tool => !theGraphToolNames.has(tool.name))
+    
+    console.log(`[ToolSelector] Filtered out ${tools.length - filteredTools.length} TheGraph tools from main agent`)
+    return filteredTools
+  }
+
+  /**
+   * Filter out both Etherscan and TheGraph tools from a tool list
+   */
+  filterOutSpecialistTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
+    const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
+    const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
+    
+    const filteredTools = tools.filter(tool => 
+      !etherscanToolNames.has(tool.name) && 
+      !theGraphToolNames.has(tool.name)
+    )
+    
+    const removedCount = tools.length - filteredTools.length
+    console.log(`[ToolSelector] Filtered out ${removedCount} specialist tools (Etherscan + TheGraph) from main agent`)
+    return filteredTools
+  }
+
+  /**
    * Generate system prompt addition with information about non-selected tools
    */
   generateToolInventoryPrompt(selectedTools: DynamicStructuredTool[]): string {
     const selectedToolNames = new Set(selectedTools.map(t => t.name))
     const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
-    
+    const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
+    console.log(theGraphToolNames, etherscanToolNames)
     const nonSelectedTools = this.toolDocuments
       .filter(td => 
         !selectedToolNames.has(td.tool.name) && 
-        !etherscanToolNames.has(td.tool.name) // Exclude Etherscan tools
+        !etherscanToolNames.has(td.tool.name) && // Exclude Etherscan tools
+        !theGraphToolNames.has(td.tool.name) // Exclude TheGraph tools
       )
       .map(td => td.tool)
 
@@ -298,7 +350,7 @@ export class ToolSelector {
     prompt += "- To understand a tool: get_tool_schema({\"toolName\": \"tool_name_here\"})\n"
     prompt += "- To call a tool directly: call_tool({\"toolName\": \"tool_name_here\", \"arguments\": {\"param1\": \"value1\"}})\n"
     
-    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools (Etherscan tools excluded)`)
+    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools (Etherscan + TheGraph tools excluded)`)
     return prompt
   }
 
