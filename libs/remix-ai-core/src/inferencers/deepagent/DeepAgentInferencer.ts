@@ -21,7 +21,8 @@ import {
   THEGRAPH_SUBAGENT_PROMPT,
   ALCHEMY_SUBAGENT_PROMPT,
   GAS_OPTIMIZER_SUBAGENT_PROMPT,
-  COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT
+  COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
+  WEB3_EDUCATOR_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
@@ -215,6 +216,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         // Get coordination tools for Comprehensive Auditor
         const coordinationTools = this.getCoordinationToolsForComprehensiveAuditor()
         
+        // Get education tools for Web3 Educator
+        const educationTools = this.getEducationToolsForWeb3Educator()
+        
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
@@ -242,6 +246,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             systemPrompt: COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
             model: this.model,
             tools: coordinationTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Web3 Educator',
+            systemPrompt: WEB3_EDUCATOR_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: educationTools,
             backend: this.filesystemBackend
           },
           {
@@ -273,7 +284,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             backend: this.filesystemBackend
           }
         ]
-        console.log(`[DeepAgentInferencer] Configured 8 specialized subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Gas Optimizer (${basicFileTools.length} basic file tools), Code Reviewer, Comprehensive Auditor (${coordinationTools.length} coordination tools), Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
+        console.log(`[DeepAgentInferencer] Configured 9 specialized subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Gas Optimizer (${basicFileTools.length} basic file tools), Code Reviewer, Comprehensive Auditor (${coordinationTools.length} coordination tools), Web3 Educator (${educationTools.length} education tools), Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       // Add store if configured
@@ -377,9 +388,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     const coordinationToolNames = [
       // Basic file operations
       'file_read',
-      'file_write',
+      'file_write', 
+      'file_create',
+      'file_delete',
+      'file_move',
+      'file_copy',
       'directory_list',
       'file_exists',
+      'file_replace',
+      'read_file_chunk',
       'grep_file',
       // Coordination tools (invoke_subagent removed - using built-in task tool)
       'verify_findings',
@@ -393,6 +410,36 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     console.log(`[DeepAgentInferencer] Comprehensive Auditor tools: ${coordinationTools.map(t => t.name).join(', ')} + built-in task tool`)
     return coordinationTools
+  }
+
+  /**
+   * Get education tools for Web3 Educator
+   */
+  private getEducationToolsForWeb3Educator(): DynamicStructuredTool[] {
+    const educationToolNames = [
+      // Basic file operations
+      'file_read',
+      'file_write', 
+      'file_create',
+      'file_delete',
+      'file_move',
+      'file_copy',
+      'directory_list',
+      'file_exists',
+      'file_replace',
+      'read_file_chunk',
+      'grep_file',
+      // Tutorial tools
+      'start_tutorial',
+      'tutorials_list'
+    ]
+
+    const educationTools = this.tools.filter(tool => 
+      educationToolNames.includes(tool.name)
+    )
+
+    console.log(`[DeepAgentInferencer] Web3 Educator tools: ${educationTools.map(t => t.name).join(', ')}`)
+    return educationTools
   }
 
   /**
@@ -854,6 +901,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         // Get coordination tools for Comprehensive Auditor
         const coordinationTools = this.getCoordinationToolsForComprehensiveAuditor()
         
+        // Get education tools for Web3 Educator
+        const educationTools = this.getEducationToolsForWeb3Educator()
+        
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
@@ -881,6 +931,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             systemPrompt: COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
             tools: coordinationTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Web3 Educator',
+            systemPrompt: WEB3_EDUCATOR_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: educationTools,
             backend: this.filesystemBackend
           },
           {
@@ -913,7 +970,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           }
         ]
         
-        console.log(`[DeepAgentInferencer] Configured 8 subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Gas Optimizer (${basicFileTools.length} basic file tools), Code Reviewer, Comprehensive Auditor (${coordinationTools.length} coordination tools), Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
+        console.log(`[DeepAgentInferencer] Configured 9 subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Gas Optimizer (${basicFileTools.length} basic file tools), Code Reviewer, Comprehensive Auditor (${coordinationTools.length} coordination tools), Web3 Educator (${educationTools.length} education tools), Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       // Add memory store if configured
