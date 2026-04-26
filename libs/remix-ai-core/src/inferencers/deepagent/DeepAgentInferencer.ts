@@ -382,6 +382,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       'file_exists',
       'grep_file',
       // Coordination tools (invoke_subagent removed - using built-in task tool)
+      'verify_findings',
       'aggregate_findings',
       'resolve_conflicts'
     ]

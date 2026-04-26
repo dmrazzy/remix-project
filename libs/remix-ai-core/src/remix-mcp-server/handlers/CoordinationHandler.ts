@@ -11,6 +11,212 @@ import {
 import { Plugin } from '@remixproject/engine';
 
 /**
+ * Self-Verification Tool Handler
+ */
+export class SelfVerificationHandler extends BaseToolHandler {
+  name = 'verify_findings';
+  description = 'Verify findings accuracy by cross-checking against actual code';
+  inputSchema = {
+    type: 'object',
+    properties: {
+      findings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Finding ID' },
+            location: { type: 'string', description: 'File path and line number (file:line)' },
+            code_snippet: { type: 'string', description: 'Code snippet mentioned in finding' },
+            claim: { type: 'string', description: 'Specific claim being made about the code' },
+            confidence: { type: 'number', minimum: 0, maximum: 100, description: 'Initial confidence score' }
+          },
+          required: ['id', 'location', 'code_snippet', 'claim', 'confidence']
+        },
+        description: 'Array of findings to verify'
+      },
+      verification_depth: {
+        type: 'string',
+        enum: ['basic', 'detailed'],
+        description: 'Depth of verification to perform',
+        default: 'basic'
+      }
+    },
+    required: ['findings']
+  };
+
+  getPermissions(): string[] {
+    return ['coordination:verify', 'file:read'];
+  }
+
+  validate(args: { findings: any[]; verification_depth?: string }): boolean | string {
+    const required = this.validateRequired(args, ['findings']);
+    if (required !== true) return required;
+
+    const types = this.validateTypes(args, {
+      findings: 'object',
+      verification_depth: 'string'
+    });
+    if (types !== true) return types;
+
+    if (!Array.isArray(args.findings)) {
+      return 'findings must be an array';
+    }
+
+    return true;
+  }
+
+  async execute(args: { findings: any[]; verification_depth?: string }, plugin: Plugin): Promise<IMCPToolResult> {
+    try {
+      const verifiedFindings = [];
+      let totalVerified = 0;
+      let totalRejected = 0;
+
+      for (const finding of args.findings) {
+        const verification = await this.verifyFinding(finding, plugin);
+        
+        if (verification.verified) {
+          verifiedFindings.push({
+            ...finding,
+            verification_status: 'verified',
+            adjusted_confidence: verification.adjustedConfidence,
+            verification_notes: verification.notes
+          });
+          totalVerified++;
+        } else {
+          // Include rejected findings with low confidence
+          verifiedFindings.push({
+            ...finding,
+            verification_status: 'rejected',
+            adjusted_confidence: Math.max(0, finding.confidence - 50),
+            verification_notes: verification.notes,
+            rejection_reason: verification.rejectionReason
+          });
+          totalRejected++;
+        }
+      }
+
+      const result = {
+        success: true,
+        verified_findings: verifiedFindings,
+        verification_summary: {
+          total_findings: args.findings.length,
+          verified: totalVerified,
+          rejected: totalRejected,
+          verification_rate: ((totalVerified / args.findings.length) * 100).toFixed(1)
+        },
+        verification_depth: args.verification_depth || 'basic',
+        timestamp: new Date().toISOString()
+      };
+
+      return this.createSuccessResult(result);
+    } catch (error: any) {
+      return this.createErrorResult(`Failed to verify findings: ${error?.message || error}`);
+    }
+  }
+
+  private async verifyFinding(finding: any, plugin: Plugin): Promise<{
+    verified: boolean;
+    adjustedConfidence: number;
+    notes: string;
+    rejectionReason?: string;
+  }> {
+    try {
+      // Parse location (format: "file.sol:line")
+      const locationParts = finding.location.split(':');
+      if (locationParts.length !== 2) {
+        return {
+          verified: false,
+          adjustedConfidence: 0,
+          notes: 'Invalid location format',
+          rejectionReason: 'Location must be in format "file.sol:line"'
+        };
+      }
+
+      const [filePath, lineStr] = locationParts;
+      const lineNumber = parseInt(lineStr);
+
+      // Check if file exists
+      const exists = await plugin.call('fileManager', 'exists', filePath);
+      if (!exists) {
+        return {
+          verified: false,
+          adjustedConfidence: 0,
+          notes: 'File not found',
+          rejectionReason: `File ${filePath} does not exist`
+        };
+      }
+
+      // Read file content
+      const content = await plugin.call('fileManager', 'readFile', filePath);
+      const lines = content.split('\n');
+
+      // Check if line number is valid
+      if (lineNumber < 1 || lineNumber > lines.length) {
+        return {
+          verified: false,
+          adjustedConfidence: 0,
+          notes: 'Invalid line number',
+          rejectionReason: `Line ${lineNumber} does not exist in ${filePath} (total lines: ${lines.length})`
+        };
+      }
+
+      // Get the actual line content
+      const actualLine = lines[lineNumber - 1].trim();
+      const expectedCode = finding.code_snippet.trim();
+
+      // Check if code snippet matches or is similar
+      const similarity = this.calculateCodeSimilarity(actualLine, expectedCode);
+      
+      if (similarity > 0.7) {
+        return {
+          verified: true,
+          adjustedConfidence: Math.min(100, finding.confidence + 10), // Boost confidence
+          notes: `Code verification successful (${(similarity * 100).toFixed(1)}% match)`
+        };
+      } else if (similarity > 0.3) {
+        return {
+          verified: true,
+          adjustedConfidence: Math.max(10, finding.confidence - 20), // Reduce confidence
+          notes: `Partial code match (${(similarity * 100).toFixed(1)}% similarity). Actual: "${actualLine}"`
+        };
+      } else {
+        return {
+          verified: false,
+          adjustedConfidence: 0,
+          notes: 'Code does not match',
+          rejectionReason: `Expected "${expectedCode}" but found "${actualLine}"`
+        };
+      }
+
+    } catch (error: any) {
+      return {
+        verified: false,
+        adjustedConfidence: 0,
+        notes: 'Verification failed due to error',
+        rejectionReason: error?.message || 'Unknown verification error'
+      };
+    }
+  }
+
+  private calculateCodeSimilarity(actual: string, expected: string): number {
+    // Simple similarity calculation
+    const actualWords = actual.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+    const expectedWords = expected.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+    
+    if (expectedWords.length === 0) return 0;
+    
+    let matches = 0;
+    for (const word of expectedWords) {
+      if (actualWords.includes(word)) {
+        matches++;
+      }
+    }
+    
+    return matches / expectedWords.length;
+  }
+}
+
+/**
  * Aggregate Findings Tool Handler
  */
 export class AggregateFindingsHandler extends BaseToolHandler {
@@ -355,6 +561,14 @@ export class ResolveConflictsHandler extends BaseToolHandler {
  */
 export function createCoordinationTools(): RemixToolDefinition[] {
   return [
+    {
+      name: 'verify_findings',
+      description: 'Verify findings accuracy by cross-checking against actual code',
+      inputSchema: new SelfVerificationHandler().inputSchema,
+      category: ToolCategory.COORDINATION,
+      permissions: ['coordination:verify', 'file:read'],
+      handler: new SelfVerificationHandler()
+    },
     {
       name: 'aggregate_findings',
       description: 'Merge and organize results from multiple subagents',
