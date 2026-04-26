@@ -907,63 +907,63 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
-            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
             model: this.model,
             tools: basicMcpTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Gas Optimizer',
-            systemPrompt: GAS_OPTIMIZER_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: GAS_OPTIMIZER_SUBAGENT_PROMPT,
             model: this.model,
             tools: basicFileTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Code Reviewer',
-            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
             model: this.model,
             tools: selectedTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Comprehensive Auditor',
-            systemPrompt: COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
             model: this.model,
             tools: coordinationTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Web3 Educator',
-            systemPrompt: WEB3_EDUCATOR_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: WEB3_EDUCATOR_SUBAGENT_PROMPT,
             model: this.model,
             tools: educationTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Frontend Specialist',
-            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
             model: this.model,
             tools: selectedTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Etherscan Specialist',
-            systemPrompt: ETHERSCAN_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: ETHERSCAN_SUBAGENT_PROMPT,
             model: this.model,
             tools: etherscanTools,
             backend: this.filesystemBackend
           },
           {
             name: 'TheGraph Specialist',
-            systemPrompt: THEGRAPH_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: THEGRAPH_SUBAGENT_PROMPT,
             model: this.model,
             tools: theGraphTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Alchemy Specialist',
-            systemPrompt: ALCHEMY_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: ALCHEMY_SUBAGENT_PROMPT,
             model: this.model,
             tools: alchemyTools,
             backend: this.filesystemBackend
