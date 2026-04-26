@@ -203,30 +203,30 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         const alchemyTools = this.toolSelector ? 
           this.toolSelector.getAlchemyTools() : []
         
-        // Filter out specialist tools from main tools for other subagents
-        const mainTools = this.toolSelector ? 
-          this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
+        // Get basic MCP tools and slither_scan for Security Auditor
+        const basicMcpTools = this.toolSelector ? 
+          this.getBasicMcpToolsForSecurityAuditor() : []
         
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
             systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
             model: this.model,
-            tools: mainTools,
+            tools: basicMcpTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Code Reviewer',
             systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
             model: this.model,
-            tools: mainTools,
+            tools: mainAgentTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Frontend Specialist',
             systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
             model: this.model,
-            tools: mainTools,
+            tools: mainAgentTools,
             backend: this.filesystemBackend
           },
           {
@@ -251,7 +251,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             backend: this.filesystemBackend
           }
         ]
-        console.log(`[DeepAgentInferencer] Configured 6 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
+        console.log(`[DeepAgentInferencer] Configured 6 specialized subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       // Add store if configured
@@ -289,6 +289,35 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.warn('[DeepAgentInferencer] Failed to initialize tools:', error)
       this.tools = []
     }
+  }
+
+  /**
+   * Get basic MCP tools and slither_scan for Security Auditor
+   */
+  private getBasicMcpToolsForSecurityAuditor(): DynamicStructuredTool[] {
+    const basicToolNames = [
+      // Basic file operations
+      'file_read',
+      'file_write', 
+      'file_create',
+      'file_delete',
+      'file_move',
+      'file_copy',
+      'directory_list',
+      'file_exists',
+      'file_replace',
+      'read_file_chunk',
+      'grep_file',
+      // Security analysis
+      'slither_scan'
+    ]
+
+    const basicTools = this.tools.filter(tool => 
+      basicToolNames.includes(tool.name)
+    )
+
+    console.log(`[DeepAgentInferencer] Security Auditor tools: ${basicTools.map(t => t.name).join(', ')}`)
+    return basicTools
   }
 
   /**
@@ -741,12 +770,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         const alchemyTools = this.toolSelector ? 
           this.toolSelector.getAlchemyTools() : []
         
+        // Get basic MCP tools and slither_scan for Security Auditor
+        const basicMcpTools = this.getBasicMcpToolsForSecurityAuditor()
+        
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
             systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
-            tools: selectedTools,
+            tools: basicMcpTools,
             backend: this.filesystemBackend
           },
           {
@@ -786,7 +818,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           }
         ]
         
-        console.log(`[DeepAgentInferencer] Configured 6 subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
+        console.log(`[DeepAgentInferencer] Configured 6 subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       // Add memory store if configured
