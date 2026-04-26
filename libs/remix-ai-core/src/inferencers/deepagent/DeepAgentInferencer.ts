@@ -19,7 +19,8 @@ import {
   FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
   ETHERSCAN_SUBAGENT_PROMPT,
   THEGRAPH_SUBAGENT_PROMPT,
-  ALCHEMY_SUBAGENT_PROMPT
+  ALCHEMY_SUBAGENT_PROMPT,
+  GAS_OPTIMIZER_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
@@ -207,12 +208,22 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         const basicMcpTools = this.toolSelector ? 
           this.getBasicMcpToolsForSecurityAuditor() : []
         
+        // Get basic file tools for Gas Optimizer
+        const basicFileTools = this.getBasicFileToolsForGasOptimizer()
+        
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
             systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
             model: this.model,
             tools: basicMcpTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Gas Optimizer',
+            systemPrompt: GAS_OPTIMIZER_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: basicFileTools,
             backend: this.filesystemBackend
           },
           {
@@ -251,7 +262,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             backend: this.filesystemBackend
           }
         ]
-        console.log(`[DeepAgentInferencer] Configured 6 specialized subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
+        console.log(`[DeepAgentInferencer] Configured 7 specialized subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Gas Optimizer (${basicFileTools.length} basic file tools), Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       // Add store if configured
@@ -318,6 +329,33 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     console.log(`[DeepAgentInferencer] Security Auditor tools: ${basicTools.map(t => t.name).join(', ')}`)
     return basicTools
+  }
+
+  /**
+   * Get basic file tools for Gas Optimizer
+   */
+  private getBasicFileToolsForGasOptimizer(): DynamicStructuredTool[] {
+    const basicFileToolNames = [
+      // Basic file operations
+      'file_read',
+      'file_write', 
+      'file_create',
+      'file_delete',
+      'file_move',
+      'file_copy',
+      'directory_list',
+      'file_exists',
+      'file_replace',
+      'read_file_chunk',
+      'grep_file'
+    ]
+
+    const basicFileTools = this.tools.filter(tool => 
+      basicFileToolNames.includes(tool.name)
+    )
+
+    console.log(`[DeepAgentInferencer] Gas Optimizer tools: ${basicFileTools.map(t => t.name).join(', ')}`)
+    return basicFileTools
   }
 
   /**
@@ -773,12 +811,22 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         // Get basic MCP tools and slither_scan for Security Auditor
         const basicMcpTools = this.getBasicMcpToolsForSecurityAuditor()
         
+        // Get basic file tools for Gas Optimizer
+        const basicFileTools = this.getBasicFileToolsForGasOptimizer()
+        
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
             systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
             tools: basicMcpTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Gas Optimizer',
+            systemPrompt: GAS_OPTIMIZER_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: basicFileTools,
             backend: this.filesystemBackend
           },
           {
@@ -818,7 +866,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           }
         ]
         
-        console.log(`[DeepAgentInferencer] Configured 6 subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
+        console.log(`[DeepAgentInferencer] Configured 7 subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Gas Optimizer (${basicFileTools.length} basic file tools), Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       // Add memory store if configured
