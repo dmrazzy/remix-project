@@ -156,7 +156,6 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
                 handleSend={handleSend}
                 themeTracker={themeTracker}
                 handleCancel={stopRequest}
-                handleLoadSkills={handleLoadSkills}
               /> : <PromptActiveButtons
                 handleRecordingStoppage={handleRecord}
                 isStreaming={isStreaming}

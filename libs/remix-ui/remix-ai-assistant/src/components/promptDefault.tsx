@@ -11,7 +11,6 @@ interface PromptDefaultProps {
   handleSend: () => void
   themeTracker: any
   handleCancel: () => void
-  handleLoadSkills?: () => void
 }
 
 export function PromptDefault(props: PromptDefaultProps) {
@@ -23,26 +22,6 @@ export function PromptDefault(props: PromptDefaultProps) {
         backgroundColor: props.themeTracker && props.themeTracker?.name.toLowerCase() === 'light' ? '#d9dee8' : '#222336',
       }}
     >
-      {props.handleLoadSkills && (
-        <CustomTooltip
-          placement="top"
-          tooltipText="Load Skills"
-          tooltipId="loadSkillsPromptTooltip"
-        >
-          <button
-            data-id="ai-chat-load-skills-btn"
-            className="btn btn-sm small font-weight-light text-secondary rounded-3 text-nowrap"
-            onClick={props.handleLoadSkills}
-            style={{
-              backgroundColor: props.themeTracker && props.themeTracker?.name.toLowerCase() === 'light' ? '#e4e8f1' : '#2a2c3f',
-              color: props.themeTracker && props.themeTracker?.name.toLowerCase() === 'light' ? '#747b90' : '#d5d7e3'
-            }}
-          >
-            <i className="fas fa-cube"></i>
-            <span className="ms-1">Skills</span>
-          </button>
-        </CustomTooltip>
-      )}
       <CustomTooltip
         placement="top"
         tooltipText={props.isRecording ? 'Stop recording' : 'Voice input'}
