@@ -847,7 +847,6 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
       const mathUtilsTools = createMathUtilsTools();
       this._tools.registerBatch(mathUtilsTools);
 
-      // Register Coordination tools
       const coordinationTools = createCoordinationTools();
       this._tools.registerBatch(coordinationTools);
 
