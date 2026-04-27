@@ -19,65 +19,50 @@ export interface SkillData {
 export interface RemixUiSkillsExplorerModalProps {
   isOpen: boolean
   onClose: () => void
-  onSkillSelect?: (skill: SkillInfo) => void
-  plugin?: any // Plugin instance to access fileManager and modal
+  plugin?: any // Plugin instance to access fileManager
 }
 
 export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProps) {
-  const { isOpen, onClose, onSkillSelect, plugin } = props
+  const { isOpen, onClose, plugin } = props
   const [skills, setSkills] = useState<SkillInfo[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [wizardStep, setWizardStep] = useState<'skills' | 'confirm' | 'downloading'>('skills')
-  const [selectedSkill, setSelectedSkill] = useState<SkillInfo | null>(null)
+  const [selectedSkills, setSelectedSkills] = useState<Set<string>>(new Set())
   const [downloading, setDownloading] = useState<boolean>(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const fetchSkillsList = async (url: string): Promise<SkillInfo[]> => {
     const response = await fetch(url)
-    
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
-
     const data = await response.json()
-    
     if (!Array.isArray(data.skills)) {
       throw new Error('Invalid skills list format - expected array of skills')
     }
-
     const skills: SkillInfo[] = []
     for (const skill of data.skills) {
       if (!skill.id || !skill.name) {
-        console.warn(`[SkillsExplorer] Skipping invalid skill object:`, skill)
+        console.warn(`[SkillsExplorer] Skipping invalid skill:`, skill)
         continue
       }
       const description = skill.description?.startsWith('>') ? skill.description.slice(1) : skill.description || ''
-      skills.push({
-        id: skill.id,
-        name: skill.name,
-        description: description
-      })
+      skills.push({ id: skill.id, name: skill.name, description })
     }
-
     return skills
   }
 
   const fetchSkillData = async (url: string): Promise<SkillData> => {
     const response = await fetch(url)
-    
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
-
     const data = await response.json()
-    
-    // Validate response structure
     if (!data.id || !data.name || !data.content || !data.resources) {
-      throw new Error('Invalid skill data format - missing required fields (id, name, content, resources)')
+      throw new Error('Invalid skill data format - missing required fields')
     }
-
     return {
       id: data.id,
       name: data.name,
@@ -87,33 +72,33 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
     }
   }
 
-  const ensureDirectoryExists = async (dirPath: string, plugin: any) => {
+  const ensureDirectoryExists = async (dirPath: string) => {
     try {
       await plugin.call('fileManager', 'mkdir', dirPath)
-    } catch (error) {
-      // Directory might already exist, which is fine
-      console.log(`Directory ${dirPath} already exists or could not be created:`, error)
+    } catch (e) {
+      // Directory may already exist
     }
   }
 
-
-
   useEffect(() => {
     if (isOpen) {
-      const loadSkills = async () => {
+      setWizardStep('skills')
+      setSelectedSkills(new Set())
+      setSearchTerm('')
+      setError(null)
+      const load = async () => {
         setLoading(true)
-        setError(null)
         try {
-          const skillsUrl = endpointUrls.mcpCorsProxy + '/ethskills/skills'
-          const skillsList = await fetchSkillsList(skillsUrl)
-          setSkills(skillsList)
+          const url = endpointUrls.mcpCorsProxy + '/ethskills/skills'
+          const list = await fetchSkillsList(url)
+          setSkills(list)
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Failed to load skills')
         } finally {
           setLoading(false)
         }
       }
-      loadSkills()
+      load()
     }
   }, [isOpen])
 
@@ -122,96 +107,106 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
     skill.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleSkillClick = (skill: SkillInfo) => {
-    setSelectedSkill(skill)
+  const toggleSkill = (id: string) => {
+    setSelectedSkills(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleLoadSelected = () => {
+    if (selectedSkills.size === 0) return
     setWizardStep('confirm')
   }
 
-  const handleConfirmSkill = async () => {
-    if (!selectedSkill || !plugin) {
-      setError('Plugin not available or no skill selected')
+  const handleConfirmSkills = async () => {
+    if (!plugin) {
+      setError('Plugin not available')
       return
     }
-
     setWizardStep('downloading')
     setDownloading(true)
-    
-    try {
-      // Fetch skill data from remote endpoint
-      const skillUrl = endpointUrls.mcpCorsProxy + `/ethskills/skills/${selectedSkill.id}`
-      const skillData = await fetchSkillData(skillUrl)
+    const errors: string[] = []
 
-      // Create skill directory
-      const skillDir = `.skills/${selectedSkill.id}`
-      await ensureDirectoryExists(skillDir, plugin)
-
-      // Write SKILL.md file
-      const skillFilePath = `${skillDir}/SKILL.md`
-      await plugin.call('fileManager', 'writeFile', skillFilePath, skillData.content)
-
-      // Write resource files
-      for (const [filename, content] of Object.entries(skillData.resources)) {
-        const filePath = `${skillDir}/${filename}`
-        await plugin.call('fileManager', 'writeFile', filePath, content)
+    for (const skillId of selectedSkills) {
+      try {
+        const url = endpointUrls.mcpCorsProxy + `/ethskills/skills/${skillId}`
+        const skillData = await fetchSkillData(url)
+        const skillDir = `.skills/${skillId}`
+        await ensureDirectoryExists(skillDir)
+        await plugin.call('fileManager', 'writeFile', `${skillDir}/SKILL.md`, skillData.content)
+        for (const [filename, content] of Object.entries(skillData.resources)) {
+          await plugin.call('fileManager', 'writeFile', `${skillDir}/${filename}`, content)
+        }
+      } catch (err) {
+        errors.push(`${skillId}: ${err instanceof Error ? err.message : 'Failed'}`)
       }
+    }
 
-      // Call the original onSkillSelect callback if provided
-      onSkillSelect?.(selectedSkill)
-      
-      // Close the modal
+    setDownloading(false)
+    if (errors.length > 0) {
+      setError(errors.join('\n'))
+      setWizardStep('confirm')
+    } else {
       onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to download skill')
-      setWizardStep('confirm') // Go back to confirm step on error
-    } finally {
-      setDownloading(false)
     }
   }
 
-  const handleCancelSkill = () => {
-    setSelectedSkill(null)
+  const handleBack = () => {
     setWizardStep('skills')
+    setError(null)
   }
 
   if (!isOpen) return null
 
+  const selectedSkillInfos = skills.filter(s => selectedSkills.has(s.id))
+
   return (
     <section data-id="skills-explorer-modal-react" className="skills-explorer-modal-background" style={{ zIndex: 8888 }}>
       <div ref={containerRef} className="skills-explorer-modal-container border bg-dark p-2">
+
+        {/* Header */}
         <div className="skills-explorer-modal-close-container bg-dark mb-3 w-100 d-flex flex-row justify-content-between align-items-center">
-          {wizardStep === 'skills' ? <div className="d-flex flex-row gap-2 w-100 mx-3 my-2">
-            <input
-              type="text"
-              name="skills-explorer-search"
-              data-id="skills-explorer-search-input"
-              placeholder="Search skills..."
-              className="form-control skills-explorer-modal-search-input ps-5 fw-light"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div> : <div>
+          {wizardStep === 'skills' ? (
+            <div className="d-flex flex-row gap-2 w-100 mx-3 my-2">
+              <input
+                type="text"
+                data-id="skills-explorer-search-input"
+                placeholder="Search skills..."
+                className="form-control skills-explorer-modal-search-input ps-5 fw-light"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          ) : (
             <div className="d-flex flex-row gap-2 w-100 mx-1 my-2">
-              <button className="btn" onClick={handleCancelSkill}>
+              <button className="btn" onClick={handleBack} disabled={downloading}>
                 <i className="fa-solid fa-arrow-left"></i>
               </button>
-              {wizardStep === 'confirm' && selectedSkill && (
-                <span className="text-light align-self-center">Add Skill: {selectedSkill.name}</span>
+              {wizardStep === 'confirm' && (
+                <span className="text-light align-self-center">
+                  Add {selectedSkills.size} Skill{selectedSkills.size !== 1 ? 's' : ''}
+                </span>
               )}
               {wizardStep === 'downloading' && (
-                <span className="text-light align-self-center">Adding Skill...</span>
+                <span className="text-light align-self-center">Adding Skills...</span>
               )}
             </div>
-          </div>}
-          <button 
-            data-id="skills-explorer-modal-close-button" 
-            className="skills-explorer-modal-close-button" 
+          )}
+          <button
+            data-id="skills-explorer-modal-close-button"
+            className="skills-explorer-modal-close-button"
             onClick={onClose}
+            disabled={downloading}
           >
             <i className="fa-solid fa-xmark text-dark"></i>
           </button>
         </div>
 
         <div className="skills-explorer-container">
+
+          {/* Step 1: Select skills */}
           {wizardStep === 'skills' && (
             <>
               {loading && (
@@ -233,7 +228,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
                 <>
                   <div className="category-title">Available Skills ({filteredSkills.length})</div>
                   <div className="category-description mb-4">
-                    Browse and select from available Ethereum development skills
+                    Select one or more Ethereum development skills to add to your workspace
                   </div>
 
                   {filteredSkills.length === 0 ? (
@@ -243,78 +238,106 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
                     </div>
                   ) : (
                     <div className="d-flex flex-wrap gap-3">
-                      {filteredSkills.map((skill) => (
-                        <div
-                          key={skill.id}
-                          className="skill-card bg-light border p-3"
-                          onClick={() => handleSkillClick(skill)}
-                        >
-                          <div className="card-body">
-                            <h6 className="card-title text-dark mb-2">{skill.name}</h6>
-                            <p className="card-description text-muted mb-0">
-                              {skill.description || 'No description available'}
-                            </p>
+                      {filteredSkills.map((skill) => {
+                        const isSelected = selectedSkills.has(skill.id)
+                        return (
+                          <div
+                            key={skill.id}
+                            className={`skill-card bg-light border p-3 ${isSelected ? 'border-primary' : ''}`}
+                            style={isSelected ? { boxShadow: '0 0 0 2px var(--bs-primary)' } : {}}
+                            onClick={() => toggleSkill(skill.id)}
+                            data-id={`skill-card-${skill.id}`}
+                          >
+                            <div className="card-body">
+                              <div className="d-flex justify-content-between align-items-start mb-2">
+                                <h6 className="card-title text-dark mb-0">{skill.name}</h6>
+                                {isSelected && (
+                                  <i className="fa-solid fa-circle-check text-primary ms-2 flex-shrink-0"></i>
+                                )}
+                              </div>
+                              <p className="card-description text-muted mb-0">
+                                {skill.description || 'No description available'}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </>
               )}
+
+              {/* Footer: Load button */}
+              {!loading && !error && selectedSkills.size > 0 && (
+                <div className="d-flex justify-content-end mt-4 pt-2 border-top border-secondary">
+                  <button
+                    data-id="skills-explorer-load-selected"
+                    className="btn btn-primary"
+                    onClick={handleLoadSelected}
+                  >
+                    <i className="fa-solid fa-download me-2"></i>
+                    Load {selectedSkills.size} Selected Skill{selectedSkills.size !== 1 ? 's' : ''}
+                  </button>
+                </div>
+              )}
             </>
           )}
 
-          {wizardStep === 'confirm' && selectedSkill && (
+          {/* Step 2: Confirm */}
+          {wizardStep === 'confirm' && (
             <div className="confirm-skill-step">
               <div className="d-flex flex-column align-items-center py-5">
                 <i className="fa-solid fa-download fa-3x mb-4 text-primary"></i>
-                <h3 className="mb-3">Add AI Skill to Workspace</h3>
+                <h3 className="mb-3">Add Skills to Workspace</h3>
                 <div className="skill-details mb-4 text-center">
-                  <h4 className="">{selectedSkill.name}</h4>
-                  <p className="text-muted">{selectedSkill.description}</p>
+                  {selectedSkillInfos.map(s => (
+                    <div key={s.id} className="mb-1">
+                      <strong className="text-light">{s.name}</strong>
+                      <span className="text-muted ms-2 small">→ .skills/{s.id}</span>
+                    </div>
+                  ))}
                 </div>
                 <div className="alert alert-info mb-4">
                   <i className="fa-solid fa-info-circle me-2"></i>
-                  This will create files in the <code>.skills/{selectedSkill.id}</code> directory.
+                  {selectedSkills.size === 1
+                    ? `This will create files in the <code>.skills/${[...selectedSkills][0]}</code> directory.`
+                    : `This will create files in <code>.skills/</code> for each selected skill.`}
                 </div>
+                {error && (
+                  <div className="alert alert-danger mb-3" role="alert">
+                    <i className="fa-solid fa-exclamation-triangle me-2"></i>
+                    <pre className="mb-0 small">{error}</pre>
+                  </div>
+                )}
                 <div className="d-flex gap-3">
-                  <button 
-                    className="btn btn-secondary" 
-                    onClick={handleCancelSkill}
-                    disabled={downloading}
+                  <button className="btn btn-secondary" onClick={handleBack}>Cancel</button>
+                  <button
+                    data-id="skills-explorer-confirm-add"
+                    className="btn btn-primary"
+                    onClick={handleConfirmSkills}
                   >
-                    Cancel
-                  </button>
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={handleConfirmSkill}
-                    disabled={downloading}
-                  >
-                    Add Skill
+                    Add Skill{selectedSkills.size !== 1 ? 's' : ''}
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {wizardStep === 'downloading' && selectedSkill && (
+          {/* Step 3: Downloading */}
+          {wizardStep === 'downloading' && (
             <div className="downloading-skill-step">
               <div className="d-flex flex-column align-items-center py-5">
                 <div className="spinner-border text-primary fa-3x mb-4" role="status">
-                  <span className="visually-hidden">Downloading skill...</span>
+                  <span className="visually-hidden">Downloading skills...</span>
                 </div>
-                <h3 className="text-light mb-3">Adding Skill</h3>
-                <p className="text-muted">Downloading and setting up "{selectedSkill.name}"...</p>
-                
-                {error && (
-                  <div className="alert alert-danger mt-4" role="alert">
-                    <i className="fa-solid fa-exclamation-triangle me-2"></i>
-                    {error}
-                  </div>
-                )}
+                <h3 className="text-light mb-3">Adding Skills</h3>
+                <p className="text-muted">
+                  Downloading and setting up {selectedSkills.size} skill{selectedSkills.size !== 1 ? 's' : ''}...
+                </p>
               </div>
             </div>
           )}
+
         </div>
       </div>
     </section>
