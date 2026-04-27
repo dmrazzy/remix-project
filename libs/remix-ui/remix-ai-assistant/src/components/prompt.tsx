@@ -37,6 +37,7 @@ export interface PromptAreaProps {
   ollamaModels: any[]
   themeTracker: any
   stopRequest: () => void
+  handleLoadSkills?: () => void
 }
 
 export const PromptArea: React.FC<PromptAreaProps> = ({
@@ -58,7 +59,8 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   setShowOllamaModelSelector,
   showOllamaModelSelector,
   selectedOllamaModel,
-  modelSelectorBtnRef
+  modelSelectorBtnRef,
+  handleLoadSkills
 }) => {
   const { trackMatomoEvent: baseTrackEvent } = useContext(TrackingContext)
 
@@ -154,6 +156,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
                 handleSend={handleSend}
                 themeTracker={themeTracker}
                 handleCancel={stopRequest}
+                handleLoadSkills={handleLoadSkills}
               /> : <PromptActiveButtons
                 handleRecordingStoppage={handleRecord}
                 isStreaming={isStreaming}

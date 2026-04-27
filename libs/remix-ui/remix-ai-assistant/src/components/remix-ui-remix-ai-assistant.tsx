@@ -1244,6 +1244,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               selectedOllamaModel={selectedOllamaModel}
               ollamaModels={ollamaModels}
               messages={messages}
+              handleLoadSkills={handleLoadSkills}
             />
           ) : (
             <AiChatPromptArea
@@ -1287,6 +1288,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               selectedOllamaModel={selectedOllamaModel}
               ollamaModels={ollamaModels}
               messages={messages}
+              handleLoadSkills={handleLoadSkills}
             />
           )
         }

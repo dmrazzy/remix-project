@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './remix-ui-skills-explorer-modal.css'
-import { endpointUrls } from '@remix-endpoints-helper'
+
+// Resolve the skills endpoint — works in both local dev and production
+function getSkillsBaseUrl(): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { endpointUrls } = require('@remix-endpoints-helper')
+    const proxy = endpointUrls?.mcpCorsProxy
+    // In local dev, mcpCorsProxy is 'mcp' (relative), which won't work for
+    // an external skills server. Fall back to the direct endpoint.
+    if (proxy && proxy.startsWith('http')) {
+      return proxy + '/ethskills'
+    }
+  } catch (_) { /* ignore */ }
+  // Fallback: direct ethskills server
+  return 'https://mcp.api.remix.live/ethskills'
+}
 
 export interface SkillInfo {
   id: string
@@ -89,7 +104,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
       const load = async () => {
         setLoading(true)
         try {
-          const url = endpointUrls.mcpCorsProxy + '/ethskills/skills'
+          const url = getSkillsBaseUrl() + '/skills'
           const list = await fetchSkillsList(url)
           setSkills(list)
         } catch (err) {
@@ -131,7 +146,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
 
     for (const skillId of selectedSkills) {
       try {
-        const url = endpointUrls.mcpCorsProxy + `/ethskills/skills/${skillId}`
+        const url = getSkillsBaseUrl() + `/skills/${skillId}`
         const skillData = await fetchSkillData(url)
         const skillDir = `.skills/${skillId}`
         await ensureDirectoryExists(skillDir)
@@ -286,8 +301,8 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
                 <div className="alert alert-info mb-4">
                   <i className="fa-solid fa-info-circle me-2"></i>
                   {selectedSkills.size === 1
-                    ? `This will create files in the <code>.skills/${[...selectedSkills][0]}</code> directory.`
-                    : `This will create files in <code>.skills/</code> for each selected skill.`}
+                    ? <span>This will create files in the <code>.skills/{[...selectedSkills][0]}</code> directory.</span>
+                    : <span>This will create files in <code>.skills/</code> for each selected skill.</span>}
                 </div>
                 {error && (
                   <div className="alert alert-danger mb-3" role="alert">
