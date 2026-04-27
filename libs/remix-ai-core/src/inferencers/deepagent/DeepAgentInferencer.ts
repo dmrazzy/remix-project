@@ -143,7 +143,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     // Initialize tools (with external MCP clients if available)
     this.initializeTools(toolRegistry, mcpInferencer)
-    
+
     this.toolSelector = new ToolSelector()
   }
 
@@ -152,9 +152,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   async initialize(): Promise<void> {
     try {
-      console.log('[DeepAgentInferencer] Initializing DeepAgent...')
-      // Dynamic import of deepagents only
-      const { createDeepAgent } = await import('deepagents')
+      console.log('[DeepAgentInferencer] Initializing DeepAgent...') // Dynamic import of deepagents only
 
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
       console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
@@ -162,141 +160,26 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       // Always use proxy server - API key is handled server-side
       const proxyUrl = 'http://localhost:4000'
 
-      // Create the appropriate model based on provider selection
       this.model = this.createModelInstance(proxyUrl)
 
       console.log(`[DeepAgentInferencer] Created ${this.modelSelection.provider} model: ${this.modelSelection.modelId}`)
 
-      // Initialize memory backend if enabled
       if (this.config.memoryBackend === 'store') {
         this.memoryBackend = new DeepAgentMemoryBackend('remix-deepagent-memory')
         await this.memoryBackend.init()
       }
 
-      const checkpointer = new MemorySaver();
+      this.tools.push(...this.toolSelector?.getEssentialTools() || [])
 
-      // Build tool index for selection
       if (this.toolSelector && this.tools.length > 0) {
         await this.toolSelector.buildToolIndex(this.tools)
-        console.log(`[DeepAgentInferencer] Built tool index with ${this.toolSelector.getStats().totalTools} tools`)
       }
 
-      // Filter out specialist tools from main agent
-      const mainAgentTools = this.toolSelector ? 
-        this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
-      
-      // Create DeepAgent configuration
-      console.log('[DeepAgentInferencer] Setting up agent configuration...')
-      const agentConfig: any = {
-        backend: this.filesystemBackend,
-        tools: mainAgentTools, // Specialist tools filtered out for main agent
-        model: this.model,
-        systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
-        skills: ["skills/"],
-        checkpointer
-      }
+      const metaTools = this.tools.filter(tool =>
+        tool.name === 'get_tool_schema' || tool.name === 'call_tool'
+      )
 
-      // Configure specialized subagents (array format expected by deepagents)
-      if (this.config.enableSubagents) {
-        // Get specialist tools for dedicated subagents
-        const etherscanTools = this.toolSelector ? 
-          this.toolSelector.getEtherscanTools() : []
-        const theGraphTools = this.toolSelector ? 
-          this.toolSelector.getTheGraphTools() : []
-        const alchemyTools = this.toolSelector ? 
-          this.toolSelector.getAlchemyTools() : []
-        
-        // Get basic MCP tools and slither_scan for Security Auditor
-        const basicMcpTools = this.toolSelector ? 
-          this.getBasicMcpToolsForSecurityAuditor() : []
-        
-        // Get basic file tools for Gas Optimizer
-        const basicFileTools = this.getBasicFileToolsForGasOptimizer()
-        
-        // Get coordination tools for Comprehensive Auditor
-        const coordinationTools = this.getCoordinationToolsForComprehensiveAuditor()
-        
-        // Get education tools for Web3 Educator
-        const educationTools = this.getEducationToolsForWeb3Educator()
-        
-        agentConfig.subagents = [
-          {
-            name: 'Security Auditor',
-            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: basicMcpTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Gas Optimizer',
-            systemPrompt: GAS_OPTIMIZER_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: basicFileTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Code Reviewer',
-            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: mainAgentTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Comprehensive Auditor',
-            systemPrompt: COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: coordinationTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Web3 Educator',
-            systemPrompt: WEB3_EDUCATOR_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: educationTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Frontend Specialist',
-            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: mainAgentTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Etherscan Specialist',
-            systemPrompt: ETHERSCAN_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: etherscanTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'TheGraph Specialist',
-            systemPrompt: THEGRAPH_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: theGraphTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Alchemy Specialist',
-            systemPrompt: ALCHEMY_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: alchemyTools,
-            backend: this.filesystemBackend
-          }
-        ]
-        console.log(`[DeepAgentInferencer] Configured 9 specialized subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Gas Optimizer (${basicFileTools.length} basic file tools), Code Reviewer, Comprehensive Auditor (${coordinationTools.length} coordination tools), Web3 Educator (${educationTools.length} education tools), Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
-      }
-
-      // Add store if configured
-      console.log('[DeepAgentInferencer] Memory backend:', this.memoryBackend ? 'Enabled' : 'Disabled')
-      if (this.memoryBackend) {
-        agentConfig.store = this.memoryBackend
-      }
-
-      // Create the agent
-      console.log('[DeepAgentInferencer] Creating DeepAgent instance...')
-      this.agent = await createDeepAgent(agentConfig)
-
+      this.createAgentWithTools(metaTools)
       console.log('[DeepAgentInferencer] Agent created successfully')
       console.log('[DeepAgentInferencer] DeepAgent instance created successfully', this.agent)
 
@@ -580,7 +463,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         this.event.emit('onInferenceDone')
       })
 
-      // Return empty string to trigger streaming mode in UI
       return ''
     } catch (error) {
       this.event.emit('onInferenceDone')
@@ -665,42 +547,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    * Run the DeepAgent with messages
    */
   private async runAgent(messages: any[], params: IParams): Promise<string> {
-    // Create abort controller for cancellation
     this.currentAbortController = new AbortController()
     let fullResponse = ''
 
     try {
-      // Select relevant tools for this query using conversation context
-      let selectedTools = this.tools
-      if (this.toolSelector && this.toolSelector.isReady()) {
-        // Choose tool selection method based on conversation length
-        if (messages.length > 6) {
-          // Use advanced analysis for longer conversations
-          selectedTools = await this.toolSelector.getRelevantToolsAdvanced(messages, 5, true)
-          console.log(`[DeepAgentInferencer] Using advanced conversation analysis for ${messages.length} messages`)
-        } else {
-          // Use simple context for shorter conversations
-          selectedTools = await this.toolSelector.getRelevantToolsWithContext(messages, 5, true)
-          console.log(`[DeepAgentInferencer] Using simple conversation context for ${messages.length} messages`)
-        }
-        
-        // Filter out specialist tools from main agent (they go to specialist subagents)
-        selectedTools = this.toolSelector.filterOutSpecialistTools(selectedTools)
-        
-        const userMessages = messages.filter(msg => msg.role === 'user')
-        const latestPrompt = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : ''
-        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools (5 context + meta-tools, specialist tools excluded) (latest: "${latestPrompt.slice(0, 50)}...")`)
-      } else {
-        console.log(`[DeepAgentInferencer] Tool selector not ready, using all ${this.tools.length} tools`)
-      }
-      
-      // Recreate agent with selected tools if needed
-      if (selectedTools.length !== this.tools.length) {
-        console.log('[DeepAgentInferencer] Recreating agent with selected tools...')
-        await this.recreateAgentWithTools(selectedTools)
-      }
-
-      // Filter out system messages - they're already set during agent creation
       const langchainMessages = messages
         .filter(msg => msg.role !== 'system')
         .map(msg => {
@@ -724,12 +574,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           configurable: {
             thread_id: `remix-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
           },
-          subgraphs: true, // Enable subgraph/subagent visibility
-          signal: this.currentAbortController?.signal // Pass abort signal for cancellation
+          subgraphs: true,
+          signal: this.currentAbortController?.signal
         }
       )
 
-      // Process stream events
       let finalMessageFromChain = ''
       for await (const event of eventStream) {
         if (this.currentAbortController?.signal.aborted) {
@@ -830,7 +679,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           console.log('[DeepAgentInferencer] Tool call started:', toolName, toolInput)
           this.event.emit('onToolCall', { toolName, toolInput, status: 'start' })
         } else if (eventType === 'on_tool_end') {
-          // Tool execution completed
           const toolName = event.name
           console.log('[DeepAgentInferencer] Tool call ended:', toolName)
           // let the tool callback for while
@@ -863,12 +711,12 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   /**
    * Recreate agent with selected tools
    */
-  private async recreateAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
+  private async createAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
     try {
       const { createDeepAgent } = await import('deepagents')
-      
+
       const checkpointer = new MemorySaver()
-      
+
       // Create agent configuration with selected tools
       const agentConfig: any = {
         backend: this.filesystemBackend,
@@ -879,31 +727,22 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         checkpointer
       }
 
-      // Configure specialized subagents with selected tools and enhanced prompts
       if (this.config.enableSubagents) {
-        const toolInventoryPrompt = this.toolSelector ? 
-          this.toolSelector.generateToolInventoryPrompt(selectedTools) : ""
-        
-        // Get specialist tools for dedicated subagents
-        const etherscanTools = this.toolSelector ? 
+        const etherscanTools = this.toolSelector ?
           this.toolSelector.getEtherscanTools() : []
-        const theGraphTools = this.toolSelector ? 
+        const theGraphTools = this.toolSelector ?
           this.toolSelector.getTheGraphTools() : []
-        const alchemyTools = this.toolSelector ? 
+        const alchemyTools = this.toolSelector ?
           this.toolSelector.getAlchemyTools() : []
         
-        // Get basic MCP tools and slither_scan for Security Auditor
         const basicMcpTools = this.getBasicMcpToolsForSecurityAuditor()
-        
-        // Get basic file tools for Gas Optimizer
         const basicFileTools = this.getBasicFileToolsForGasOptimizer()
-        
-        // Get coordination tools for Comprehensive Auditor
         const coordinationTools = this.getCoordinationToolsForComprehensiveAuditor()
-        
-        // Get education tools for Web3 Educator
         const educationTools = this.getEducationToolsForWeb3Educator()
-        
+
+        const generalTools = this.toolSelector ?
+          this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
+
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
@@ -923,7 +762,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             name: 'Code Reviewer',
             systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
             model: this.model,
-            tools: selectedTools,
+            tools: generalTools,
             backend: this.filesystemBackend
           },
           {
@@ -944,7 +783,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             name: 'Frontend Specialist',
             systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
             model: this.model,
-            tools: selectedTools,
+            tools: generalTools,
             backend: this.filesystemBackend
           },
           {
@@ -969,16 +808,12 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             backend: this.filesystemBackend
           }
         ]
-        
-        console.log(`[DeepAgentInferencer] Configured 9 subagents: Security Auditor (${basicMcpTools.length} basic+slither tools), Gas Optimizer (${basicFileTools.length} basic file tools), Code Reviewer, Comprehensive Auditor (${coordinationTools.length} coordination tools), Web3 Educator (${educationTools.length} education tools), Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
-      // Add memory store if configured
       if (this.memoryBackend) {
         agentConfig.store = this.memoryBackend
       }
 
-      // Generate enhanced system prompt with tool inventory
       let enhancedSystemPrompt = REMIX_DEEPAGENT_SYSTEM_PROMPT
       if (this.toolSelector) {
         const toolInventoryPrompt = this.toolSelector.generateToolInventoryPrompt(selectedTools)
@@ -986,13 +821,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
       agentConfig.systemPrompt = enhancedSystemPrompt
 
-      // Recreate the agent
       this.agent = createDeepAgent(agentConfig)
-      
+
       console.log(`[DeepAgentInferencer] Recreated agent with ${selectedTools.length} selected tools`)
     } catch (error) {
       console.error('[DeepAgentInferencer] Failed to recreate agent with selected tools:', error)
-      // Continue with existing agent if recreation fails
     }
   }
 
@@ -1077,25 +910,5 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   isReady(): boolean {
     return this.agent !== null
-  }
-
-  /**
-   * Get memory statistics
-   */
-  async getMemoryStats(): Promise<any> {
-    if (this.memoryBackend) {
-      return await this.memoryBackend.getStats()
-    }
-    return null
-  }
-
-  /**
-   * Get tool selector statistics
-   */
-  getToolSelectorStats(): any {
-    if (this.toolSelector) {
-      return this.toolSelector.getStats()
-    }
-    return { totalTools: 0, initialized: false, categories: {} }
   }
 }
