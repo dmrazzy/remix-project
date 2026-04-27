@@ -277,6 +277,29 @@ export class ToolSelector {
   }
 
   /**
+   * Get Education/Tutorial-specific tools for the Web3 Educator subagent
+   */
+  getEducationTools(): DynamicStructuredTool[] {
+    const educationTools = this.toolDocuments
+      .filter(td => {
+        // Check if tool is tutorial/education related
+        const toolName = td.tool.name.toLowerCase()
+        const description = td.tool.description.toLowerCase()
+        return toolName === 'start_tutorial' ||
+               toolName === 'tutorials_list' ||
+               toolName.includes('tutorial') ||
+               toolName.includes('learn') ||
+               description.includes('tutorial') ||
+               description.includes('learn') ||
+               description.includes('education')
+      })
+      .map(td => td.tool)
+
+    console.log(`[ToolSelector] Found ${educationTools.length} Education tools`)
+    return educationTools
+  }
+
+  /**
    * Filter out Etherscan tools from a tool list
    */
   filterOutEtherscanTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
@@ -310,21 +333,34 @@ export class ToolSelector {
   }
 
   /**
-   * Filter out all specialist tools (Etherscan, TheGraph, Alchemy) from a tool list
+   * Filter out Education tools from a tool list
+   */
+  filterOutEducationTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
+    const educationToolNames = new Set(this.getEducationTools().map(t => t.name))
+    const filteredTools = tools.filter(tool => !educationToolNames.has(tool.name))
+    
+    console.log(`[ToolSelector] Filtered out ${tools.length - filteredTools.length} Education tools from main agent`)
+    return filteredTools
+  }
+
+  /**
+   * Filter out all specialist tools (Etherscan, TheGraph, Alchemy, Education) from a tool list
    */
   filterOutSpecialistTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
     const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
     const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
+    const educationToolNames = new Set(this.getEducationTools().map(t => t.name))
     
     const filteredTools = tools.filter(tool => 
       !etherscanToolNames.has(tool.name) && 
       !theGraphToolNames.has(tool.name) &&
-      !alchemyToolNames.has(tool.name)
+      !alchemyToolNames.has(tool.name) &&
+      !educationToolNames.has(tool.name)
     )
     
     const removedCount = tools.length - filteredTools.length
-    console.log(`[ToolSelector] Filtered out ${removedCount} specialist tools (Etherscan + TheGraph + Alchemy) from main agent`)
+    console.log(`[ToolSelector] Filtered out ${removedCount} specialist tools (Etherscan + TheGraph + Alchemy + Education) from main agent`)
     return filteredTools
   }
 
@@ -336,14 +372,16 @@ export class ToolSelector {
     const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
     const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
-    console.log('Specialist tools:', { theGraphToolNames, etherscanToolNames, alchemyToolNames })
+    const educationToolNames = new Set(this.getEducationTools().map(t => t.name))
+    console.log('Specialist tools:', { theGraphToolNames, etherscanToolNames, alchemyToolNames, educationToolNames })
     
     const nonSelectedTools = this.toolDocuments
       .filter(td => 
         !selectedToolNames.has(td.tool.name) && 
         !etherscanToolNames.has(td.tool.name) && // Exclude Etherscan tools
         !theGraphToolNames.has(td.tool.name) && // Exclude TheGraph tools
-        !alchemyToolNames.has(td.tool.name) // Exclude Alchemy tools
+        !alchemyToolNames.has(td.tool.name) && // Exclude Alchemy tools
+        !educationToolNames.has(td.tool.name) // Exclude Education tools
       )
       .map(td => td.tool)
 
@@ -384,7 +422,7 @@ export class ToolSelector {
     prompt += "- To understand a tool: get_tool_schema({\"toolName\": \"tool_name_here\"})\n"
     prompt += "- To call a tool directly: call_tool({\"toolName\": \"tool_name_here\", \"arguments\": {\"param1\": \"value1\"}})\n"
     
-    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools (Etherscan + TheGraph + Alchemy tools excluded)`)
+    console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools (Etherscan + TheGraph + Alchemy + Education tools excluded)`)
     return prompt
   }
 
