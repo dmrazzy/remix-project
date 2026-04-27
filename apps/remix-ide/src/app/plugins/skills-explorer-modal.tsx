@@ -1,6 +1,6 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
 import React from 'react'
-import { AppAction } from '@remix-ui/app'
+import { AppAction, appActionTypes } from '@remix-ui/app'
 import { PluginViewWrapper } from '@remix-ui/helper'
 import { Plugin } from '@remixproject/engine'
 import { EventEmitter } from 'events'
@@ -25,7 +25,7 @@ export class SkillsExplorerModalPlugin extends Plugin {
   element: HTMLDivElement
   dispatch: React.Dispatch<any> = () => { }
   event: EventEmitter
-  appStateDispatch: React.Dispatch<AppAction>
+  appStateDispatch: React.Dispatch<AppAction> = () => { }
 
   constructor() {
     super(pluginProfile)
@@ -48,6 +48,20 @@ export class SkillsExplorerModalPlugin extends Plugin {
     this.appStateDispatch = appStateDispatch
   }
 
+  /**
+   * Close the modal. Uses two mechanisms for reliability:
+   * 1. Plugin's own dispatch → sets isOpen:false in PluginViewWrapper state → modal renders null
+   * 2. appStateDispatch → removes the plugin from the DOM entirely
+   */
+  closeModal() {
+    // Primary: update the plugin's own React state via PluginViewWrapper
+    this.dispatch({ ...this, isOpen: false })
+    // Secondary: remove from DOM via appState (works once setAppStateDispatch has been called)
+    try {
+      this.appStateDispatch({ type: appActionTypes.showSkillsModal, payload: false })
+    } catch (_) { /* appStateDispatch may not be set yet */ }
+  }
+
   render() {
     return (
       <div id="inner-remix-skills-explorer-modal">
@@ -57,18 +71,17 @@ export class SkillsExplorerModalPlugin extends Plugin {
   }
 
   renderComponent() {
-    this.dispatch({ ...this })
+    this.dispatch({ ...this, isOpen: true })
   }
 
   updateComponent(state: any) {
+    // isOpen defaults to true on first render (when triggered by button),
+    // becomes false when closeModal() dispatches { isOpen: false }
+    const isOpen = state.isOpen !== false
     return (
       <RemixUiSkillsExplorerModal
-        isOpen={true}
-        onClose={() => {
-          if (this.appStateDispatch) {
-            this.appStateDispatch({ type: 'SHOW_SKILLS_MODAL' as any, payload: false })
-          }
-        }}
+        isOpen={isOpen}
+        onClose={() => this.closeModal()}
         plugin={this}
       />
     )
