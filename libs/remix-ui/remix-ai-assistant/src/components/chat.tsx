@@ -110,7 +110,13 @@ export const ChatHistoryComponent: React.FC<ChatHistoryComponentProps> = ({
                       </small>
                     )}
 
-                    <div className={`aiMarkup lh-base text-wrap ${msg.isIntermediateContent ? 'text-muted' : ''}`}>
+                    <div className={`aiMarkup lh-base text-wrap ${msg.isIntermediateContent ? 'text-muted' : ''} ${msg.isSubagentStreaming ? 'subagent-content' : ''}`}
+                      style={msg.isSubagentStreaming ? {
+                        borderLeft: '3px solid rgba(23, 162, 184, 0.5)',
+                        paddingLeft: '8px',
+                        marginLeft: '4px'
+                      } : undefined}
+                    >
                       {msg.role === 'assistant' ? (
                         RemixMarkdownViewer(theme, msg.content ?? '')
                       ) : (
@@ -152,11 +158,19 @@ export const ChatHistoryComponent: React.FC<ChatHistoryComponentProps> = ({
                   </div>
                 )}
 
-                {/* Subagent Activity Indicator */}
-                {msg.role === 'assistant' && msg.activeSubagent && (
-                  <div className="subagent-indicator text-info small mb-2">
-                    <i className="fa fa-robot fa-spin me-2"></i>
-                    <span><strong>{msg.activeSubagent}</strong>: {msg.subagentTask}</span>
+                {/* Subagent Activity Indicator - shows when subagent is active */}
+                {msg.role === 'assistant' && (msg.activeSubagent || msg.isSubagentStreaming) && (
+                  <div className="subagent-indicator small mb-2 p-2 rounded" style={{
+                    backgroundColor: theme?.toLowerCase() === 'dark' ? 'rgba(23, 162, 184, 0.15)' : 'rgba(23, 162, 184, 0.1)',
+                    border: '1px solid rgba(23, 162, 184, 0.3)'
+                  }}>
+                    <div className="d-flex align-items-center">
+                      <i className={`fa fa-robot me-2 text-info ${msg.isSubagentStreaming ? 'fa-beat' : 'fa-spin'}`}></i>
+                      <span className="text-info">
+                        <strong>{msg.streamingSubagentName || msg.activeSubagent || 'Subagent'}</strong>
+                        {msg.isSubagentStreaming ? ' is responding...' : `: ${msg.subagentTask || 'Processing...'}`}
+                      </span>
+                    </div>
                   </div>
                 )}
 

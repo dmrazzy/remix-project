@@ -312,15 +312,23 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   // Listen for streaming chunks from DeepAgent
   useEffect(() => {
     // Handle stream chunks - supports both legacy string format and new object format
-    const handleStreamChunk = (data: string | { content: string; isIntermediate?: boolean; source?: string }) => {
+    const handleStreamChunk = (data: string | { content: string; isIntermediate?: boolean; source?: string; isSubagent?: boolean; subagentName?: string }) => {
       const chunk = typeof data === 'string' ? data : data.content
       const isIntermediate = typeof data === 'object' ? data.isIntermediate : false
+      const isSubagent = typeof data === 'object' ? data.isSubagent : false
+      const subagentName = typeof data === 'object' ? data.subagentName : undefined
 
       if (streamingAssistantIdRef.current) {
         setMessages(prev =>
           prev.map(m =>
             m.id === streamingAssistantIdRef.current
-              ? { ...m, content: m.content + chunk, isIntermediateContent: isIntermediate }
+              ? {
+                ...m,
+                content: m.content + chunk,
+                isIntermediateContent: isIntermediate,
+                isSubagentStreaming: isSubagent,
+                streamingSubagentName: subagentName
+              }
               : m
           )
         )
@@ -330,12 +338,30 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     const handleStreamComplete = (finalText: string) => {
       // Save to chat history when streaming completes
       if (streamingAssistantIdRef.current) {
+        const assistantId = streamingAssistantIdRef.current
         setMessages(prev => {
           const userMsg = prev[prev.length - 2]
           if (userMsg && userMsg.role === 'user' && finalText) {
             Promise.resolve(ChatHistory.pushHistory(userMsg.content, finalText)).then(() => props.plugin.loadConversations())
           }
-          return prev
+          // Clear all streaming and agent-related states
+          return prev.map(m =>
+            m.id === assistantId
+              ? {
+                ...m,
+                isSubagentStreaming: false,
+                streamingSubagentName: undefined,
+                activeSubagent: undefined,
+                subagentTask: undefined,
+                isExecutingTools: false,
+                executingToolName: undefined,
+                executingToolArgs: undefined,
+                currentTask: undefined,
+                taskStatus: undefined,
+                isIntermediateContent: false
+              }
+              : m
+          )
         })
       }
       setIsStreaming(false)
@@ -390,7 +416,13 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         setMessages(prev =>
           prev.map(m =>
             m.id === streamingAssistantIdRef.current
-              ? { ...m, activeSubagent: undefined, subagentTask: undefined }
+              ? {
+                ...m,
+                activeSubagent: undefined,
+                subagentTask: undefined,
+                isSubagentStreaming: false,
+                streamingSubagentName: undefined
+              }
               : m
           )
         )

@@ -507,15 +507,22 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         }
 
         const eventType = event.event
+        const metadata = event["metadata"] || {}
+        const checkpoint_ns = metadata["langgraph_checkpoint_ns"] || ""
+        const agent_name = metadata["lc_agent_name"] || ""
+        const is_subagent = checkpoint_ns.includes("tools:")
+
+        if (is_subagent) {
+          console.log(`[DeepAgentInferencer] Stream event from subagent detected: ${eventType} (agent: ${agent_name})`, event)
+        }
 
         if (eventType === 'on_chain_start') {
           const runName = event.name || ''
           const tags = event.tags || []
-
-          if (runName.includes('subagent') || tags.includes('subagent')) {
-            const subagentName = event.metadata?.subagent_name || runName
+          if (is_subagent && agent_name) {
+            console.log(`[DeepAgentInferencer] Subagent execution started: ${agent_name} (run_id: ${event.run_id})`, event)
+            const subagentName = agent_name
             activeSubagents.set(event.run_id, { name: subagentName, startTime: Date.now() })
-            console.log(`[DeepAgentInferencer] Subagent started: ${subagentName} (run_id: ${event.run_id})`)
 
             this.event.emit('onSubagentStart', {
               id: event.run_id,
@@ -541,6 +548,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
         if (eventType === 'on_chain_end' && activeSubagents.has(event.run_id)) {
           const subagent = activeSubagents.get(event.run_id)!
+          console.log(`[DeepAgentInferencer] Subagent completed: ${subagent.name} (run_id: ${event.run_id})`)
           const duration = Date.now() - subagent.startTime
 
           this.event.emit('onSubagentComplete', {
@@ -568,7 +576,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
                 deltaContent = chunk.content[0]
               }
             }
-            console.log(`[DeepAgentInferencer] Received stream chunk (run_id: ${event.run_id}):`, deltaContent)
 
             if (deltaContent) {
               const currentRunId = event.run_id
@@ -578,11 +585,24 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
               previousRunId = currentRunId
 
               fullResponse += deltaContent
-              this.event.emit('onStreamResult', {
-                content: deltaContent,
-                isIntermediate: isIntermediatePhase,
-                source: event.metadata?.langgraph_node || 'agent'
-              })
+
+              if (is_subagent) {
+                this.event.emit('onStreamResult', {
+                  content: deltaContent,
+                  isIntermediate: isIntermediatePhase,
+                  source: event.metadata?.langgraph_node || 'agent',
+                  isSubagent: true,
+                  subagentName: agent_name
+                })
+              } else {
+                this.event.emit('onStreamResult', {
+                  content: deltaContent,
+                  isIntermediate: isIntermediatePhase,
+                  source: event.metadata?.langgraph_node || 'agent',
+                  isSubagent: false,
+                  subagentName: ""
+                })
+              }
             }
           }
         } else if (eventType === 'on_chain_end') {

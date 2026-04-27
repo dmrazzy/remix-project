@@ -32,6 +32,8 @@ export interface ChatMessage {
   isIntermediateContent?: boolean
   todos?: TodoItem[]
   currentTodoIndex?: number
+  isSubagentStreaming?: boolean
+  streamingSubagentName?: string
 }
 
 /**
