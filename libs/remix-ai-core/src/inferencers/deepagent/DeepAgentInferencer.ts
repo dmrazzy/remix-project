@@ -37,6 +37,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { buildChatPrompt } from '../../prompts/promptBuilder'
 import { MemorySaver } from "@langchain/langgraph";
+import { getBasicFileToolsForGasOptimizer, getBasicMcpToolsForSecurityAuditor, getCoordinationToolsForComprehensiveAuditor, getEducationToolsForWeb3Educator } from './helpers'
 
 // Model provider types
 type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
@@ -205,124 +206,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.warn('[DeepAgentInferencer] Failed to initialize tools:', error)
       this.tools = []
     }
-  }
-
-  /**
-   * Get basic MCP tools and slither_scan for Security Auditor
-   */
-  private getBasicMcpToolsForSecurityAuditor(): DynamicStructuredTool[] {
-    const basicToolNames = [
-      // Basic file operations
-      'file_read',
-      'file_write',
-      'file_create',
-      'file_delete',
-      'file_move',
-      'file_copy',
-      'directory_list',
-      'file_exists',
-      'file_replace',
-      'read_file_chunk',
-      'grep_file',
-      // Security analysis
-      'slither_scan'
-    ]
-
-    const basicTools = this.tools.filter(tool =>
-      basicToolNames.includes(tool.name)
-    )
-
-    console.log(`[DeepAgentInferencer] Security Auditor tools: ${basicTools.map(t => t.name).join(', ')}`)
-    return basicTools
-  }
-
-  /**
-   * Get basic file tools for Gas Optimizer
-   */
-  private getBasicFileToolsForGasOptimizer(): DynamicStructuredTool[] {
-    const basicFileToolNames = [
-      // Basic file operations
-      'file_read',
-      'file_write',
-      'file_create',
-      'file_delete',
-      'file_move',
-      'file_copy',
-      'directory_list',
-      'file_exists',
-      'file_replace',
-      'read_file_chunk',
-      'grep_file'
-    ]
-
-    const basicFileTools = this.tools.filter(tool =>
-      basicFileToolNames.includes(tool.name)
-    )
-
-    console.log(`[DeepAgentInferencer] Gas Optimizer tools: ${basicFileTools.map(t => t.name).join(', ')}`)
-    return basicFileTools
-  }
-
-  /**
-   * Get coordination tools for Comprehensive Auditor
-   * Note: Uses built-in task tool instead of custom invoke_subagent
-   */
-  private getCoordinationToolsForComprehensiveAuditor(): DynamicStructuredTool[] {
-    const coordinationToolNames = [
-      // Basic file operations
-      'file_read',
-      'file_write',
-      'file_create',
-      'file_delete',
-      'file_move',
-      'file_copy',
-      'directory_list',
-      'file_exists',
-      'file_replace',
-      'read_file_chunk',
-      'grep_file',
-      // Coordination tools (invoke_subagent removed - using built-in task tool)
-      'verify_findings',
-      'aggregate_findings',
-      'resolve_conflicts'
-    ]
-
-    const coordinationTools = this.tools.filter(tool =>
-      coordinationToolNames.includes(tool.name)
-    )
-
-    console.log(`[DeepAgentInferencer] Comprehensive Auditor tools: ${coordinationTools.map(t => t.name).join(', ')} + built-in task tool`)
-    return coordinationTools
-  }
-
-  /**
-   * Get education tools for Web3 Educator
-   */
-  private getEducationToolsForWeb3Educator(): DynamicStructuredTool[] {
-    const educationToolNames = [
-      // Basic file operations
-      'file_read',
-      'file_write',
-      'file_create',
-      'file_delete',
-      'file_move',
-      'file_copy',
-      'directory_list',
-      'file_exists',
-      'file_replace',
-      'read_file_chunk',
-      'grep_file',
-      // Tutorial tools
-      'start_tutorial',
-      'tutorials_list'
-    ]
-
-    const educationTools = this.tools.filter(tool =>
-      educationToolNames.includes(tool.name)
-    )
-
-    console.log(`[DeepAgentInferencer] Web3 Educator tools: ${educationTools.map(t => t.name).join(', ')}`)
-    return educationTools
   }
 
   /**
@@ -735,10 +618,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         const alchemyTools = this.toolSelector ?
           this.toolSelector.getAlchemyTools() : []
 
-        const basicMcpTools = this.getBasicMcpToolsForSecurityAuditor()
-        const basicFileTools = this.getBasicFileToolsForGasOptimizer()
-        const coordinationTools = this.getCoordinationToolsForComprehensiveAuditor()
-        const educationTools = this.getEducationToolsForWeb3Educator()
+        const basicMcpTools = getBasicMcpToolsForSecurityAuditor(this.tools)
+        const basicFileTools = getBasicFileToolsForGasOptimizer(this.tools)
+        const coordinationTools = getCoordinationToolsForComprehensiveAuditor(this.tools)
+        const educationTools = getEducationToolsForWeb3Educator(this.tools)
 
         const generalTools = this.toolSelector ?
           this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
