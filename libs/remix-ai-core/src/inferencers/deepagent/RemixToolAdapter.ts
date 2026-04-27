@@ -8,6 +8,16 @@ import { IMCPToolResult, IMCPTool, IMCPToolCall } from '../../types/mcp'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { RemixToolDefinition, ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
+import EventEmitter from 'events'
+import {
+  ToolApprovalRequest,
+  ToolApprovalResponse,
+  ToolApprovalPolicy,
+  shouldRequireApproval,
+  getToolMetadata,
+  isSafeTool,
+  DIRECT_WRITE_TOOLS
+} from '../../types/humanInTheLoop'
 
 /**
  * Convert JSON Schema to Zod schema for LangChain
@@ -78,15 +88,178 @@ function mcpResultToString(result: IMCPToolResult): string {
 }
 
 /**
+ * Wraps tool execution with user approval when the tool is risky.
+ * Emits 'onToolApprovalRequired' and waits for 'onToolApprovalResponse'.
+ */
+export class ToolApprovalGate {
+  private eventEmitter: EventEmitter
+  private policy: ToolApprovalPolicy
+  private plugin: Plugin
+  private pendingApprovals = new Map<string, { resolve: (approved: boolean, modified?: Record<string, any>) => void }>()
+
+  constructor(plugin: Plugin, eventEmitter: EventEmitter, policy: ToolApprovalPolicy = 'ask_risky') {
+    this.plugin = plugin
+    this.eventEmitter = eventEmitter
+    this.policy = policy
+
+    this.eventEmitter.on('onToolApprovalResponse', (response: ToolApprovalResponse) => {
+
+      const pending = this.pendingApprovals.get(response.requestId)
+      if (pending) {
+        pending.resolve(response.approved, response.modifiedArgs)
+        this.pendingApprovals.delete(response.requestId)
+      } else {
+
+      }
+    })
+  }
+
+  setPolicy(policy: ToolApprovalPolicy) {
+    this.policy = policy
+  }
+
+  /**
+   * Wrap a tool's func so risky calls require user approval first.
+   * For file-write MCP tools, after approval, writes directly to avoid
+   * the handler's internal showCustomDiff (which would cause double-approval).
+   */
+  wrap(toolName: string, originalFunc: (args: Record<string, any>) => Promise<string>): (args: Record<string, any>) => Promise<string> {
+    if (isSafeTool(toolName)) {
+
+      return originalFunc
+    }
+
+    return async (args: Record<string, any>): Promise<string> => {
+      if (!shouldRequireApproval(toolName, this.policy)) {
+
+        return originalFunc(args)
+      }
+
+      const meta = getToolMetadata(toolName)
+      const requestId = `approval_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const filePath = args.path || args.filePath
+
+      // === Compute existingContent and proposedContent for the approval modal ===
+      let existingContent: string | undefined
+      let proposedContent: string | undefined
+
+      if (meta.category === 'file_write' && filePath) {
+        try {
+          existingContent = await this.plugin.call('fileManager', 'readFile', filePath)
+
+        } catch {
+          // File doesn't exist yet — that's fine for file_create / file_write on new files
+
+        }
+
+        if (toolName === 'file_replace') {
+          // file_replace uses regEx + contentToReplace, NOT content.
+          // Compute the full resulting file content so the user sees a proper diff.
+          if (existingContent && args.regEx && args.contentToReplace !== undefined) {
+            try {
+              proposedContent = existingContent.replace(new RegExp(args.regEx, 'g'), args.contentToReplace)
+
+            } catch (regexErr) {
+              console.warn('[HITL][ApprovalGate] file_replace: regex failed:', regexErr)
+              proposedContent = undefined
+            }
+          }
+        } else {
+          // file_write, file_create: content is in args.content or args.data
+          proposedContent = args.content || args.data
+
+        }
+      } else {
+        // Non-file tools — just use content/data if present
+        proposedContent = args.content || args.data
+      }
+
+      const request: ToolApprovalRequest = {
+        requestId,
+        toolName,
+        toolArgs: args,
+        category: meta.category,
+        risk: meta.risk,
+        existingContent,
+        proposedContent,
+        filePath,
+        timestamp: Date.now()
+      }
+
+      // Wait for user decision
+      const { approved, modifiedArgs } = await new Promise<{ approved: boolean; modifiedArgs?: Record<string, any> }>(
+        (resolve) => {
+          this.pendingApprovals.set(requestId, {
+            resolve: (approved, modified) => resolve({ approved, modifiedArgs: modified })
+          })
+          this.eventEmitter.emit('onToolApprovalRequired', request)
+        }
+      )
+
+      if (!approved) {
+        return JSON.stringify({ cancelled: true, reason: `REJECTED: The user explicitly rejected this ${toolName} operation. Do NOT retry this operation or use alternative tools/methods. Inform the user and move on.` })
+      }
+
+      const finalArgs = modifiedArgs || args
+
+      // === DIRECT WRITE: For file-write MCP tools, write directly via fileManager ===
+      // This bypasses the handler's execute() which would call showCustomDiff and
+      // create a double-approval situation.
+      if (DIRECT_WRITE_TOOLS.has(toolName) && filePath) {
+
+        try {
+          if (toolName === 'file_replace') {
+            // Re-compute the replacement with (possibly modified) args
+            const currentContent = await this.plugin.call('fileManager', 'readFile', filePath)
+            const resultContent = currentContent.replace(
+              new RegExp(finalArgs.regEx, 'g'),
+              finalArgs.contentToReplace
+            )
+            await this.plugin.call('fileManager', 'writeFile', filePath, resultContent)
+
+            return JSON.stringify({ success: true, path: filePath, message: 'File replaced successfully' })
+
+          } else {
+            // file_write or file_create
+            const content = finalArgs.content || finalArgs.data || ''
+            const exists = await this.plugin.call('fileManager', 'exists', filePath)
+            if (!exists) {
+              // Ensure parent directory structure is created (writeFile handles this)
+
+            }
+            await this.plugin.call('fileManager', 'writeFile', filePath, content)
+
+            return JSON.stringify({ success: true, path: filePath, message: 'File written successfully' })
+          }
+        } catch (writeErr) {
+          console.error('[HITL][ApprovalGate][DirectWrite] Write failed:', writeErr)
+          return JSON.stringify({ success: false, error: `Failed to write file: ${writeErr.message}` })
+        }
+      }
+
+      // === FALLBACK: For non-file tools, call the original handler as before ===
+      return originalFunc(finalArgs)
+    }
+  }
+
+  dispose() {
+    this.eventEmitter.removeAllListeners('onToolApprovalResponse')
+    this.pendingApprovals.clear()
+  }
+}
+
+/**
  * RemixToolAdapter converts Remix MCP tools to LangChain format
  */
 export class RemixToolAdapter {
   private plugin: Plugin
   private toolRegistry: ToolRegistry
+  private approvalGate?: ToolApprovalGate
 
-  constructor(plugin: Plugin, toolRegistry: ToolRegistry) {
+  constructor(plugin: Plugin, toolRegistry: ToolRegistry, approvalGate?: ToolApprovalGate) {
     this.plugin = plugin
     this.toolRegistry = toolRegistry
+    this.approvalGate = approvalGate
   }
 
   /**
@@ -149,24 +322,31 @@ export class RemixToolAdapter {
         // Convert inputSchema to Zod schema
         const zodSchema = jsonSchemaToZod(tool.inputSchema)
 
+        let func = async (input: Record<string, any>): Promise<string> => {
+          try {
+            const toolCall: IMCPToolCall = {
+              name: tool.name,
+              arguments: input
+            }
+
+            const result: IMCPToolResult = await mcpInferencer.executeTool(serverName, toolCall)
+            return mcpResultToString(result)
+          } catch (error) {
+            return `Tool execution error: ${error.message}`
+          }
+        }
+
+        // Wrap risky MCP tools with approval gate (file_write, file_create, etc.)
+        if (this.approvalGate) {
+
+          func = this.approvalGate.wrap(tool.name, func)
+        }
+
         const langChainTool = new DynamicStructuredTool({
           name: tool.name,
           description: `[${serverName}] ${tool.description}`,
           schema: zodSchema,
-          func: async (input: Record<string, any>) => {
-            try {
-              // Execute tool through MCPInferencer
-              const toolCall: IMCPToolCall = {
-                name: tool.name,
-                arguments: input
-              }
-
-              const result: IMCPToolResult = await mcpInferencer.executeTool(serverName, toolCall)
-              return mcpResultToString(result)
-            } catch (error) {
-              return `Tool execution error: ${error.message}`
-            }
-          }
+          func
         })
 
         tools.push(langChainTool)
@@ -182,24 +362,26 @@ export class RemixToolAdapter {
    * Convert a Remix MCP tool definition to LangChain tool
    */
   private convertToLangChainTool(toolDef: RemixToolDefinition): DynamicStructuredTool {
-    // Convert inputSchema to Zod schema
     const zodSchema = jsonSchemaToZod(toolDef.inputSchema)
+
+    let func = async (input: Record<string, any>): Promise<string> => {
+      try {
+        const result = await toolDef.handler.execute(input, this.plugin)
+        return mcpResultToString(result)
+      } catch (error) {
+        return `Tool execution error: ${error.message}`
+      }
+    }
+
+    if (this.approvalGate) {
+      func = this.approvalGate.wrap(toolDef.name, func)
+    }
 
     return new DynamicStructuredTool({
       name: toolDef.name,
       description: toolDef.description,
       schema: zodSchema,
-      func: async (input: Record<string, any>) => {
-        try {
-          // Execute the tool handler
-          const result = await toolDef.handler.execute(input, this.plugin)
-
-          // Convert result to string
-          return mcpResultToString(result)
-        } catch (error) {
-          return `Tool execution error: ${error.message}`
-        }
-      }
+      func
     })
   }
 
@@ -296,9 +478,10 @@ export class RemixToolAdapter {
 export async function createRemixTools(
   plugin: Plugin,
   toolRegistry: ToolRegistry,
-  mcpInferencer?: any
+  mcpInferencer?: any,
+  approvalGate?: ToolApprovalGate
 ): Promise<DynamicStructuredTool[]> {
-  const adapter = new RemixToolAdapter(plugin, toolRegistry)
+  const adapter = new RemixToolAdapter(plugin, toolRegistry, approvalGate)
 
   // Get Solidity-specific tools from internal Remix MCP server
   const solidityTools = adapter.getSolidityTools()
