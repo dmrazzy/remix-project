@@ -68,7 +68,7 @@ export class RemixFilesystemBackend {
 
       return content
     } catch (error) {
-      return`Failed to read file ${path}: ${error.message}`
+      return `Failed to read file ${path}: ${error.message}`
     }
   }
 
@@ -179,7 +179,7 @@ export class RemixFilesystemBackend {
         return files[name].isDirectory ? `${name}/` : name
       })
     } catch (error) {
-      return [`Failed to list directory ${path || 'cwd'}: ${error.message}`]  
+      return [`Failed to list directory ${path || 'cwd'}: ${error.message}`]
     }
   }
 
@@ -368,7 +368,7 @@ export class RemixFilesystemBackend {
       const contractMatch = line.match(contractRegex)
       if (contractMatch) {
         currentContract = contractMatch[2]
-        contracts[currentContract] = { functions: [], events: [] }
+        contracts[currentContract] = { functions: [], events: []}
         summary.push(`=== ${contractMatch[1]} ${currentContract} ===`)
       }
 

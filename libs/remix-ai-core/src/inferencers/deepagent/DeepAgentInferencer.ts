@@ -140,7 +140,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     // Initialize tools (with external MCP clients if available)
     this.initializeTools(toolRegistry, mcpInferencer)
-    
+
     this.toolSelector = new ToolSelector()
   }
 
@@ -149,7 +149,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   async initialize(): Promise<void> {
     try {
-      console.log('[DeepAgentInferencer] Initializing DeepAgent...')      // Dynamic import of deepagents only
+      console.log('[DeepAgentInferencer] Initializing DeepAgent...') // Dynamic import of deepagents only
 
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
       console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
@@ -172,11 +172,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         await this.toolSelector.buildToolIndex(this.tools)
       }
 
-      const metaTools = this.tools.filter(tool => 
+      const metaTools = this.tools.filter(tool =>
         tool.name === 'get_tool_schema' || tool.name === 'call_tool'
       )
 
-      this.createAgentWithTools(metaTools)     
+      this.createAgentWithTools(metaTools)
       console.log('[DeepAgentInferencer] Agent created successfully')
       console.log('[DeepAgentInferencer] DeepAgent instance created successfully', this.agent)
 
@@ -593,9 +593,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private async createAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
     try {
       const { createDeepAgent } = await import('deepagents')
-      
+
       const checkpointer = new MemorySaver()
-      
+
       // Create agent configuration with selected tools
       const agentConfig: any = {
         backend: this.filesystemBackend,
@@ -607,19 +607,19 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
 
       if (this.config.enableSubagents) {
-        const toolInventoryPrompt = this.toolSelector ? 
+        const toolInventoryPrompt = this.toolSelector ?
           this.toolSelector.generateToolInventoryPrompt(this.tools) : ""
-        
-        const etherscanTools = this.toolSelector ? 
+
+        const etherscanTools = this.toolSelector ?
           this.toolSelector.getEtherscanTools() : []
-        const theGraphTools = this.toolSelector ? 
+        const theGraphTools = this.toolSelector ?
           this.toolSelector.getTheGraphTools() : []
-        const alchemyTools = this.toolSelector ? 
+        const alchemyTools = this.toolSelector ?
           this.toolSelector.getAlchemyTools() : []
-        
-        const generalTools = this.toolSelector ? 
+
+        const generalTools = this.toolSelector ?
           this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
-        
+
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
@@ -664,7 +664,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             backend: this.filesystemBackend
           }
         ]
-        
+
         console.log(`[DeepAgentInferencer] Configured 6 subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
@@ -680,7 +680,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       agentConfig.systemPrompt = enhancedSystemPrompt
 
       this.agent = createDeepAgent(agentConfig)
-      
+
       console.log(`[DeepAgentInferencer] Recreated agent with ${selectedTools.length} selected tools`)
     } catch (error) {
       console.error('[DeepAgentInferencer] Failed to recreate agent with selected tools:', error)

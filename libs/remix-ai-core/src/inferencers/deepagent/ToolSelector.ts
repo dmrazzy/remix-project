@@ -92,19 +92,19 @@ export class ToolSelector {
         const content = `${tool.name}: ${tool.description}`
         const document = new Document({
           pageContent: content,
-          metadata: { 
-            index, 
+          metadata: {
+            index,
             toolName: tool.name,
             category: this.categorizeToolFromName(tool.name)
           }
         })
-        
+
         return { tool, document }
       })
 
       // Build vector store
       const documents = this.toolDocuments.map(td => td.document)
-      
+
       // For now, always use simple text-based matching as it's more reliable
       // TODO: Add proper vector embeddings when @langchain/openai is available
       this.vectorStore = new SimpleVectorStore(documents)
@@ -124,7 +124,7 @@ export class ToolSelector {
       this.initialized = false
     }
   }
-  
+
   /**
    * Get Etherscan-specific tools for the Etherscan subagent
    */
@@ -133,7 +133,7 @@ export class ToolSelector {
       .filter(td => {
         // Check if tool comes from Etherscan MCP server
         const description = td.tool.description.toLowerCase()
-        return description.includes('[etherscan]') || 
+        return description.includes('[etherscan]') ||
                td.tool.name.toLowerCase().includes('etherscan') ||
                description.includes('etherscan')
       })
@@ -151,7 +151,7 @@ export class ToolSelector {
       .filter(td => {
         // Check if tool comes from TheGraph MCP server
         const description = td.tool.description.toLowerCase()
-        return description.includes('[the graph api]') || 
+        return description.includes('[the graph api]') ||
                description.includes('[thegraph]') ||
                td.tool.name.toLowerCase().includes('thegraph') ||
                td.tool.name.toLowerCase().includes('graph') ||
@@ -173,7 +173,7 @@ export class ToolSelector {
       .filter(td => {
         // Check if tool comes from Alchemy MCP server
         const description = td.tool.description.toLowerCase()
-        return description.includes('[alchemy]') || 
+        return description.includes('[alchemy]') ||
                td.tool.name.toLowerCase().includes('alchemy') ||
                description.includes('alchemy')
       })
@@ -189,7 +189,7 @@ export class ToolSelector {
   filterOutEtherscanTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
     const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
     const filteredTools = tools.filter(tool => !etherscanToolNames.has(tool.name))
-    
+
     console.log(`[ToolSelector] Filtered out ${tools.length - filteredTools.length} Etherscan tools from main agent`)
     return filteredTools
   }
@@ -200,7 +200,7 @@ export class ToolSelector {
   filterOutTheGraphTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
     const filteredTools = tools.filter(tool => !theGraphToolNames.has(tool.name))
-    
+
     console.log(`[ToolSelector] Filtered out ${tools.length - filteredTools.length} TheGraph tools from main agent`)
     return filteredTools
   }
@@ -211,7 +211,7 @@ export class ToolSelector {
   filterOutAlchemyTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
     const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
     const filteredTools = tools.filter(tool => !alchemyToolNames.has(tool.name))
-    
+
     console.log(`[ToolSelector] Filtered out ${tools.length - filteredTools.length} Alchemy tools from main agent`)
     return filteredTools
   }
@@ -223,13 +223,13 @@ export class ToolSelector {
     const etherscanToolNames = new Set(this.getEtherscanTools().map(t => t.name))
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
     const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
-    
-    const filteredTools = tools.filter(tool => 
-      !etherscanToolNames.has(tool.name) && 
+
+    const filteredTools = tools.filter(tool =>
+      !etherscanToolNames.has(tool.name) &&
       !theGraphToolNames.has(tool.name) &&
       !alchemyToolNames.has(tool.name)
     )
-    
+
     const removedCount = tools.length - filteredTools.length
     console.log(`[ToolSelector] Filtered out ${removedCount} specialist tools (Etherscan + TheGraph + Alchemy) from main agent`)
     return filteredTools
@@ -240,13 +240,13 @@ export class ToolSelector {
    */
   private categorizeToolFromName(toolName: string): string {
     const name = toolName.toLowerCase()
-    
+
     if (name.includes('compile') || name.includes('solidity')) return 'compilation'
     if (name.includes('debug') || name.includes('trace')) return 'debugging'
     if (name.includes('deploy') || name.includes('network')) return 'deployment'
     if (name.includes('analyze') || name.includes('security') || name.includes('audit')) return 'analysis'
     if (name.includes('file') || name.includes('read') || name.includes('write')) return 'file'
-    
+
     return 'general'
   }
 
@@ -259,10 +259,10 @@ export class ToolSelector {
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
     const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
     console.log('Specialist tools:', { theGraphToolNames, etherscanToolNames, alchemyToolNames })
-    
+
     const nonSelectedTools = this.toolDocuments
-      .filter(td => 
-        !selectedToolNames.has(td.tool.name) && 
+      .filter(td =>
+        !selectedToolNames.has(td.tool.name) &&
         !etherscanToolNames.has(td.tool.name) && // Exclude Etherscan tools
         !theGraphToolNames.has(td.tool.name) && // Exclude TheGraph tools
         !alchemyToolNames.has(td.tool.name) // Exclude Alchemy tools
@@ -274,7 +274,7 @@ export class ToolSelector {
     }
 
     const toolCategories: Record<string, Array<{name: string, description: string}>> = {}
-    
+
     // Group non-selected tools by category
     for (const tool of nonSelectedTools) {
       const category = this.categorizeToolFromName(tool.name)
@@ -305,7 +305,7 @@ export class ToolSelector {
     prompt += "Examples:\n"
     prompt += "- To understand a tool: get_tool_schema({\"toolName\": \"tool_name_here\"})\n"
     prompt += "- To call a tool directly: call_tool({\"toolName\": \"tool_name_here\", \"arguments\": {\"param1\": \"value1\"}})\n"
-    
+
     console.log(`[ToolSelector] Generated tool inventory prompt for ${nonSelectedTools.length} additional tools (Etherscan + TheGraph + Alchemy tools excluded)`)
     return prompt
   }
@@ -315,7 +315,7 @@ export class ToolSelector {
    */
   private createGetToolSchemaTool(): DynamicStructuredTool {
     const DynamicStructuredTool = require('@langchain/core/tools').DynamicStructuredTool
-    
+
     return new DynamicStructuredTool({
       name: 'get_tool_schema',
       description: 'Get the schema and description of any available tool by name. Use this to understand how to call tools that are not currently loaded.',
@@ -328,7 +328,7 @@ export class ToolSelector {
           const availableTools = this.toolDocuments.map(td => td.tool.name).join(', ')
           return `Tool '${input.toolName}' not found. Available tools: ${availableTools}`
         }
-        
+
         return JSON.stringify({
           name: tool.tool.name,
           description: tool.tool.description,
@@ -344,7 +344,7 @@ export class ToolSelector {
    */
   private createCallToolMetaTool(): DynamicStructuredTool {
     const DynamicStructuredTool = require('@langchain/core/tools').DynamicStructuredTool
-    
+
     return new DynamicStructuredTool({
       name: 'call_tool',
       description: 'Call any available tool by name with the provided arguments. Use get_tool_schema first to understand the required arguments.',
@@ -358,24 +358,24 @@ export class ToolSelector {
           const availableTools = this.toolDocuments.map(td => td.tool.name).join(', ')
           return `Error: Tool '${input.toolName}' not found. Available tools: ${availableTools}`
         }
-        
+
         try {
           // Call the actual tool with provided arguments
           // Note: Validation is handled by the tool itself
-          let validatedArgs = input.arguments
-          
+          const validatedArgs = input.arguments
+
           // Call the actual tool
           console.log(`[ToolSelector] Calling tool '${input.toolName}' with args:`, validatedArgs)
           const result = await toolDoc.tool.func(validatedArgs)
-          
+
           return `Tool '${input.toolName}' executed successfully. Result: ${result}`
         } catch (error: any) {
           console.error(`[ToolSelector] Error calling tool '${input.toolName}':`, error)
-          
+
           if (error.name === 'ZodError') {
             return `Error: Invalid arguments for tool '${input.toolName}'. ${error.message}. Use get_tool_schema to see the correct argument format.`
           }
-          
+
           return `Error calling tool '${input.toolName}': ${error.message || error}`
         }
       }
@@ -395,11 +395,11 @@ export class ToolSelector {
     const essentialTools = this.toolDocuments
       .filter(td => essentialToolNames.includes(td.tool.name))
       .map(td => td.tool)
-    
+
     // Add the meta-tools
     essentialTools.push(this.createGetToolSchemaTool())
     essentialTools.push(this.createCallToolMetaTool())
-    
+
     return essentialTools
   }
 
