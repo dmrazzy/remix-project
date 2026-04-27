@@ -168,6 +168,40 @@ export const ChatHistoryComponent: React.FC<ChatHistoryComponentProps> = ({
                   </div>
                 )}
 
+                {/* Todo List Display */}
+                {msg.role === 'assistant' && msg.todos && msg.todos.length > 0 && (
+                  <div className="todo-list-container mt-2 mb-2 p-2 rounded" style={{
+                    backgroundColor: theme?.toLowerCase() === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                    border: '1px solid var(--bs-border-color)'
+                  }}>
+                    <div className="todo-list-header d-flex align-items-center mb-2">
+                      <i className="fa fa-list-check me-2 text-primary"></i>
+                      <strong className="small">Task Plan</strong>
+                      <span className="ms-2 badge bg-secondary small">
+                        {msg.todos.filter(t => t.status === 'completed').length}/{msg.todos.length}
+                      </span>
+                    </div>
+                    <ul className="todo-list list-unstyled mb-0 small">
+                      {msg.todos.map((todo, idx) => {
+                        const isCurrentTodo = msg.currentTodoIndex === idx
+                        return (
+                          <li key={todo.id || idx} className={`todo-item d-flex align-items-start mb-1 ${isCurrentTodo ? 'fw-bold' : ''}`}>
+                            <span className="todo-status me-2" style={{ width: '16px' }}>
+                              {todo.status === 'completed' && <i className="fa fa-check-circle text-success"></i>}
+                              {todo.status === 'in_progress' && <i className="fa fa-spinner fa-spin text-primary"></i>}
+                              {todo.status === 'pending' && <i className="fa fa-circle text-muted" style={{ opacity: 0.4 }}></i>}
+                              {todo.status === 'failed' && <i className="fa fa-times-circle text-danger"></i>}
+                            </span>
+                            <span className={`todo-task ${todo.status === 'completed' ? 'text-success' : ''} ${isCurrentTodo && todo.status !== 'completed' ? 'text-primary' : ''}`}>
+                              {todo.content || todo.task}
+                            </span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                )}
+
                 {/* Feedback buttons */}
                 {msg.role === 'assistant' && (
                   <div className="feedback text-end mt-2 me-1">

@@ -89,6 +89,7 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.removeAllListeners('onSubagentComplete')
     eventEmitter.removeAllListeners('onTaskStart')
     eventEmitter.removeAllListeners('onTaskComplete')
+    eventEmitter.removeAllListeners('onTodoUpdate')
 
     // Set up fresh listeners
     eventEmitter.on('onInference', () => {
@@ -117,6 +118,9 @@ export class RemixAIPlugin extends Plugin {
     })
     eventEmitter.on('onTaskComplete', (data: { id: string; name: string; status: string }) => {
       this.emit('onTaskComplete', data)
+    })
+    eventEmitter.on('onTodoUpdate', (data: { todos: any[]; timestamp: number }) => {
+      this.emit('onTodoUpdate', data)
     })
 
     this.deepAgentEventListenersSetup = true

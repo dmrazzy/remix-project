@@ -425,6 +425,20 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       }
     }
 
+    // Handle todo update events from DeepAgent's write_todos tool
+    const handleTodoUpdate = (data: { todos: any[]; currentTodoIndex?: number; timestamp: number }) => {
+      console.log('[RemixAI Assistant] Todo list updated:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? { ...m, todos: data.todos, currentTodoIndex: data.currentTodoIndex }
+              : m
+          )
+        )
+      }
+    }
+
     props.plugin.on('remixAI', 'onStreamResult', handleStreamChunk)
     props.plugin.on('remixAI', 'onStreamComplete', handleStreamComplete)
     props.plugin.on('remixAI', 'onToolCall', handleToolCall)
@@ -432,6 +446,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     props.plugin.on('remixAI', 'onSubagentComplete', handleSubagentComplete)
     props.plugin.on('remixAI', 'onTaskStart', handleTaskStart)
     props.plugin.on('remixAI', 'onTaskComplete', handleTaskComplete)
+    props.plugin.on('remixAI', 'onTodoUpdate', handleTodoUpdate)
 
     return () => {
       props.plugin.off('remixAI', 'onStreamResult')
@@ -441,6 +456,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       props.plugin.off('remixAI', 'onSubagentComplete')
       props.plugin.off('remixAI', 'onTaskStart')
       props.plugin.off('remixAI', 'onTaskComplete')
+      props.plugin.off('remixAI', 'onTodoUpdate')
     }
   }, [props.plugin])
 

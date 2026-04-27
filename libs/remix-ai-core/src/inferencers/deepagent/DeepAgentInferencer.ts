@@ -568,6 +568,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
                 deltaContent = chunk.content[0]
               }
             }
+            console.log(`[DeepAgentInferencer] Received stream chunk (run_id: ${event.run_id}):`, deltaContent)
 
             if (deltaContent) {
               const currentRunId = event.run_id
@@ -595,9 +596,35 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         } else if (eventType === 'on_tool_start') {
           // Tool execution started - emit onToolCall event
           const toolName = event.name
-          const toolInput = event.data?.input || {}
+          const toolInput = JSON.parse(event.data?.input.input || '{}')
           console.log('[DeepAgentInferencer] Tool call started:', toolName, toolInput)
           this.event.emit('onToolCall', { toolName, toolInput, status: 'start' })
+
+          console.log('[DeepAgentInferencer] Checking for todo updates in tool input...', toolInput.todos)
+          if (toolName === 'write_todos' && toolInput?.todos) {
+            const todos = toolInput.todos
+            // Find the current todo being executed (first in_progress, or first pending if none in progress)
+            let currentTodoIndex = todos.findIndex((t: any) => t.status === 'in_progress')
+            if (currentTodoIndex === -1) {
+              const allCompleted = todos.every((t: any) => t.status === 'completed')
+              if (allCompleted) {
+                currentTodoIndex = todos.length - 1
+              } else {
+                currentTodoIndex = todos.findIndex((t: any) => t.status === 'pending')
+              }
+            }
+
+            const currentTodoContent = currentTodoIndex >= 0 ? (todos[currentTodoIndex]?.content || todos[currentTodoIndex]?.task) : undefined
+
+            console.log('[DeepAgentInferencer] Todo list updated:', todos, 'Current index:', currentTodoIndex, 'Current todo:', currentTodoContent)
+            this.event.emit('onToolCall', { toolName:currentTodoContent, toolInput: { }, status: 'start' }) // just for UI
+
+            this.event.emit('onTodoUpdate', {
+              todos: todos,
+              currentTodoIndex: currentTodoIndex,
+              timestamp: Date.now()
+            })
+          }
         } else if (eventType === 'on_tool_end') {
           // Tool execution completed
           const toolName = event.name
