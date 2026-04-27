@@ -73,7 +73,7 @@ export class SelfVerificationHandler extends BaseToolHandler {
 
       for (const finding of args.findings) {
         const verification = await this.verifyFinding(finding, plugin);
-        
+
         if (verification.verified) {
           verifiedFindings.push({
             ...finding,
@@ -166,7 +166,7 @@ export class SelfVerificationHandler extends BaseToolHandler {
 
       // Check if code snippet matches or is similar
       const similarity = this.calculateCodeSimilarity(actualLine, expectedCode);
-      
+
       if (similarity > 0.7) {
         return {
           verified: true,
@@ -202,16 +202,16 @@ export class SelfVerificationHandler extends BaseToolHandler {
     // Simple similarity calculation
     const actualWords = actual.toLowerCase().split(/\s+/).filter(w => w.length > 0);
     const expectedWords = expected.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-    
+
     if (expectedWords.length === 0) return 0;
-    
+
     let matches = 0;
     for (const word of expectedWords) {
       if (actualWords.includes(word)) {
         matches++;
       }
     }
-    
+
     return matches / expectedWords.length;
   }
 }
@@ -302,19 +302,19 @@ export class AggregateFindingsHandler extends BaseToolHandler {
   async execute(args: { findings: any[]; consolidate_duplicates?: boolean }, plugin: Plugin): Promise<IMCPToolResult> {
     try {
       const consolidate = args.consolidate_duplicates !== false;
-      
+
       // Organize findings by type and severity
       const organized: Record<string, Record<string, any[]>> = {
-        security: { critical: [], high: [], medium: [], low: [], info: [] },
-        gas_optimization: { critical: [], high: [], medium: [], low: [], info: [] },
-        code_quality: { critical: [], high: [], medium: [], low: [], info: [] }
+        security: { critical: [], high: [], medium: [], low: [], info: []},
+        gas_optimization: { critical: [], high: [], medium: [], low: [], info: []},
+        code_quality: { critical: [], high: [], medium: [], low: [], info: []}
       };
 
       // Sort findings into categories
       for (const finding of args.findings) {
         const type = finding.type || 'code_quality';
         const severity = finding.severity || 'medium';
-        
+
         if (organized[type] && organized[type][severity]) {
           organized[type][severity].push(finding);
         }
@@ -511,7 +511,7 @@ export class ResolveConflictsHandler extends BaseToolHandler {
     };
 
     const order = priorityOrder[strategy] || priorityOrder['security_first'];
-    
+
     // Find the highest priority recommendation
     let chosenRecommendation = null;
     for (const priority of order) {

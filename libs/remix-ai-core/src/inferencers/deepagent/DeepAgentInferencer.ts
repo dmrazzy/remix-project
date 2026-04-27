@@ -214,7 +214,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     const basicToolNames = [
       // Basic file operations
       'file_read',
-      'file_write', 
+      'file_write',
       'file_create',
       'file_delete',
       'file_move',
@@ -228,7 +228,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       'slither_scan'
     ]
 
-    const basicTools = this.tools.filter(tool => 
+    const basicTools = this.tools.filter(tool =>
       basicToolNames.includes(tool.name)
     )
 
@@ -243,7 +243,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     const basicFileToolNames = [
       // Basic file operations
       'file_read',
-      'file_write', 
+      'file_write',
       'file_create',
       'file_delete',
       'file_move',
@@ -255,7 +255,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       'grep_file'
     ]
 
-    const basicFileTools = this.tools.filter(tool => 
+    const basicFileTools = this.tools.filter(tool =>
       basicFileToolNames.includes(tool.name)
     )
 
@@ -271,7 +271,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     const coordinationToolNames = [
       // Basic file operations
       'file_read',
-      'file_write', 
+      'file_write',
       'file_create',
       'file_delete',
       'file_move',
@@ -287,7 +287,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       'resolve_conflicts'
     ]
 
-    const coordinationTools = this.tools.filter(tool => 
+    const coordinationTools = this.tools.filter(tool =>
       coordinationToolNames.includes(tool.name)
     )
 
@@ -302,7 +302,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     const educationToolNames = [
       // Basic file operations
       'file_read',
-      'file_write', 
+      'file_write',
       'file_create',
       'file_delete',
       'file_move',
@@ -317,7 +317,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       'tutorials_list'
     ]
 
-    const educationTools = this.tools.filter(tool => 
+    const educationTools = this.tools.filter(tool =>
       educationToolNames.includes(tool.name)
     )
 
@@ -734,7 +734,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           this.toolSelector.getTheGraphTools() : []
         const alchemyTools = this.toolSelector ?
           this.toolSelector.getAlchemyTools() : []
-        
+
         const basicMcpTools = this.getBasicMcpToolsForSecurityAuditor()
         const basicFileTools = this.getBasicFileToolsForGasOptimizer()
         const coordinationTools = this.getCoordinationToolsForComprehensiveAuditor()

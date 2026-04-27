@@ -245,7 +245,7 @@ export class ToolSelector {
   filterOutEducationTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
     const educationToolNames = new Set(this.getEducationTools().map(t => t.name))
     const filteredTools = tools.filter(tool => !educationToolNames.has(tool.name))
-    
+
     console.log(`[ToolSelector] Filtered out ${tools.length - filteredTools.length} Education tools from main agent`)
     return filteredTools
   }
@@ -258,9 +258,9 @@ export class ToolSelector {
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
     const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
     const educationToolNames = new Set(this.getEducationTools().map(t => t.name))
-    
-    const filteredTools = tools.filter(tool => 
-      !etherscanToolNames.has(tool.name) && 
+
+    const filteredTools = tools.filter(tool =>
+      !etherscanToolNames.has(tool.name) &&
       !theGraphToolNames.has(tool.name) &&
       !alchemyToolNames.has(tool.name) &&
       !educationToolNames.has(tool.name)
@@ -292,7 +292,7 @@ export class ToolSelector {
     const theGraphToolNames = new Set(this.getTheGraphTools().map(t => t.name))
     const alchemyToolNames = new Set(this.getAlchemyTools().map(t => t.name))
     const educationToolNames = new Set(this.getEducationTools().map(t => t.name))
-    
+
     const nonSelectedTools = this.toolDocuments
       .filter(td =>
         !selectedToolNames.has(td.tool.name) &&
