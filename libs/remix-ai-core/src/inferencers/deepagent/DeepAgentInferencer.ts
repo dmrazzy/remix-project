@@ -180,7 +180,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         tool.name === 'get_tool_schema' || tool.name === 'call_tool'
       )
 
-      this.recreateAgentWithTools(metaTools)     
+      this.createAgentWithTools(metaTools)     
       console.log('[DeepAgentInferencer] Agent created successfully')
       console.log('[DeepAgentInferencer] DeepAgent instance created successfully', this.agent)
 
@@ -436,20 +436,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     let fullResponse = ''
 
     try {
-      // Main agent starts with only get_tool_schema and call_tool
-      const metaTools = this.tools.filter(tool => 
-        tool.name === 'get_tool_schema' || tool.name === 'call_tool'
-      )
-      const selectedTools = metaTools
-      
-      console.log(`[DeepAgentInferencer] Main agent using ${selectedTools.length} meta-tools only: ${selectedTools.map(t => t.name).join(', ')}`)
-      
-      // Recreate agent with selected tools if needed
-      if (selectedTools.length !== this.tools.length) {
-        console.log('[DeepAgentInferencer] Recreating agent with selected tools...')
-        await this.recreateAgentWithTools(selectedTools)
-      }
-
       // Filter out system messages - they're already set during agent creation
       const langchainMessages = messages
         .filter(msg => msg.role !== 'system')
@@ -613,7 +599,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   /**
    * Recreate agent with selected tools
    */
-  private async recreateAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
+  private async createAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
     try {
       const { createDeepAgent } = await import('deepagents')
       
