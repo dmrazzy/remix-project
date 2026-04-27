@@ -91,5 +91,8 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
       showSkillsModal: action.payload
     }
   }
+
+  default:
+    return state
   }
 }
