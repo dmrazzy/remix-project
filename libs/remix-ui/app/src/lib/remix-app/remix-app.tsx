@@ -1,6 +1,5 @@
 /* eslint-disable @nrwl/nx/enforce-module-boundaries */
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { RemixUiSkillsExplorerModal } from 'libs/remix-ui/skills-explorer-modal/src/lib/remix-ui-skills-explorer-modal'
 import './style/remix-app.css'
 import 'libs/remix-ui/remix-ai-assistant/src/css/remix-ai-assistant.css'
 import { RemixUIMainPanel } from '@remix-ui/panel'
@@ -119,6 +118,9 @@ const RemixApp = (props: IRemixAppUi) => {
   useEffect(() => {
     if (props.app.remixAiAssistant?.setAppStateDispatch) {
       props.app.remixAiAssistant.setAppStateDispatch(appStateDispatch)
+    }
+    if (props.app.skillExplorerModal?.setAppStateDispatch) {
+      props.app.skillExplorerModal.setAppStateDispatch(appStateDispatch)
     }
   }, [appStateDispatch, props.app.remixAiAssistant])
 
@@ -504,13 +506,7 @@ const RemixApp = (props: IRemixAppUi) => {
               }
               {appState.skillsModalState?.showModal && props.app.skillExplorerModal.render()
               }
-              {appState.showSkillsModal && (
-                <RemixUiSkillsExplorerModal
-                  isOpen={appState.showSkillsModal}
-                  onClose={() => appStateDispatch({ type: appActionTypes.showSkillsModal, payload: false })}
-                  plugin={props.app}
-                />
-              )}
+              {appState.showSkillsModal && props.app.skillExplorerModal.render()}
               {props.app.invitationManager.render()}
               {props.app.membershipRequest.render()}
               {showBetaTestRegisterWidget && props.app.betaCornerWidget.render()}

@@ -178,3 +178,34 @@
   height: 500px;
   max-height: 500px;
 }
+/* ========== Fixed footer for Load Selected button ========== */
+
+.skills-explorer-modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--bs-dark, #212529);
+}
+
+/* Make the modal use flex column so footer sticks to bottom */
+.skills-explorer-modal-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== Card description ellipsis ========== */
+
+.skill-card {
+  height: 130px;
+  overflow: hidden;
+}
+
+.card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

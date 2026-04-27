@@ -5,7 +5,7 @@ import { PluginViewWrapper } from '@remix-ui/helper'
 import { Plugin } from '@remixproject/engine'
 import { EventEmitter } from 'events'
 import * as packageJson from '../../../../../package.json'
-import { RemixUiSkillsExplorerModal, SkillInfo } from '../../../../../libs/remix-ui/skills-explorer-modal/src/lib/remix-ui-skills-explorer-modal'
+import { RemixUiSkillsExplorerModal } from 'libs/remix-ui/skills-explorer-modal/src/lib/remix-ui-skills-explorer-modal'
 
 const pluginProfile = {
   name: 'skillsexplorermodal',
@@ -25,7 +25,7 @@ export class SkillsExplorerModalPlugin extends Plugin {
   element: HTMLDivElement
   dispatch: React.Dispatch<any> = () => { }
   event: EventEmitter
-  appStateDispatch: any
+  appStateDispatch: React.Dispatch<AppAction>
 
   constructor() {
     super(pluginProfile)
@@ -35,13 +35,9 @@ export class SkillsExplorerModalPlugin extends Plugin {
     this.event = new EventEmitter()
   }
 
-  async onActivation(): Promise<void> {
+  async onActivation(): Promise<void> { }
 
-  }
-
-  onDeactivation(): void {
-
-  }
+  onDeactivation(): void { }
 
   setDispatch(dispatch: React.Dispatch<any>) {
     this.dispatch = dispatch
@@ -61,24 +57,17 @@ export class SkillsExplorerModalPlugin extends Plugin {
   }
 
   renderComponent() {
-    this.dispatch({
-      ...this,
-    })
+    this.dispatch({ ...this })
   }
 
   updateComponent(state: any) {
     return (
-      <RemixUiSkillsExplorerModal 
+      <RemixUiSkillsExplorerModal
         isOpen={true}
         onClose={() => {
-          // Close the modal by setting skillsModalState.showModal to false
           if (this.appStateDispatch) {
-            this.appStateDispatch({ type: 'SHOW_SKLLS_MODAL', payload: false })
+            this.appStateDispatch({ type: 'SHOW_SKILLS_MODAL' as any, payload: false })
           }
-        }}
-        onSkillSelect={(skill: SkillInfo) => {
-          console.log('Selected skill:', skill)
-          // Handle skill selection here
         }}
         plugin={this}
       />

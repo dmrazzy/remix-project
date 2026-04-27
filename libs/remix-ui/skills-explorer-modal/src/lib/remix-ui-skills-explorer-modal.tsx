@@ -266,20 +266,6 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
                   )}
                 </>
               )}
-
-              {/* Footer: Load button */}
-              {!loading && !error && selectedSkills.size > 0 && (
-                <div className="d-flex justify-content-end mt-4 pt-2 border-top border-secondary">
-                  <button
-                    data-id="skills-explorer-load-selected"
-                    className="btn btn-primary"
-                    onClick={handleLoadSelected}
-                  >
-                    <i className="fa-solid fa-download me-2"></i>
-                    Load {selectedSkills.size} Selected Skill{selectedSkills.size !== 1 ? 's' : ''}
-                  </button>
-                </div>
-              )}
             </>
           )}
 
@@ -339,6 +325,20 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
           )}
 
         </div>
+
+        {/* Fixed footer - outside scrollable area */}
+        {wizardStep === 'skills' && !loading && !error && selectedSkills.size > 0 && (
+          <div className="skills-explorer-modal-footer">
+            <button
+              data-id="skills-explorer-load-selected"
+              className="btn btn-primary"
+              onClick={handleLoadSelected}
+            >
+              <i className="fa-solid fa-download me-2"></i>
+              Load {selectedSkills.size} Selected Skill{selectedSkills.size !== 1 ? 's' : ''}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   )
