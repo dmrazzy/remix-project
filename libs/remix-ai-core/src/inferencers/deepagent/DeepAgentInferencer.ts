@@ -149,9 +149,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   async initialize(): Promise<void> {
     try {
-      console.log('[DeepAgentInferencer] Initializing DeepAgent...')
-      // Dynamic import of deepagents only
-      const { createDeepAgent } = await import('deepagents')
+      console.log('[DeepAgentInferencer] Initializing DeepAgent...')      // Dynamic import of deepagents only
 
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
       console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
@@ -170,100 +168,19 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         await this.memoryBackend.init()
       }
 
-      const checkpointer = new MemorySaver();
+      this.tools.push(...this.toolSelector?.getEssentialTools() || [])
 
       // Build tool index for selection
       if (this.toolSelector && this.tools.length > 0) {
         await this.toolSelector.buildToolIndex(this.tools)
-        console.log(`[DeepAgentInferencer] Built tool index with ${this.toolSelector.getStats().totalTools} tools`)
       }
 
-      // Filter out specialist tools from main agent
-      const mainAgentTools = this.toolSelector ? 
-        this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
-      
-      // Create DeepAgent configuration
-      console.log('[DeepAgentInferencer] Setting up agent configuration...')
-      const agentConfig: any = {
-        backend: this.filesystemBackend,
-        tools: mainAgentTools, // Specialist tools filtered out for main agent
-        model: this.model,
-        systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
-        skills: ["skills/"],
-        checkpointer
-      }
+      // Main agent starts with only meta-tools (get_tool_schema and call_tool)
+      const metaTools = this.tools.filter(tool => 
+        tool.name === 'get_tool_schema' || tool.name === 'call_tool'
+      )
 
-      // Configure specialized subagents (array format expected by deepagents)
-      if (this.config.enableSubagents) {
-        // Get specialist tools for dedicated subagents
-        const etherscanTools = this.toolSelector ? 
-          this.toolSelector.getEtherscanTools() : []
-        const theGraphTools = this.toolSelector ? 
-          this.toolSelector.getTheGraphTools() : []
-        const alchemyTools = this.toolSelector ? 
-          this.toolSelector.getAlchemyTools() : []
-        
-        // Filter out specialist tools from main tools for other subagents
-        const mainTools = this.toolSelector ? 
-          this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
-        
-        agentConfig.subagents = [
-          {
-            name: 'Security Auditor',
-            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: mainTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Code Reviewer',
-            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: mainTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Frontend Specialist',
-            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: mainTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Etherscan Specialist',
-            systemPrompt: ETHERSCAN_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: etherscanTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'TheGraph Specialist',
-            systemPrompt: THEGRAPH_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: theGraphTools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Alchemy Specialist',
-            systemPrompt: ALCHEMY_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: alchemyTools,
-            backend: this.filesystemBackend
-          }
-        ]
-        console.log(`[DeepAgentInferencer] Configured 6 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
-      }
-
-      // Add store if configured
-      console.log('[DeepAgentInferencer] Memory backend:', this.memoryBackend ? 'Enabled' : 'Disabled')
-      if (this.memoryBackend) {
-        agentConfig.store = this.memoryBackend
-      }
-
-      // Create the agent
-      console.log('[DeepAgentInferencer] Creating DeepAgent instance...')
-      this.agent = await createDeepAgent(agentConfig)
-
+      this.recreateAgentWithTools(metaTools)     
       console.log('[DeepAgentInferencer] Agent created successfully')
       console.log('[DeepAgentInferencer] DeepAgent instance created successfully', this.agent)
 
@@ -519,29 +436,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     let fullResponse = ''
 
     try {
-      // Select relevant tools for this query using conversation context
-      let selectedTools = this.tools
-      if (this.toolSelector && this.toolSelector.isReady()) {
-        // Choose tool selection method based on conversation length
-        if (messages.length > 6) {
-          // Use advanced analysis for longer conversations
-          selectedTools = await this.toolSelector.getRelevantToolsAdvanced(messages, 5, true)
-          console.log(`[DeepAgentInferencer] Using advanced conversation analysis for ${messages.length} messages`)
-        } else {
-          // Use simple context for shorter conversations
-          selectedTools = await this.toolSelector.getRelevantToolsWithContext(messages, 5, true)
-          console.log(`[DeepAgentInferencer] Using simple conversation context for ${messages.length} messages`)
-        }
-        
-        // Filter out specialist tools from main agent (they go to specialist subagents)
-        selectedTools = this.toolSelector.filterOutSpecialistTools(selectedTools)
-        
-        const userMessages = messages.filter(msg => msg.role === 'user')
-        const latestPrompt = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : ''
-        console.log(`[DeepAgentInferencer] Selected ${selectedTools.length} tools (5 context + meta-tools, specialist tools excluded) (latest: "${latestPrompt.slice(0, 50)}...")`)
-      } else {
-        console.log(`[DeepAgentInferencer] Tool selector not ready, using all ${this.tools.length} tools`)
-      }
+      // Main agent starts with only get_tool_schema and call_tool
+      const metaTools = this.tools.filter(tool => 
+        tool.name === 'get_tool_schema' || tool.name === 'call_tool'
+      )
+      const selectedTools = metaTools
+      
+      console.log(`[DeepAgentInferencer] Main agent using ${selectedTools.length} meta-tools only: ${selectedTools.map(t => t.name).join(', ')}`)
       
       // Recreate agent with selected tools if needed
       if (selectedTools.length !== this.tools.length) {
@@ -728,10 +629,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         checkpointer
       }
 
-      // Configure specialized subagents with selected tools and enhanced prompts
+      // Configure specialized subagents with all tools (not just selected tools for main agent)
       if (this.config.enableSubagents) {
         const toolInventoryPrompt = this.toolSelector ? 
-          this.toolSelector.generateToolInventoryPrompt(selectedTools) : ""
+          this.toolSelector.generateToolInventoryPrompt(this.tools) : ""
         
         // Get specialist tools for dedicated subagents
         const etherscanTools = this.toolSelector ? 
@@ -741,26 +642,30 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         const alchemyTools = this.toolSelector ? 
           this.toolSelector.getAlchemyTools() : []
         
+        // General tools for non-specialist subagents (all tools minus specialist tools)
+        const generalTools = this.toolSelector ? 
+          this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
+        
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
             systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
-            tools: selectedTools,
+            tools: generalTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Code Reviewer',
             systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
-            tools: selectedTools,
+            tools: generalTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Frontend Specialist',
             systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT + toolInventoryPrompt,
             model: this.model,
-            tools: selectedTools,
+            tools: generalTools,
             backend: this.filesystemBackend
           },
           {
@@ -893,25 +798,5 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   isReady(): boolean {
     return this.agent !== null
-  }
-
-  /**
-   * Get memory statistics
-   */
-  async getMemoryStats(): Promise<any> {
-    if (this.memoryBackend) {
-      return await this.memoryBackend.getStats()
-    }
-    return null
-  }
-
-  /**
-   * Get tool selector statistics
-   */
-  getToolSelectorStats(): any {
-    if (this.toolSelector) {
-      return this.toolSelector.getStats()
-    }
-    return { totalTools: 0, initialized: false, categories: {} }
   }
 }
