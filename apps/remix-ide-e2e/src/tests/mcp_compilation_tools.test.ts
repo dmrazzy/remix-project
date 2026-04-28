@@ -90,7 +90,6 @@ const tests = {
       .clearValue('*[data-id=remix-ai-prompt-input]')
       .setValue('*[data-id=remix-ai-prompt-input]', 'What is the current Solidity compiler version?')
       .sendKeys('*[data-id=remix-ai-prompt-input]', browser.Keys.ENTER)
-      .pause(2000)
       .waitForElementPresent({
         locateStrategy: 'xpath',
         selector: "//*[@data-id='remix-ai-streaming' and @data-streaming='true']",
@@ -101,7 +100,6 @@ const tests = {
         selector: "//*[@data-id='remix-ai-streaming' and @data-streaming='false']",
         timeout: 60000
       })
-      .pause(1000)
       .waitForElementVisible({
         locateStrategy: 'xpath',
         selector: '//div[contains(@class,"chat-bubble") and (contains(.,"version") or contains(.,"Version") or contains(.,"0.8") or contains(.,"compiler") or contains(.,"current"))]',
