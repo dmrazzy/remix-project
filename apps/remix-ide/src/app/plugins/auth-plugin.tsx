@@ -517,6 +517,31 @@ export class AuthPlugin extends Plugin {
     return typeof window !== 'undefined' && (window as any).electronAPI !== undefined
   }
 
+  private getPendingDesktopAuthState(): string | null {
+    if (this.isDesktop()) return null
+    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash
+    const params = new URLSearchParams(hash)
+    return params.get('desktop_auth')
+  }
+
+  private completeDesktopAuthIfPending(accessToken: string, refreshToken: string, user: any): void {
+    const state = this.getPendingDesktopAuthState()
+    if (!state) return
+
+    try {
+      const userJson = JSON.stringify(user)
+      const userBase64 = btoa(userJson)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '')
+
+      const callbackUrl = `remix://auth/sso-callback?state=${encodeURIComponent(state)}&access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken)}&user=${encodeURIComponent(userBase64)}`
+      window.location.href = callbackUrl
+    } catch (error) {
+      console.error('[AuthPlugin] Failed to complete desktop auth callback:', error)
+    }
+  }
+
   /**
    * Desktop login flow: opens the web IDE in the user's browser, user authenticates there,
    * and tokens are sent back to desktop via the remix:// custom protocol.
@@ -731,6 +756,9 @@ export class AuthPlugin extends Plugin {
       localStorage.setItem('remix_refresh_token', result.refreshToken)
       localStorage.setItem('remix_user', JSON.stringify(result.user))
       this.log('[AuthPlugin] Stored user JSON:', localStorage.getItem('remix_user'))
+
+      // If browser login was initiated by desktop, complete the callback now.
+      this.completeDesktopAuthIfPending(result.accessToken, result.refreshToken, result.user)
 
       // Schedule proactive refresh based on access token expiry
       this.scheduleRefresh(result.accessToken)
@@ -1176,16 +1204,16 @@ export class AuthPlugin extends Plugin {
     // stale/unvalidated tokens in localStorage.
     await this.validateAndRestoreSession()
 
-    // After session validation, check if there's a pending desktop auth flow.
-    // This handles the case where the user was redirected from the DesktopAuthCallback
-    // page to sign in first, and now needs to be sent back to authorize the desktop app.
-    if (!this.isDesktop()) {
-      const pendingDesktopState = sessionStorage.getItem('remix_desktop_auth_state')
-      if (pendingDesktopState && localStorage.getItem('remix_access_token')) {
-        sessionStorage.removeItem('remix_desktop_auth_state')
-        // Redirect back to the desktop auth callback page
-        window.location.hash = `desktop_auth=${pendingDesktopState}`
-        window.location.reload()
+    // If already authenticated and we were opened by desktop, send auth back immediately.
+    const accessToken = localStorage.getItem('remix_access_token')
+    const refreshToken = localStorage.getItem('remix_refresh_token')
+    const userStr = localStorage.getItem('remix_user')
+    if (!this.isDesktop() && accessToken && refreshToken && userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        this.completeDesktopAuthIfPending(accessToken, refreshToken, user)
+      } catch {
+        // ignore malformed stored user
       }
     }
   }
@@ -1200,6 +1228,11 @@ export class AuthPlugin extends Plugin {
    */
   async notifyEmailOtpLogin(user: any, accessToken: string): Promise<void> {
     this.scheduleRefresh(accessToken)
+
+    const refreshToken = localStorage.getItem('remix_refresh_token')
+    if (refreshToken) {
+      this.completeDesktopAuthIfPending(accessToken, refreshToken, user)
+    }
 
     this.emit('authStateChanged', {
       isAuthenticated: true,

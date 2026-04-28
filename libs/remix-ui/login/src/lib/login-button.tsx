@@ -30,6 +30,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
   const [themes, setThemes] = useState<Array<{ name: string; quality: string }>>([])
   const [currentTheme, setCurrentTheme] = useState<string>('')
   const signInButtonMode = appContext?.appConfig?.['auth.sign_in_button_mode'] || 'hidden'
+  const isDesktopApp = typeof window !== 'undefined' && (window as any).electronAPI !== undefined
 
   useEffect(() => {
     if (plugin && typeof plugin.call === 'function') {
@@ -49,6 +50,35 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
       })()
     }
   }, [plugin])
+
+  useEffect(() => {
+    if (isDesktopApp || isAuthenticated) return
+
+    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash
+    const params = new URLSearchParams(hash)
+    if (params.get('desktop_auth')) {
+      setShowModal(true)
+    }
+  }, [isDesktopApp, isAuthenticated])
+
+  const handleSignIn = async () => {
+    // In desktop app, do not show the local modal first.
+    // Open browser immediately so provider selection happens there.
+    if (isDesktopApp && plugin && typeof plugin.call === 'function') {
+      try {
+        await plugin.call('desktopAuthHandler', 'login')
+        plugin.call('matomo', 'trackEvent', 'auth', 'desktopOpenBrowserLogin', 'Sign In', undefined).catch(() => {})
+      } catch (err) {
+        console.error('[LoginButton] Failed to open browser login flow:', err)
+      }
+      return
+    }
+
+    setShowModal(true)
+    if (plugin && typeof plugin.call === 'function') {
+      plugin.call('matomo', 'trackEvent', 'auth', 'openLoginModal', 'Sign In', undefined).catch(() => {})
+    }
+  }
 
   const pollForCurrentTheme = async () => {
     const active = await plugin.call('theme', 'currentTheme')
@@ -132,12 +162,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
         <button
           className={`btn btn-sm btn-primary ${className}`}
           style={{ whiteSpace: 'nowrap' }}
-          onClick={() => {
-            setShowModal(true)
-            if (plugin && typeof plugin.call === 'function') {
-              plugin.call('matomo', 'trackEvent', 'auth', 'openLoginModal', 'Sign In', undefined).catch(() => {})
-            }
-          }}
+          onClick={handleSignIn}
           data-id="login-button"
         >
           <span className="d-inline-flex align-items-center">
@@ -155,7 +180,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
   if (variant === 'badge') {
     return (
       <UserBadge
-        user={user}
+        user={user!}
         credits={credits}
         showCredits={showCredits}
         className={className}
@@ -170,7 +195,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
   if (variant === 'compact') {
     return (
       <UserMenuCompact
-        user={user}
+        user={user!}
         credits={credits}
         showCredits={showCredits}
         className={className}
@@ -191,7 +216,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
 
   return (
     <UserMenuFull
-      user={user}
+      user={user!}
       credits={credits}
       showCredits={showCredits}
       className={className}
