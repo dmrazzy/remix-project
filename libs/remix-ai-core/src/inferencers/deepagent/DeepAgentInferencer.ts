@@ -232,22 +232,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
-  /**
-   * Emit error to update todo list with failed status
-   * This marks the current in-progress todo as failed and emits error details
-   */
   private emitErrorToTodos(error: any): void {
     const errorMessage = error?.message || String(error) || 'Unknown error'
 
-    // Emit an error event that the UI can use to display the error
     this.event.emit('onAgentError', {
       message: errorMessage,
       timestamp: Date.now(),
       type: error?.name || 'Error'
     })
 
-    // Also emit a todo update to mark current task as failed
-    // The UI will receive this and can update the todo list accordingly
     this.event.emit('onTodoError', {
       error: errorMessage,
       timestamp: Date.now()
@@ -487,6 +480,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       const activeSubagents: Map<string, { name: string; startTime: number }> = new Map()
       let previousRunId: string | null = null
 
+      // Token usage tracking for this request
+      let totalInputTokens = 0
+      let totalOutputTokens = 0
+      let turnCount = 0
+
       // https://docs.langchain.com/oss/python/deepagents/streaming
       console.log('[DeepAgent-Thread] ▶ runAgent called | thread_id:', this.sessionThreadId, '| message:', String(langchainMessages[0]?.content || '').substring(0, 60) + '...')
       const eventStream = this.agent.streamEvents(
@@ -588,6 +586,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             if (deltaContent) {
               const currentRunId = event.run_id
               if (previousRunId !== null && previousRunId !== currentRunId) {
+                // Log token usage when run_id changes (new agent turn)
+                console.log(`[DeepAgent-Tokens] Run ID changed: ${previousRunId} → ${currentRunId}`)
                 deltaContent = '\n \n---\n' + deltaContent
               }
               previousRunId = currentRunId
@@ -611,6 +611,42 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
                   subagentName: ""
                 })
               }
+            }
+          }
+        } else if (eventType === 'on_chat_model_end') {
+          // Track token usage when a chat model call completes
+          const output = event.data?.output
+          if (output) {
+            const usageMetadata = output.usage_metadata || output.response_metadata?.usage
+            if (usageMetadata) {
+              const inputTokens = usageMetadata.input_tokens || usageMetadata.prompt_tokens || 0
+              const outputTokens = usageMetadata.output_tokens || usageMetadata.completion_tokens || 0
+              const totalTokens = usageMetadata.total_tokens || (inputTokens + outputTokens)
+
+              // Update cumulative counts
+              totalInputTokens += inputTokens
+              totalOutputTokens += outputTokens
+              turnCount++
+
+              console.log(`[DeepAgent-Tokens]   Turn ${turnCount} completed | run_id: ${event.run_id}`)
+              console.log(`[DeepAgent-Tokens]   Input:  ${inputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Output: ${outputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Total:  ${totalTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cumulative: ${totalInputTokens} in / ${totalOutputTokens} out`)
+
+              // Emit token usage event for UI tracking
+              this.event.emit('onTokenUsage', {
+                runId: event.run_id,
+                inputTokens,
+                outputTokens,
+                totalTokens,
+                cumulativeInputTokens: totalInputTokens,
+                cumulativeOutputTokens: totalOutputTokens,
+                turnCount,
+                timestamp: Date.now(),
+                agentName: agent_name || 'main',
+                isSubagent: is_subagent
+              })
             }
           }
         } else if (eventType === 'on_chain_end') {
@@ -672,6 +708,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       // after the agent finishes, so the user sees the combined diff right away
 
       await (this.filesystemBackend as any).flushAllPendingBatches()
+
+      // Log final token usage summary
+      if (turnCount > 0) {
+        console.log(`[DeepAgent-Tokens] ═══════════════════════════════════════`)
+        console.log(`[DeepAgent-Tokens]   Request Complete - Token Summary`)
+        console.log(`[DeepAgent-Tokens]   Total Turns:   ${turnCount}`)
+        console.log(`[DeepAgent-Tokens]   Total Input:   ${totalInputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Total Output:  ${totalOutputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Grand Total:   ${totalInputTokens + totalOutputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens] ═══════════════════════════════════════`)
+      }
 
       console.log('[DeepAgentInferencer] Full response length:', fullResponse.length)
       return fullResponse
