@@ -233,6 +233,30 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   }
 
   /**
+   * Emit error to update todo list with failed status
+   * This marks the current in-progress todo as failed and emits error details
+   */
+  private emitErrorToTodos(error: any): void {
+    const errorMessage = error?.message || String(error) || 'Unknown error'
+
+    // Emit an error event that the UI can use to display the error
+    this.event.emit('onAgentError', {
+      message: errorMessage,
+      timestamp: Date.now(),
+      type: error?.name || 'Error'
+    })
+
+    // Also emit a todo update to mark current task as failed
+    // The UI will receive this and can update the todo list accordingly
+    this.event.emit('onTodoError', {
+      error: errorMessage,
+      timestamp: Date.now()
+    })
+
+    console.log('[DeepAgentInferencer] Emitted error to todos:', errorMessage)
+  }
+
+  /**
    * Create the appropriate model instance based on provider selection
    */
   private createModelInstance(proxyUrl: string): BaseChatModel {
@@ -355,6 +379,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           console.log('[DeepAgentInferencer] Answer request was cancelled')
         } else {
           console.error('[DeepAgentInferencer] Answer error:', error)
+          // Emit error to update todo list with failed status
+          this.emitErrorToTodos(error)
         }
         this.event.emit('onInferenceDone')
       })

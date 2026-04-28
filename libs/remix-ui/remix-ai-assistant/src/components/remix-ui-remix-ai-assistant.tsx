@@ -478,6 +478,52 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       }
     }
 
+    // Handle error events - mark current todo as failed
+    const handleTodoError = (data: { error: string; timestamp: number }) => {
+      console.log('[RemixAI Assistant] Todo error received:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m => {
+            if (m.id !== streamingAssistantIdRef.current) return m
+            // Mark the current in-progress todo as failed
+            const updatedTodos = m.todos?.map((todo, idx) => {
+              if (todo.status === 'in_progress' || idx === m.currentTodoIndex) {
+                return { ...todo, status: 'failed' as const }
+              }
+              return todo
+            })
+            return {
+              ...m,
+              todos: updatedTodos,
+              isExecutingTools: false,
+              executingToolName: undefined,
+              executingToolArgs: undefined
+            }
+          })
+        )
+      }
+    }
+
+    // Handle agent error events - display error message
+    const handleAgentError = (data: { message: string; timestamp: number; type: string }) => {
+      console.error('[RemixAI Assistant] Agent error:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? {
+                ...m,
+                content: m.content + `\n\n**Error:** ${data.message}`,
+                isExecutingTools: false,
+                executingToolName: undefined,
+                executingToolArgs: undefined
+              }
+              : m
+          )
+        )
+      }
+    }
+
     props.plugin.on('remixAI', 'onStreamResult', handleStreamChunk)
     props.plugin.on('remixAI', 'onStreamComplete', handleStreamComplete)
     props.plugin.on('remixAI', 'onToolCall', handleToolCall)
@@ -486,6 +532,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     props.plugin.on('remixAI', 'onTaskStart', handleTaskStart)
     props.plugin.on('remixAI', 'onTaskComplete', handleTaskComplete)
     props.plugin.on('remixAI', 'onTodoUpdate', handleTodoUpdate)
+    props.plugin.on('remixAI', 'onTodoError', handleTodoError)
+    props.plugin.on('remixAI', 'onAgentError', handleAgentError)
 
     // Human-in-the-loop: listen for tool approval requests (batch processing)
     const handleToolApproval = (request: ToolApprovalRequest) => {
@@ -503,6 +551,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       props.plugin.off('remixAI', 'onTaskStart')
       props.plugin.off('remixAI', 'onTaskComplete')
       props.plugin.off('remixAI', 'onTodoUpdate')
+      props.plugin.off('remixAI', 'onTodoError')
+      props.plugin.off('remixAI', 'onAgentError')
       props.plugin.off('remixAI', 'onToolApprovalRequired')
     }
   }, [props.plugin])
