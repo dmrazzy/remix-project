@@ -7,7 +7,8 @@ import { IAIStreamResponse, ICompletions, IGeneration, IParams } from '../../typ
 import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
 import { RemixFilesystemBackend } from './RemixFilesystemBackend'
-import { createRemixTools } from './RemixToolAdapter'
+import { createRemixTools, ToolApprovalGate } from './RemixToolAdapter'
+import { ToolSelector } from './ToolSelector'
 import {
   REMIX_DEEPAGENT_SYSTEM_PROMPT,
   SOLIDITY_CODE_GENERATION_PROMPT,
@@ -15,7 +16,10 @@ import {
   CODE_EXPLANATION_PROMPT,
   SECURITY_AUDITOR_SUBAGENT_PROMPT,
   CODE_REVIEWER_SUBAGENT_PROMPT,
-  FRONTEND_SPECIALIST_SUBAGENT_PROMPT
+  FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
+  ETHERSCAN_SUBAGENT_PROMPT,
+  THEGRAPH_SUBAGENT_PROMPT,
+  ALCHEMY_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
@@ -29,7 +33,7 @@ import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { buildChatPrompt } from '../../prompts/promptBuilder'
-import { MemorySaver } from "@langchain/langgraph";
+import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 
 // Model provider types
 type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
@@ -96,10 +100,38 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private filesystemBackend: RemixFilesystemBackend
   private memoryBackend: DeepAgentMemoryBackend | null = null
   private tools: DynamicStructuredTool[] = []
+  private approvalGate: ToolApprovalGate | null = null
+  private toolSelector: ToolSelector | null = null
   private currentAbortController: AbortController | null = null
   private fallbackInferencer: any = null
   private model: BaseChatModel | null = null
   private modelSelection: ModelSelection
+  // Session-level thread_id for multi-turn context via MemorySaver checkpointer.
+  // Same thread_id is reused so LangGraph remembers previous conversation.
+  // Auto-resets on errors (e.g. ToolInputParsingException from stale tool state).
+  private sessionThreadId: string = DeepAgentInferencer.generateThreadId()
+
+  private static generateThreadId(): string {
+    return `remix-session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  }
+
+  /** Reset the session thread_id (e.g. after error or new conversation) */
+  private resetSessionThread(): void {
+    const oldId = this.sessionThreadId
+    this.sessionThreadId = DeepAgentInferencer.generateThreadId()
+    console.log('[DeepAgent-Thread] resetSessionThread:', this.sessionThreadId, '(was:', oldId, ')')
+  }
+
+  /** Set the session thread_id (e.g. when switching conversations) */
+  setSessionThreadId(threadId: string): void {
+    console.log('[DeepAgent-Thread] setSessionThreadId:', threadId, '(was:', this.sessionThreadId, ')')
+    this.sessionThreadId = threadId
+  }
+
+  /** Get the current session thread_id */
+  getSessionThreadId(): string {
+    return this.sessionThreadId
+  }
 
   constructor(
     plugin: Plugin,
@@ -130,11 +162,14 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       enablePlanning: config?.enablePlanning !== false
     }
 
-    // Initialize filesystem backend
-    this.filesystemBackend = new RemixFilesystemBackend(plugin)
+    // Initialize filesystem backend with shared EventEmitter for approval
+    this.filesystemBackend = new RemixFilesystemBackend(plugin, this.event) as any
 
-    // Initialize tools (with external MCP clients if available)
+    // Initialize tools with approval gate
+    this.approvalGate = new ToolApprovalGate(plugin, this.event, 'ask_risky')
     this.initializeTools(toolRegistry, mcpInferencer)
+
+    this.toolSelector = new ToolSelector()
   }
 
   /**
@@ -142,9 +177,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   async initialize(): Promise<void> {
     try {
-      console.log('[DeepAgentInferencer] Initializing DeepAgent...')
-      // Dynamic import of deepagents only
-      const { createDeepAgent } = await import('deepagents')
+      console.log('[DeepAgentInferencer] Initializing DeepAgent...') // Dynamic import of deepagents only
 
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
       console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
@@ -152,68 +185,26 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       // Always use proxy server - API key is handled server-side
       const proxyUrl = 'http://localhost:4000'
 
-      // Create the appropriate model based on provider selection
       this.model = this.createModelInstance(proxyUrl)
 
       console.log(`[DeepAgentInferencer] Created ${this.modelSelection.provider} model: ${this.modelSelection.modelId}`)
 
-      // Initialize memory backend if enabled
       if (this.config.memoryBackend === 'store') {
         this.memoryBackend = new DeepAgentMemoryBackend('remix-deepagent-memory')
         await this.memoryBackend.init()
       }
 
-      const checkpointer = new MemorySaver();
+      this.tools.push(...this.toolSelector?.getEssentialTools() || [])
 
-      // Create DeepAgent configuration
-      console.log('[DeepAgentInferencer] Setting up agent configuration...')
-      const agentConfig: any = {
-        backend: this.filesystemBackend,
-        tools: this.tools,
-        model: this.model,
-        systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
-        skills: ["skills/"],
-        checkpointer
+      if (this.toolSelector && this.tools.length > 0) {
+        await this.toolSelector.buildToolIndex(this.tools)
       }
 
-      // Configure specialized subagents (array format expected by deepagents)
-      if (this.config.enableSubagents) {
-        agentConfig.subagents = [
-          {
-            name: 'Security Auditor',
-            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: this.tools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Code Reviewer',
-            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: this.tools,
-            backend: this.filesystemBackend
-          },
-          {
-            name: 'Frontend Specialist',
-            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
-            model: this.model,
-            tools: this.tools,
-            backend: this.filesystemBackend
-          }
-        ]
-        console.log('[DeepAgentInferencer] Configured 3 specialized subagents: Security Auditor, Code Reviewer, Frontend Specialist')
-      }
+      const metaTools = this.tools.filter(tool =>
+        tool.name === 'get_tool_schema' || tool.name === 'call_tool'
+      )
 
-      // Add store if configured
-      console.log('[DeepAgentInferencer] Memory backend:', this.memoryBackend ? 'Enabled' : 'Disabled')
-      if (this.memoryBackend) {
-        agentConfig.store = this.memoryBackend
-      }
-
-      // Create the agent
-      console.log('[DeepAgentInferencer] Creating DeepAgent instance...')
-      this.agent = await createDeepAgent(agentConfig)
-
+      this.createAgentWithTools(metaTools)
       console.log('[DeepAgentInferencer] Agent created successfully')
       console.log('[DeepAgentInferencer] DeepAgent instance created successfully', this.agent)
 
@@ -233,7 +224,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   private async initializeTools(toolRegistry: ToolRegistry, mcpInferencer?: any): Promise<void> {
     try {
-      this.tools = await createRemixTools(this.plugin, toolRegistry, mcpInferencer)
+      this.tools = await createRemixTools(this.plugin, toolRegistry, mcpInferencer, this.approvalGate)
       console.log(`[DeepAgentInferencer] Initialized ${this.tools.length} tools`)
     } catch (error) {
       console.warn('[DeepAgentInferencer] Failed to initialize tools:', error)
@@ -350,20 +341,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           DeepAgentErrorType.INITIALIZATION_FAILED
         )
       }
-      const chatHistory = buildChatPrompt()
-      let messages = []
-
-      if (chatHistory.length > 0) {
-        messages = [
-          ...chatHistory,
-          { role: 'user', content: context ? `Context:\n${context}\n\nQuestion: ${prompt}` : prompt }
-        ]
-      } else {
-        messages = [
-          { role: 'system', content: REMIX_DEEPAGENT_SYSTEM_PROMPT },
-          { role: 'user', content: context ? `Context:\n${context}\n\nQuestion: ${prompt}` : prompt }
-        ]
-      }
+      const messages = [
+        { role: 'user', content: context ? `Context:\n${context}\n\nQuestion: ${prompt}` : prompt }
+      ]
       console.log('[DeepAgentInferencer] Running answer with messages:')
       const responsePromise = this.runAgent(messages, params)
 
@@ -379,7 +359,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         this.event.emit('onInferenceDone')
       })
 
-      // Return empty string to trigger streaming mode in UI
       return ''
     } catch (error) {
       this.event.emit('onInferenceDone')
@@ -464,41 +443,44 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    * Run the DeepAgent with messages
    */
   private async runAgent(messages: any[], params: IParams): Promise<string> {
-    // Create abort controller for cancellation
     this.currentAbortController = new AbortController()
     let fullResponse = ''
 
-    try {
-      // Filter out system messages - they're already set during agent creation
-      const langchainMessages = messages
-        .filter(msg => msg.role !== 'system')
-        .map(msg => {
-          if (msg.role === 'user') return new HumanMessage(msg.content)
-          if (msg.role === 'assistant') return new AIMessage(msg.content)
-          return new HumanMessage(msg.content)
-        })
+    // Filter out system messages - they're already set during agent creation
+    const langchainMessages = messages
+      .filter(msg => msg.role !== 'system')
+      .map(msg => {
+        if (msg.role === 'user') return new HumanMessage(msg.content)
+        if (msg.role === 'assistant') return new AIMessage(msg.content)
+        return new HumanMessage(msg.content)
+      })
 
+    try {
       // Tracking state for subagents and intermediate/final answers
       let isIntermediatePhase = true
       const activeSubagents: Map<string, { name: string; startTime: number }> = new Map()
       let previousRunId: string | null = null
 
       // https://docs.langchain.com/oss/python/deepagents/streaming
+      console.log('[DeepAgent-Thread] ▶ runAgent called | thread_id:', this.sessionThreadId, '| message:', String(langchainMessages[0]?.content || '').substring(0, 60) + '...')
       const eventStream = this.agent.streamEvents(
         {
           messages: langchainMessages
         },
         {
           version: 'v2',
+          // Reuse session-level thread_id so MemorySaver carries multi-turn context.
+          // buildChatPrompt() is intentionally NOT used — its incomplete history
+          // (missing tool_use blocks) caused LLM hallucination.
+          // On ToolInputParsingException, sessionThreadId is auto-reset (see catch block).
           configurable: {
-            thread_id: `remix-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+            thread_id: this.sessionThreadId
           },
-          subgraphs: true, // Enable subgraph/subagent visibility
-          signal: this.currentAbortController?.signal // Pass abort signal for cancellation
+          subgraphs: true,
+          signal: this.currentAbortController?.signal
         }
       )
 
-      // Process stream events
       let finalMessageFromChain = ''
       for await (const event of eventStream) {
         if (this.currentAbortController?.signal.aborted) {
@@ -646,9 +628,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             })
           }
         } else if (eventType === 'on_tool_end') {
-          // Tool execution completed
           const toolName = event.name
-          const toolOutput = event.data?.output
           console.log('[DeepAgentInferencer] Tool call ended:', toolName)
           // let the tool callback for while
           //this.event.emit('onToolCall', { toolName, toolOutput, status: 'end' })
@@ -662,18 +642,165 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         fullResponse = finalMessageFromChain
       }
 
-      console.log('[DeepAgentInferencer] Stream complete, full response length:', fullResponse.length)
+      // Flush any pending edit batches — this triggers the HITL modal immediately
+      // after the agent finishes, so the user sees the combined diff right away
+
+      await (this.filesystemBackend as any).flushAllPendingBatches()
+
+      console.log('[DeepAgentInferencer] Full response length:', fullResponse.length)
       return fullResponse
     } catch (error: any) {
       if (error?.name === 'AbortError' || this.currentAbortController?.signal.aborted) {
         console.log('[DeepAgentInferencer] Request cancelled by user')
         return fullResponse
       }
+
+      // If ToolInputParsingException (stale multi-turn state), reset session and retry once
+      if (error?.message?.includes('ToolInputParsingException') || error?.message?.includes('did not match expected schema')) {
+        console.warn('[DeepAgentInferencer] Tool input schema error detected — resetting session thread and retrying...')
+        console.warn('[DeepAgentInferencer] Error details:', error?.message)
+        console.warn('[DeepAgentInferencer] Error cause:', error?.cause?.message || error?.cause)
+        console.warn('[DeepAgentInferencer] Thread ID was:', this.sessionThreadId)
+        this.resetSessionThread()
+
+        // Retry with fresh thread_id (only once — if it fails again, propagate the error)
+        try {
+          this.currentAbortController = new AbortController()
+          fullResponse = ''
+          const retryStream = this.agent.streamEvents(
+            { messages: langchainMessages },
+            {
+              version: 'v2',
+              configurable: { thread_id: this.sessionThreadId },
+              subgraphs: true,
+              signal: this.currentAbortController?.signal
+            }
+          )
+          for await (const event of retryStream) {
+            if (this.currentAbortController?.signal.aborted) break
+            if (event.event === 'on_chat_model_stream' && event.data?.chunk?.content) {
+              const content = typeof event.data.chunk.content === 'string'
+                ? event.data.chunk.content
+                : event.data.chunk.content.map((c: any) => c.text || '').join('')
+              if (content) {
+                fullResponse += content
+                this.event.emit('onStreamResult', { content, isIntermediate: false, source: 'retry' })
+              }
+            }
+          }
+          await (this.filesystemBackend as any).flushAllPendingBatches()
+          return fullResponse
+        } catch (retryError: any) {
+          console.error('[DeepAgentInferencer] Retry also failed:', retryError)
+          throw retryError
+        }
+      }
+
       console.error('[DeepAgentInferencer] Error during agent execution:', error)
       throw error
     } finally {
       this.currentAbortController = null
       this.event.emit('onToolCall', { toolName:'', toolInput:'', status: 'end' })
+    }
+  }
+
+  /**
+   * Recreate agent with selected tools
+   */
+  private async createAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
+    try {
+      const { createDeepAgent } = await import('deepagents')
+
+      const checkpointer = new IndexedDBCheckpointSaver()
+
+      // Create agent configuration with selected tools
+      const agentConfig: any = {
+        backend: this.filesystemBackend,
+        tools: selectedTools,
+        model: this.model,
+        systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
+        skills: ["skills/"],
+        checkpointer
+      }
+
+      if (this.config.enableSubagents) {
+        const toolInventoryPrompt = this.toolSelector ?
+          this.toolSelector.generateToolInventoryPrompt(this.tools) : ""
+
+        const etherscanTools = this.toolSelector ?
+          this.toolSelector.getEtherscanTools() : []
+        const theGraphTools = this.toolSelector ?
+          this.toolSelector.getTheGraphTools() : []
+        const alchemyTools = this.toolSelector ?
+          this.toolSelector.getAlchemyTools() : []
+
+        const generalTools = this.toolSelector ?
+          this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
+
+        agentConfig.subagents = [
+          {
+            name: 'Security Auditor',
+            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: generalTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Code Reviewer',
+            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: generalTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Frontend Specialist',
+            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: generalTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Etherscan Specialist',
+            systemPrompt: ETHERSCAN_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: etherscanTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'TheGraph Specialist',
+            systemPrompt: THEGRAPH_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: theGraphTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Alchemy Specialist',
+            systemPrompt: ALCHEMY_SUBAGENT_PROMPT + toolInventoryPrompt,
+            model: this.model,
+            tools: alchemyTools,
+            backend: this.filesystemBackend
+          }
+        ]
+
+        console.log(`[DeepAgentInferencer] Configured 6 subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
+      }
+
+      if (this.memoryBackend) {
+        agentConfig.store = this.memoryBackend
+      }
+
+      let enhancedSystemPrompt = REMIX_DEEPAGENT_SYSTEM_PROMPT
+      if (this.toolSelector) {
+        const toolInventoryPrompt = this.toolSelector.generateToolInventoryPrompt(selectedTools)
+        enhancedSystemPrompt += toolInventoryPrompt
+      }
+      agentConfig.systemPrompt = enhancedSystemPrompt
+
+      this.agent = createDeepAgent(agentConfig)
+
+      console.log(`[DeepAgentInferencer] Recreated agent with ${selectedTools.length} selected tools`)
+    } catch (error) {
+      console.error('[DeepAgentInferencer] Failed to recreate agent with selected tools:', error)
     }
   }
 
@@ -741,8 +868,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     if (this.memoryBackend) {
       this.memoryBackend.close()
     }
+    if (this.approvalGate) {
+      this.approvalGate.dispose()
+      this.approvalGate = null
+    }
     this.agent = null
     this.model = null
+    this.toolSelector = null
   }
 
   /**
@@ -757,15 +889,5 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   isReady(): boolean {
     return this.agent !== null
-  }
-
-  /**
-   * Get memory statistics
-   */
-  async getMemoryStats(): Promise<any> {
-    if (this.memoryBackend) {
-      return await this.memoryBackend.getStats()
-    }
-    return null
   }
 }

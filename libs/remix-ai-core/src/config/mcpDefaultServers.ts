@@ -70,6 +70,7 @@ export const mcpDefaultServersConfig: MCPDefaultServersConfig = {
       enabled: true,
       timeout: 30000
     },
+    /*
     {
       name: 'Circle',
       description: 'Circle API for code generation',
@@ -105,7 +106,7 @@ export const mcpDefaultServersConfig: MCPDefaultServersConfig = {
       autoStart: true,
       enabled: true,
       timeout: 30000
-    },
+    },*/
     {
       name: 'Web Search',
       description: 'Web search capabilities',
