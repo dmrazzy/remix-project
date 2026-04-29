@@ -34,6 +34,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { buildChatPrompt } from '../../prompts/promptBuilder'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
+import { endpointUrls } from "@remix-endpoints-helper"
 
 // Model provider types
 type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
@@ -182,10 +183,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
       console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
 
-      // Always use proxy server - API key is handled server-side
-      const proxyUrl = 'http://localhost:4000'
-
-      this.model = this.createModelInstance(proxyUrl)
+      this.model = this.createModelInstance()
 
       console.log(`[DeepAgentInferencer] Created ${this.modelSelection.provider} model: ${this.modelSelection.modelId}`)
 
@@ -252,7 +250,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   /**
    * Create the appropriate model instance based on provider selection
    */
-  private createModelInstance(proxyUrl: string): BaseChatModel {
+  private createModelInstance(): BaseChatModel {
     const { provider, modelId } = this.modelSelection
 
     switch (provider) {
@@ -264,7 +262,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         temperature: 0.7,
         maxTokens: 4096,
         streaming: true,
-        serverURL: `${proxyUrl}/mistral`
+        serverURL: `${endpointUrls.langchain}/mistral`
       })
     }
 
@@ -278,7 +276,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         maxTokens: 4096,
         streaming: true,
         clientOptions: {
-          baseURL: proxyUrl
+          baseURL: endpointUrls.langchain
         }
       })
     }
@@ -483,6 +481,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       // Token usage tracking for this request
       let totalInputTokens = 0
       let totalOutputTokens = 0
+      let totalCacheReadTokens = 0
+      let totalCacheCreationTokens = 0
       let turnCount = 0
 
       // https://docs.langchain.com/oss/python/deepagents/streaming
@@ -623,16 +623,24 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
               const outputTokens = usageMetadata.output_tokens || usageMetadata.completion_tokens || 0
               const totalTokens = usageMetadata.total_tokens || (inputTokens + outputTokens)
 
+              // Extract cached token information (Anthropic-specific fields)
+              const cacheReadInputTokens = usageMetadata.cache_read_input_tokens || 0
+              const cacheCreationInputTokens = usageMetadata.cache_creation_input_tokens || 0
+
               // Update cumulative counts
               totalInputTokens += inputTokens
               totalOutputTokens += outputTokens
+              totalCacheReadTokens += cacheReadInputTokens
+              totalCacheCreationTokens += cacheCreationInputTokens
               turnCount++
 
               console.log(`[DeepAgent-Tokens]   Turn ${turnCount} completed | run_id: ${event.run_id}`)
               console.log(`[DeepAgent-Tokens]   Input:  ${inputTokens} tokens`)
               console.log(`[DeepAgent-Tokens]   Output: ${outputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cache Read: ${cacheReadInputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cache Creation: ${cacheCreationInputTokens} tokens`)
               console.log(`[DeepAgent-Tokens]   Total:  ${totalTokens} tokens`)
-              console.log(`[DeepAgent-Tokens]   Cumulative: ${totalInputTokens} in / ${totalOutputTokens} out`)
+              console.log(`[DeepAgent-Tokens]   Cumulative: ${totalInputTokens} in / ${totalOutputTokens} out / ${totalCacheReadTokens} cache-read / ${totalCacheCreationTokens} cache-creation`)
 
               // Emit token usage event for UI tracking
               this.event.emit('onTokenUsage', {
@@ -640,8 +648,12 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
                 inputTokens,
                 outputTokens,
                 totalTokens,
+                cacheReadInputTokens,
+                cacheCreationInputTokens,
                 cumulativeInputTokens: totalInputTokens,
                 cumulativeOutputTokens: totalOutputTokens,
+                cumulativeCacheReadTokens: totalCacheReadTokens,
+                cumulativeCacheCreationTokens: totalCacheCreationTokens,
                 turnCount,
                 timestamp: Date.now(),
                 agentName: agent_name || 'main',
@@ -716,6 +728,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         console.log(`[DeepAgent-Tokens]   Total Turns:   ${turnCount}`)
         console.log(`[DeepAgent-Tokens]   Total Input:   ${totalInputTokens} tokens`)
         console.log(`[DeepAgent-Tokens]   Total Output:  ${totalOutputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Cache Read:    ${totalCacheReadTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Cache Creation: ${totalCacheCreationTokens} tokens`)
         console.log(`[DeepAgent-Tokens]   Grand Total:   ${totalInputTokens + totalOutputTokens} tokens`)
         console.log(`[DeepAgent-Tokens] ═══════════════════════════════════════`)
       }
