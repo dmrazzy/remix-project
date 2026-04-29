@@ -319,15 +319,23 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   // Listen for streaming chunks from DeepAgent
   useEffect(() => {
     // Handle stream chunks - supports both legacy string format and new object format
-    const handleStreamChunk = (data: string | { content: string; isIntermediate?: boolean; source?: string }) => {
+    const handleStreamChunk = (data: string | { content: string; isIntermediate?: boolean; source?: string; isSubagent?: boolean; subagentName?: string }) => {
       const chunk = typeof data === 'string' ? data : data.content
       const isIntermediate = typeof data === 'object' ? data.isIntermediate : false
+      const isSubagent = typeof data === 'object' ? data.isSubagent : false
+      const subagentName = typeof data === 'object' ? data.subagentName : undefined
 
       if (streamingAssistantIdRef.current) {
         setMessages(prev =>
           prev.map(m =>
             m.id === streamingAssistantIdRef.current
-              ? { ...m, content: m.content + chunk, isIntermediateContent: isIntermediate }
+              ? {
+                ...m,
+                content: m.content + chunk,
+                isIntermediateContent: isIntermediate,
+                isSubagentStreaming: isSubagent,
+                streamingSubagentName: subagentName
+              }
               : m
           )
         )
@@ -337,12 +345,30 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     const handleStreamComplete = (finalText: string) => {
       // Save to chat history when streaming completes
       if (streamingAssistantIdRef.current) {
+        const assistantId = streamingAssistantIdRef.current
         setMessages(prev => {
           const userMsg = prev[prev.length - 2]
           if (userMsg && userMsg.role === 'user' && finalText) {
             Promise.resolve(ChatHistory.pushHistory(userMsg.content, finalText)).then(() => props.plugin.loadConversations())
           }
-          return prev
+          // Clear all streaming and agent-related states
+          return prev.map(m =>
+            m.id === assistantId
+              ? {
+                ...m,
+                isSubagentStreaming: false,
+                streamingSubagentName: undefined,
+                activeSubagent: undefined,
+                subagentTask: undefined,
+                isExecutingTools: false,
+                executingToolName: undefined,
+                executingToolArgs: undefined,
+                currentTask: undefined,
+                taskStatus: undefined,
+                isIntermediateContent: false
+              }
+              : m
+          )
         })
       }
       setIsStreaming(false)
@@ -397,7 +423,13 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         setMessages(prev =>
           prev.map(m =>
             m.id === streamingAssistantIdRef.current
-              ? { ...m, activeSubagent: undefined, subagentTask: undefined }
+              ? {
+                ...m,
+                activeSubagent: undefined,
+                subagentTask: undefined,
+                isSubagentStreaming: false,
+                streamingSubagentName: undefined
+              }
               : m
           )
         )
@@ -432,6 +464,66 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       }
     }
 
+    // Handle todo update events from DeepAgent's write_todos tool
+    const handleTodoUpdate = (data: { todos: any[]; currentTodoIndex?: number; timestamp: number }) => {
+      console.log('[RemixAI Assistant] Todo list updated:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? { ...m, todos: data.todos, currentTodoIndex: data.currentTodoIndex }
+              : m
+          )
+        )
+      }
+    }
+
+    // Handle error events - mark current todo as failed
+    const handleTodoError = (data: { error: string; timestamp: number }) => {
+      console.log('[RemixAI Assistant] Todo error received:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m => {
+            if (m.id !== streamingAssistantIdRef.current) return m
+            // Mark the current in-progress todo as failed
+            const updatedTodos = m.todos?.map((todo, idx) => {
+              if (todo.status === 'in_progress' || idx === m.currentTodoIndex) {
+                return { ...todo, status: 'failed' as const }
+              }
+              return todo
+            })
+            return {
+              ...m,
+              todos: updatedTodos,
+              isExecutingTools: false,
+              executingToolName: undefined,
+              executingToolArgs: undefined
+            }
+          })
+        )
+      }
+    }
+
+    // Handle agent error events - display error message
+    const handleAgentError = (data: { message: string; timestamp: number; type: string }) => {
+      console.error('[RemixAI Assistant] Agent error:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? {
+                ...m,
+                content: m.content + `\n\n**Error:** ${data.message}`,
+                isExecutingTools: false,
+                executingToolName: undefined,
+                executingToolArgs: undefined
+              }
+              : m
+          )
+        )
+      }
+    }
+
     props.plugin.on('remixAI', 'onStreamResult', handleStreamChunk)
     props.plugin.on('remixAI', 'onStreamComplete', handleStreamComplete)
     props.plugin.on('remixAI', 'onToolCall', handleToolCall)
@@ -439,6 +531,9 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     props.plugin.on('remixAI', 'onSubagentComplete', handleSubagentComplete)
     props.plugin.on('remixAI', 'onTaskStart', handleTaskStart)
     props.plugin.on('remixAI', 'onTaskComplete', handleTaskComplete)
+    props.plugin.on('remixAI', 'onTodoUpdate', handleTodoUpdate)
+    props.plugin.on('remixAI', 'onTodoError', handleTodoError)
+    props.plugin.on('remixAI', 'onAgentError', handleAgentError)
 
     // Human-in-the-loop: listen for tool approval requests (batch processing)
     const handleToolApproval = (request: ToolApprovalRequest) => {
@@ -455,6 +550,9 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       props.plugin.off('remixAI', 'onSubagentComplete')
       props.plugin.off('remixAI', 'onTaskStart')
       props.plugin.off('remixAI', 'onTaskComplete')
+      props.plugin.off('remixAI', 'onTodoUpdate')
+      props.plugin.off('remixAI', 'onTodoError')
+      props.plugin.off('remixAI', 'onAgentError')
       props.plugin.off('remixAI', 'onToolApprovalRequired')
     }
   }, [props.plugin])

@@ -92,6 +92,9 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.removeAllListeners('onSubagentComplete')
     eventEmitter.removeAllListeners('onTaskStart')
     eventEmitter.removeAllListeners('onTaskComplete')
+    eventEmitter.removeAllListeners('onTodoUpdate')
+    eventEmitter.removeAllListeners('onAgentError')
+    eventEmitter.removeAllListeners('onTodoError')
     eventEmitter.removeAllListeners('onToolApprovalRequired')
 
     // Set up fresh listeners
@@ -121,6 +124,17 @@ export class RemixAIPlugin extends Plugin {
     })
     eventEmitter.on('onTaskComplete', (data: { id: string; name: string; status: string }) => {
       this.emit('onTaskComplete', data)
+    })
+    eventEmitter.on('onTodoUpdate', (data: { todos: any[]; timestamp: number }) => {
+      this.emit('onTodoUpdate', data)
+    })
+
+    // Error events for todo list updates
+    eventEmitter.on('onAgentError', (data: { message: string; timestamp: number; type: string }) => {
+      this.emit('onAgentError', data)
+    })
+    eventEmitter.on('onTodoError', (data: { error: string; timestamp: number }) => {
+      this.emit('onTodoError', data)
     })
 
     // Human-in-the-loop: relay approval requests to UI

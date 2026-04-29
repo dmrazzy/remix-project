@@ -34,6 +34,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { buildChatPrompt } from '../../prompts/promptBuilder'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
+import { endpointUrls } from "@remix-endpoints-helper"
 
 // Model provider types
 type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
@@ -182,10 +183,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
       console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
 
-      // Always use proxy server - API key is handled server-side
-      const proxyUrl = 'http://localhost:4000'
-
-      this.model = this.createModelInstance(proxyUrl)
+      this.model = this.createModelInstance()
 
       console.log(`[DeepAgentInferencer] Created ${this.modelSelection.provider} model: ${this.modelSelection.modelId}`)
 
@@ -232,10 +230,27 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
+  private emitErrorToTodos(error: any): void {
+    const errorMessage = error?.message || String(error) || 'Unknown error'
+
+    this.event.emit('onAgentError', {
+      message: errorMessage,
+      timestamp: Date.now(),
+      type: error?.name || 'Error'
+    })
+
+    this.event.emit('onTodoError', {
+      error: errorMessage,
+      timestamp: Date.now()
+    })
+
+    console.log('[DeepAgentInferencer] Emitted error to todos:', errorMessage)
+  }
+
   /**
    * Create the appropriate model instance based on provider selection
    */
-  private createModelInstance(proxyUrl: string): BaseChatModel {
+  private createModelInstance(): BaseChatModel {
     const { provider, modelId } = this.modelSelection
 
     switch (provider) {
@@ -247,7 +262,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         temperature: 0.7,
         maxTokens: 4096,
         streaming: true,
-        serverURL: `${proxyUrl}/mistral`
+        serverURL: `${endpointUrls.langchain}/mistral`
       })
     }
 
@@ -261,7 +276,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         maxTokens: 4096,
         streaming: true,
         clientOptions: {
-          baseURL: proxyUrl
+          baseURL: endpointUrls.langchain
         }
       })
     }
@@ -355,6 +370,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           console.log('[DeepAgentInferencer] Answer request was cancelled')
         } else {
           console.error('[DeepAgentInferencer] Answer error:', error)
+          // Emit error to update todo list with failed status
+          this.emitErrorToTodos(error)
         }
         this.event.emit('onInferenceDone')
       })
@@ -461,6 +478,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       const activeSubagents: Map<string, { name: string; startTime: number }> = new Map()
       let previousRunId: string | null = null
 
+      // Token usage tracking for this request
+      let totalInputTokens = 0
+      let totalOutputTokens = 0
+      let totalCacheReadTokens = 0
+      let totalCacheCreationTokens = 0
+      let turnCount = 0
+
       // https://docs.langchain.com/oss/python/deepagents/streaming
       console.log('[DeepAgent-Thread] ▶ runAgent called | thread_id:', this.sessionThreadId, '| message:', String(langchainMessages[0]?.content || '').substring(0, 60) + '...')
       const eventStream = this.agent.streamEvents(
@@ -489,15 +513,22 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         }
 
         const eventType = event.event
+        const metadata = event["metadata"] || {}
+        const checkpoint_ns = metadata["langgraph_checkpoint_ns"] || ""
+        const agent_name = metadata["lc_agent_name"] || ""
+        const is_subagent = checkpoint_ns.includes("tools:")
+
+        if (is_subagent) {
+          console.log(`[DeepAgentInferencer] Stream event from subagent detected: ${eventType} (agent: ${agent_name})`, event)
+        }
 
         if (eventType === 'on_chain_start') {
           const runName = event.name || ''
           const tags = event.tags || []
-
-          if (runName.includes('subagent') || tags.includes('subagent')) {
-            const subagentName = event.metadata?.subagent_name || runName
+          if (is_subagent && agent_name) {
+            console.log(`[DeepAgentInferencer] Subagent execution started: ${agent_name} (run_id: ${event.run_id})`, event)
+            const subagentName = agent_name
             activeSubagents.set(event.run_id, { name: subagentName, startTime: Date.now() })
-            console.log(`[DeepAgentInferencer] Subagent started: ${subagentName} (run_id: ${event.run_id})`)
 
             this.event.emit('onSubagentStart', {
               id: event.run_id,
@@ -523,6 +554,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
         if (eventType === 'on_chain_end' && activeSubagents.has(event.run_id)) {
           const subagent = activeSubagents.get(event.run_id)!
+          console.log(`[DeepAgentInferencer] Subagent completed: ${subagent.name} (run_id: ${event.run_id})`)
           const duration = Date.now() - subagent.startTime
 
           this.event.emit('onSubagentComplete', {
@@ -554,15 +586,78 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             if (deltaContent) {
               const currentRunId = event.run_id
               if (previousRunId !== null && previousRunId !== currentRunId) {
+                // Log token usage when run_id changes (new agent turn)
+                console.log(`[DeepAgent-Tokens] Run ID changed: ${previousRunId} → ${currentRunId}`)
                 deltaContent = '\n \n---\n' + deltaContent
               }
               previousRunId = currentRunId
 
               fullResponse += deltaContent
-              this.event.emit('onStreamResult', {
-                content: deltaContent,
-                isIntermediate: isIntermediatePhase,
-                source: event.metadata?.langgraph_node || 'agent'
+
+              if (is_subagent) {
+                this.event.emit('onStreamResult', {
+                  content: deltaContent,
+                  isIntermediate: isIntermediatePhase,
+                  source: event.metadata?.langgraph_node || 'agent',
+                  isSubagent: true,
+                  subagentName: agent_name
+                })
+              } else {
+                this.event.emit('onStreamResult', {
+                  content: deltaContent,
+                  isIntermediate: isIntermediatePhase,
+                  source: event.metadata?.langgraph_node || 'agent',
+                  isSubagent: false,
+                  subagentName: ""
+                })
+              }
+            }
+          }
+        } else if (eventType === 'on_chat_model_end') {
+          // Track token usage when a chat model call completes
+          const output = event.data?.output
+          if (output) {
+            const usageMetadata = output.usage_metadata || output.response_metadata?.usage
+            if (usageMetadata) {
+              const inputTokens = usageMetadata.input_tokens || usageMetadata.prompt_tokens || 0
+              const outputTokens = usageMetadata.output_tokens || usageMetadata.completion_tokens || 0
+              const totalTokens = usageMetadata.total_tokens || (inputTokens + outputTokens)
+
+              // Extract cached token information (Anthropic-specific fields)
+              const cacheReadInputTokens = usageMetadata.cache_read_input_tokens || 0
+              const cacheCreationInputTokens = usageMetadata.cache_creation_input_tokens || 0
+
+              // Update cumulative counts
+              totalInputTokens += inputTokens
+              totalOutputTokens += outputTokens
+              totalCacheReadTokens += cacheReadInputTokens
+              totalCacheCreationTokens += cacheCreationInputTokens
+              turnCount++
+
+              console.log(`[DeepAgent-Tokens]   Turn ${turnCount} completed | run_id: ${event.run_id}`)
+              console.log(`[DeepAgent-Tokens]   Input:  ${inputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Output: ${outputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cache Read: ${cacheReadInputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cache Creation: ${cacheCreationInputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Total:  ${totalTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cumulative: ${totalInputTokens} in / ${totalOutputTokens} out / ${totalCacheReadTokens} cache-read / ${totalCacheCreationTokens} cache-creation`)
+
+              // Emit token usage event for UI tracking
+              this.event.emit('onTokenUsage', {
+                runId: event.run_id,
+                inputTokens,
+                outputTokens,
+                totalTokens,
+                cacheReadInputTokens,
+                cacheCreationInputTokens,
+                cumulativeInputTokens: totalInputTokens,
+                cumulativeOutputTokens: totalOutputTokens,
+                cumulativeCacheReadTokens: totalCacheReadTokens,
+                cumulativeCacheCreationTokens: totalCacheCreationTokens,
+                turnCount,
+                timestamp: Date.now(),
+                agentName: agent_name || 'main',
+                isSubagent: is_subagent
               })
             }
           }
@@ -577,9 +672,35 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         } else if (eventType === 'on_tool_start') {
           // Tool execution started - emit onToolCall event
           const toolName = event.name
-          const toolInput = event.data?.input || {}
+          const toolInput = JSON.parse(event.data?.input.input || '{}')
           console.log('[DeepAgentInferencer] Tool call started:', toolName, toolInput)
           this.event.emit('onToolCall', { toolName, toolInput, status: 'start' })
+
+          console.log('[DeepAgentInferencer] Checking for todo updates in tool input...', toolInput.todos)
+          if (toolName === 'write_todos' && toolInput?.todos) {
+            const todos = toolInput.todos
+            // Find the current todo being executed (first in_progress, or first pending if none in progress)
+            let currentTodoIndex = todos.findIndex((t: any) => t.status === 'in_progress')
+            if (currentTodoIndex === -1) {
+              const allCompleted = todos.every((t: any) => t.status === 'completed')
+              if (allCompleted) {
+                currentTodoIndex = todos.length - 1
+              } else {
+                currentTodoIndex = todos.findIndex((t: any) => t.status === 'pending')
+              }
+            }
+
+            const currentTodoContent = currentTodoIndex >= 0 ? (todos[currentTodoIndex]?.content || todos[currentTodoIndex]?.task) : undefined
+
+            console.log('[DeepAgentInferencer] Todo list updated:', todos, 'Current index:', currentTodoIndex, 'Current todo:', currentTodoContent)
+            this.event.emit('onToolCall', { toolName:currentTodoContent, toolInput: { }, status: 'start' }) // just for UI
+
+            this.event.emit('onTodoUpdate', {
+              todos: todos,
+              currentTodoIndex: currentTodoIndex,
+              timestamp: Date.now()
+            })
+          }
         } else if (eventType === 'on_tool_end') {
           const toolName = event.name
           console.log('[DeepAgentInferencer] Tool call ended:', toolName)
@@ -599,6 +720,19 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       // after the agent finishes, so the user sees the combined diff right away
 
       await (this.filesystemBackend as any).flushAllPendingBatches()
+
+      // Log final token usage summary
+      if (turnCount > 0) {
+        console.log(`[DeepAgent-Tokens] ═══════════════════════════════════════`)
+        console.log(`[DeepAgent-Tokens]   Request Complete - Token Summary`)
+        console.log(`[DeepAgent-Tokens]   Total Turns:   ${turnCount}`)
+        console.log(`[DeepAgent-Tokens]   Total Input:   ${totalInputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Total Output:  ${totalOutputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Cache Read:    ${totalCacheReadTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Cache Creation: ${totalCacheCreationTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Grand Total:   ${totalInputTokens + totalOutputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens] ═══════════════════════════════════════`)
+      }
 
       console.log('[DeepAgentInferencer] Full response length:', fullResponse.length)
       return fullResponse
