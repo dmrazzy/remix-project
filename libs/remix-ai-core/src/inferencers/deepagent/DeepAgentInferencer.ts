@@ -107,6 +107,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private fallbackInferencer: any = null
   private model: BaseChatModel | null = null
   private modelSelection: ModelSelection
+  private mcpInferencer: any = null
   // Session-level thread_id for multi-turn context via MemorySaver checkpointer.
   // Same thread_id is reused so LangGraph remembers previous conversation.
   // Auto-resets on errors (e.g. ToolInputParsingException from stale tool state).
@@ -165,6 +166,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     // Initialize filesystem backend with shared EventEmitter for approval
     this.filesystemBackend = new RemixFilesystemBackend(plugin, this.event) as any
+
+    // Store MCP inferencer for resource access
+    this.mcpInferencer = mcpInferencer
 
     // Initialize tools with approval gate
     this.approvalGate = new ToolApprovalGate(plugin, this.event, 'ask_risky')
@@ -230,6 +234,35 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
+  private async gatherMCPResourcesContext(prompt?: string): Promise<string> {
+    if (!this.mcpInferencer || !prompt) {
+      return ''
+    }
+
+    try {
+      const connectedServers = this.mcpInferencer.getConnectedServers()
+      if (!connectedServers || connectedServers.length === 0) {
+        return ''
+      }
+
+      const mcpParams = {
+        mcpServers: connectedServers,
+        enableIntentMatching: true,
+        maxResources: 5,
+        selectionStrategy: 'hybrid'
+      }
+      const mcpContext = await this.mcpInferencer.intelligentResourceSelection(prompt, mcpParams)
+
+      if (mcpContext) {
+        console.log(`[DeepAgentInferencer] Gathered MCP resources context using intelligentResourceSelection`)
+      }
+
+      return mcpContext
+    } catch (error) {
+      console.warn('[DeepAgentInferencer] Failed to gather MCP resources:', error)
+      return ''
+    }
+  }
   private emitErrorToTodos(error: any): void {
     const errorMessage = error?.message || String(error) || 'Unknown error'
 
@@ -297,10 +330,14 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
+      // Gather MCP resources context
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const enrichedPrompt = mcpContext ? `${mcpContext}\n\n${prompt}` : prompt
+
       // Build messages
       const messages = [
         { role: 'system', content: REMIX_DEEPAGENT_SYSTEM_PROMPT + '\n\n' + SOLIDITY_CODE_GENERATION_PROMPT },
-        { role: 'user', content: prompt }
+        { role: 'user', content: enrichedPrompt }
       ]
 
       // Run the agent
@@ -328,9 +365,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
+      // Gather MCP resources context
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const enrichedContext = mcpContext ? `${mcpContext}\n\n${context}` : context
+
       const messages = [
         { role: 'system', content: REMIX_DEEPAGENT_SYSTEM_PROMPT + '\n\n' + CODE_EXPLANATION_PROMPT },
-        { role: 'user', content: `Context:\n${context}\n\nQuestion: ${prompt}` }
+        { role: 'user', content: `Context:\n${enrichedContext}\n\nQuestion: ${prompt}` }
       ]
 
       const response = await this.runAgent(messages, params)
@@ -356,8 +397,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           DeepAgentErrorType.INITIALIZATION_FAILED
         )
       }
+
+       const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const enrichedContext = mcpContext
+        ? (context ? `${mcpContext}\n\n${context}` : mcpContext)
+        : context
       const messages = [
-        { role: 'user', content: context ? `Context:\n${context}\n\nQuestion: ${prompt}` : prompt }
+        { role: 'user', content: enrichedContext ? `Context:\n${enrichedContext}\n\nQuestion: ${prompt}` : prompt }
       ]
       console.log('[DeepAgentInferencer] Running answer with messages:')
       const responsePromise = this.runAgent(messages, params)
@@ -419,9 +465,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
+      // Gather MCP resources context
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const enrichedPrompt = mcpContext ? `${mcpContext}\n\n${prompt}` : prompt
+
       const messages = [
         { role: 'system', content: REMIX_DEEPAGENT_SYSTEM_PROMPT + '\n\n' + SECURITY_ANALYSIS_PROMPT },
-        { role: 'user', content: prompt }
+        { role: 'user', content: enrichedPrompt }
       ]
 
       const response = await this.runAgent(messages, params)
