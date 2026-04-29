@@ -262,6 +262,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.warn('[DeepAgentInferencer] Failed to gather MCP resources:', error)
       return ''
     }
+  }
   private emitErrorToTodos(error: any): void {
     const errorMessage = error?.message || String(error) || 'Unknown error'
 
