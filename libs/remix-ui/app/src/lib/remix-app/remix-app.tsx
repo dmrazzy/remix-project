@@ -93,19 +93,6 @@ const RemixApp = (props: IRemixAppUi) => {
       height: '720px',
       showModal: false
     },
-    skillsModalState: {
-      id: '',
-      title: <div>Skills Explorer</div>,
-      message: <div>Explore Skills</div>,
-      footer: <div></div>,
-      okLabel: 'OK',
-      okFn: () => { },
-      cancelLabel: 'Cancel',
-      cancelFn: () => { },
-      width: '720px',
-      height: '720px',
-      showModal: false
-    },
     aiChatHistoryState: {
       showAiChatHistory: props.app.rightSidePanel.isMaximized,
       toggleIsAiChatMaximized: props.app.remixAiAssistant.isMaximized,
@@ -503,8 +490,6 @@ const RemixApp = (props: IRemixAppUi) => {
               <AppDialogs></AppDialogs>
               <DialogViewPlugin></DialogViewPlugin>
               {appState.genericModalState?.showModal && props.app.templateExplorerModal.render()
-              }
-              {appState.skillsModalState?.showModal && props.app.skillExplorerModal.render()
               }
               {appState.showSkillsModal && props.app.skillExplorerModal.render()}
               {props.app.invitationManager.render()}

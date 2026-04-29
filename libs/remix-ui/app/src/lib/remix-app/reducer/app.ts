@@ -57,13 +57,6 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
     }
   }
 
-  case appActionTypes.showSkillsModal: {
-    return {
-      ...state,
-      skillsModalState: { ...state.skillsModalState, showModal: action.payload }
-    }
-  }
-
   case appActionTypes.showAiChatHistorySidebar: {
     return {
       ...state,
