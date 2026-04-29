@@ -396,6 +396,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           DeepAgentErrorType.INITIALIZATION_FAILED
         )
       }
+
+       const mcpContext = await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
         ? (context ? `${mcpContext}\n\n${context}` : mcpContext)
         : context
