@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react'
 import { useAuth } from '../../../app/src/lib/remix-app/context/auth-context'
 import { AppContext } from '../../../app/src/lib/remix-app/context/context'
 import { LoginModal } from './modals/login-modal'
+import { startSignInFlow } from './start-sign-in'
 import { UserBadge } from './user-badge'
 import { UserMenuCompact } from './user-menu-compact'
 import { UserMenuFull } from './user-menu-full'
@@ -62,22 +63,7 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
   }, [isDesktopApp, isAuthenticated])
 
   const handleSignIn = async () => {
-    // In desktop app, do not show the local modal first.
-    // Open browser immediately so provider selection happens there.
-    if (isDesktopApp && plugin && typeof plugin.call === 'function') {
-      try {
-        await plugin.call('desktopAuthHandler', 'login')
-        plugin.call('matomo', 'trackEvent', 'auth', 'desktopOpenBrowserLogin', 'Sign In', undefined).catch(() => {})
-      } catch (err) {
-        console.error('[LoginButton] Failed to open browser login flow:', err)
-      }
-      return
-    }
-
-    setShowModal(true)
-    if (plugin && typeof plugin.call === 'function') {
-      plugin.call('matomo', 'trackEvent', 'auth', 'openLoginModal', 'Sign In', undefined).catch(() => {})
-    }
+    await startSignInFlow(plugin, () => setShowModal(true), 'Sign In')
   }
 
   const pollForCurrentTheme = async () => {
