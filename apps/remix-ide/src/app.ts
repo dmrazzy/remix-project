@@ -74,6 +74,7 @@ import { HardhatHandle } from './app/files/hardhat-handle'
 import { HardhatHandleDesktop } from './app/plugins/electron/hardhatPlugin'
 import { circomPlugin } from './app/plugins/electron/circomElectronPlugin'
 import { GitHubAuthHandler } from './app/plugins/electron/gitHubAuthHandler'
+import { DesktopAuthHandler as DesktopAuthHandlerPlugin } from './app/plugins/electron/desktopAuthHandler'
 import { GitPlugin } from './app/plugins/git'
 import { Matomo } from './app/plugins/matomo'
 import { DesktopClient } from './app/plugins/desktop-client'
@@ -602,6 +603,8 @@ class AppComponent {
       this.engine.register([desktopHost])
       const githubAuthHandler = new GitHubAuthHandler()
       this.engine.register([githubAuthHandler])
+      const desktopAuthHandler = new DesktopAuthHandlerPlugin()
+      this.engine.register([desktopAuthHandler])
     } else {
       //---- desktop client
       const desktopClient = new DesktopClient(blockchain)

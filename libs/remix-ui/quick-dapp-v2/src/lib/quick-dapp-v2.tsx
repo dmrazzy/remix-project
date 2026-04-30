@@ -1,5 +1,5 @@
 import React, { useEffect, useReducer, useState, useMemo, useRef, useContext } from 'react';
-import { LoginModal } from '@remix-ui/login';
+import { LoginModal, startSignInFlow } from '@remix-ui/login';
 import { IntlProvider } from 'react-intl';
 import CreateInstance from './components/CreateInstance';
 import EditHtmlTemplate from './components/EditHtmlTemplate';
@@ -466,7 +466,7 @@ export function RemixUiQuickDappV2({ plugin }: RemixUiQuickDappV2Props): JSX.Ele
               </p>
               <button
                 className="btn btn-sm btn-primary mt-2"
-                onClick={() => setShowLoginModal(true)}
+                onClick={() => startSignInFlow(plugin, () => setShowLoginModal(true), 'QuickDapp Sign In')}
               >
                 Sign In
               </button>
