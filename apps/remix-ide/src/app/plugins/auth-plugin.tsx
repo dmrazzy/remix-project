@@ -519,9 +519,8 @@ export class AuthPlugin extends Plugin {
 
   private getPendingDesktopAuthState(): string | null {
     if (this.isDesktop()) return null
-    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash
-    const params = new URLSearchParams(hash)
-    return params.get('desktop_auth')
+    const params = new QueryParams().get() as Record<string, string>
+    return params.desktop_auth || null
   }
 
   private completeDesktopAuthIfPending(accessToken: string, refreshToken: string, user: any): void {

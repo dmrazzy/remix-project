@@ -18,7 +18,7 @@ const clientProfile: Profile = {
 }
 
 // The base URL for the Remix web IDE used for authentication
-const REMIX_WEB_URL = 'http://localhost:8080'
+const REMIX_WEB_URL =  'http://localhost:8080'
 
 // State expires after 10 minutes
 const STATE_TTL_MS = 10 * 60 * 1000

@@ -19,6 +19,7 @@ import isElectron from 'is-electron'
 import { desktopConnectionType, AppConfig } from '@remix-api'
 import { FloatingChatHistory } from './components/chatHistory/floatingChatHistory'
 import { appActionTypes } from './actions/app'
+import { DesktopRedirectOverlay } from '@remix-ui/login'
 
 interface IRemixAppUi {
   app: any
@@ -396,6 +397,7 @@ const RemixApp = (props: IRemixAppUi) => {
         <onLineContext.Provider value={online}>
           <AuthProvider plugin={props.app.authPlugin}>
             <AppProvider value={value}>
+              <DesktopRedirectOverlay />
               <MatomoDialog hide={!appReady} managePreferencesFn={() => setShowManagePreferencesDialog(true)}></MatomoDialog>
               {showManagePreferencesDialog && <ManagePreferencesDialog></ManagePreferencesDialog>}
               <div className="d-flex flex-column col-12 vh-100">

@@ -7,6 +7,7 @@ import { UserBadge } from './user-badge'
 import { UserMenuCompact } from './user-menu-compact'
 import { UserMenuFull } from './user-menu-full'
 import { AuthProviderType } from '@remix-ui/app'
+import { QueryParams } from '@remix-project/remix-lib'
 
 interface LoginButtonProps {
   className?: string
@@ -55,9 +56,8 @@ export const LoginButton: React.FC<LoginButtonProps> = ({
   useEffect(() => {
     if (isDesktopApp || isAuthenticated) return
 
-    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash
-    const params = new URLSearchParams(hash)
-    if (params.get('desktop_auth')) {
+    const params = new QueryParams().get() as Record<string, string>
+    if (params.desktop_auth) {
       setShowModal(true)
     }
   }, [isDesktopApp, isAuthenticated])
