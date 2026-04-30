@@ -95,6 +95,7 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.removeAllListeners('onTodoUpdate')
     eventEmitter.removeAllListeners('onAgentError')
     eventEmitter.removeAllListeners('onTodoError')
+    eventEmitter.removeAllListeners('onApiError')
     eventEmitter.removeAllListeners('onToolApprovalRequired')
 
     // Set up fresh listeners
@@ -135,6 +136,11 @@ export class RemixAIPlugin extends Plugin {
     })
     eventEmitter.on('onTodoError', (data: { error: string; timestamp: number }) => {
       this.emit('onTodoError', data)
+    })
+
+    // API error events (rate limits, quota exceeded, etc.)
+    eventEmitter.on('onApiError', (data: { type: string; message: string; retryable: boolean; retryAfter?: number; originalError?: string; timestamp: number }) => {
+      this.emit('onApiError', data)
     })
 
     // Human-in-the-loop: relay approval requests to UI

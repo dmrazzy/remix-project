@@ -524,6 +524,28 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       }
     }
 
+    // Handle API errors (rate limits, quota exceeded, etc.)
+    const handleApiError = (data: { type: string; message: string; retryable: boolean; retryAfter?: number; originalError?: string; timestamp: number }) => {
+      console.error('[RemixAI Assistant] API error:', data)
+      setIsStreaming(false)
+
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? {
+                ...m,
+                content: m.content + `\n${data.message}`,
+                isExecutingTools: false,
+                executingToolName: undefined,
+                executingToolArgs: undefined
+              }
+              : m
+          )
+        )
+      }
+    }
+
     props.plugin.on('remixAI', 'onStreamResult', handleStreamChunk)
     props.plugin.on('remixAI', 'onStreamComplete', handleStreamComplete)
     props.plugin.on('remixAI', 'onToolCall', handleToolCall)
@@ -534,6 +556,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     props.plugin.on('remixAI', 'onTodoUpdate', handleTodoUpdate)
     props.plugin.on('remixAI', 'onTodoError', handleTodoError)
     props.plugin.on('remixAI', 'onAgentError', handleAgentError)
+    props.plugin.on('remixAI', 'onApiError', handleApiError)
 
     // Human-in-the-loop: listen for tool approval requests (batch processing)
     const handleToolApproval = (request: ToolApprovalRequest) => {
@@ -553,6 +576,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       props.plugin.off('remixAI', 'onTodoUpdate')
       props.plugin.off('remixAI', 'onTodoError')
       props.plugin.off('remixAI', 'onAgentError')
+      props.plugin.off('remixAI', 'onApiError')
       props.plugin.off('remixAI', 'onToolApprovalRequired')
     }
   }, [props.plugin])
@@ -625,7 +649,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const handleReviewChanges = useCallback(async (approval: ToolApprovalRequest) => {
     if (!approval) return
     const { proposedContent, requestId } = approval
-    let { filePath } = approval
+    const { filePath } = approval
     if (!filePath || !proposedContent) {
       console.warn('[HITL][Review] Cannot open review — missing filePath or proposedContent')
       return
@@ -634,7 +658,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     // Normalize path: Remix fileManager expects paths without leading '/'
     // (e.g. 'contracts/X.sol', not '/contracts/X.sol')
     const normalizedPath = filePath.replace(/^\/+/, '')
-
 
     try {
       // For new files: create empty file and open it (same as Stefan's handler pattern)
@@ -670,7 +693,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       const pending = pendingDiffApprovalRef.current
       if (!pending) return
 
-
       // Read the final editor model content (includes selective accept/decline)
       let finalContent: string | undefined
       try {
@@ -694,7 +716,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     const handleDiffRejected = (file: string) => {
       const pending = pendingDiffApprovalRef.current
       if (!pending) return
-
 
       props.plugin.call('remixAI', 'respondToToolApproval', {
         requestId: pending.requestId,
