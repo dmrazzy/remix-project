@@ -97,7 +97,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const menuRef = useRef<any>()
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<AIModel>(getDefaultModel())
-  const [isOllamaFailureFallback, setIsOllamaFailureFallback] = useState(false)
+  const [setIsOllamaFailureFallback] = useState(false)
   const [themeTracker, setThemeTracker] = useState<{ name: string } | null>(() => ({ name: getSystemThemeFallback() }))
   const historyRef = useRef<HTMLDivElement | null>(null)
   const modelBtnRef = useRef(null)
@@ -184,9 +184,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   useOnClickOutside([modelBtnRef], () => setShowModelSelector(false))
   useOnClickOutside([modelSelectorBtnRef], () => setShowOllamaModelSelector(false))
 
-  const getBoundingRect = (ref: MutableRefObject<any>) => ref.current?.getBoundingClientRect()
-  const calcAndConvertToDvh = (coordValue: number) => (coordValue / window.innerHeight) * 100
-  const calcAndConvertToDvw = (coordValue: number) => (coordValue / window.innerWidth) * 100
   const chatCmdParser = new ChatCommandParser(props.plugin)
 
   const dispatchActivity = useCallback(
