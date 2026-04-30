@@ -97,7 +97,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const menuRef = useRef<any>()
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<AIModel>(getDefaultModel())
-  const [setIsOllamaFailureFallback] = useState(false)
+  const [isOllamaFailureFallback, setIsOllamaFailureFallback] = useState(false)
   const [themeTracker, setThemeTracker] = useState<{ name: string } | null>(() => ({ name: getSystemThemeFallback() }))
   const historyRef = useRef<HTMLDivElement | null>(null)
   const modelBtnRef = useRef(null)
