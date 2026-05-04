@@ -3,7 +3,7 @@
  * Integrates LangChain DeepAgent with Remix's AI system
  */
 
-import { IAIStreamResponse, ICompletions, IGeneration, IParams } from '../../types/types'
+import { ICompletions, IGeneration, IParams } from '../../types/types'
 import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
 import { RemixFilesystemBackend } from './RemixFilesystemBackend'
@@ -24,6 +24,7 @@ import {
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
+import { classifyApiError, getErrorMessage } from './ApiErrorHandler'
 
 // Import LangChain modules
 import { ChatAnthropic } from '@langchain/anthropic'
@@ -32,7 +33,6 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
-import { buildChatPrompt } from '../../prompts/promptBuilder'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import { endpointUrls } from "@remix-endpoints-helper"
 
@@ -46,7 +46,6 @@ interface ModelSelection {
 
 // Initialize AsyncLocalStorage for browser environment
 const initializeAsyncLocalStorage = () => {
-  // Create a proper AsyncLocalStorage implementation for browser
   const storeStack: any[] = []
   const browserAsyncLocalStorage = {
     run<T>(store: any, callback: () => T): T {
@@ -108,9 +107,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private model: BaseChatModel | null = null
   private modelSelection: ModelSelection
   private mcpInferencer: any = null
-  // Session-level thread_id for multi-turn context via MemorySaver checkpointer.
-  // Same thread_id is reused so LangGraph remembers previous conversation.
-  // Auto-resets on errors (e.g. ToolInputParsingException from stale tool state).
   private sessionThreadId: string = DeepAgentInferencer.generateThreadId()
 
   private static generateThreadId(): string {
@@ -398,14 +394,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
-       const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
         ? (context ? `${mcpContext}\n\n${context}` : mcpContext)
         : context
       const messages = [
         { role: 'user', content: enrichedContext ? `Context:\n${enrichedContext}\n\nQuestion: ${prompt}` : prompt }
       ]
-      console.log('[DeepAgentInferencer] Running answer with messages:')
       const responsePromise = this.runAgent(messages, params)
 
       responsePromise.then(response => {
@@ -416,8 +411,20 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           console.log('[DeepAgentInferencer] Answer request was cancelled')
         } else {
           console.error('[DeepAgentInferencer] Answer error:', error)
+          const { type: errorType, retryable, retryAfter } = classifyApiError(error)
+          const userMessage = getErrorMessage(errorType, error, retryAfter)
+
+          this.event.emit('onApiError', {
+            type: errorType,
+            message: userMessage,
+            retryable,
+            retryAfter,
+            originalError: error?.message,
+            timestamp: Date.now()
+          })
+
           // Emit error to update todo list with failed status
-          this.emitErrorToTodos(error)
+          this.emitErrorToTodos(new Error(userMessage))
         }
         this.event.emit('onInferenceDone')
       })
@@ -543,10 +550,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         },
         {
           version: 'v2',
-          // Reuse session-level thread_id so MemorySaver carries multi-turn context.
-          // buildChatPrompt() is intentionally NOT used — its incomplete history
-          // (missing tool_use blocks) caused LLM hallucination.
-          // On ToolInputParsingException, sessionThreadId is auto-reset (see catch block).
           configurable: {
             thread_id: this.sessionThreadId
           },
@@ -833,7 +836,36 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         }
       }
 
-      console.error('[DeepAgentInferencer] Error during agent execution:', error)
+      // Classify and handle API errors
+      const { type: errorType, retryable, retryAfter } = classifyApiError(error)
+      const userMessage = getErrorMessage(errorType, error, retryAfter)
+
+      console.error(`[DeepAgentInferencer] Error during agent execution: ${errorType}`, error)
+
+      // Emit API error event for UI handling
+      this.event.emit('onApiError', {
+        type: errorType,
+        message: userMessage,
+        retryable,
+        retryAfter,
+        originalError: error?.message,
+        timestamp: Date.now()
+      })
+
+      // For recoverable errors, emit a friendly stream message and return
+      if (errorType === DeepAgentErrorType.RATE_LIMIT_EXCEEDED ||
+          errorType === DeepAgentErrorType.QUOTA_EXCEEDED ||
+          errorType === DeepAgentErrorType.MODEL_OVERLOADED) {
+        const errorMessage = `\n\n${userMessage}`
+        this.event.emit('onStreamResult', {
+          content: errorMessage,
+          isIntermediate: false,
+          source: 'error'
+        })
+        fullResponse += errorMessage
+        return fullResponse
+      }
+
       throw error
     } finally {
       this.currentAbortController = null
@@ -947,19 +979,26 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private async handleError(error: any, method: string, prompt: string, params: IParams): Promise<string> {
     console.error(`[DeepAgentInferencer] Error in ${method}:`, error)
 
-    // Categorize error
-    let errorType = DeepAgentErrorType.UNKNOWN
-    if (error.message?.includes('context_length_exceeded')) {
-      errorType = DeepAgentErrorType.CONTEXT_LENGTH_EXCEEDED
-    } else if (error.message?.includes('tool_execution_failed')) {
-      errorType = DeepAgentErrorType.TOOL_EXECUTION_FAILED
-    } else if (error.message?.includes('API key')) {
-      errorType = DeepAgentErrorType.API_KEY_INVALID
-    } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
-      errorType = DeepAgentErrorType.NETWORK_ERROR
+    const { type: errorType, retryable, retryAfter } = classifyApiError(error)
+    const userMessage = getErrorMessage(errorType, error, retryAfter)
+
+    console.log(`[DeepAgentInferencer] Error classified as: ${errorType}, retryable: ${retryable}, retryAfter: ${retryAfter}`)
+
+    this.event.emit('onApiError', {
+      type: errorType,
+      message: userMessage,
+      retryable,
+      retryAfter,
+      originalError: error?.message,
+      timestamp: Date.now()
+    })
+
+    if (errorType === DeepAgentErrorType.RATE_LIMIT_EXCEEDED ||
+        errorType === DeepAgentErrorType.QUOTA_EXCEEDED) {
+      return `${userMessage}`
     }
 
-    // Try fallback to RemoteInferencer
+    // Try fallback to RemoteInferencer for other errors
     if (this.fallbackInferencer) {
       console.log(`[DeepAgentInferencer] Falling back to RemoteInferencer for ${method}`)
       this.event.emit('deepAgentFallback', { method, error: error.message, errorType })
@@ -977,13 +1016,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         default:
           return await this.fallbackInferencer.generate(prompt, params)
         }
-      } catch (fallbackError) {
+      } catch (fallbackError: any) {
         console.error('[DeepAgentInferencer] Fallback also failed:', fallbackError)
+        const fallbackClassification = classifyApiError(fallbackError)
+        const fallbackMessage = getErrorMessage(fallbackClassification.type, fallbackError, fallbackClassification.retryAfter)
+        return `${fallbackMessage}`
       }
     }
 
-    // Return error message
-    return `Error: ${error.message || 'An unexpected error occurred'}`
+    return `${userMessage}`
   }
 
   /**
