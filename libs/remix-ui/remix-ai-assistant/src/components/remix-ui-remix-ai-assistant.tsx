@@ -360,6 +360,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                 isExecutingTools: false,
                 executingToolName: undefined,
                 executingToolArgs: undefined,
+                executingToolUIString: undefined,
                 currentTask: undefined,
                 taskStatus: undefined,
                 isIntermediateContent: false
@@ -373,7 +374,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
 
     // Handle tool call events from DeepAgent
-    const handleToolCall = (data: { toolName: string; toolInput?: any; toolOutput?: any; status: 'start' | 'end' }) => {
+    const handleToolCall = (data: { toolName: string; toolInput?: any; toolUIString?: string; toolOutput?: any; status: 'start' | 'end' }) => {
       console.log('[RemixAI Assistant] Tool call event:', data)
       const assistantId = streamingAssistantIdRef.current
       if (!assistantId) return
@@ -384,7 +385,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             ...m,
             isExecutingTools: true,
             executingToolName: data.toolName,
-            executingToolArgs: data.toolInput
+            executingToolArgs: data.toolInput,
+            executingToolUIString: data.toolUIString
           } : m))
         )
       } else {
@@ -393,7 +395,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             ...m,
             isExecutingTools: false,
             executingToolName: undefined,
-            executingToolArgs: undefined
+            executingToolArgs: undefined,
+            executingToolUIString: undefined
           } : m))
         )
       }
@@ -494,7 +497,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               todos: updatedTodos,
               isExecutingTools: false,
               executingToolName: undefined,
-              executingToolArgs: undefined
+              executingToolArgs: undefined,
+              executingToolUIString: undefined
             }
           })
         )
@@ -513,7 +517,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                 content: m.content + `\n\n**Error:** ${data.message}`,
                 isExecutingTools: false,
                 executingToolName: undefined,
-                executingToolArgs: undefined
+                executingToolArgs: undefined,
+                executingToolUIString: undefined
               }
               : m
           )
@@ -535,7 +540,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                 content: m.content + `\n${data.message}`,
                 isExecutingTools: false,
                 executingToolName: undefined,
-                executingToolArgs: undefined
+                executingToolArgs: undefined,
+                executingToolUIString: undefined
               }
               : m
           )
@@ -874,6 +880,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             isExecutingTools: false,
             executingToolName: undefined,
             executingToolArgs: undefined,
+            executingToolUIString: undefined,
             activeSubagent: undefined,
             subagentTask: undefined,
             currentTask: undefined,
@@ -937,7 +944,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
             // Clear tool execution status when content starts arriving
             isExecutingTools: false,
             executingToolName: undefined,
-            executingToolArgs: undefined
+            executingToolArgs: undefined,
+            executingToolUIString: undefined
           } : m))
         )
       }
@@ -1068,7 +1076,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                       ...m,
                       isExecutingTools: false,
                       executingToolName: undefined,
-                      executingToolArgs: undefined
+                      executingToolArgs: undefined,
+                      executingToolUIString: undefined
                     } : m))
                   )
                   toolExecutionStartTime = null
@@ -1080,7 +1089,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                     ...m,
                     isExecutingTools: false,
                     executingToolName: undefined,
-                    executingToolArgs: undefined
+                    executingToolArgs: undefined,
+                    executingToolUIString: undefined
                   } : m))
                 )
                 toolExecutionStartTime = null
@@ -1092,7 +1102,8 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                   ...m,
                   isExecutingTools: false,
                   executingToolName: undefined,
-                  executingToolArgs: undefined
+                  executingToolArgs: undefined,
+                  executingToolUIString: undefined
                 } : m))
               )
             }

@@ -92,6 +92,16 @@ export interface IContentStreamEvent {
 }
 
 /**
+ * Tool call event for UI updates
+ */
+export interface IToolCallEvent {
+  toolName: string
+  toolInput: Record<string, any>
+  toolUIString: string // User-friendly UI string for display
+  status: 'start' | 'end'
+}
+
+/**
  * DeepAgent error types
  */
 export enum DeepAgentErrorType {

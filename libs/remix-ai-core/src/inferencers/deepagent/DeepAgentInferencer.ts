@@ -25,6 +25,7 @@ import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
 import { classifyApiError, getErrorMessage } from './ApiErrorHandler'
+import { resolveToolUIString } from './ToolUIStrings'
 
 // Import LangChain modules
 import { ChatAnthropic } from '@langchain/anthropic'
@@ -729,8 +730,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           // Tool execution started - emit onToolCall event
           const toolName = event.name
           const toolInput = JSON.parse(event.data?.input.input || '{}')
-          console.log('[DeepAgentInferencer] Tool call started:', toolName, toolInput)
-          this.event.emit('onToolCall', { toolName, toolInput, status: 'start' })
+          const toolUIString = resolveToolUIString(toolName, toolInput)
+          console.log('[DeepAgentInferencer] Tool call started:', toolName, toolInput, '| UI:', toolUIString)
+          this.event.emit('onToolCall', { toolName, toolInput, toolUIString, status: 'start' })
 
           console.log('[DeepAgentInferencer] Checking for todo updates in tool input...', toolInput.todos)
           if (toolName === 'write_todos' && toolInput?.todos) {
@@ -747,9 +749,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             }
 
             const currentTodoContent = currentTodoIndex >= 0 ? (todos[currentTodoIndex]?.content || todos[currentTodoIndex]?.task) : undefined
+            const currentTodoUIString = currentTodoIndex >= 0 ? (todos[currentTodoIndex]?.activeForm || currentTodoContent) : undefined
 
             console.log('[DeepAgentInferencer] Todo list updated:', todos, 'Current index:', currentTodoIndex, 'Current todo:', currentTodoContent)
-            this.event.emit('onToolCall', { toolName:currentTodoContent, toolInput: { }, status: 'start' }) // just for UI
+            this.event.emit('onToolCall', { toolName: currentTodoContent, toolInput: { }, toolUIString: currentTodoUIString || currentTodoContent, status: 'start' }) // just for UI
 
             this.event.emit('onTodoUpdate', {
               todos: todos,
@@ -760,8 +763,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         } else if (eventType === 'on_tool_end') {
           const toolName = event.name
           console.log('[DeepAgentInferencer] Tool call ended:', toolName)
-          // let the tool callback for while
-          //this.event.emit('onToolCall', { toolName, toolOutput, status: 'end' })
+          this.event.emit('onToolCall', { toolName, toolInput: {}, toolUIString: '', status: 'end' })
         }
       }
 
@@ -872,7 +874,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       throw error
     } finally {
       this.currentAbortController = null
-      this.event.emit('onToolCall', { toolName:'', toolInput:'', status: 'end' })
+      this.event.emit('onToolCall', { toolName: '', toolInput: '', toolUIString: '', status: 'end' })
     }
   }
 

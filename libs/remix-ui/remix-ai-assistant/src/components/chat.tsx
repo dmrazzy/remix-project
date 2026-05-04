@@ -12,7 +12,6 @@ import {
   type ConversationStarter
 } from '../lib/conversationStarters'
 import { normalizeMarkdown } from 'libs/remix-ui/helper/src/lib/components/remix-md-renderer'
-import { getToolExecutionMessage } from '../lib/toolDescriptions'
 import { QueryParams } from '@remix-project/remix-lib'
 import { AiChatButtons } from './aichatButtons'
 
@@ -148,12 +147,7 @@ export const ChatHistoryComponent: React.FC<ChatHistoryComponentProps> = ({
                   <div className="tool-execution-indicator text-muted">
                     <i className="fa fa-spinner fa-spin me-2"></i>
                     <span>
-                      {msg.executingToolName
-                        ? getToolExecutionMessage({
-                          toolName: msg.executingToolName,
-                          arguments: msg.executingToolArgs
-                        })
-                        : 'Executing tools...'}
+                      {msg.executingToolUIString || msg.executingToolName || 'Executing tools...'}
                     </span>
                   </div>
                 )}

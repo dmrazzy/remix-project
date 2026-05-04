@@ -11,8 +11,8 @@
  */
 export interface TodoItem {
   id?: string
-  content?: string  // DeepAgents uses 'content' field
-  task?: string     // Alternative field name for compatibility
+  content?: string // DeepAgents uses 'content' field
+  task?: string // Alternative field name for compatibility
   status: 'pending' | 'in_progress' | 'completed' | 'failed'
 }
 
@@ -25,6 +25,7 @@ export interface ChatMessage {
   isExecutingTools?: boolean
   executingToolName?: string
   executingToolArgs?: Record<string, any>
+  executingToolUIString?: string
   currentTask?: string
   taskStatus?: 'running' | 'completed'
   activeSubagent?: string
