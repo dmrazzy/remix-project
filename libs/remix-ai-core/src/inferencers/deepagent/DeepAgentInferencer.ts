@@ -35,6 +35,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import { endpointUrls } from "@remix-endpoints-helper"
+import { max } from 'bn.js'
 
 // Model provider types
 type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
@@ -43,6 +44,8 @@ interface ModelSelection {
   provider: ModelProvider
   modelId: string
 }
+
+const DAPP_MAX_TOKENS = 65536
 
 // Initialize AsyncLocalStorage for browser environment
 const initializeAsyncLocalStorage = () => {
@@ -279,7 +282,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   /**
    * Create the appropriate model instance based on provider selection
    */
-  private createModelInstance(): BaseChatModel {
+  private createModelInstance(maxTokens: number=DAPP_MAX_TOKENS): BaseChatModel {
     const { provider, modelId } = this.modelSelection
 
     switch (provider) {
@@ -289,7 +292,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         apiKey: 'proxy-handled',
         model: modelId,
         temperature: 0.7,
-        maxTokens: 4096,
+        maxTokens: maxTokens,
         streaming: true,
         serverURL: `${endpointUrls.langchain}/mistral`
       })
@@ -302,7 +305,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         apiKey: 'proxy-handled',
         model: modelId,
         temperature: 0.7,
-        maxTokens: 4096,
+        maxTokens: maxTokens,
         streaming: true,
         clientOptions: {
           baseURL: endpointUrls.langchain
