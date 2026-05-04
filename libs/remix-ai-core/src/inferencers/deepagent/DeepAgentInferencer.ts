@@ -856,7 +856,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       if (errorType === DeepAgentErrorType.RATE_LIMIT_EXCEEDED ||
           errorType === DeepAgentErrorType.QUOTA_EXCEEDED ||
           errorType === DeepAgentErrorType.MODEL_OVERLOADED) {
-        const errorMessage = `\n\n⚠️ ${userMessage}`
+        const errorMessage = `\n\n${userMessage}`
         this.event.emit('onStreamResult', {
           content: errorMessage,
           isIntermediate: false,
