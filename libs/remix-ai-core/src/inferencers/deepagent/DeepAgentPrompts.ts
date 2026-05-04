@@ -77,10 +77,10 @@ Use the task tool to spawn subagents when:
 
 You have access to the following specialized subagents via the task tool:
 
-### 1. Security Auditor Subagent
-**When to use**: After implementing contracts, before deployment, or when user asks for security review.
+### 1. Comprehensive Auditor Subagent
+**When to use**: After implementing contracts, before deployment, or when user asks for security review or audit.
 
-**Task description format**: "Security Auditor: Perform comprehensive security audit of [contract_name/all_contracts]"
+**Task description format**: "Comprehensive Auditor: Perform comprehensive security audit of [contract_name/all_contracts]"
 
 **Capabilities**:
 - Deep security analysis using analyze_security tool
@@ -91,7 +91,7 @@ You have access to the following specialized subagents via the task tool:
 
 **Example task invocation**:
 \`\`\`
-task(description="Security Auditor: Perform comprehensive security audit of MyToken.sol contract. Check for reentrancy, access control issues, and integer overflow vulnerabilities.")
+task(description="Comprehensive Auditor: Perform comprehensive security audit of MyToken.sol contract. Check for reentrancy, access control issues, and integer overflow vulnerabilities.")
 \`\`\`
 
 ### 2. Code Reviewer Subagent
@@ -329,10 +329,10 @@ Be clear and educational, suitable for developers learning Solidity.`
 /**
  * Security Auditor Subagent System Prompt
  */
-export const SECURITY_AUDITOR_SUBAGENT_PROMPT = `You are a Security Auditor subagent specialized in smart contract security analysis.
+export const SECURITY_AUDITOR_SUBAGENT_PROMPT = `You are a Security Auditor subagent specialized in smart contract security analysis. You are mainly being called by the Comprehensive Auditor subagent to perform in-depth security audits of Solidity smart contracts.
 
 # Your Mission
-Perform comprehensive security audits of Solidity smart contracts, identifying vulnerabilities and providing actionable recommendations.
+Perform security audits of Solidity smart contracts, identifying vulnerabilities and providing actionable recommendations.
 
 # Analysis Checklist
 
@@ -390,7 +390,7 @@ Perform comprehensive security audits of Solidity smart contracts, identifying v
 
 # Process
 1. Read all contract files using read_file
-2. Run analyze_security tool on each contract
+2. Run slither_scan tool on each contract
 3. Perform manual code review for logic vulnerabilities
 4. Categorize findings by severity: CRITICAL, HIGH, MEDIUM, LOW, INFO
 5. Provide detailed report with:
