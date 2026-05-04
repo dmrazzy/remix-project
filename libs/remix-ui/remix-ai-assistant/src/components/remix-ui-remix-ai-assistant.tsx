@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useImperativeHandle, M
 import '../css/remix-ai-assistant.css'
 
 import { ChatCommandParser, GenerationParams, ChatHistory, HandleStreamResponse, listModels, isOllamaAvailable, AVAILABLE_MODELS, getDefaultModel, getModelById, AIModel } from '@remix/remix-ai-core'
+import { ToolApprovalRequest } from '@remix/remix-ai-core'
 import { HandleOpenAIResponse, HandleMistralAIResponse, HandleAnthropicResponse, HandleOllamaResponse } from '@remix/remix-ai-core'
 //@ts-ignore
 import '../css/color.css'
@@ -21,6 +22,7 @@ import { ChatHistorySidebar } from './chatHistorySidebar'
 import AiChatPromptAreaForHistory from './aiChatPromptAreaForHistory'
 import AiChatPromptArea from './aiChatPromptArea'
 import { useModelAccess } from '../hooks/useModelAccess'
+import { ToolApprovalModal } from './ToolApprovalModal'
 
 export interface RemixUiRemixAiAssistantProps {
   plugin: RemixAIAssistant
@@ -81,6 +83,11 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const mcpEnabled = true
 
   const [mcpEnhanced, setMcpEnhanced] = useState(mcpEnabled)
+  const [pendingApprovals, setPendingApprovals] = useState<ToolApprovalRequest[]>([])
+  const approvalQueueRef = useRef<ToolApprovalRequest[]>([])
+  // Tracks which approval requests are currently being reviewed in the editor via showCustomDiff
+  const [reviewingApprovals, setReviewingApprovals] = useState<Set<string>>(new Set())
+  const pendingDiffApprovalRef = useRef<{ requestId: string; filePath: string } | null>(null)
   const { trackMatomoEvent: baseTrackEvent } = useContext(TrackingContext)
   const trackMatomoEvent = <T extends MatomoEvent = AIEvent>(event: T) => {
     baseTrackEvent?.<T>(event)
@@ -177,9 +184,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   useOnClickOutside([modelBtnRef], () => setShowModelSelector(false))
   useOnClickOutside([modelSelectorBtnRef], () => setShowOllamaModelSelector(false))
 
-  const getBoundingRect = (ref: MutableRefObject<any>) => ref.current?.getBoundingClientRect()
-  const calcAndConvertToDvh = (coordValue: number) => (coordValue / window.innerHeight) * 100
-  const calcAndConvertToDvw = (coordValue: number) => (coordValue / window.innerWidth) * 100
   const chatCmdParser = new ChatCommandParser(props.plugin)
 
   const dispatchActivity = useCallback(
@@ -312,15 +316,23 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   // Listen for streaming chunks from DeepAgent
   useEffect(() => {
     // Handle stream chunks - supports both legacy string format and new object format
-    const handleStreamChunk = (data: string | { content: string; isIntermediate?: boolean; source?: string }) => {
+    const handleStreamChunk = (data: string | { content: string; isIntermediate?: boolean; source?: string; isSubagent?: boolean; subagentName?: string }) => {
       const chunk = typeof data === 'string' ? data : data.content
       const isIntermediate = typeof data === 'object' ? data.isIntermediate : false
+      const isSubagent = typeof data === 'object' ? data.isSubagent : false
+      const subagentName = typeof data === 'object' ? data.subagentName : undefined
 
       if (streamingAssistantIdRef.current) {
         setMessages(prev =>
           prev.map(m =>
             m.id === streamingAssistantIdRef.current
-              ? { ...m, content: m.content + chunk, isIntermediateContent: isIntermediate }
+              ? {
+                ...m,
+                content: m.content + chunk,
+                isIntermediateContent: isIntermediate,
+                isSubagentStreaming: isSubagent,
+                streamingSubagentName: subagentName
+              }
               : m
           )
         )
@@ -330,12 +342,30 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     const handleStreamComplete = (finalText: string) => {
       // Save to chat history when streaming completes
       if (streamingAssistantIdRef.current) {
+        const assistantId = streamingAssistantIdRef.current
         setMessages(prev => {
           const userMsg = prev[prev.length - 2]
           if (userMsg && userMsg.role === 'user' && finalText) {
             Promise.resolve(ChatHistory.pushHistory(userMsg.content, finalText)).then(() => props.plugin.loadConversations())
           }
-          return prev
+          // Clear all streaming and agent-related states
+          return prev.map(m =>
+            m.id === assistantId
+              ? {
+                ...m,
+                isSubagentStreaming: false,
+                streamingSubagentName: undefined,
+                activeSubagent: undefined,
+                subagentTask: undefined,
+                isExecutingTools: false,
+                executingToolName: undefined,
+                executingToolArgs: undefined,
+                currentTask: undefined,
+                taskStatus: undefined,
+                isIntermediateContent: false
+              }
+              : m
+          )
         })
       }
       setIsStreaming(false)
@@ -390,7 +420,13 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         setMessages(prev =>
           prev.map(m =>
             m.id === streamingAssistantIdRef.current
-              ? { ...m, activeSubagent: undefined, subagentTask: undefined }
+              ? {
+                ...m,
+                activeSubagent: undefined,
+                subagentTask: undefined,
+                isSubagentStreaming: false,
+                streamingSubagentName: undefined
+              }
               : m
           )
         )
@@ -425,6 +461,88 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       }
     }
 
+    // Handle todo update events from DeepAgent's write_todos tool
+    const handleTodoUpdate = (data: { todos: any[]; currentTodoIndex?: number; timestamp: number }) => {
+      console.log('[RemixAI Assistant] Todo list updated:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? { ...m, todos: data.todos, currentTodoIndex: data.currentTodoIndex }
+              : m
+          )
+        )
+      }
+    }
+
+    // Handle error events - mark current todo as failed
+    const handleTodoError = (data: { error: string; timestamp: number }) => {
+      console.log('[RemixAI Assistant] Todo error received:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m => {
+            if (m.id !== streamingAssistantIdRef.current) return m
+            // Mark the current in-progress todo as failed
+            const updatedTodos = m.todos?.map((todo, idx) => {
+              if (todo.status === 'in_progress' || idx === m.currentTodoIndex) {
+                return { ...todo, status: 'failed' as const }
+              }
+              return todo
+            })
+            return {
+              ...m,
+              todos: updatedTodos,
+              isExecutingTools: false,
+              executingToolName: undefined,
+              executingToolArgs: undefined
+            }
+          })
+        )
+      }
+    }
+
+    // Handle agent error events - display error message
+    const handleAgentError = (data: { message: string; timestamp: number; type: string }) => {
+      console.error('[RemixAI Assistant] Agent error:', data)
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? {
+                ...m,
+                content: m.content + `\n\n**Error:** ${data.message}`,
+                isExecutingTools: false,
+                executingToolName: undefined,
+                executingToolArgs: undefined
+              }
+              : m
+          )
+        )
+      }
+    }
+
+    // Handle API errors (rate limits, quota exceeded, etc.)
+    const handleApiError = (data: { type: string; message: string; retryable: boolean; retryAfter?: number; originalError?: string; timestamp: number }) => {
+      console.error('[RemixAI Assistant] API error:', data)
+      setIsStreaming(false)
+
+      if (streamingAssistantIdRef.current) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingAssistantIdRef.current
+              ? {
+                ...m,
+                content: m.content + `\n${data.message}`,
+                isExecutingTools: false,
+                executingToolName: undefined,
+                executingToolArgs: undefined
+              }
+              : m
+          )
+        )
+      }
+    }
+
     props.plugin.on('remixAI', 'onStreamResult', handleStreamChunk)
     props.plugin.on('remixAI', 'onStreamComplete', handleStreamComplete)
     props.plugin.on('remixAI', 'onToolCall', handleToolCall)
@@ -432,6 +550,17 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     props.plugin.on('remixAI', 'onSubagentComplete', handleSubagentComplete)
     props.plugin.on('remixAI', 'onTaskStart', handleTaskStart)
     props.plugin.on('remixAI', 'onTaskComplete', handleTaskComplete)
+    props.plugin.on('remixAI', 'onTodoUpdate', handleTodoUpdate)
+    props.plugin.on('remixAI', 'onTodoError', handleTodoError)
+    props.plugin.on('remixAI', 'onAgentError', handleAgentError)
+    props.plugin.on('remixAI', 'onApiError', handleApiError)
+
+    // Human-in-the-loop: listen for tool approval requests (batch processing)
+    const handleToolApproval = (request: ToolApprovalRequest) => {
+      // Add the new approval to pending approvals to show all at once
+      setPendingApprovals(prev => [...prev, request])
+    }
+    props.plugin.on('remixAI', 'onToolApprovalRequired', handleToolApproval)
 
     return () => {
       props.plugin.off('remixAI', 'onStreamResult')
@@ -441,6 +570,11 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       props.plugin.off('remixAI', 'onSubagentComplete')
       props.plugin.off('remixAI', 'onTaskStart')
       props.plugin.off('remixAI', 'onTaskComplete')
+      props.plugin.off('remixAI', 'onTodoUpdate')
+      props.plugin.off('remixAI', 'onTodoError')
+      props.plugin.off('remixAI', 'onAgentError')
+      props.plugin.off('remixAI', 'onApiError')
+      props.plugin.off('remixAI', 'onToolApprovalRequired')
     }
   }, [props.plugin])
 
@@ -493,6 +627,216 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       trackMatomoEvent<AIEvent>({ category: 'ai', action: 'remixAI', name: 'dislike-response', isClick: true })
     }
   }
+
+  // Helper: remove a specific approval from the pending list
+  const removeApproval = useCallback((requestId: string) => {
+    setReviewingApprovals(prev => {
+      const next = new Set(prev)
+      next.delete(requestId)
+      return next
+    })
+    pendingDiffApprovalRef.current = null
+    setPendingApprovals(prev => prev.filter(approval => approval.requestId !== requestId))
+  }, [])
+
+  /**
+   * Open showCustomDiff in the editor for line-by-line review.
+   * The agent stays blocked until the user clicks Accept All or Reject All.
+   */
+  const handleReviewChanges = useCallback(async (approval: ToolApprovalRequest) => {
+    if (!approval) return
+    const { proposedContent, requestId } = approval
+    const { filePath } = approval
+    if (!filePath || !proposedContent) {
+      console.warn('[HITL][Review] Cannot open review — missing filePath or proposedContent')
+      return
+    }
+
+    // Normalize path: Remix fileManager expects paths without leading '/'
+    // (e.g. 'contracts/X.sol', not '/contracts/X.sol')
+    const normalizedPath = filePath.replace(/^\/+/, '')
+
+    try {
+      // For new files: create empty file and open it (same as Stefan's handler pattern)
+      const exists = await props.plugin.call('fileManager', 'exists', normalizedPath)
+      if (!exists) {
+
+        await props.plugin.call('fileManager', 'writeFile', normalizedPath, '')
+      }
+      await props.plugin.call('fileManager', 'open', normalizedPath)
+
+      // Store pending state before calling showCustomDiff
+      pendingDiffApprovalRef.current = { requestId, filePath: normalizedPath }
+      setReviewingApprovals(prev => new Set([...prev, requestId]))
+
+      // Call showCustomDiff — this shows inline diff with Accept/Decline widgets
+      await props.plugin.call('editor', 'showCustomDiff', normalizedPath, proposedContent)
+
+    } catch (err) {
+      console.error('[HITL][Review] Failed to open showCustomDiff:', err)
+      // Fallback: reset reviewing state so the modal buttons are usable again
+      setReviewingApprovals(prev => {
+        const next = new Set(prev)
+        next.delete(requestId)
+        return next
+      })
+      pendingDiffApprovalRef.current = null
+    }
+  }, [props.plugin])
+
+  // Listen for Accept All / Reject All events from the editor
+  useEffect(() => {
+    const handleDiffAccepted = async (file: string) => {
+      const pending = pendingDiffApprovalRef.current
+      if (!pending) return
+
+      // Read the final editor model content (includes selective accept/decline)
+      let finalContent: string | undefined
+      try {
+        finalContent = await props.plugin.call('editor', 'getText')
+
+      } catch (err) {
+        console.warn('[HITL][Review] Could not read editor text, using proposedContent as fallback')
+      }
+
+      // Send approval with the final content as modifiedArgs
+      const modifiedArgs = finalContent ? { content: finalContent } : undefined
+      props.plugin.call('remixAI', 'respondToToolApproval', {
+        requestId: pending.requestId,
+        approved: true,
+        modifiedArgs
+      })
+
+      removeApproval(pending.requestId)
+    }
+
+    const handleDiffRejected = (file: string) => {
+      const pending = pendingDiffApprovalRef.current
+      if (!pending) return
+
+      props.plugin.call('remixAI', 'respondToToolApproval', {
+        requestId: pending.requestId,
+        approved: false
+      })
+
+      removeApproval(pending.requestId)
+    }
+
+    props.plugin.on('editor', 'customDiffAccepted', handleDiffAccepted)
+    props.plugin.on('editor', 'customDiffRejected', handleDiffRejected)
+
+    return () => {
+      props.plugin.off('editor', 'customDiffAccepted')
+      props.plugin.off('editor', 'customDiffRejected')
+    }
+  }, [props.plugin, removeApproval])
+
+  const handleApproveToolAction = useCallback(async (approval: ToolApprovalRequest, modifiedArgs?: Record<string, any>) => {
+    if (!approval) return
+
+    // Close DiffEditor tab if the user had opened a Review
+    if (reviewingApprovals.has(approval.requestId)) {
+      try {
+        const sessions = await props.plugin.call('editor', 'getDiffSessions')
+        for (const session of sessions) {
+          await props.plugin.call('editor', 'closeDiffSession', session.id)
+        }
+      } catch (err) {
+        console.warn('[HITL] Failed to close diff sessions:', err)
+      }
+    }
+
+    props.plugin.call('remixAI', 'respondToToolApproval', {
+      requestId: approval.requestId,
+      approved: true,
+      modifiedArgs
+    })
+    removeApproval(approval.requestId)
+  }, [props.plugin, removeApproval, reviewingApprovals])
+
+  const handleRejectToolAction = useCallback(async (approval: ToolApprovalRequest) => {
+    if (!approval) return
+
+    // Close DiffEditor tab if the user had opened a Review
+    if (reviewingApprovals.has(approval.requestId)) {
+      try {
+        const sessions = await props.plugin.call('editor', 'getDiffSessions')
+        for (const session of sessions) {
+          await props.plugin.call('editor', 'closeDiffSession', session.id)
+        }
+      } catch (err) {
+        console.warn('[HITL] Failed to close diff sessions:', err)
+      }
+    }
+
+    props.plugin.call('remixAI', 'respondToToolApproval', {
+      requestId: approval.requestId,
+      approved: false
+    })
+    removeApproval(approval.requestId)
+  }, [props.plugin, removeApproval, reviewingApprovals])
+
+  const handleTimeoutToolAction = useCallback(async (approval: ToolApprovalRequest) => {
+    if (!approval) return
+    props.plugin.call('remixAI', 'respondToToolApproval', {
+      requestId: approval.requestId,
+      approved: false,
+      timedOut: true
+    })
+    removeApproval(approval.requestId)
+  }, [props.plugin, removeApproval])
+
+  // Handle approving all pending approvals at once
+  const handleApproveAll = useCallback(async () => {
+    // Close any open DiffEditor sessions first
+    if (reviewingApprovals.size > 0) {
+      try {
+        const sessions = await props.plugin.call('editor', 'getDiffSessions')
+        for (const session of sessions) {
+          await props.plugin.call('editor', 'closeDiffSession', session.id)
+        }
+      } catch (err) {
+        console.warn('[HITL] Failed to close diff sessions:', err)
+      }
+    }
+
+    const approvals = [...pendingApprovals]
+    for (const approval of approvals) {
+      props.plugin.call('remixAI', 'respondToToolApproval', {
+        requestId: approval.requestId,
+        approved: true
+      })
+    }
+    // Clear all approvals
+    setPendingApprovals([])
+    setReviewingApprovals(new Set())
+  }, [pendingApprovals, props.plugin, reviewingApprovals])
+
+  // Handle rejecting all pending approvals at once
+  const handleRejectAll = useCallback(async () => {
+    // Close any open DiffEditor sessions first
+    if (reviewingApprovals.size > 0) {
+      try {
+        const sessions = await props.plugin.call('editor', 'getDiffSessions')
+        for (const session of sessions) {
+          await props.plugin.call('editor', 'closeDiffSession', session.id)
+        }
+      } catch (err) {
+        console.warn('[HITL] Failed to close diff sessions:', err)
+      }
+    }
+
+    const approvals = [...pendingApprovals]
+    for (const approval of approvals) {
+      props.plugin.call('remixAI', 'respondToToolApproval', {
+        requestId: approval.requestId,
+        approved: false
+      })
+    }
+    // Clear all approvals
+    setPendingApprovals([])
+    setReviewingApprovals(new Set())
+  }, [pendingApprovals, props.plugin, reviewingApprovals])
 
   // Push a queued message (if any) into history once props update
   useEffect(() => {
@@ -1279,6 +1623,41 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                   handleGenerateWorkspace={handleGenerateWorkspace}
                   allowedMcps={modelAccess.allowedMcps}
                 />
+                {pendingApprovals.length > 1 && (
+                  <div style={{ padding: '12px', borderBottom: '1px solid #ccc', marginBottom: '8px' }}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="fw-bold">Multiple Changes Pending ({pendingApprovals.length})</span>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-success btn-sm"
+                          onClick={handleApproveAll}
+                          data-id="approve-all-changes"
+                        >
+                          Approve All
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={handleRejectAll}
+                          data-id="reject-all-changes"
+                        >
+                          Discard All
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {pendingApprovals.map((approval) => (
+                  <div key={approval.requestId} style={{ padding: '0 12px', marginBottom: '8px' }}>
+                    <ToolApprovalModal
+                      request={approval}
+                      onApprove={(modifiedArgs) => handleApproveToolAction(approval, modifiedArgs)}
+                      onReject={() => handleRejectToolAction(approval)}
+                      onTimeout={() => handleTimeoutToolAction(approval)}
+                      onReviewChanges={() => handleReviewChanges(approval)}
+                      isReviewing={reviewingApprovals.has(approval.requestId)}
+                    />
+                  </div>
+                ))}
               </section>
             </div>
           ) : (
@@ -1358,6 +1737,41 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                     handleGenerateWorkspace={handleGenerateWorkspace}
                     allowedMcps={modelAccess.allowedMcps}
                   />
+                  {pendingApprovals.length > 1 && (
+                    <div style={{ padding: '12px', borderBottom: '1px solid #ccc', marginBottom: '8px' }}>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="fw-bold">Multiple Changes Pending ({pendingApprovals.length})</span>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={handleApproveAll}
+                            data-id="approve-all-changes"
+                          >
+                            Approve All
+                          </button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={handleRejectAll}
+                            data-id="reject-all-changes"
+                          >
+                            Discard All
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {pendingApprovals.map((approval) => (
+                    <div key={approval.requestId} style={{ padding: '0 12px', marginBottom: '8px' }}>
+                      <ToolApprovalModal
+                        request={approval}
+                        onApprove={(modifiedArgs) => handleApproveToolAction(approval, modifiedArgs)}
+                        onReject={() => handleRejectToolAction(approval)}
+                        onTimeout={() => handleTimeoutToolAction(approval)}
+                        onReviewChanges={() => handleReviewChanges(approval)}
+                        isReviewing={reviewingApprovals.has(approval.requestId)}
+                      />
+                    </div>
+                  ))}
                 </section>
               </div>
             )

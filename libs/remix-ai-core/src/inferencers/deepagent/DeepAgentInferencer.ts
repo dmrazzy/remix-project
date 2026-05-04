@@ -3,11 +3,11 @@
  * Integrates LangChain DeepAgent with Remix's AI system
  */
 
-import { IAIStreamResponse, ICompletions, IGeneration, IParams } from '../../types/types'
+import { ICompletions, IGeneration, IParams } from '../../types/types'
 import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
 import { RemixFilesystemBackend } from './RemixFilesystemBackend'
-import { createRemixTools } from './RemixToolAdapter'
+import { createRemixTools, ToolApprovalGate } from './RemixToolAdapter'
 import { ToolSelector } from './ToolSelector'
 import {
   REMIX_DEEPAGENT_SYSTEM_PROMPT,
@@ -27,6 +27,7 @@ import {
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
+import { classifyApiError, getErrorMessage } from './ApiErrorHandler'
 
 // Import LangChain modules
 import { ChatAnthropic } from '@langchain/anthropic'
@@ -35,9 +36,9 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
-import { buildChatPrompt } from '../../prompts/promptBuilder'
-import { MemorySaver } from "@langchain/langgraph";
 import { getBasicFileToolsForGasOptimizer, getBasicMcpToolsForSecurityAuditor, getCoordinationToolsForComprehensiveAuditor, getEducationToolsForWeb3Educator } from './helpers'
+import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
+import { endpointUrls } from "@remix-endpoints-helper"
 
 // Model provider types
 type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
@@ -47,9 +48,10 @@ interface ModelSelection {
   modelId: string
 }
 
+const DAPP_MAX_TOKENS = 65536
+
 // Initialize AsyncLocalStorage for browser environment
 const initializeAsyncLocalStorage = () => {
-  // Create a proper AsyncLocalStorage implementation for browser
   const storeStack: any[] = []
   const browserAsyncLocalStorage = {
     run<T>(store: any, callback: () => T): T {
@@ -104,11 +106,36 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private filesystemBackend: RemixFilesystemBackend
   private memoryBackend: DeepAgentMemoryBackend | null = null
   private tools: DynamicStructuredTool[] = []
+  private approvalGate: ToolApprovalGate | null = null
   private toolSelector: ToolSelector | null = null
   private currentAbortController: AbortController | null = null
   private fallbackInferencer: any = null
   private model: BaseChatModel | null = null
   private modelSelection: ModelSelection
+  private mcpInferencer: any = null
+  private sessionThreadId: string = DeepAgentInferencer.generateThreadId()
+
+  private static generateThreadId(): string {
+    return `remix-session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  }
+
+  /** Reset the session thread_id (e.g. after error or new conversation) */
+  private resetSessionThread(): void {
+    const oldId = this.sessionThreadId
+    this.sessionThreadId = DeepAgentInferencer.generateThreadId()
+    console.log('[DeepAgent-Thread] resetSessionThread:', this.sessionThreadId, '(was:', oldId, ')')
+  }
+
+  /** Set the session thread_id (e.g. when switching conversations) */
+  setSessionThreadId(threadId: string): void {
+    console.log('[DeepAgent-Thread] setSessionThreadId:', threadId, '(was:', this.sessionThreadId, ')')
+    this.sessionThreadId = threadId
+  }
+
+  /** Get the current session thread_id */
+  getSessionThreadId(): string {
+    return this.sessionThreadId
+  }
 
   constructor(
     plugin: Plugin,
@@ -139,10 +166,14 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       enablePlanning: config?.enablePlanning !== false
     }
 
-    // Initialize filesystem backend
-    this.filesystemBackend = new RemixFilesystemBackend(plugin)
+    // Initialize filesystem backend with shared EventEmitter for approval
+    this.filesystemBackend = new RemixFilesystemBackend(plugin, this.event) as any
 
-    // Initialize tools (with external MCP clients if available)
+    // Store MCP inferencer for resource access
+    this.mcpInferencer = mcpInferencer
+
+    // Initialize tools with approval gate
+    this.approvalGate = new ToolApprovalGate(plugin, this.event, 'ask_risky')
     this.initializeTools(toolRegistry, mcpInferencer)
 
     this.toolSelector = new ToolSelector()
@@ -158,10 +189,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       console.log('[DeepAgentInferencer] Initializing DeepAgent with config:', this.config)
       console.log('[DeepAgentInferencer] Model selection:', this.modelSelection)
 
-      // Always use proxy server - API key is handled server-side
-      const proxyUrl = 'http://localhost:4000'
-
-      this.model = this.createModelInstance(proxyUrl)
+      this.model = this.createModelInstance()
 
       console.log(`[DeepAgentInferencer] Created ${this.modelSelection.provider} model: ${this.modelSelection.modelId}`)
 
@@ -200,7 +228,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   private async initializeTools(toolRegistry: ToolRegistry, mcpInferencer?: any): Promise<void> {
     try {
-      this.tools = await createRemixTools(this.plugin, toolRegistry, mcpInferencer)
+      this.tools = await createRemixTools(this.plugin, toolRegistry, mcpInferencer, this.approvalGate)
       console.log(`[DeepAgentInferencer] Initialized ${this.tools.length} tools`)
     } catch (error) {
       console.warn('[DeepAgentInferencer] Failed to initialize tools:', error)
@@ -208,10 +236,56 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
+  private async gatherMCPResourcesContext(prompt?: string): Promise<string> {
+    if (!this.mcpInferencer || !prompt) {
+      return ''
+    }
+
+    try {
+      const connectedServers = this.mcpInferencer.getConnectedServers()
+      if (!connectedServers || connectedServers.length === 0) {
+        return ''
+      }
+
+      const mcpParams = {
+        mcpServers: connectedServers,
+        enableIntentMatching: true,
+        maxResources: 5,
+        selectionStrategy: 'hybrid'
+      }
+      const mcpContext = await this.mcpInferencer.intelligentResourceSelection(prompt, mcpParams)
+
+      if (mcpContext) {
+        console.log(`[DeepAgentInferencer] Gathered MCP resources context using intelligentResourceSelection`)
+      }
+
+      return mcpContext
+    } catch (error) {
+      console.warn('[DeepAgentInferencer] Failed to gather MCP resources:', error)
+      return ''
+    }
+  }
+  private emitErrorToTodos(error: any): void {
+    const errorMessage = error?.message || String(error) || 'Unknown error'
+
+    this.event.emit('onAgentError', {
+      message: errorMessage,
+      timestamp: Date.now(),
+      type: error?.name || 'Error'
+    })
+
+    this.event.emit('onTodoError', {
+      error: errorMessage,
+      timestamp: Date.now()
+    })
+
+    console.log('[DeepAgentInferencer] Emitted error to todos:', errorMessage)
+  }
+
   /**
    * Create the appropriate model instance based on provider selection
    */
-  private createModelInstance(proxyUrl: string): BaseChatModel {
+  private createModelInstance(maxTokens: number=DAPP_MAX_TOKENS): BaseChatModel {
     const { provider, modelId } = this.modelSelection
 
     switch (provider) {
@@ -221,9 +295,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         apiKey: 'proxy-handled',
         model: modelId,
         temperature: 0.7,
-        maxTokens: 4096,
+        maxTokens: maxTokens,
         streaming: true,
-        serverURL: `${proxyUrl}/mistral`
+        serverURL: `${endpointUrls.langchain}/mistral`
       })
     }
 
@@ -234,10 +308,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         apiKey: 'proxy-handled',
         model: modelId,
         temperature: 0.7,
-        maxTokens: 4096,
+        maxTokens: maxTokens,
         streaming: true,
         clientOptions: {
-          baseURL: proxyUrl
+          baseURL: endpointUrls.langchain
         }
       })
     }
@@ -258,10 +332,14 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
+      // Gather MCP resources context
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const enrichedPrompt = mcpContext ? `${mcpContext}\n\n${prompt}` : prompt
+
       // Build messages
       const messages = [
         { role: 'system', content: REMIX_DEEPAGENT_SYSTEM_PROMPT + '\n\n' + SOLIDITY_CODE_GENERATION_PROMPT },
-        { role: 'user', content: prompt }
+        { role: 'user', content: enrichedPrompt }
       ]
 
       // Run the agent
@@ -289,9 +367,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
+      // Gather MCP resources context
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const enrichedContext = mcpContext ? `${mcpContext}\n\n${context}` : context
+
       const messages = [
         { role: 'system', content: REMIX_DEEPAGENT_SYSTEM_PROMPT + '\n\n' + CODE_EXPLANATION_PROMPT },
-        { role: 'user', content: `Context:\n${context}\n\nQuestion: ${prompt}` }
+        { role: 'user', content: `Context:\n${enrichedContext}\n\nQuestion: ${prompt}` }
       ]
 
       const response = await this.runAgent(messages, params)
@@ -317,21 +399,14 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           DeepAgentErrorType.INITIALIZATION_FAILED
         )
       }
-      const chatHistory = buildChatPrompt()
-      let messages = []
 
-      if (chatHistory.length > 0) {
-        messages = [
-          ...chatHistory,
-          { role: 'user', content: context ? `Context:\n${context}\n\nQuestion: ${prompt}` : prompt }
-        ]
-      } else {
-        messages = [
-          { role: 'system', content: REMIX_DEEPAGENT_SYSTEM_PROMPT },
-          { role: 'user', content: context ? `Context:\n${context}\n\nQuestion: ${prompt}` : prompt }
-        ]
-      }
-      console.log('[DeepAgentInferencer] Running answer with messages:')
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const enrichedContext = mcpContext
+        ? (context ? `${mcpContext}\n\n${context}` : mcpContext)
+        : context
+      const messages = [
+        { role: 'user', content: enrichedContext ? `Context:\n${enrichedContext}\n\nQuestion: ${prompt}` : prompt }
+      ]
       const responsePromise = this.runAgent(messages, params)
 
       responsePromise.then(response => {
@@ -342,6 +417,20 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           console.log('[DeepAgentInferencer] Answer request was cancelled')
         } else {
           console.error('[DeepAgentInferencer] Answer error:', error)
+          const { type: errorType, retryable, retryAfter } = classifyApiError(error)
+          const userMessage = getErrorMessage(errorType, error, retryAfter)
+
+          this.event.emit('onApiError', {
+            type: errorType,
+            message: userMessage,
+            retryable,
+            retryAfter,
+            originalError: error?.message,
+            timestamp: Date.now()
+          })
+
+          // Emit error to update todo list with failed status
+          this.emitErrorToTodos(new Error(userMessage))
         }
         this.event.emit('onInferenceDone')
       })
@@ -389,9 +478,13 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
+      // Gather MCP resources context
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const enrichedPrompt = mcpContext ? `${mcpContext}\n\n${prompt}` : prompt
+
       const messages = [
         { role: 'system', content: REMIX_DEEPAGENT_SYSTEM_PROMPT + '\n\n' + SECURITY_ANALYSIS_PROMPT },
-        { role: 'user', content: prompt }
+        { role: 'user', content: enrichedPrompt }
       ]
 
       const response = await this.runAgent(messages, params)
@@ -433,21 +526,30 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     this.currentAbortController = new AbortController()
     let fullResponse = ''
 
-    try {
-      const langchainMessages = messages
-        .filter(msg => msg.role !== 'system')
-        .map(msg => {
-          if (msg.role === 'user') return new HumanMessage(msg.content)
-          if (msg.role === 'assistant') return new AIMessage(msg.content)
-          return new HumanMessage(msg.content)
-        })
+    // Filter out system messages - they're already set during agent creation
+    const langchainMessages = messages
+      .filter(msg => msg.role !== 'system')
+      .map(msg => {
+        if (msg.role === 'user') return new HumanMessage(msg.content)
+        if (msg.role === 'assistant') return new AIMessage(msg.content)
+        return new HumanMessage(msg.content)
+      })
 
+    try {
       // Tracking state for subagents and intermediate/final answers
       let isIntermediatePhase = true
       const activeSubagents: Map<string, { name: string; startTime: number }> = new Map()
       let previousRunId: string | null = null
 
+      // Token usage tracking for this request
+      let totalInputTokens = 0
+      let totalOutputTokens = 0
+      let totalCacheReadTokens = 0
+      let totalCacheCreationTokens = 0
+      let turnCount = 0
+
       // https://docs.langchain.com/oss/python/deepagents/streaming
+      console.log('[DeepAgent-Thread] ▶ runAgent called | thread_id:', this.sessionThreadId, '| message:', String(langchainMessages[0]?.content || '').substring(0, 60) + '...')
       const eventStream = this.agent.streamEvents(
         {
           messages: langchainMessages
@@ -455,7 +557,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         {
           version: 'v2',
           configurable: {
-            thread_id: `remix-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+            thread_id: this.sessionThreadId
           },
           subgraphs: true,
           signal: this.currentAbortController?.signal
@@ -470,15 +572,22 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         }
 
         const eventType = event.event
+        const metadata = event["metadata"] || {}
+        const checkpoint_ns = metadata["langgraph_checkpoint_ns"] || ""
+        const agent_name = metadata["lc_agent_name"] || ""
+        const is_subagent = checkpoint_ns.includes("tools:")
+
+        if (is_subagent) {
+          console.log(`[DeepAgentInferencer] Stream event from subagent detected: ${eventType} (agent: ${agent_name})`, event)
+        }
 
         if (eventType === 'on_chain_start') {
           const runName = event.name || ''
           const tags = event.tags || []
-
-          if (runName.includes('subagent') || tags.includes('subagent')) {
-            const subagentName = event.metadata?.subagent_name || runName
+          if (is_subagent && agent_name) {
+            console.log(`[DeepAgentInferencer] Subagent execution started: ${agent_name} (run_id: ${event.run_id})`, event)
+            const subagentName = agent_name
             activeSubagents.set(event.run_id, { name: subagentName, startTime: Date.now() })
-            console.log(`[DeepAgentInferencer] Subagent started: ${subagentName} (run_id: ${event.run_id})`)
 
             this.event.emit('onSubagentStart', {
               id: event.run_id,
@@ -504,6 +613,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
         if (eventType === 'on_chain_end' && activeSubagents.has(event.run_id)) {
           const subagent = activeSubagents.get(event.run_id)!
+          console.log(`[DeepAgentInferencer] Subagent completed: ${subagent.name} (run_id: ${event.run_id})`)
           const duration = Date.now() - subagent.startTime
 
           this.event.emit('onSubagentComplete', {
@@ -535,15 +645,78 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             if (deltaContent) {
               const currentRunId = event.run_id
               if (previousRunId !== null && previousRunId !== currentRunId) {
+                // Log token usage when run_id changes (new agent turn)
+                console.log(`[DeepAgent-Tokens] Run ID changed: ${previousRunId} → ${currentRunId}`)
                 deltaContent = '\n \n---\n' + deltaContent
               }
               previousRunId = currentRunId
 
               fullResponse += deltaContent
-              this.event.emit('onStreamResult', {
-                content: deltaContent,
-                isIntermediate: isIntermediatePhase,
-                source: event.metadata?.langgraph_node || 'agent'
+
+              if (is_subagent) {
+                this.event.emit('onStreamResult', {
+                  content: deltaContent,
+                  isIntermediate: isIntermediatePhase,
+                  source: event.metadata?.langgraph_node || 'agent',
+                  isSubagent: true,
+                  subagentName: agent_name
+                })
+              } else {
+                this.event.emit('onStreamResult', {
+                  content: deltaContent,
+                  isIntermediate: isIntermediatePhase,
+                  source: event.metadata?.langgraph_node || 'agent',
+                  isSubagent: false,
+                  subagentName: ""
+                })
+              }
+            }
+          }
+        } else if (eventType === 'on_chat_model_end') {
+          // Track token usage when a chat model call completes
+          const output = event.data?.output
+          if (output) {
+            const usageMetadata = output.usage_metadata || output.response_metadata?.usage
+            if (usageMetadata) {
+              const inputTokens = usageMetadata.input_tokens || usageMetadata.prompt_tokens || 0
+              const outputTokens = usageMetadata.output_tokens || usageMetadata.completion_tokens || 0
+              const totalTokens = usageMetadata.total_tokens || (inputTokens + outputTokens)
+
+              // Extract cached token information (Anthropic-specific fields)
+              const cacheReadInputTokens = usageMetadata.cache_read_input_tokens || 0
+              const cacheCreationInputTokens = usageMetadata.cache_creation_input_tokens || 0
+
+              // Update cumulative counts
+              totalInputTokens += inputTokens
+              totalOutputTokens += outputTokens
+              totalCacheReadTokens += cacheReadInputTokens
+              totalCacheCreationTokens += cacheCreationInputTokens
+              turnCount++
+
+              console.log(`[DeepAgent-Tokens]   Turn ${turnCount} completed | run_id: ${event.run_id}`)
+              console.log(`[DeepAgent-Tokens]   Input:  ${inputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Output: ${outputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cache Read: ${cacheReadInputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cache Creation: ${cacheCreationInputTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Total:  ${totalTokens} tokens`)
+              console.log(`[DeepAgent-Tokens]   Cumulative: ${totalInputTokens} in / ${totalOutputTokens} out / ${totalCacheReadTokens} cache-read / ${totalCacheCreationTokens} cache-creation`)
+
+              // Emit token usage event for UI tracking
+              this.event.emit('onTokenUsage', {
+                runId: event.run_id,
+                inputTokens,
+                outputTokens,
+                totalTokens,
+                cacheReadInputTokens,
+                cacheCreationInputTokens,
+                cumulativeInputTokens: totalInputTokens,
+                cumulativeOutputTokens: totalOutputTokens,
+                cumulativeCacheReadTokens: totalCacheReadTokens,
+                cumulativeCacheCreationTokens: totalCacheCreationTokens,
+                turnCount,
+                timestamp: Date.now(),
+                agentName: agent_name || 'main',
+                isSubagent: is_subagent
               })
             }
           }
@@ -558,9 +731,35 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         } else if (eventType === 'on_tool_start') {
           // Tool execution started - emit onToolCall event
           const toolName = event.name
-          const toolInput = event.data?.input || {}
+          const toolInput = JSON.parse(event.data?.input.input || '{}')
           console.log('[DeepAgentInferencer] Tool call started:', toolName, toolInput)
           this.event.emit('onToolCall', { toolName, toolInput, status: 'start' })
+
+          console.log('[DeepAgentInferencer] Checking for todo updates in tool input...', toolInput.todos)
+          if (toolName === 'write_todos' && toolInput?.todos) {
+            const todos = toolInput.todos
+            // Find the current todo being executed (first in_progress, or first pending if none in progress)
+            let currentTodoIndex = todos.findIndex((t: any) => t.status === 'in_progress')
+            if (currentTodoIndex === -1) {
+              const allCompleted = todos.every((t: any) => t.status === 'completed')
+              if (allCompleted) {
+                currentTodoIndex = todos.length - 1
+              } else {
+                currentTodoIndex = todos.findIndex((t: any) => t.status === 'pending')
+              }
+            }
+
+            const currentTodoContent = currentTodoIndex >= 0 ? (todos[currentTodoIndex]?.content || todos[currentTodoIndex]?.task) : undefined
+
+            console.log('[DeepAgentInferencer] Todo list updated:', todos, 'Current index:', currentTodoIndex, 'Current todo:', currentTodoContent)
+            this.event.emit('onToolCall', { toolName:currentTodoContent, toolInput: { }, status: 'start' }) // just for UI
+
+            this.event.emit('onTodoUpdate', {
+              todos: todos,
+              currentTodoIndex: currentTodoIndex,
+              timestamp: Date.now()
+            })
+          }
         } else if (eventType === 'on_tool_end') {
           const toolName = event.name
           console.log('[DeepAgentInferencer] Tool call ended:', toolName)
@@ -576,14 +775,103 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         fullResponse = finalMessageFromChain
       }
 
-      console.log('[DeepAgentInferencer] Stream complete, full response length:', fullResponse.length)
+      // Flush any pending edit batches — this triggers the HITL modal immediately
+      // after the agent finishes, so the user sees the combined diff right away
+
+      await (this.filesystemBackend as any).flushAllPendingBatches()
+
+      // Log final token usage summary
+      if (turnCount > 0) {
+        console.log(`[DeepAgent-Tokens] ═══════════════════════════════════════`)
+        console.log(`[DeepAgent-Tokens]   Request Complete - Token Summary`)
+        console.log(`[DeepAgent-Tokens]   Total Turns:   ${turnCount}`)
+        console.log(`[DeepAgent-Tokens]   Total Input:   ${totalInputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Total Output:  ${totalOutputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Cache Read:    ${totalCacheReadTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Cache Creation: ${totalCacheCreationTokens} tokens`)
+        console.log(`[DeepAgent-Tokens]   Grand Total:   ${totalInputTokens + totalOutputTokens} tokens`)
+        console.log(`[DeepAgent-Tokens] ═══════════════════════════════════════`)
+      }
+
+      console.log('[DeepAgentInferencer] Full response length:', fullResponse.length)
       return fullResponse
     } catch (error: any) {
       if (error?.name === 'AbortError' || this.currentAbortController?.signal.aborted) {
         console.log('[DeepAgentInferencer] Request cancelled by user')
         return fullResponse
       }
-      console.error('[DeepAgentInferencer] Error during agent execution:', error)
+
+      // If ToolInputParsingException (stale multi-turn state), reset session and retry once
+      if (error?.message?.includes('ToolInputParsingException') || error?.message?.includes('did not match expected schema')) {
+        console.warn('[DeepAgentInferencer] Tool input schema error detected — resetting session thread and retrying...')
+        console.warn('[DeepAgentInferencer] Error details:', error?.message)
+        console.warn('[DeepAgentInferencer] Error cause:', error?.cause?.message || error?.cause)
+        console.warn('[DeepAgentInferencer] Thread ID was:', this.sessionThreadId)
+        this.resetSessionThread()
+
+        // Retry with fresh thread_id (only once — if it fails again, propagate the error)
+        try {
+          this.currentAbortController = new AbortController()
+          fullResponse = ''
+          const retryStream = this.agent.streamEvents(
+            { messages: langchainMessages },
+            {
+              version: 'v2',
+              configurable: { thread_id: this.sessionThreadId },
+              subgraphs: true,
+              signal: this.currentAbortController?.signal
+            }
+          )
+          for await (const event of retryStream) {
+            if (this.currentAbortController?.signal.aborted) break
+            if (event.event === 'on_chat_model_stream' && event.data?.chunk?.content) {
+              const content = typeof event.data.chunk.content === 'string'
+                ? event.data.chunk.content
+                : event.data.chunk.content.map((c: any) => c.text || '').join('')
+              if (content) {
+                fullResponse += content
+                this.event.emit('onStreamResult', { content, isIntermediate: false, source: 'retry' })
+              }
+            }
+          }
+          await (this.filesystemBackend as any).flushAllPendingBatches()
+          return fullResponse
+        } catch (retryError: any) {
+          console.error('[DeepAgentInferencer] Retry also failed:', retryError)
+          throw retryError
+        }
+      }
+
+      // Classify and handle API errors
+      const { type: errorType, retryable, retryAfter } = classifyApiError(error)
+      const userMessage = getErrorMessage(errorType, error, retryAfter)
+
+      console.error(`[DeepAgentInferencer] Error during agent execution: ${errorType}`, error)
+
+      // Emit API error event for UI handling
+      this.event.emit('onApiError', {
+        type: errorType,
+        message: userMessage,
+        retryable,
+        retryAfter,
+        originalError: error?.message,
+        timestamp: Date.now()
+      })
+
+      // For recoverable errors, emit a friendly stream message and return
+      if (errorType === DeepAgentErrorType.RATE_LIMIT_EXCEEDED ||
+          errorType === DeepAgentErrorType.QUOTA_EXCEEDED ||
+          errorType === DeepAgentErrorType.MODEL_OVERLOADED) {
+        const errorMessage = `\n\n${userMessage}`
+        this.event.emit('onStreamResult', {
+          content: errorMessage,
+          isIntermediate: false,
+          source: 'error'
+        })
+        fullResponse += errorMessage
+        return fullResponse
+      }
+
       throw error
     } finally {
       this.currentAbortController = null
@@ -598,7 +886,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     try {
       const { createDeepAgent } = await import('deepagents')
 
-      const checkpointer = new MemorySaver()
+      const checkpointer = new IndexedDBCheckpointSaver()
 
       // Create agent configuration with selected tools
       const agentConfig: any = {
@@ -718,19 +1006,26 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private async handleError(error: any, method: string, prompt: string, params: IParams): Promise<string> {
     console.error(`[DeepAgentInferencer] Error in ${method}:`, error)
 
-    // Categorize error
-    let errorType = DeepAgentErrorType.UNKNOWN
-    if (error.message?.includes('context_length_exceeded')) {
-      errorType = DeepAgentErrorType.CONTEXT_LENGTH_EXCEEDED
-    } else if (error.message?.includes('tool_execution_failed')) {
-      errorType = DeepAgentErrorType.TOOL_EXECUTION_FAILED
-    } else if (error.message?.includes('API key')) {
-      errorType = DeepAgentErrorType.API_KEY_INVALID
-    } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
-      errorType = DeepAgentErrorType.NETWORK_ERROR
+    const { type: errorType, retryable, retryAfter } = classifyApiError(error)
+    const userMessage = getErrorMessage(errorType, error, retryAfter)
+
+    console.log(`[DeepAgentInferencer] Error classified as: ${errorType}, retryable: ${retryable}, retryAfter: ${retryAfter}`)
+
+    this.event.emit('onApiError', {
+      type: errorType,
+      message: userMessage,
+      retryable,
+      retryAfter,
+      originalError: error?.message,
+      timestamp: Date.now()
+    })
+
+    if (errorType === DeepAgentErrorType.RATE_LIMIT_EXCEEDED ||
+        errorType === DeepAgentErrorType.QUOTA_EXCEEDED) {
+      return `${userMessage}`
     }
 
-    // Try fallback to RemoteInferencer
+    // Try fallback to RemoteInferencer for other errors
     if (this.fallbackInferencer) {
       console.log(`[DeepAgentInferencer] Falling back to RemoteInferencer for ${method}`)
       this.event.emit('deepAgentFallback', { method, error: error.message, errorType })
@@ -748,13 +1043,15 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         default:
           return await this.fallbackInferencer.generate(prompt, params)
         }
-      } catch (fallbackError) {
+      } catch (fallbackError: any) {
         console.error('[DeepAgentInferencer] Fallback also failed:', fallbackError)
+        const fallbackClassification = classifyApiError(fallbackError)
+        const fallbackMessage = getErrorMessage(fallbackClassification.type, fallbackError, fallbackClassification.retryAfter)
+        return `${fallbackMessage}`
       }
     }
 
-    // Return error message
-    return `Error: ${error.message || 'An unexpected error occurred'}`
+    return `${userMessage}`
   }
 
   /**
@@ -775,6 +1072,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   async close(): Promise<void> {
     if (this.memoryBackend) {
       this.memoryBackend.close()
+    }
+    if (this.approvalGate) {
+      this.approvalGate.dispose()
+      this.approvalGate = null
     }
     this.agent = null
     this.model = null

@@ -4,6 +4,8 @@
  */
 
 import { Plugin } from '@remixproject/engine'
+import EventEmitter from 'events'
+import { ToolApprovalRequest, ToolApprovalResponse } from '../../types/humanInTheLoop'
 
 // File size limit for auto-summarization (100KB)
 const MAX_FILE_SIZE = 100 * 1024
@@ -20,15 +22,140 @@ interface EditInstruction {
 export class RemixFilesystemBackend {
   private plugin: Plugin
   private workspaceRoot: string = '/'
+  private eventEmitter: EventEmitter | null = null
+  private pendingApprovals = new Map<string, (result: { approved: boolean; modifiedContent?: string; timedOut?: boolean }) => void>()
 
-  constructor(plugin: Plugin) {
+  // Edit batching: accumulate edits per file, flush as one combined diff
+  private editBatches = new Map<string, {
+    originalContent: string
+    virtualContent: string
+    totalEdits: number
+  }>()
+
+  constructor(plugin: Plugin, eventEmitter?: EventEmitter) {
     this.plugin = plugin
+
+    if (eventEmitter) {
+      this.eventEmitter = eventEmitter
+      this.eventEmitter.on('onToolApprovalResponse', (response: ToolApprovalResponse) => {
+        const resolve = this.pendingApprovals.get(response.requestId)
+        if (resolve) {
+          resolve({
+            approved: response.approved,
+            modifiedContent: response.modifiedArgs?.content,
+            timedOut: response.timedOut
+          })
+          this.pendingApprovals.delete(response.requestId)
+        } else {
+
+        }
+      })
+    }
+  }
+
+  // deepagents library calls edit(path, old_string, new_string, replace_all)
+  async edit(
+    filePath: string, oldString: string, newString: string, replaceAll = false
+  ): Promise<{ error?: string; occurrences?: number; metadata?: any; filesUpdate?: any }> {
+
+    try {
+      // If there are pending edits for a DIFFERENT file, flush them first
+      for (const [batchFile] of this.editBatches) {
+        if (batchFile !== filePath) {
+
+          await this.flushEditBatch(batchFile)
+        }
+      }
+
+      // Get content — either from an existing batch or from the filesystem
+      let batch = this.editBatches.get(filePath)
+      let content: string
+
+      if (batch) {
+        // Use virtual content from previous edits in this batch
+        content = batch.virtualContent
+
+      } else {
+        // First edit — read from filesystem and start a new batch
+        const readResult = await this.read_file(filePath)
+        if (typeof readResult !== 'string') {
+          return { error: `Failed to read file: ${(readResult as any).error || 'unknown error'}` }
+        }
+        content = readResult
+        batch = {
+          originalContent: content,
+          virtualContent: content,
+          totalEdits: 0
+        }
+        this.editBatches.set(filePath, batch)
+
+      }
+
+      // Check if oldString exists in the virtual content
+      if (!content.includes(oldString)) {
+
+        return { error: `Text not found in file: "${oldString.substring(0, 50)}..."` }
+      }
+
+      // Apply replacement to virtual content
+      const updated = replaceAll
+        ? content.split(oldString).join(newString)
+        : content.replace(oldString, newString)
+      const occurrences = replaceAll
+        ? (content.split(oldString).length - 1)
+        : 1
+
+      batch.virtualContent = updated
+      batch.totalEdits += occurrences
+
+      // Return success immediately — approval will come later via flush
+      return { occurrences }
+    } catch (err) {
+      console.error('[HITL][Backend] edit() error:', err)
+      return { error: err.message }
+    }
+  }
+
+  /**
+   * Flush accumulated edits for a file: show combined diff, request ONE approval.
+   */
+  private async flushEditBatch(filePath: string): Promise<void> {
+    const batch = this.editBatches.get(filePath)
+    if (!batch) return
+    this.editBatches.delete(filePath)
+
+    // Request ONE approval for the combined diff
+    const result = await this.requestWriteApproval(filePath, batch.originalContent, batch.virtualContent, 'edit_file')
+
+    if (!result.approved) {
+
+      // Revert: the file still has original content (we never wrote during batching)
+      return
+    }
+
+    const finalContent = result.modifiedContent || batch.virtualContent
+
+    await this.writeFileInternal(filePath, finalContent)
+  }
+
+  /**
+   * Flush ALL pending edit batches. Called before any non-edit backend method
+   * to ensure the user approves all accumulated edits before the agent moves on.
+   * All flushEditBatch operations are triggered synchronously and we wait for all to complete.
+   */
+  public async flushAllPendingBatches(): Promise<void> {
+    const files = [...this.editBatches.keys()]
+    if (files.length === 0) return
+
+    // Trigger all flush operations synchronously and wait for all to complete
+    await Promise.all(files.map(file => this.flushEditBatch(file)))
   }
 
   /**
    * Get current working directory
    */
   async cwd(): Promise<string> {
+    await this.flushAllPendingBatches()
     try {
       // Try to get the current file's directory
       const currentFile = await this.plugin.call('fileManager', 'getCurrentFile')
@@ -50,18 +177,24 @@ export class RemixFilesystemBackend {
    */
   async read_file(path: string): Promise<string | { error: string }> {
     try {
-      console.log(`[RemixFilesystemBackend] Reading file: ${path}`)
-      const normalizedPath = path //this.normalizePath(path)
+
+      // If there are pending batched edits for this file, return the virtual content
+      const batch = this.editBatches.get(path)
+      if (batch) {
+
+        return batch.virtualContent
+      }
+
+      const normalizedPath = path
       const exists = await this.plugin.call('fileManager', 'exists', normalizedPath)
-      console.log(`[RemixFilesystemBackend] File exists: ${exists}`)
 
       if (!exists) {
+
         throw new Error(`File not found: ${path}`)
       }
 
       const content = await this.plugin.call('fileManager', 'readFile', normalizedPath)
 
-      // Check file size and summarize if too large
       if (content.length > MAX_FILE_SIZE) {
         return this.summarizeFile(normalizedPath, content)
       }
@@ -78,6 +211,7 @@ export class RemixFilesystemBackend {
       if (typeof content !== 'string') {
         return content
       }
+      // Default to full content if offset/limit not specified (Ref: Yann PR #7080)
       if (offset === undefined) offset = 0
       if (limit === undefined) limit = content.length
       return content.substring(offset, offset + limit)
@@ -87,81 +221,108 @@ export class RemixFilesystemBackend {
   }
 
   /**
-   * Write file contents
-   * Shows diff to user for approval before writing
+   * Write file contents — goes through HITL approval before writing.
+   * Called by deepagents built-in write_file tool and our write() alias.
    */
-  async write_file(path: string, content: string): Promise< { success?: boolean, error?: string } > {
+  async write_file(path: string, content: string): Promise<{ success?: boolean, error?: string }> {
+    await this.flushAllPendingBatches()
+
     try {
-      console.log(`[RemixFilesystemBackend] Writing file: ${path}`)
-      const normalizedPath = path //this.normalizePath(path)
+      const normalizedPath = path
       const exists = await this.plugin.call('fileManager', 'exists', normalizedPath)
-      console.log(`[RemixFilesystemBackend] File exists: ${exists}`)
 
-      // If file exists, show diff for approval
+      let oldContent = ''
       if (exists) {
-        console.log(`[RemixFilesystemBackend] Fetching existing content for diff...`)
-        const oldContent = await this.plugin.call('fileManager', 'readFile', normalizedPath)
+        oldContent = await this.plugin.call('fileManager', 'readFile', normalizedPath)
 
-        // Show custom diff to user
-        // const approved = await this.showCustomDiff(normalizedPath, oldContent, content)
-        // console.log(`[RemixFilesystemBackend] User approved changes: ${approved}`)
       }
 
-      // Write the file
-      await this.plugin.call('fileManager', 'writeFile', normalizedPath, content)
-      console.log(`[RemixFilesystemBackend] File written successfully: ${path}`)
+      const result = await this.requestWriteApproval(normalizedPath, oldContent, content, 'write_file')
+
+      if (!result.approved) {
+        if (result.timedOut) {
+          return { error: `TIMEOUT: No user input within 60 seconds for writing to ${path}. The user did not respond to the approval request. You may decide what to do next — retry, try a different approach, or skip this operation.` }
+        }
+        return { error: `REJECTED: The user explicitly rejected writing to ${path}. Do NOT retry this operation or use alternative tools/methods to write this file. Inform the user and move on.` }
+      }
+
+      const finalContent = result.modifiedContent || content
+
+      await this.writeFileInternal(normalizedPath, finalContent)
+
       return { success: true }
     } catch (error) {
-      console.error(`[RemixFilesystemBackend] Error writing file ${path}:`, error)
+      console.error('[HITL][Backend] write_file ERROR:', path, error)
       return { error: `Failed to write file ${path}: ${error.message}` }
     }
   }
 
   async write(file_path: string, content: string): Promise<any> {
+
     return await this.write_file(file_path, content)
   }
 
   /**
-   * Edit file with search/replace operations
+   * Internal write — bypasses approval (used after approval has already been granted).
    */
-  async edit_file(path: string, edits: EditInstruction[]): Promise< { success?: boolean, error?: string } > {
+  private async writeFileInternal(path: string, content: string): Promise<void> {
+
+    await this.plugin.call('fileManager', 'writeFile', path, content)
+  }
+
+  /**
+   * Edit file with search/replace operations.
+   * Goes through HITL approval showing the full before/after diff.
+   */
+  async edit_file(path: string, edits: EditInstruction[]): Promise<{ success?: boolean, error?: string }> {
+    await this.flushAllPendingBatches()
+
     try {
       const normalizedPath = this.normalizePath(path)
-      let content = await this.read_file(normalizedPath)
+      const originalContent = await this.read_file(normalizedPath)
 
-      if (typeof content !== 'string') {
-        throw new Error(`Failed to read file: ${content.error}`)
+      if (typeof originalContent !== 'string') {
+
+        return { error: `Failed to read file: ${(originalContent as any).error}` }
       }
 
+      let content = originalContent
       for (const edit of edits) {
         const { oldText, newText } = edit
         if (!content.includes(oldText)) {
-          throw new Error(`Text not found in file: "${oldText.substring(0, 50)}..."`)
-        }
 
+          return { error: `Text not found in file: "${oldText.substring(0, 50)}..."` }
+        }
         content = content.replace(oldText, newText)
       }
 
-      await this.write_file(normalizedPath, content)
-      return { success: true }
+      const result = await this.requestWriteApproval(normalizedPath, originalContent, content, 'edit_file')
+      if (!result.approved) {
+        if (result.timedOut) {
+          return { error: `TIMEOUT: No user input within 60 seconds for editing ${path}. The user did not respond to the approval request. You may decide what to do next — retry, try a different approach, or skip this operation.` }
+        }
+        return { error: `REJECTED: The user explicitly rejected editing ${path}. Do NOT retry this operation or use alternative tools/methods to edit this file. Inform the user and move on.` }
+      }
 
+      const finalContent = result.modifiedContent || content
+
+      await this.writeFileInternal(normalizedPath, finalContent)
+
+      return { success: true }
     } catch (error) {
+      console.error('[HITL][Backend] edit_file() ERROR:', error)
       return { error: `Failed to edit file ${path}: ${error.message}` }
     }
-  }
-
-  async edit(file_path: string, edits: EditInstruction[]): Promise<any> {
-    return await this.edit_file(file_path, edits)
   }
 
   /**
    * List directory contents
    */
   async ls(path?: string): Promise<string[]> {
+    await this.flushAllPendingBatches()
     try {
-      console.log(`[RemixFilesystemBackend] Listing directory: ${path || 'cwd'}`)
+
       const targetPath = path ? this.normalizePath(path) : await this.cwd()
-      console.log(`[RemixFilesystemBackend] Target path normalized for ls: ${targetPath}`)
 
       const exists = await this.plugin.call('fileManager', 'exists', targetPath)
       if (!exists) {
@@ -184,6 +345,7 @@ export class RemixFilesystemBackend {
   }
 
   async lsInfo(path?: string): Promise<{ name: string, path: string, is_dir: boolean }[]> {
+    await this.flushAllPendingBatches()
     try {
       const targetPath = path ? this.normalizePath(path) : await this.cwd()
       const exists = await this.plugin.call('fileManager', 'exists', targetPath)
@@ -213,6 +375,7 @@ export class RemixFilesystemBackend {
    * Create a new directory
    */
   async mkdir(path: string): Promise<void> {
+    await this.flushAllPendingBatches()
     try {
       const normalizedPath = this.normalizePath(path)
       await this.plugin.call('fileManager', 'mkdir', normalizedPath)
@@ -221,6 +384,7 @@ export class RemixFilesystemBackend {
   }
 
   async globInfo(pattern: string, path?: string): Promise<{ name: string, path: string, is_dir: boolean }[]> {
+    await this.flushAllPendingBatches()
     try {
       const targetPath = path ? this.normalizePath(path) : await this.cwd()
       const exists = await this.plugin.call('fileManager', 'exists', targetPath)
@@ -268,6 +432,7 @@ export class RemixFilesystemBackend {
 
       for (const name of Object.keys(files)) {
         if (!files[name].isDirectory) {
+          // Remix readdir returns full paths as keys (Ref: Yann PR #7080)
           const content = await this.plugin.call('fileManager', 'readFile', name)
           const lines = content.split('\n')
           lines.forEach((line, index) => {
@@ -405,29 +570,38 @@ export class RemixFilesystemBackend {
   }
 
   /**
-   * Show custom diff to user for approval
+   * Request user approval before writing a file.
+   * If no eventEmitter is connected, auto-approves (backwards-compatible).
+   * @param toolName — displayed in the modal so user knows if this is a write or edit
    */
-  private async showCustomDiff(
+  private async requestWriteApproval(
     path: string,
     oldContent: string,
-    newContent: string
-  ): Promise<boolean> {
-    try {
-      // Use Remix's diff viewer if available
-      if (this.plugin.call) {
-        // Try to show diff in terminal or notification
-        await this.plugin.call('terminal', 'log', {
-          type: 'info',
-          value: `DeepAgent wants to modify ${path}. Please review the changes.`
-        })
-      }
+    newContent: string,
+    toolName: string = 'write_file'
+  ): Promise<{ approved: boolean; modifiedContent?: string; timedOut?: boolean }> {
+    if (!this.eventEmitter) {
 
-      // For now, auto-approve (in production, this should show a diff modal)
-      // TODO: Integrate with Remix UI to show proper diff modal
-      return true
-    } catch (error) {
-      console.warn('Failed to show diff:', error)
-      return true // Auto-approve on error
+      return { approved: true }
     }
+
+    const requestId = `fs_approval_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+    const request: ToolApprovalRequest = {
+      requestId,
+      toolName,
+      toolArgs: { path, content: newContent },
+      category: 'file_write',
+      risk: 'high',
+      existingContent: oldContent || undefined,
+      proposedContent: newContent,
+      filePath: path,
+      timestamp: Date.now()
+    }
+
+    return new Promise<{ approved: boolean; modifiedContent?: string; timedOut?: boolean }>((resolve) => {
+      this.pendingApprovals.set(requestId, resolve)
+      this.eventEmitter.emit('onToolApprovalRequired', request)
+    })
   }
 }

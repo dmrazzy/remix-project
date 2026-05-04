@@ -27,6 +27,8 @@ const profile = {
     'addMCPServer', 'removeMCPServer', 'getMCPConnectionStatus', 'getMCPResources', 'getMCPTools', 'executeMCPTool',
     'enableMCPEnhancement', 'disableMCPEnhancement', 'isMCPEnabled', 'getIMCPServers',
     'enableDeepAgent', 'disableDeepAgent', 'isDeepAgentEnabled',
+    'setDeepAgentThread',
+    'respondToToolApproval',
     'clearCaches', 'cancelRequest'
   ],
   events: [
@@ -67,6 +69,7 @@ export class RemixAIPlugin extends Plugin {
   deepAgentInferencer: DeepAgentInferencer | null = null
   deepAgentEnabled: boolean = false
   private deepAgentEventListenersSetup: boolean = false
+  private pendingDeepAgentThreadId: string | null = null
 
   constructor() {
     super(profile)
@@ -89,6 +92,11 @@ export class RemixAIPlugin extends Plugin {
     eventEmitter.removeAllListeners('onSubagentComplete')
     eventEmitter.removeAllListeners('onTaskStart')
     eventEmitter.removeAllListeners('onTaskComplete')
+    eventEmitter.removeAllListeners('onTodoUpdate')
+    eventEmitter.removeAllListeners('onAgentError')
+    eventEmitter.removeAllListeners('onTodoError')
+    eventEmitter.removeAllListeners('onApiError')
+    eventEmitter.removeAllListeners('onToolApprovalRequired')
 
     // Set up fresh listeners
     eventEmitter.on('onInference', () => {
@@ -117,6 +125,28 @@ export class RemixAIPlugin extends Plugin {
     })
     eventEmitter.on('onTaskComplete', (data: { id: string; name: string; status: string }) => {
       this.emit('onTaskComplete', data)
+    })
+    eventEmitter.on('onTodoUpdate', (data: { todos: any[]; timestamp: number }) => {
+      this.emit('onTodoUpdate', data)
+    })
+
+    // Error events for todo list updates
+    eventEmitter.on('onAgentError', (data: { message: string; timestamp: number; type: string }) => {
+      this.emit('onAgentError', data)
+    })
+    eventEmitter.on('onTodoError', (data: { error: string; timestamp: number }) => {
+      this.emit('onTodoError', data)
+    })
+
+    // API error events (rate limits, quota exceeded, etc.)
+    eventEmitter.on('onApiError', (data: { type: string; message: string; retryable: boolean; retryAfter?: number; originalError?: string; timestamp: number }) => {
+      this.emit('onApiError', data)
+    })
+
+    // Human-in-the-loop: relay approval requests to UI
+    eventEmitter.on('onToolApprovalRequired', (request: any) => {
+
+      this.emit('onToolApprovalRequired', request)
     })
 
     this.deepAgentEventListenersSetup = true
@@ -214,6 +244,12 @@ export class RemixAIPlugin extends Plugin {
         this.setupDeepAgentEventListeners()
 
         console.log('[RemixAI Plugin] DeepAgent initialized successfully')
+
+        // Apply pending thread_id if setDeepAgentThread was called before init completed
+        if (this.pendingDeepAgentThreadId) {
+          this.deepAgentInferencer.setSessionThreadId(this.pendingDeepAgentThreadId)
+          this.pendingDeepAgentThreadId = null
+        }
       } catch (error) {
         console.error('[RemixAI Plugin] Failed to initialize DeepAgent:', error)
         this.deepAgentEnabled = false
@@ -634,6 +670,12 @@ export class RemixAIPlugin extends Plugin {
         this.setupDeepAgentEventListeners();
 
         console.log('[RemixAI Plugin] DeepAgent reinitialized with new model successfully');
+
+        // Apply pending thread_id after model switch reinitialization
+        if (this.pendingDeepAgentThreadId) {
+          this.deepAgentInferencer.setSessionThreadId(this.pendingDeepAgentThreadId)
+          this.pendingDeepAgentThreadId = null
+        }
       } catch (error) {
         console.error('[RemixAI Plugin] Failed to reinitialize DeepAgent on model change:', error);
         // Keep DeepAgent enabled but log the error
@@ -865,6 +907,12 @@ export class RemixAIPlugin extends Plugin {
       localStorage.setItem('deepagent_enabled', 'true')
 
       console.log('[RemixAI Plugin] DeepAgent enabled successfully')
+
+      // Apply pending thread_id if setDeepAgentThread was called before init completed
+      if (this.pendingDeepAgentThreadId) {
+        this.deepAgentInferencer.setSessionThreadId(this.pendingDeepAgentThreadId)
+        this.pendingDeepAgentThreadId = null
+      }
     } catch (error) {
       console.error('[RemixAI Plugin] Failed to enable DeepAgent:', error)
       this.deepAgentEnabled = false
@@ -896,6 +944,31 @@ export class RemixAIPlugin extends Plugin {
 
   isDeepAgentEnabled(): boolean {
     return this.deepAgentEnabled
+  }
+
+  /**
+   * Set DeepAgent thread for an existing conversation.
+   * Uses conversationId as part of thread_id so MemorySaver restores that conversation's context.
+   * If DeepAgent is not yet initialized, stores the thread_id for later application.
+   */
+  setDeepAgentThread(conversationId: string): void {
+    const threadId = `remix-conv-${conversationId}`
+    if (this.deepAgentInferencer) {
+      this.deepAgentInferencer.setSessionThreadId(threadId)
+      this.pendingDeepAgentThreadId = null
+      console.log('[DeepAgent-Thread] Plugin: thread set for conversation:', conversationId, '→', threadId)
+    } else {
+      // DeepAgent not yet initialized — store for later
+      this.pendingDeepAgentThreadId = threadId
+      console.log('[DeepAgent-Thread] Plugin: thread PENDING (DeepAgent not ready):', conversationId, '→', threadId)
+    }
+  }
+
+  respondToToolApproval(response: { requestId: string; approved: boolean; modifiedArgs?: Record<string, any> }): void {
+
+    if (this.deepAgentInferencer) {
+      this.deepAgentInferencer.getEventEmitter().emit('onToolApprovalResponse', response)
+    }
   }
 
   clearCaches(){

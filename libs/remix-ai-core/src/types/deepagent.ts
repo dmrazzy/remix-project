@@ -100,6 +100,14 @@ export enum DeepAgentErrorType {
   API_KEY_INVALID = 'api_key_invalid',
   INITIALIZATION_FAILED = 'initialization_failed',
   NETWORK_ERROR = 'network_error',
+  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
+  SERVER_ERROR = 'server_error',
+  SERVICE_UNAVAILABLE = 'service_unavailable',
+  REQUEST_TIMEOUT = 'request_timeout',
+  INVALID_REQUEST = 'invalid_request',
+  AUTHENTICATION_FAILED = 'authentication_failed',
+  QUOTA_EXCEEDED = 'quota_exceeded',
+  MODEL_OVERLOADED = 'model_overloaded',
   UNKNOWN = 'unknown'
 }
 
