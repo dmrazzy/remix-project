@@ -683,8 +683,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
               const totalTokens = usageMetadata.total_tokens || (inputTokens + outputTokens)
 
               // Extract cached token information (Anthropic-specific fields)
-              const cacheReadInputTokens = usageMetadata.cache_read_input_tokens || 0
-              const cacheCreationInputTokens = usageMetadata.cache_creation_input_tokens || 0
+              let cacheReadInputTokens = usageMetadata.cache_read_input_tokens || 0
+              cacheReadInputTokens = cacheReadInputTokens === 0 ? usageMetadata.input_token_details?.cache_read || 0 : cacheReadInputTokens
+              let cacheCreationInputTokens = usageMetadata.cache_creation_input_tokens || 0
+              cacheCreationInputTokens = cacheCreationInputTokens === 0 ? usageMetadata.input_token_details?.cache_creation || 0 : cacheCreationInputTokens
 
               // Update cumulative counts
               totalInputTokens += inputTokens
