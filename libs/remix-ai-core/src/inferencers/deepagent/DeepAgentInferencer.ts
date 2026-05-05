@@ -1039,7 +1039,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     const metaTools = this.tools.filter(tool =>
       tool.name === 'get_tool_schema' || tool.name === 'call_tool'
     )
-    await this.createAgentWithTools(metaTools)
+    if (!this.agent) await this.createAgentWithTools(metaTools)
+    else {
+      this.agent.options.model = this.model
+    }
   }
 
   /**
