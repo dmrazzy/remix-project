@@ -23,7 +23,7 @@ import {
   GAS_OPTIMIZER_SUBAGENT_PROMPT,
   COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
   WEB3_EDUCATOR_SUBAGENT_PROMPT
-} from './LightDeepAgentPrompts'
+} from './DeepAgentLightPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, IAutoModelConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
