@@ -39,6 +39,7 @@ import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
 import { getBasicFileToolsForGasOptimizer, getBasicMcpToolsForSecurityAuditor, getCoordinationToolsForComprehensiveAuditor, getEducationToolsForWeb3Educator } from './helpers'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import { endpointUrls } from "@remix-endpoints-helper"
+import type { DeepAgent } from 'deepagents'
 
 // Model provider types
 type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
@@ -102,7 +103,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private plugin: Plugin
   private config: IDeepAgentConfig
   private event: EventEmitter
-  private agent: any = null
+  private agent: DeepAgent = null
   private filesystemBackend: RemixFilesystemBackend
   private memoryBackend: DeepAgentMemoryBackend | null = null
   private tools: DynamicStructuredTool[] = []
