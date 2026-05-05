@@ -34,9 +34,9 @@ export function getBasicFileToolsForGasOptimizer(tools: DynamicStructuredTool[])
 export function getCoordinationToolsForComprehensiveAuditor(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
   const coordinationToolNames = [
     // Coordination tools (invoke_subagent removed - using built-in task tool)
-    'verify_findings',
+    /*'verify_findings',
     'aggregate_findings',
-    'resolve_conflicts'
+    'resolve_conflicts'*/
   ]
 
   const coordinationTools = tools.filter(tool =>
