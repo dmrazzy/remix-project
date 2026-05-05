@@ -561,7 +561,7 @@ export class ResolveConflictsHandler extends BaseToolHandler {
  */
 export function createCoordinationTools(): RemixToolDefinition[] {
   return [
-    {
+    /*{
       name: 'verify_findings',
       description: 'Verify findings accuracy by cross-checking against actual code',
       inputSchema: new SelfVerificationHandler().inputSchema,
@@ -584,6 +584,6 @@ export function createCoordinationTools(): RemixToolDefinition[] {
       category: ToolCategory.COORDINATION,
       permissions: ['coordination:resolve'],
       handler: new ResolveConflictsHandler()
-    }
+    }*/
   ];
 }
