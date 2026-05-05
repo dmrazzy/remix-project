@@ -37,7 +37,7 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
-import { getBasicFileToolsForGasOptimizer, getBasicMcpToolsForSecurityAuditor, getCoordinationToolsForComprehensiveAuditor, getEducationToolsForWeb3Educator } from './helpers'
+import { getBasicFileToolsForGasOptimizer, getBasicMcpToolsForSecurityAuditor, getCoordinationToolsForComprehensiveAuditor, getEducationToolsForWeb3Educator, analyzePromptForAutoSelection, selectOptimalModel } from './helpers'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import { endpointUrls } from "@remix-endpoints-helper"
 import type { DeepAgent } from 'deepagents'
@@ -291,93 +291,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     console.log('[DeepAgentInferencer] Emitted error to todos:', errorMessage)
   }
 
-  /**
-   * Analyze prompt complexity and content to determine optimal model
-   */
-  private analyzePromptForAutoSelection(prompt: string): 'simple' | 'complex' {
-    const complexityIndicators = [
-      'audit', 'security', 'vulnerability', 'exploit', 'attack', 'malicious',
-      'comprehensive', 'detailed', 'analyze', 'review', 'optimize',
-      'refactor', 'architecture', 'design pattern', 'best practice',
-      'multi-step', 'complex', 'advanced', 'sophisticated'
-    ]
-    
-    const securityKeywords = [
-      'security', 'audit', 'vulnerability', 'exploit', 'attack', 'malicious',
-      'reentrancy', 'overflow', 'underflow', 'access control', 'authorization',
-      'authentication', 'privilege', 'permission', 'dos', 'denial of service'
-    ]
-    
-    const lowerPrompt = prompt.toLowerCase()
-    
-    // Count complexity and security indicators
-    const complexityCount = complexityIndicators.filter(keyword => 
-      lowerPrompt.includes(keyword)
-    ).length
-    
-    const securityCount = securityKeywords.filter(keyword => 
-      lowerPrompt.includes(keyword)
-    ).length
-    
-    // Analyze prompt length and structure
-    const wordCount = prompt.split(/\s+/).length
-    const hasMultipleQuestions = (prompt.match(/\?/g) || []).length > 1
-    const hasCodeBlocks = /```[\s\S]*?```/.test(prompt)
-    
-    // Determine complexity based on multiple factors
-    if (securityCount > 0 || complexityCount >= 2 || wordCount > 100 || 
-        hasMultipleQuestions || hasCodeBlocks) {
-      return 'complex'
-    }
-    
-    return 'simple'
-  }
-
-  /**
-   * Select optimal model based on prompt analysis and auto mode configuration
-   */
-  private selectOptimalModel(prompt: string, context?: string): ModelSelection {
-    const autoConfig = this.config.autoMode
-    
-    // If auto mode is disabled, use current selection
-    if (!autoConfig?.enabled) {
-      return this.modelSelection
-    }
-    
-    // Analyze the prompt (include context if provided)
-    const fullPrompt = context ? `${context}\n\n${prompt}` : prompt
-    const complexity = this.analyzePromptForAutoSelection(fullPrompt)
-    
-    // Use custom security keywords if provided
-    const securityKeywords = autoConfig.securityKeywords || [
-      'security', 'audit', 'vulnerability', 'exploit', 'attack'
-    ]
-    
-    const hasSecurityKeywords = securityKeywords.some(keyword => 
-      fullPrompt.toLowerCase().includes(keyword)
-    )
-    
-    console.log(`[DeepAgentInferencer] Auto selection analysis:`, {
-      complexity,
-      hasSecurityKeywords,
-      promptLength: fullPrompt.length
-    })
-    
-    // Decision logic: complex tasks or security-related → Claude, simple → Mistral
-    if (complexity === 'complex' || hasSecurityKeywords) {
-      console.log('[DeepAgentInferencer] Selected Anthropic Claude for complex/security task')
-      return {
-        provider: 'anthropic',
-        modelId: 'claude-3-5-sonnet-20241022'
-      }
-    } else {
-      console.log('[DeepAgentInferencer] Selected Mistral for simple task')
-      return {
-        provider: 'mistralai', 
-        modelId: 'mistral-medium-latest'
-      }
-    }
-  }
 
   /**
    * Create the appropriate model instance based on provider selection
@@ -498,7 +411,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
 
       // Auto model selection based on prompt and context
-      const optimalModel = this.selectOptimalModel(prompt, context)
+      const optimalModel = selectOptimalModel(prompt, context, this.config.autoMode, this.modelSelection)
       await this.updateAgentModel(optimalModel)
 
       const mcpContext = await this.gatherMCPResourcesContext(prompt)
