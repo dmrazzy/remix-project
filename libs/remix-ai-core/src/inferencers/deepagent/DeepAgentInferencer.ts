@@ -1062,6 +1062,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   cancelRequest(): void {
     if (this.currentAbortController) {
       console.log('[DeepAgentInferencer] Cancelling request...')
+      this.resetSessionThread()
       this.currentAbortController.abort()
       this.currentAbortController = null
       this.event.emit('onInferenceDone')
