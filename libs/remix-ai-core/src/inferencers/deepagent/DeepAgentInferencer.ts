@@ -25,7 +25,7 @@ import {
   WEB3_EDUCATOR_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
-import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
+import { IDeepAgentConfig, IAutoModelConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
 import { classifyApiError, getErrorMessage } from './ApiErrorHandler'
 import { resolveToolUIString } from './ToolUIStrings'
@@ -37,7 +37,7 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
-import { getBasicFileToolsForGasOptimizer, getBasicMcpToolsForSecurityAuditor, getCoordinationToolsForComprehensiveAuditor, getEducationToolsForWeb3Educator } from './helpers'
+import { getBasicFileToolsForGasOptimizer, getBasicMcpToolsForSecurityAuditor, getCoordinationToolsForComprehensiveAuditor, getEducationToolsForWeb3Educator, analyzePromptForAutoSelection, selectOptimalModel } from './helpers'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import { endpointUrls } from "@remix-endpoints-helper"
 import type { DeepAgent } from 'deepagents'
@@ -104,7 +104,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private plugin: Plugin
   private config: IDeepAgentConfig
   private event: EventEmitter
-  private agent: DeepAgent = null
+  private agent: DeepAgent | null = null
   private filesystemBackend: RemixFilesystemBackend
   private memoryBackend: DeepAgentMemoryBackend | null = null
   private tools: DynamicStructuredTool[] = []
@@ -165,7 +165,14 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       maxToolExecutions: config?.maxToolExecutions || 10,
       timeout: config?.timeout || 300000, // 5 minutes
       enableSubagents: config?.enableSubagents !== false,
-      enablePlanning: config?.enablePlanning !== false
+      enablePlanning: config?.enablePlanning !== false,
+      autoMode: config?.autoMode || {
+        enabled: false,
+        fallbackModel: {
+          provider: 'mistralai',
+          modelId: 'mistral-medium-latest'
+        }
+      }
     }
 
     // Initialize filesystem backend with shared EventEmitter for approval
@@ -284,11 +291,12 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     console.log('[DeepAgentInferencer] Emitted error to todos:', errorMessage)
   }
 
+
   /**
    * Create the appropriate model instance based on provider selection
    */
-  private createModelInstance(maxTokens: number=DAPP_MAX_TOKENS): BaseChatModel {
-    const { provider, modelId } = this.modelSelection
+  private createModelInstance(maxTokens: number=DAPP_MAX_TOKENS, modelSelection?: ModelSelection): BaseChatModel {
+    const { provider, modelId } = modelSelection || this.modelSelection
 
     switch (provider) {
     case 'mistralai': {
@@ -401,6 +409,11 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           DeepAgentErrorType.INITIALIZATION_FAILED
         )
       }
+
+      // Auto model selection based on prompt and context
+      const allowedModels = await this.plugin.call('remixAI', 'getAllowedModels') || []
+      const optimalModel = selectOptimalModel(prompt, context, this.config.autoMode, this.modelSelection, allowedModels)
+      await this.updateAgentModel(optimalModel)
 
       const mcpContext = await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
@@ -1006,6 +1019,34 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   }
 
   /**
+   * Update agent model based on auto selection
+   */
+  private async updateAgentModel(selectedModel: ModelSelection): Promise<void> {
+    // Only recreate if the model has changed
+    if (this.modelSelection.provider === selectedModel.provider && 
+        this.modelSelection.modelId === selectedModel.modelId) {
+      return
+    }
+
+    console.log(`[DeepAgentInferencer] Switching from ${this.modelSelection.provider}:${this.modelSelection.modelId} to ${selectedModel.provider}:${selectedModel.modelId}`)
+    
+    // Update current model selection
+    this.modelSelection = selectedModel
+    
+    // Create new model instance
+    this.model = this.createModelInstance(DAPP_MAX_TOKENS, selectedModel)
+    
+    // Recreate agent with new model
+    const metaTools = this.tools.filter(tool =>
+      tool.name === 'get_tool_schema' || tool.name === 'call_tool'
+    )
+    if (!this.agent) await this.createAgentWithTools(metaTools)
+    else {
+      this.agent.options.model = this.model
+    }
+  }
+
+  /**
    * Handle errors with fallback strategy
    */
   private async handleError(error: any, method: string, prompt: string, params: IParams): Promise<string> {
@@ -1100,5 +1141,32 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   isReady(): boolean {
     return this.agent !== null
+  }
+
+  /**
+   * Enable or disable auto model selection
+   */
+  setAutoMode(enabled: boolean): void {
+    if (this.config.autoMode) {
+      this.config.autoMode.enabled = enabled
+      console.log(`[DeepAgentInferencer] Auto mode ${enabled ? 'enabled' : 'disabled'}`)
+    }
+  }
+
+  /**
+   * Get auto mode status
+   */
+  isAutoModeEnabled(): boolean {
+    return this.config.autoMode?.enabled || false
+  }
+
+  /**
+   * Get current model selection info
+   */
+  getCurrentModelInfo(): ModelSelection & { autoModeEnabled: boolean } {
+    return {
+      ...this.modelSelection,
+      autoModeEnabled: this.isAutoModeEnabled()
+    }
   }
 }

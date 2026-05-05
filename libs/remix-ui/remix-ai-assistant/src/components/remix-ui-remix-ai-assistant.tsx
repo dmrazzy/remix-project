@@ -98,6 +98,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<AIModel>(getDefaultModel())
   const [isOllamaFailureFallback, setIsOllamaFailureFallback] = useState(false)
+  const [autoModeEnabled, setAutoModeEnabled] = useState(false)
   const [themeTracker, setThemeTracker] = useState<{ name: string } | null>(() => ({ name: getSystemThemeFallback() }))
   const historyRef = useRef<HTMLDivElement | null>(null)
   const modelBtnRef = useRef(null)
@@ -213,7 +214,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_model_selected', value: `${modelName}|from:${previousModel || 'none'}`, isClick: true })
     // Update the model in the backend
     try {
-      await props.plugin.call('remixAI', 'setModel', modelName)
+      await props.plugin.call('remixAI', 'setModel', modelName, modelAccess.allowedModels)
       trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_model_set_backend_success', value: modelName, isClick: false })
     } catch (error: any) {
       console.warn('Failed to set model:', error)
@@ -293,7 +294,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
           setSelectedModel(defaultModel)
           setAssistantChoice(defaultModel.provider as 'openai' | 'mistralai' | 'anthropic' | 'ollama')
           try {
-            await props.plugin.call('remixAI', 'setModel', defaultModel.id)
+            await props.plugin.call('remixAI', 'setModel', defaultModel.id, modelAccess.allowedModels)
           } catch (error) {
             console.warn('Failed to set default model on logout:', error)
           }
@@ -1299,7 +1300,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                 trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'ollama_default_model_selected', value: `${defaultModel}|codestral|total:${models.length}`, isClick: false })
                 // Sync the default model with the backend
                 try {
-                  await props.plugin.call('remixAI', 'setModel', defaultModel)
+                  await props.plugin.call('remixAI', 'setModel', defaultModel, modelAccess.allowedModels)
                   setAssistantChoice(selectedModel.provider)
                   setMessages(prev => [...prev, {
                     id: crypto.randomUUID(),
@@ -1365,6 +1366,26 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   }, [])
 
   const handleModelSelection = useCallback(async (modelId: string) => {
+    // Handle auto mode selection
+    if (modelId === 'auto') {
+      setAutoModeEnabled(true)
+      try {
+        await props.plugin.call('remixAI', 'setAutoMode', true)
+        trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'auto_mode_enabled', isClick: true })
+      } catch (error) {
+        console.warn('Failed to enable auto mode:', error)
+      }
+      setShowModelSelector(false)
+      return
+    } else {
+      setAutoModeEnabled(false)
+      try {
+        await props.plugin.call('remixAI', 'setAutoMode', false)
+      } catch (error) {
+        console.warn('Failed to disable auto mode:', error)
+      }
+    }
+
     const model = AVAILABLE_MODELS.find(m => m.id === modelId)
     if (!model) return
 
@@ -1398,7 +1419,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       }
     } else {
       try {
-        await props.plugin.call('remixAI', 'setModel', modelId)
+        await props.plugin.call('remixAI', 'setModel', modelId, modelAccess.allowedModels)
         trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'model_selected', value: modelId, isClick: true })
       } catch (error) {
         console.warn('Failed to set model:', error)
@@ -1804,6 +1825,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               setMcpEnhanced={setMcpEnhanced}
               availableModels={AVAILABLE_MODELS}
               selectedModel={selectedModel}
+              autoModeEnabled={autoModeEnabled}
               handleModelSelection={handleModelSelection}
               onLockedModelClick={handleLockedModelClick}
               input={input}
@@ -1847,6 +1869,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               setMcpEnhanced={setMcpEnhanced}
               availableModels={AVAILABLE_MODELS}
               selectedModel={selectedModel}
+              autoModeEnabled={autoModeEnabled}
               handleModelSelection={handleModelSelection}
               onLockedModelClick={handleLockedModelClick}
               input={input}

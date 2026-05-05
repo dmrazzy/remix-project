@@ -29,7 +29,9 @@ const profile = {
     'enableDeepAgent', 'disableDeepAgent', 'isDeepAgentEnabled',
     'setDeepAgentThread',
     'respondToToolApproval',
-    'clearCaches', 'cancelRequest'
+    'setAutoMode', 'getAutoModeStatus',
+    'clearCaches', 'cancelRequest',
+    'getAllowedModels'
   ],
   events: [
     'modelChanged',
@@ -57,6 +59,7 @@ export class RemixAIPlugin extends Plugin {
   securityAgent: SecurityAgent
   contractor: ContractAgent
   workspaceAgent: workspaceAgent
+  allowedModels: string[] = []
   selectedModel: AIModel = getDefaultModel() // default model
   selectedModelId: string = getDefaultModel().id
   assistantThreadId: string = ''
@@ -161,6 +164,10 @@ export class RemixAIPlugin extends Plugin {
       console.warn('Failed to get localized message for key:', key, error)
       return key
     }
+  }
+
+  public getAllowedModels(): string[] {
+    return this.allowedModels
   }
 
   async onActivation(): Promise<void> {
@@ -548,12 +555,14 @@ export class RemixAIPlugin extends Plugin {
     await this.setModel(modelId)
   }
 
-  async setModel(modelId: string) {
+  async setModel(modelId: string, allowedModels: string[] = []) {
     let model = getModelById(modelId)
     if (!model) {
       model = getDefaultModel()
       modelId = model.id
     }
+
+    this.allowedModels = allowedModels
 
     // Store previous model for comparison
     const previousModelId = this.selectedModelId
@@ -888,7 +897,14 @@ export class RemixAIPlugin extends Plugin {
         {
           memoryBackend: (localStorage.getItem('deepagent_memory_backend') as 'state' | 'store') || 'store',
           enableSubagents: true,
-          enablePlanning: true
+          enablePlanning: true,
+          autoMode: {
+            enabled: localStorage.getItem('deepagent_auto_mode') === 'true',
+            fallbackModel: {
+              provider: 'mistralai',
+              modelId: 'mistral-medium-latest'
+            }
+          }
         },
         this.remoteInferencer,
         this.mcpInferencer,
@@ -944,6 +960,35 @@ export class RemixAIPlugin extends Plugin {
 
   isDeepAgentEnabled(): boolean {
     return this.deepAgentEnabled
+  }
+
+  /**
+   * Enable or disable auto mode for DeepAgent
+   */
+  async setAutoMode(enabled: boolean): Promise<void> {
+    console.log(`[RemixAI Plugin] ${enabled ? 'Enabling' : 'Disabling'} auto mode for DeepAgent`)
+    
+    if (this.deepAgentInferencer) {
+      this.deepAgentInferencer.setAutoMode(enabled)
+      console.log(`[RemixAI Plugin] Auto mode ${enabled ? 'enabled' : 'disabled'} for existing DeepAgent instance`)
+    } else {
+      console.warn('[RemixAI Plugin] DeepAgent not initialized, auto mode setting will apply when initialized')
+    }
+
+    // Store the auto mode preference
+    localStorage.setItem('deepagent_auto_mode', enabled ? 'true' : 'false')
+  }
+
+  /**
+   * Get current auto mode status
+   */
+  getAutoModeStatus(): boolean {
+    if (this.deepAgentInferencer) {
+      return this.deepAgentInferencer.isAutoModeEnabled()
+    }
+    
+    // Return stored preference if DeepAgent not initialized
+    return localStorage.getItem('deepagent_auto_mode') === 'true'
   }
 
   /**
