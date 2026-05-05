@@ -13,16 +13,14 @@ interface ParsedSkillFile {
 }
 
 /**
- * Generate a skill folder name from the file name
+ * Parse the `name` field from a SKILL.md YAML frontmatter block.
+ * Convention: SKILL.md starts with ---\nname: <skill-name>\ndescription: ...\n---
+ * The name value is used as the parent directory name under .skills/
  */
-function generateSkillFolderName(filename: string): string {
-  return filename
-    .toLowerCase()
-    .replace(/\.(md|zip|skill)$/i, '')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 50) || 'custom-skill'
+function parseSkillNameFromContent(content: string): string | null {
+  const match = content.match(/^---[\s\S]*?^name:\s*([^\n]+)/m)
+  if (!match) return null
+  return match[1].trim()
 }
 
 /**
@@ -144,16 +142,21 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
     if (!fileType) {
       throw new Error('Invalid file type. Please upload a .md, .zip, or .skill file.')
     }
-
-    const folderName = generateSkillFolderName(file.name)
     const files: Record<string, string> = {}
 
     if (fileType === 'md') {
       // Single .md file - treat it as SKILL.md
       const content = await file.text()
+      const nameFromFrontmatter = parseSkillNameFromContent(content)
+      if (!nameFromFrontmatter) {
+        throw new Error(
+          `"${file.name}" is not a valid SKILL.md — missing required frontmatter.\n` +
+          `Expected format:\n---\nname: skill-name\ndescription: skill description\n---`
+        )
+      }
       files['SKILL.md'] = content
       return {
-        folderName,
+        folderName: nameFromFrontmatter,
         files,
         hasSkillMd: true,
         sourceFileName: file.name
@@ -163,6 +166,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
     // Handle .zip or .skill file
     const zip = await JSZip.loadAsync(file)
     let hasSkillMd = false
+    let skillMdContent = ''
 
     for (const [path, zipEntry] of Object.entries(zip.files)) {
       if (zipEntry.dir) continue
@@ -178,6 +182,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
 
       if (filename.toUpperCase() === 'SKILL.MD') {
         hasSkillMd = true
+        skillMdContent = content
       }
     }
 
@@ -185,8 +190,16 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
       throw new Error('The uploaded archive must contain a SKILL.md file.')
     }
 
+    const nameFromFrontmatter = parseSkillNameFromContent(skillMdContent)
+    if (!nameFromFrontmatter) {
+      throw new Error(
+        `The SKILL.md inside "${file.name}" is missing required frontmatter.\n` +
+        `Expected format:\n---\nname: skill-name\ndescription: skill description\n---`
+      )
+    }
+
     return {
-      folderName,
+      folderName: nameFromFrontmatter,
       files,
       hasSkillMd,
       sourceFileName: file.name
@@ -337,7 +350,14 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
       try {
         const url = getSkillsBaseUrl() + `/skills/${skillId}`
         const skillData = await fetchSkillData(url)
-        const skillDir = `.skills/${skillId}`
+        // Use the name from SKILL.md frontmatter as the directory name per convention.
+        // e.g. "---\nname: my-skill\n---" → .skills/my-skill/
+        const dirName = parseSkillNameFromContent(skillData.content)
+        if (!dirName) {
+          errors.push(`${skillId}: SKILL.md is not in the correct format. Expected YAML frontmatter with a 'name' field (---\nname: skill-name\ndescription: ...\n---)`)
+          continue
+        }
+        const skillDir = `.skills/${dirName}`
         await ensureDirectoryExists(skillDir)
         await plugin.call('fileManager', 'writeFile', `${skillDir}/SKILL.md`, skillData.content)
         for (const [filename, content] of Object.entries(skillData.resources)) {
@@ -528,14 +548,14 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
                       {selectedSkillInfos.map(s => (
                         <div key={s.id} className="mb-1">
                           <strong className="text-light">{s.name}</strong>
-                          <span className="text-muted ms-2 small">→ .skills/{s.id}</span>
+                          <span className="text-muted ms-2 small">→ .skills/{s.name}/</span>
                         </div>
                       ))}
                     </div>
                     <div className="alert alert-info mb-4">
                       <i className="fa-solid fa-info-circle me-2"></i>
                       {selectedSkills.size === 1
-                        ? <span>This will create files in the <code>.skills/{[...selectedSkills][0]}</code> directory.</span>
+                        ? <span>This will create files in <code>.skills/{selectedSkillInfos[0]?.name || [...selectedSkills][0]}/</code> using the skill's SKILL.md name.</span>
                         : <span>This will create files in <code>.skills/</code> for each selected skill.</span>}
                     </div>
                     {error && (
@@ -615,7 +635,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
                   {uploadError && (
                     <div className="alert alert-danger mt-3" role="alert">
                       <i className="fa-solid fa-exclamation-triangle me-2"></i>
-                      {uploadError}
+                      <pre className="mb-0 small" style={{ whiteSpace: 'pre-wrap' }}>{uploadError}</pre>
                     </div>
                   )}
 
@@ -668,7 +688,7 @@ export function RemixUiSkillsExplorerModal(props: RemixUiSkillsExplorerModalProp
                     {uploadError && (
                       <div className="alert alert-danger mb-3 w-100" role="alert">
                         <i className="fa-solid fa-exclamation-triangle me-2"></i>
-                        {uploadError}
+                        <pre className="mb-0 small" style={{ whiteSpace: 'pre-wrap' }}>{uploadError}</pre>
                       </div>
                     )}
 
