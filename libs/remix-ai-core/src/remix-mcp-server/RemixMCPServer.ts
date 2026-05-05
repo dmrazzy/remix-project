@@ -51,6 +51,7 @@ import { createTutorialsTools } from './handlers/TutorialsHandler';
 import { createAmpTools } from './handlers/AmpHandler';
 import { createMathUtilsTools } from './handlers/MathUtilsHandler';
 import { createFoundryHardhatTools } from './handlers/FoundryHardhatHandler';
+import { createCoordinationTools } from './handlers/CoordinationHandler';
 import { createSkillTools } from './handlers/SkillLoaderHandler';
 
 // Import resource providers
@@ -845,6 +846,9 @@ export class RemixMCPServer extends EventEmitter implements IRemixMCPServer {
       // Register Math Utils tools
       const mathUtilsTools = createMathUtilsTools();
       this._tools.registerBatch(mathUtilsTools);
+
+      const coordinationTools = createCoordinationTools();
+      this._tools.registerBatch(coordinationTools);
 
       // Register Foundry and Hardhat tools
       if (isElectron()) {

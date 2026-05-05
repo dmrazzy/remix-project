@@ -19,7 +19,10 @@ import {
   FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
   ETHERSCAN_SUBAGENT_PROMPT,
   THEGRAPH_SUBAGENT_PROMPT,
-  ALCHEMY_SUBAGENT_PROMPT
+  ALCHEMY_SUBAGENT_PROMPT,
+  GAS_OPTIMIZER_SUBAGENT_PROMPT,
+  COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
+  WEB3_EDUCATOR_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
@@ -34,9 +37,10 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons'
+import { getBasicFileToolsForGasOptimizer, getBasicMcpToolsForSecurityAuditor, getCoordinationToolsForComprehensiveAuditor, getEducationToolsForWeb3Educator } from './helpers'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import { endpointUrls } from "@remix-endpoints-helper"
-import { max } from 'bn.js'
+import type { DeepAgent } from 'deepagents'
 
 // Model provider types
 type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
@@ -100,7 +104,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private plugin: Plugin
   private config: IDeepAgentConfig
   private event: EventEmitter
-  private agent: any = null
+  private agent: DeepAgent = null
   private filesystemBackend: RemixFilesystemBackend
   private memoryBackend: DeepAgentMemoryBackend | null = null
   private tools: DynamicStructuredTool[] = []
@@ -681,8 +685,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
               const totalTokens = usageMetadata.total_tokens || (inputTokens + outputTokens)
 
               // Extract cached token information (Anthropic-specific fields)
-              const cacheReadInputTokens = usageMetadata.cache_read_input_tokens || 0
-              const cacheCreationInputTokens = usageMetadata.cache_creation_input_tokens || 0
+              let cacheReadInputTokens = usageMetadata.cache_read_input_tokens || 0
+              cacheReadInputTokens = cacheReadInputTokens === 0 ? usageMetadata.input_token_details?.cache_read || 0 : cacheReadInputTokens
+              let cacheCreationInputTokens = usageMetadata.cache_creation_input_tokens || 0
+              cacheCreationInputTokens = cacheCreationInputTokens === 0 ? usageMetadata.input_token_details?.cache_creation || 0 : cacheCreationInputTokens
 
               // Update cumulative counts
               totalInputTokens += inputTokens
@@ -898,9 +904,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
 
       if (this.config.enableSubagents) {
-        const toolInventoryPrompt = this.toolSelector ?
-          this.toolSelector.generateToolInventoryPrompt(this.tools) : ""
-
         const etherscanTools = this.toolSelector ?
           this.toolSelector.getEtherscanTools() : []
         const theGraphTools = this.toolSelector ?
@@ -908,55 +911,79 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         const alchemyTools = this.toolSelector ?
           this.toolSelector.getAlchemyTools() : []
 
+        const basicMcpTools = getBasicMcpToolsForSecurityAuditor(this.tools)
+        const basicFileTools = getBasicFileToolsForGasOptimizer(this.tools)
+        const coordinationTools = getCoordinationToolsForComprehensiveAuditor(this.tools)
+        const educationTools = getEducationToolsForWeb3Educator(this.tools)
+
         const generalTools = this.toolSelector ?
           this.toolSelector.filterOutSpecialistTools(this.tools) : this.tools
 
         agentConfig.subagents = [
           {
             name: 'Security Auditor',
-            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
             model: this.model,
-            tools: generalTools,
+            tools: basicMcpTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Gas Optimizer',
+            systemPrompt: GAS_OPTIMIZER_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: basicFileTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Code Reviewer',
-            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
             model: this.model,
             tools: generalTools,
             backend: this.filesystemBackend
           },
           {
+            name: 'Comprehensive Auditor',
+            systemPrompt: COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: coordinationTools,
+            backend: this.filesystemBackend
+          },
+          {
+            name: 'Web3 Educator',
+            systemPrompt: WEB3_EDUCATOR_SUBAGENT_PROMPT,
+            model: this.model,
+            tools: educationTools,
+            backend: this.filesystemBackend
+          },
+          {
             name: 'Frontend Specialist',
-            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
             model: this.model,
             tools: generalTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Etherscan Specialist',
-            systemPrompt: ETHERSCAN_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: ETHERSCAN_SUBAGENT_PROMPT,
             model: this.model,
             tools: etherscanTools,
             backend: this.filesystemBackend
           },
           {
             name: 'TheGraph Specialist',
-            systemPrompt: THEGRAPH_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: THEGRAPH_SUBAGENT_PROMPT,
             model: this.model,
             tools: theGraphTools,
             backend: this.filesystemBackend
           },
           {
             name: 'Alchemy Specialist',
-            systemPrompt: ALCHEMY_SUBAGENT_PROMPT + toolInventoryPrompt,
+            systemPrompt: ALCHEMY_SUBAGENT_PROMPT,
             model: this.model,
             tools: alchemyTools,
             backend: this.filesystemBackend
           }
         ]
-
-        console.log(`[DeepAgentInferencer] Configured 6 subagents: Security Auditor, Code Reviewer, Frontend Specialist, Etherscan Specialist (${etherscanTools.length} tools), TheGraph Specialist (${theGraphTools.length} tools), Alchemy Specialist (${alchemyTools.length} tools)`)
       }
 
       if (this.memoryBackend) {
@@ -1038,6 +1065,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   cancelRequest(): void {
     if (this.currentAbortController) {
       console.log('[DeepAgentInferencer] Cancelling request...')
+      this.resetSessionThread()
       this.currentAbortController.abort()
       this.currentAbortController = null
       this.event.emit('onInferenceDone')
