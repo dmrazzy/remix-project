@@ -411,7 +411,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
 
       // Auto model selection based on prompt and context
-      const optimalModel = selectOptimalModel(prompt, context, this.config.autoMode, this.modelSelection)
+      const allowedModels = await this.plugin.call('remixAI', 'getAllowedModels') || []
+      const optimalModel = selectOptimalModel(prompt, context, this.config.autoMode, this.modelSelection, allowedModels)
       await this.updateAgentModel(optimalModel)
 
       const mcpContext = await this.gatherMCPResourcesContext(prompt)

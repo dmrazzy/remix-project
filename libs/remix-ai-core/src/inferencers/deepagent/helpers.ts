@@ -115,7 +115,7 @@ export function analyzePromptForAutoSelection(prompt: string): 'simple' | 'compl
 /**
  * Select optimal model based on prompt analysis and auto mode configuration
  */
-export function selectOptimalModel(prompt: string, context?: string, autoModeConfig?: IAutoModelConfig, currentModelSelection?: ModelSelection): ModelSelection {
+export function selectOptimalModel(prompt: string, context?: string, autoModeConfig?: IAutoModelConfig, currentModelSelection?: ModelSelection, allowedModels: string[] = []): ModelSelection {
   // If auto mode is disabled, use current selection
   if (!autoModeConfig?.enabled || !currentModelSelection) {
     return currentModelSelection || {
@@ -146,15 +146,24 @@ export function selectOptimalModel(prompt: string, context?: string, autoModeCon
   // Decision logic: complex tasks or security-related → Claude, simple → Mistral
   if (complexity === 'complex' || hasSecurityKeywords) {
     console.log('[DeepAgentInferencer] Selected Anthropic Claude for complex/security task')
-    return {
-      provider: 'anthropic',
-      modelId: 'claude-3-5-sonnet-20241022'
-    }
+    const modelId = allowedModels.find(model => model.includes('sonnet'))
+    if (modelId) {
+      return {
+        provider: 'anthropic',
+        modelId
+      }
+    } else {
+      console.warn('[DeepAgentInferencer] Preferred Claude model not available, falling back to Mistral')
+      return {
+        provider: 'mistralai', 
+        modelId: allowedModels.find(model => model.includes('mistral-medium')) || 'mistral-medium-latest'
+      }
+    }    
   } else {
     console.log('[DeepAgentInferencer] Selected Mistral for simple task')
     return {
       provider: 'mistralai', 
-      modelId: 'mistral-medium-latest'
+      modelId: allowedModels.find(model => model.includes('mistral-medium')) || 'mistral-medium-latest'
     }
   }
 }

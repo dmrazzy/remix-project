@@ -30,7 +30,8 @@ const profile = {
     'setDeepAgentThread',
     'respondToToolApproval',
     'setAutoMode', 'getAutoModeStatus',
-    'clearCaches', 'cancelRequest'
+    'clearCaches', 'cancelRequest',
+    'getAllowedModels'
   ],
   events: [
     'modelChanged',
@@ -58,6 +59,7 @@ export class RemixAIPlugin extends Plugin {
   securityAgent: SecurityAgent
   contractor: ContractAgent
   workspaceAgent: workspaceAgent
+  allowedModels: string[] = []
   selectedModel: AIModel = getDefaultModel() // default model
   selectedModelId: string = getDefaultModel().id
   assistantThreadId: string = ''
@@ -162,6 +164,10 @@ export class RemixAIPlugin extends Plugin {
       console.warn('Failed to get localized message for key:', key, error)
       return key
     }
+  }
+
+  public getAllowedModels(): string[] {
+    return this.allowedModels
   }
 
   async onActivation(): Promise<void> {
@@ -549,12 +555,14 @@ export class RemixAIPlugin extends Plugin {
     await this.setModel(modelId)
   }
 
-  async setModel(modelId: string) {
+  async setModel(modelId: string, allowedModels: string[] = []) {
     let model = getModelById(modelId)
     if (!model) {
       model = getDefaultModel()
       modelId = model.id
     }
+
+    this.allowedModels = allowedModels
 
     // Store previous model for comparison
     const previousModelId = this.selectedModelId
