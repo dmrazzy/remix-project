@@ -98,6 +98,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<AIModel>(getDefaultModel())
   const [isOllamaFailureFallback, setIsOllamaFailureFallback] = useState(false)
+  const [autoModeEnabled, setAutoModeEnabled] = useState(false)
   const [themeTracker, setThemeTracker] = useState<{ name: string } | null>(() => ({ name: getSystemThemeFallback() }))
   const historyRef = useRef<HTMLDivElement | null>(null)
   const modelBtnRef = useRef(null)
@@ -1365,6 +1366,26 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
   }, [])
 
   const handleModelSelection = useCallback(async (modelId: string) => {
+    // Handle auto mode selection
+    if (modelId === 'auto') {
+      setAutoModeEnabled(true)
+      try {
+        await props.plugin.call('remixAI', 'setAutoMode', true)
+        trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'auto_mode_enabled', isClick: true })
+      } catch (error) {
+        console.warn('Failed to enable auto mode:', error)
+      }
+      setShowModelSelector(false)
+      return
+    } else {
+      setAutoModeEnabled(false)
+      try {
+        await props.plugin.call('remixAI', 'setAutoMode', false)
+      } catch (error) {
+        console.warn('Failed to disable auto mode:', error)
+      }
+    }
+
     const model = AVAILABLE_MODELS.find(m => m.id === modelId)
     if (!model) return
 
@@ -1804,6 +1825,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               setMcpEnhanced={setMcpEnhanced}
               availableModels={AVAILABLE_MODELS}
               selectedModel={selectedModel}
+              autoModeEnabled={autoModeEnabled}
               handleModelSelection={handleModelSelection}
               onLockedModelClick={handleLockedModelClick}
               input={input}
@@ -1847,6 +1869,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               setMcpEnhanced={setMcpEnhanced}
               availableModels={AVAILABLE_MODELS}
               selectedModel={selectedModel}
+              autoModeEnabled={autoModeEnabled}
               handleModelSelection={handleModelSelection}
               onLockedModelClick={handleLockedModelClick}
               input={input}

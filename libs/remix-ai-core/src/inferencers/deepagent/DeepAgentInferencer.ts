@@ -25,7 +25,7 @@ import {
   WEB3_EDUCATOR_SUBAGENT_PROMPT
 } from './DeepAgentPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
-import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
+import { IDeepAgentConfig, IAutoModelConfig, DeepAgentError, DeepAgentErrorType } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
 import { classifyApiError, getErrorMessage } from './ApiErrorHandler'
 import { resolveToolUIString } from './ToolUIStrings'
@@ -104,7 +104,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private plugin: Plugin
   private config: IDeepAgentConfig
   private event: EventEmitter
-  private agent: DeepAgent = null
+  private agent: DeepAgent | null = null
   private filesystemBackend: RemixFilesystemBackend
   private memoryBackend: DeepAgentMemoryBackend | null = null
   private tools: DynamicStructuredTool[] = []
@@ -165,7 +165,14 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       maxToolExecutions: config?.maxToolExecutions || 10,
       timeout: config?.timeout || 300000, // 5 minutes
       enableSubagents: config?.enableSubagents !== false,
-      enablePlanning: config?.enablePlanning !== false
+      enablePlanning: config?.enablePlanning !== false,
+      autoMode: config?.autoMode || {
+        enabled: false,
+        fallbackModel: {
+          provider: 'mistralai',
+          modelId: 'mistral-medium-latest'
+        }
+      }
     }
 
     // Initialize filesystem backend with shared EventEmitter for approval
@@ -285,10 +292,98 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   }
 
   /**
+   * Analyze prompt complexity and content to determine optimal model
+   */
+  private analyzePromptForAutoSelection(prompt: string): 'simple' | 'complex' {
+    const complexityIndicators = [
+      'audit', 'security', 'vulnerability', 'exploit', 'attack', 'malicious',
+      'comprehensive', 'detailed', 'analyze', 'review', 'optimize',
+      'refactor', 'architecture', 'design pattern', 'best practice',
+      'multi-step', 'complex', 'advanced', 'sophisticated'
+    ]
+    
+    const securityKeywords = [
+      'security', 'audit', 'vulnerability', 'exploit', 'attack', 'malicious',
+      'reentrancy', 'overflow', 'underflow', 'access control', 'authorization',
+      'authentication', 'privilege', 'permission', 'dos', 'denial of service'
+    ]
+    
+    const lowerPrompt = prompt.toLowerCase()
+    
+    // Count complexity and security indicators
+    const complexityCount = complexityIndicators.filter(keyword => 
+      lowerPrompt.includes(keyword)
+    ).length
+    
+    const securityCount = securityKeywords.filter(keyword => 
+      lowerPrompt.includes(keyword)
+    ).length
+    
+    // Analyze prompt length and structure
+    const wordCount = prompt.split(/\s+/).length
+    const hasMultipleQuestions = (prompt.match(/\?/g) || []).length > 1
+    const hasCodeBlocks = /```[\s\S]*?```/.test(prompt)
+    
+    // Determine complexity based on multiple factors
+    if (securityCount > 0 || complexityCount >= 2 || wordCount > 100 || 
+        hasMultipleQuestions || hasCodeBlocks) {
+      return 'complex'
+    }
+    
+    return 'simple'
+  }
+
+  /**
+   * Select optimal model based on prompt analysis and auto mode configuration
+   */
+  private selectOptimalModel(prompt: string, context?: string): ModelSelection {
+    const autoConfig = this.config.autoMode
+    
+    // If auto mode is disabled, use current selection
+    if (!autoConfig?.enabled) {
+      return this.modelSelection
+    }
+    
+    // Analyze the prompt (include context if provided)
+    const fullPrompt = context ? `${context}\n\n${prompt}` : prompt
+    const complexity = this.analyzePromptForAutoSelection(fullPrompt)
+    
+    // Use custom security keywords if provided
+    const securityKeywords = autoConfig.securityKeywords || [
+      'security', 'audit', 'vulnerability', 'exploit', 'attack'
+    ]
+    
+    const hasSecurityKeywords = securityKeywords.some(keyword => 
+      fullPrompt.toLowerCase().includes(keyword)
+    )
+    
+    console.log(`[DeepAgentInferencer] Auto selection analysis:`, {
+      complexity,
+      hasSecurityKeywords,
+      promptLength: fullPrompt.length
+    })
+    
+    // Decision logic: complex tasks or security-related → Claude, simple → Mistral
+    if (complexity === 'complex' || hasSecurityKeywords) {
+      console.log('[DeepAgentInferencer] Selected Anthropic Claude for complex/security task')
+      return {
+        provider: 'anthropic',
+        modelId: 'claude-3-5-sonnet-20241022'
+      }
+    } else {
+      console.log('[DeepAgentInferencer] Selected Mistral for simple task')
+      return {
+        provider: 'mistralai', 
+        modelId: 'mistral-medium-latest'
+      }
+    }
+  }
+
+  /**
    * Create the appropriate model instance based on provider selection
    */
-  private createModelInstance(maxTokens: number=DAPP_MAX_TOKENS): BaseChatModel {
-    const { provider, modelId } = this.modelSelection
+  private createModelInstance(maxTokens: number=DAPP_MAX_TOKENS, modelSelection?: ModelSelection): BaseChatModel {
+    const { provider, modelId } = modelSelection || this.modelSelection
 
     switch (provider) {
     case 'mistralai': {
@@ -401,6 +496,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           DeepAgentErrorType.INITIALIZATION_FAILED
         )
       }
+
+      // Auto model selection based on prompt and context
+      const optimalModel = this.selectOptimalModel(prompt, context)
+      await this.updateAgentModel(optimalModel)
 
       const mcpContext = await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
@@ -1006,6 +1105,31 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   }
 
   /**
+   * Update agent model based on auto selection
+   */
+  private async updateAgentModel(selectedModel: ModelSelection): Promise<void> {
+    // Only recreate if the model has changed
+    if (this.modelSelection.provider === selectedModel.provider && 
+        this.modelSelection.modelId === selectedModel.modelId) {
+      return
+    }
+
+    console.log(`[DeepAgentInferencer] Switching from ${this.modelSelection.provider}:${this.modelSelection.modelId} to ${selectedModel.provider}:${selectedModel.modelId}`)
+    
+    // Update current model selection
+    this.modelSelection = selectedModel
+    
+    // Create new model instance
+    this.model = this.createModelInstance(DAPP_MAX_TOKENS, selectedModel)
+    
+    // Recreate agent with new model
+    const metaTools = this.tools.filter(tool =>
+      tool.name === 'get_tool_schema' || tool.name === 'call_tool'
+    )
+    await this.createAgentWithTools(metaTools)
+  }
+
+  /**
    * Handle errors with fallback strategy
    */
   private async handleError(error: any, method: string, prompt: string, params: IParams): Promise<string> {
@@ -1100,5 +1224,32 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
    */
   isReady(): boolean {
     return this.agent !== null
+  }
+
+  /**
+   * Enable or disable auto model selection
+   */
+  setAutoMode(enabled: boolean): void {
+    if (this.config.autoMode) {
+      this.config.autoMode.enabled = enabled
+      console.log(`[DeepAgentInferencer] Auto mode ${enabled ? 'enabled' : 'disabled'}`)
+    }
+  }
+
+  /**
+   * Get auto mode status
+   */
+  isAutoModeEnabled(): boolean {
+    return this.config.autoMode?.enabled || false
+  }
+
+  /**
+   * Get current model selection info
+   */
+  getCurrentModelInfo(): ModelSelection & { autoModeEnabled: boolean } {
+    return {
+      ...this.modelSelection,
+      autoModeEnabled: this.isAutoModeEnabled()
+    }
   }
 }

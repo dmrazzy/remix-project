@@ -29,6 +29,7 @@ const profile = {
     'enableDeepAgent', 'disableDeepAgent', 'isDeepAgentEnabled',
     'setDeepAgentThread',
     'respondToToolApproval',
+    'setAutoMode', 'getAutoModeStatus',
     'clearCaches', 'cancelRequest'
   ],
   events: [
@@ -888,7 +889,14 @@ export class RemixAIPlugin extends Plugin {
         {
           memoryBackend: (localStorage.getItem('deepagent_memory_backend') as 'state' | 'store') || 'store',
           enableSubagents: true,
-          enablePlanning: true
+          enablePlanning: true,
+          autoMode: {
+            enabled: localStorage.getItem('deepagent_auto_mode') === 'true',
+            fallbackModel: {
+              provider: 'mistralai',
+              modelId: 'mistral-medium-latest'
+            }
+          }
         },
         this.remoteInferencer,
         this.mcpInferencer,
@@ -944,6 +952,35 @@ export class RemixAIPlugin extends Plugin {
 
   isDeepAgentEnabled(): boolean {
     return this.deepAgentEnabled
+  }
+
+  /**
+   * Enable or disable auto mode for DeepAgent
+   */
+  async setAutoMode(enabled: boolean): Promise<void> {
+    console.log(`[RemixAI Plugin] ${enabled ? 'Enabling' : 'Disabling'} auto mode for DeepAgent`)
+    
+    if (this.deepAgentInferencer) {
+      this.deepAgentInferencer.setAutoMode(enabled)
+      console.log(`[RemixAI Plugin] Auto mode ${enabled ? 'enabled' : 'disabled'} for existing DeepAgent instance`)
+    } else {
+      console.warn('[RemixAI Plugin] DeepAgent not initialized, auto mode setting will apply when initialized')
+    }
+
+    // Store the auto mode preference
+    localStorage.setItem('deepagent_auto_mode', enabled ? 'true' : 'false')
+  }
+
+  /**
+   * Get current auto mode status
+   */
+  getAutoModeStatus(): boolean {
+    if (this.deepAgentInferencer) {
+      return this.deepAgentInferencer.isAutoModeEnabled()
+    }
+    
+    // Return stored preference if DeepAgent not initialized
+    return localStorage.getItem('deepagent_auto_mode') === 'true'
   }
 
   /**
