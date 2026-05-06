@@ -1,8 +1,3 @@
-/**
- * Remix Tool Adapter for DeepAgent
- * Converts Remix MCP tools to LangChain tool format
- */
-
 import { Plugin } from '@remixproject/engine'
 import { IMCPToolResult, IMCPTool, IMCPToolCall } from '../../types/mcp'
 import { DynamicStructuredTool } from '@langchain/core/tools'
@@ -19,9 +14,6 @@ import {
   DIRECT_WRITE_TOOLS
 } from '../../types/humanInTheLoop'
 
-/**
- * Convert JSON Schema to Zod schema for LangChain
- */
 function jsonSchemaToZod(schema: any): z.ZodObject<any> {
   const shape: Record<string, z.ZodTypeAny> = {}
 
@@ -67,9 +59,6 @@ function jsonSchemaToZod(schema: any): z.ZodObject<any> {
   return z.object(shape)
 }
 
-/**
- * Convert IMCPToolResult to string for LangChain
- */
 function mcpResultToString(result: IMCPToolResult): string {
   if (result.isError) {
     const errorText = result.content.find(c => c.type === 'text')?.text || 'Unknown error'
@@ -87,10 +76,6 @@ function mcpResultToString(result: IMCPToolResult): string {
     .join('\n')
 }
 
-/**
- * Wraps tool execution with user approval when the tool is risky.
- * Emits 'onToolApprovalRequired' and waits for 'onToolApprovalResponse'.
- */
 export class ToolApprovalGate {
   private eventEmitter: EventEmitter
   private policy: ToolApprovalPolicy
@@ -118,11 +103,6 @@ export class ToolApprovalGate {
     this.policy = policy
   }
 
-  /**
-   * Wrap a tool's func so risky calls require user approval first.
-   * For file-write MCP tools, after approval, writes directly to avoid
-   * the handler's internal showCustomDiff (which would cause double-approval).
-   */
   wrap(toolName: string, originalFunc: (args: Record<string, any>) => Promise<string>): (args: Record<string, any>) => Promise<string> {
     if (isSafeTool(toolName)) {
 
@@ -139,7 +119,6 @@ export class ToolApprovalGate {
       const requestId = `approval_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
       const filePath = args.path || args.filePath
 
-      // === Compute existingContent and proposedContent for the approval modal ===
       let existingContent: string | undefined
       let proposedContent: string | undefined
 
@@ -288,9 +267,6 @@ export class RemixToolAdapter {
       .filter((tool): tool is DynamicStructuredTool => tool !== null)
   }
 
-  /**
-   * Get Solidity-specific tools
-   */
   getSolidityTools(): DynamicStructuredTool[] {
     const solidityToolNames = [
       'solidity_compile',
@@ -304,11 +280,6 @@ export class RemixToolAdapter {
     return this.getTools(solidityToolNames)
   }
 
-  /**
-   * Convert external MCP client tools to LangChain format
-   * @param mcpTools Array of MCP tools from external MCP clients (with _mcpServer property)
-   * @param mcpInferencer MCPInferencer instance to execute tools
-   */
   convertExternalMCPTools(
     mcpTools: Array<IMCPTool & { _mcpServer?: string; _mcpCategory?: string }>,
     mcpInferencer: any
@@ -385,9 +356,6 @@ export class RemixToolAdapter {
     })
   }
 
-  /**
-   * Create additional Solidity-specific helper tools
-   */
   static createSolidityHelperTools(plugin: Plugin): DynamicStructuredTool[] {
     return [
       // Get current file
@@ -469,12 +437,6 @@ export class RemixToolAdapter {
   }
 }
 
-/**
- * Factory function to create Remix tools for DeepAgent
- * @param plugin Plugin instance
- * @param toolRegistry Internal Remix MCP tool registry
- * @param mcpInferencer Optional MCPInferencer to gather external MCP client tools
- */
 export async function createRemixTools(
   plugin: Plugin,
   toolRegistry: ToolRegistry,
@@ -483,15 +445,12 @@ export async function createRemixTools(
 ): Promise<DynamicStructuredTool[]> {
   const adapter = new RemixToolAdapter(plugin, toolRegistry, approvalGate)
 
-  // Get Solidity-specific tools from internal Remix MCP server
   const solidityTools = adapter.getSolidityTools()
   console.log('solidity tools:', solidityTools)
 
-  // Get helper tools
   const helperTools = RemixToolAdapter.createSolidityHelperTools(plugin)
   console.log('helper tools:', helperTools)
 
-  // Get all external MCP client tools if mcpInferencer is provided
   let externalTools: DynamicStructuredTool[] = []
   if (mcpInferencer) {
     try {
@@ -505,5 +464,4 @@ export async function createRemixTools(
   }
 
   return [...externalTools]
-  // return [...solidityTools, ...helperTools, ...externalTools]
 }

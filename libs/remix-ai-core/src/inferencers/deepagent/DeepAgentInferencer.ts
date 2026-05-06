@@ -26,16 +26,11 @@ import { selectOptimalModel } from './helpers'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import type { DeepAgent } from 'deepagents'
 
-// Import refactored modules
-import './AsyncLocalStorageInit' // Auto-initializes on import
-// DAPP_MAX_TOKENS is used in ModelFactory
+import './AsyncLocalStorageInit'
 import { createModelInstance } from './ModelFactory'
 import { buildSubagentConfigs } from './SubagentConfig'
 import { StreamEventHandler } from './StreamEventHandler'
 
-/**
- * DeepAgentInferencer integrates LangChain DeepAgent with Remix IDE
- */
 export class DeepAgentInferencer implements ICompletions, IGeneration {
   private plugin: Plugin
   private config: IDeepAgentConfig
@@ -58,20 +53,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     return `remix-session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   }
 
-  /** Reset the session thread_id (e.g. after error or new conversation) */
   private resetSessionThread(): void {
     const oldId = this.sessionThreadId
     this.sessionThreadId = DeepAgentInferencer.generateThreadId()
     console.log('[DeepAgent-Thread] resetSessionThread:', this.sessionThreadId, '(was:', oldId, ')')
   }
 
-  /** Set the session thread_id (e.g. when switching conversations) */
   setSessionThreadId(threadId: string): void {
     console.log('[DeepAgent-Thread] setSessionThreadId:', threadId, '(was:', this.sessionThreadId, ')')
     this.sessionThreadId = threadId
   }
 
-  /** Get the current session thread_id */
   getSessionThreadId(): string {
     return this.sessionThreadId
   }
@@ -126,9 +118,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     this.toolSelector = new ToolSelector()
   }
 
-  /**
-   * Initialize DeepAgent with all components
-   */
   async initialize(): Promise<void> {
     try {
       console.log('[DeepAgentInferencer] Initializing DeepAgent...')
@@ -169,9 +158,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
-  /**
-   * Initialize Remix tools for DeepAgent
-   */
   private async initializeTools(toolRegistry: ToolRegistry, mcpInferencer?: any): Promise<void> {
     try {
       this.tools = await createRemixTools(this.plugin, toolRegistry, mcpInferencer, this.approvalGate)
@@ -261,9 +247,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
-  /**
-   * Code explanation method
-   */
   async code_explaining(prompt: string, context: string, params: IParams): Promise<string> {
     this.event.emit('onInference')
 
@@ -294,9 +277,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
-  /**
-   * Answer questions method
-   */
   async answer(prompt: string, params: IParams, context?: string): Promise<string> {
     this.event.emit('onInference')
 

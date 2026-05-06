@@ -1,8 +1,3 @@
-/**
- * Remix Filesystem Backend for DeepAgent
- * Implements BackendProtocol to bridge DeepAgent with Remix FileManager
- */
-
 import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
 import { ToolApprovalRequest, ToolApprovalResponse } from '../../types/humanInTheLoop'
@@ -15,17 +10,12 @@ interface EditInstruction {
   newText: string
 }
 
-/**
- * RemixFilesystemBackend implements the BackendProtocol interface
- * to allow DeepAgent to interact with Remix's filesystem
- */
 export class RemixFilesystemBackend {
   private plugin: Plugin
   private workspaceRoot: string = '/'
   private eventEmitter: EventEmitter | null = null
   private pendingApprovals = new Map<string, (result: { approved: boolean; modifiedContent?: string; timedOut?: boolean }) => void>()
 
-  // Edit batching: accumulate edits per file, flush as one combined diff
   private editBatches = new Map<string, {
     originalContent: string
     virtualContent: string
@@ -53,7 +43,6 @@ export class RemixFilesystemBackend {
     }
   }
 
-  // deepagents library calls edit(path, old_string, new_string, replace_all)
   async edit(
     filePath: string, oldString: string, newString: string, replaceAll = false
   ): Promise<{ error?: string; occurrences?: number; metadata?: any; filesUpdate?: any }> {
@@ -138,11 +127,6 @@ export class RemixFilesystemBackend {
     await this.writeFileInternal(filePath, finalContent)
   }
 
-  /**
-   * Flush ALL pending edit batches. Called before any non-edit backend method
-   * to ensure the user approves all accumulated edits before the agent moves on.
-   * All flushEditBatch operations are triggered synchronously and we wait for all to complete.
-   */
   public async flushAllPendingBatches(): Promise<void> {
     const files = [...this.editBatches.keys()]
     if (files.length === 0) return
@@ -151,9 +135,6 @@ export class RemixFilesystemBackend {
     await Promise.all(files.map(file => this.flushEditBatch(file)))
   }
 
-  /**
-   * Get current working directory
-   */
   async cwd(): Promise<string> {
     await this.flushAllPendingBatches()
     try {
@@ -171,17 +152,10 @@ export class RemixFilesystemBackend {
     return this.workspaceRoot
   }
 
-  /**
-   * Read file contents
-   * Auto-summarizes files larger than 100KB
-   */
   async read_file(path: string): Promise<string | { error: string }> {
     try {
-
-      // If there are pending batched edits for this file, return the virtual content
       const batch = this.editBatches.get(path)
       if (batch) {
-
         return batch.virtualContent
       }
 
@@ -211,7 +185,6 @@ export class RemixFilesystemBackend {
       if (typeof content !== 'string') {
         return content
       }
-      // Default to full content if offset/limit not specified (Ref: Yann PR #7080)
       if (offset === undefined) offset = 0
       if (limit === undefined) limit = content.length
       return content.substring(offset, offset + limit)
@@ -220,10 +193,6 @@ export class RemixFilesystemBackend {
     }
   }
 
-  /**
-   * Write file contents — goes through HITL approval before writing.
-   * Called by deepagents built-in write_file tool and our write() alias.
-   */
   async write_file(path: string, content: string): Promise<{ success?: boolean, error?: string }> {
     await this.flushAllPendingBatches()
 
@@ -262,18 +231,11 @@ export class RemixFilesystemBackend {
     return await this.write_file(file_path, content)
   }
 
-  /**
-   * Internal write — bypasses approval (used after approval has already been granted).
-   */
   private async writeFileInternal(path: string, content: string): Promise<void> {
 
     await this.plugin.call('fileManager', 'writeFile', path, content)
   }
 
-  /**
-   * Edit file with search/replace operations.
-   * Goes through HITL approval showing the full before/after diff.
-   */
   async edit_file(path: string, edits: EditInstruction[]): Promise<{ success?: boolean, error?: string }> {
     await this.flushAllPendingBatches()
 
@@ -315,9 +277,6 @@ export class RemixFilesystemBackend {
     }
   }
 
-  /**
-   * List directory contents
-   */
   async ls(path?: string): Promise<string[]> {
     await this.flushAllPendingBatches()
     try {
@@ -371,9 +330,6 @@ export class RemixFilesystemBackend {
     }
   }
 
-  /**
-   * Create a new directory
-   */
   async mkdir(path: string): Promise<void> {
     await this.flushAllPendingBatches()
     try {
@@ -448,31 +404,19 @@ export class RemixFilesystemBackend {
     }
   }
 
-  /**
-   * Normalize file path to Remix workspace format
-   */
   private normalizePath(path: string): string {
-    // Remove leading ./ or ../
     let normalized = path.replace(/^\.\//, '').replace(/^\.\.\//, '')
-
-    // Ensure path starts with /browser or is absolute
     if (!normalized.startsWith('/')) {
       normalized = `${this.workspaceRoot}/${normalized}`
     }
 
-    // Remove double slashes
     normalized = normalized.replace(/\/\//g, '/')
 
     return normalized
   }
 
-  /**
-   * Summarize large files to prevent context overflow
-   */
   private summarizeFile(path: string, content: string): string {
     const ext = path.substring(path.lastIndexOf('.') + 1).toLowerCase()
-
-    // Special handling for Solidity files
     if (ext === 'sol') {
       return this.summarizeSolidityFile(content)
     }
@@ -494,10 +438,6 @@ export class RemixFilesystemBackend {
     return summary.join('\n')
   }
 
-  /**
-   * Smart summarization for Solidity files
-   * Extracts contracts, functions, events, and key structures
-   */
   private summarizeSolidityFile(content: string): string {
     const lines = content.split('\n')
     const summary: string[] = [
@@ -505,7 +445,6 @@ export class RemixFilesystemBackend {
       ''
     ]
 
-    // Extract pragma and imports
     const pragmas = lines.filter(line => line.trim().startsWith('pragma'))
     const imports = lines.filter(line => line.trim().startsWith('import'))
 
@@ -569,11 +508,6 @@ export class RemixFilesystemBackend {
     return summary.join('\n')
   }
 
-  /**
-   * Request user approval before writing a file.
-   * If no eventEmitter is connected, auto-approves (backwards-compatible).
-   * @param toolName — displayed in the modal so user knows if this is a write or edit
-   */
   private async requestWriteApproval(
     path: string,
     oldContent: string,

@@ -1,8 +1,3 @@
-/**
- * Stream Event Handler for DeepAgent
- * Processes streaming events and manages inactivity timeouts
- */
-
 import EventEmitter from 'events'
 import { InactivityTimeoutManager } from './InactivityTimeoutManager'
 import { INACTIVITY_TIMEOUT_MS } from './constants'

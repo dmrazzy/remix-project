@@ -1,35 +1,18 @@
-/**
- * Tool UI String Resolution
- * Resolves tool names to user-friendly UI strings for display during tool execution
- */
-
-/**
- * Helper to get filename from path
- */
 function getFileName(path: string): string {
   return path.split('/').pop() || path
 }
 
-/**
- * Helper to truncate address for display
- */
 function truncateAddress(address: string): string {
   if (address.length <= 13) return address
   return `${address.substring(0, 10)}...`
 }
 
-/**
- * Resolve tool name to user-friendly UI string
- * @param toolName - The technical tool name
- * @param toolInput - Optional tool input for context-specific messages
- * @returns User-friendly UI string
- */
 export function resolveToolUIString(toolName: string, toolInput?: Record<string, any>): string {
   const args = toolInput || {}
 
   switch (toolName) {
-  // File operations
   case 'file_read':
+    return args.path ? `Reading file ${getFileName(args.path)}` : 'Reading file...'
   case 'read_file':
     return args.path ? `Reading file ${getFileName(args.path)}` : 'Reading file...'
 
@@ -64,7 +47,6 @@ export function resolveToolUIString(toolName: string, toolInput?: Record<string,
   case 'grep_file':
     return args.pattern ? `Searching for "${args.pattern}"` : 'Searching in files...'
 
-  // Directory operations
   case 'directory_list':
   case 'list_directory':
     return args.path ? `Listing directory ${getFileName(args.path)}` : 'Listing directory contents...'
@@ -72,7 +54,6 @@ export function resolveToolUIString(toolName: string, toolInput?: Record<string,
   case 'ls':
     return args.path ? `Listing ${getFileName(args.path)}` : 'Listing files...'
 
-  // Editor operations
   case 'get_current_file':
     return 'Getting current file...'
 
@@ -130,7 +111,6 @@ export function resolveToolUIString(toolName: string, toolInput?: Record<string,
   case 'foundry_sync':
     return 'Syncing Foundry artifacts...'
 
-  // Analysis
   case 'analyze_contract':
     return args.contractName ? `Analyzing contract ${args.contractName}` : 'Analyzing contract...'
 

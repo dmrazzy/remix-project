@@ -1,12 +1,8 @@
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { IAutoModelConfig, ModelSelection } from '../../types/deepagent'
 
-/**
-  * Get basic MCP tools and slither_scan for Security Auditor
-  */
 export function getBasicMcpToolsForSecurityAuditor(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
   const basicToolNames = [
-    // Security analysis
     'slither_scan'
   ]
 
@@ -16,9 +12,6 @@ export function getBasicMcpToolsForSecurityAuditor(tools: DynamicStructuredTool[
   return basicTools
 }
 
-/**
-  * Get basic file tools for Gas Optimizer
-  */
 export function getBasicFileToolsForGasOptimizer(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
   const basicFileToolNames: string[] = []
 
@@ -28,16 +21,8 @@ export function getBasicFileToolsForGasOptimizer(tools: DynamicStructuredTool[])
   return basicFileTools
 }
 
-/**
-   * Get coordination tools for Comprehensive Auditor
-   * Note: Uses built-in task tool instead of custom invoke_subagent
-   */
 export function getCoordinationToolsForComprehensiveAuditor(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
   const coordinationToolNames: string[] = [
-    // Coordination tools (invoke_subagent removed - using built-in task tool)
-    /*'verify_findings',
-    'aggregate_findings',
-    'resolve_conflicts'*/
   ]
 
   const coordinationTools = tools.filter(tool =>
@@ -46,12 +31,8 @@ export function getCoordinationToolsForComprehensiveAuditor(tools: DynamicStruct
   return coordinationTools
 }
 
-/**
-   * Get education tools for Web3 Educator
-   */
 export function getEducationToolsForWeb3Educator(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
   const educationToolNames = [
-    // Tutorial tools
     'start_tutorial',
     'tutorials_list'
   ]
@@ -62,9 +43,6 @@ export function getEducationToolsForWeb3Educator(tools: DynamicStructuredTool[])
   return educationTools
 }
 
-/**
- * Analyze prompt complexity and content to determine optimal model
- */
 export function analyzePromptForAutoSelection(prompt: string): 'simple' | 'complex' {
   const complexityIndicators = [
     'audit', 'security', 'vulnerability', 'exploit', 'attack', 'malicious',
@@ -81,7 +59,6 @@ export function analyzePromptForAutoSelection(prompt: string): 'simple' | 'compl
 
   const lowerPrompt = prompt.toLowerCase()
 
-  // Count complexity and security indicators
   const complexityCount = complexityIndicators.filter(keyword =>
     lowerPrompt.includes(keyword)
   ).length
@@ -90,7 +67,6 @@ export function analyzePromptForAutoSelection(prompt: string): 'simple' | 'compl
     lowerPrompt.includes(keyword)
   ).length
 
-  // Analyze prompt length and structure
   const wordCount = prompt.split(/\s+/).length
   const hasMultipleQuestions = (prompt.match(/\?/g) || []).length > 1
   const hasCodeBlocks = /```[\s\S]*?```/.test(prompt)
@@ -104,9 +80,6 @@ export function analyzePromptForAutoSelection(prompt: string): 'simple' | 'compl
   return 'simple'
 }
 
-/**
- * Select optimal model based on prompt analysis and auto mode configuration
- */
 export function selectOptimalModel(prompt: string, context?: string, autoModeConfig?: IAutoModelConfig, currentModelSelection?: ModelSelection, allowedModels: string[] = []): ModelSelection {
   // If auto mode is disabled, use current selection
   if (!autoModeConfig?.enabled || !currentModelSelection) {
@@ -116,11 +89,8 @@ export function selectOptimalModel(prompt: string, context?: string, autoModeCon
     }
   }
 
-  // Analyze the prompt (include context if provided)
   const fullPrompt = context ? `${context}\n\n${prompt}` : prompt
   const complexity = analyzePromptForAutoSelection(fullPrompt)
-
-  // Use custom security keywords if provided
   const securityKeywords = autoModeConfig.securityKeywords || [
     'security', 'audit', 'vulnerability', 'exploit', 'attack'
   ]
