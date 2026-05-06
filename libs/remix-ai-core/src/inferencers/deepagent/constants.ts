@@ -1,0 +1,2 @@
+export const DAPP_MAX_TOKENS = 65536
+export const INACTIVITY_TIMEOUT_MS = 10000

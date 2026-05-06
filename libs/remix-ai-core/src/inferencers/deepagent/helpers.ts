@@ -1,13 +1,5 @@
 import type { DynamicStructuredTool } from '@langchain/core/tools'
-import { IAutoModelConfig } from '../../types/deepagent'
-
-// Model provider types
-type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
-
-interface ModelSelection {
-  provider: ModelProvider
-  modelId: string
-}
+import { IAutoModelConfig, ModelSelection } from '../../types/deepagent'
 
 /**
   * Get basic MCP tools and slither_scan for Security Auditor
@@ -28,7 +20,7 @@ export function getBasicMcpToolsForSecurityAuditor(tools: DynamicStructuredTool[
   * Get basic file tools for Gas Optimizer
   */
 export function getBasicFileToolsForGasOptimizer(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
-  const basicFileToolNames = []
+  const basicFileToolNames: string[] = []
 
   const basicFileTools = tools.filter(tool =>
     basicFileToolNames.includes(tool.name)
@@ -41,7 +33,7 @@ export function getBasicFileToolsForGasOptimizer(tools: DynamicStructuredTool[])
    * Note: Uses built-in task tool instead of custom invoke_subagent
    */
 export function getCoordinationToolsForComprehensiveAuditor(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
-  const coordinationToolNames = [
+  const coordinationToolNames: string[] = [
     // Coordination tools (invoke_subagent removed - using built-in task tool)
     /*'verify_findings',
     'aggregate_findings',
@@ -80,35 +72,35 @@ export function analyzePromptForAutoSelection(prompt: string): 'simple' | 'compl
     'refactor', 'architecture', 'design pattern', 'best practice',
     'multi-step', 'complex', 'advanced', 'sophisticated'
   ]
-  
+
   const securityKeywords = [
     'security', 'audit', 'vulnerability', 'exploit', 'attack', 'malicious',
     'reentrancy', 'overflow', 'underflow', 'access control', 'authorization',
     'authentication', 'privilege', 'permission', 'dos', 'denial of service'
   ]
-  
+
   const lowerPrompt = prompt.toLowerCase()
-  
+
   // Count complexity and security indicators
-  const complexityCount = complexityIndicators.filter(keyword => 
+  const complexityCount = complexityIndicators.filter(keyword =>
     lowerPrompt.includes(keyword)
   ).length
-  
-  const securityCount = securityKeywords.filter(keyword => 
+
+  const securityCount = securityKeywords.filter(keyword =>
     lowerPrompt.includes(keyword)
   ).length
-  
+
   // Analyze prompt length and structure
   const wordCount = prompt.split(/\s+/).length
   const hasMultipleQuestions = (prompt.match(/\?/g) || []).length > 1
   const hasCodeBlocks = /```[\s\S]*?```/.test(prompt)
-  
+
   // Determine complexity based on multiple factors
-  if (securityCount > 0 || complexityCount >= 2 || wordCount > 100 || 
+  if (securityCount > 0 || complexityCount >= 2 || wordCount > 100 ||
       hasMultipleQuestions || hasCodeBlocks) {
     return 'complex'
   }
-  
+
   return 'simple'
 }
 
@@ -123,26 +115,26 @@ export function selectOptimalModel(prompt: string, context?: string, autoModeCon
       modelId: 'mistral-medium-latest'
     }
   }
-  
+
   // Analyze the prompt (include context if provided)
   const fullPrompt = context ? `${context}\n\n${prompt}` : prompt
   const complexity = analyzePromptForAutoSelection(fullPrompt)
-  
+
   // Use custom security keywords if provided
   const securityKeywords = autoModeConfig.securityKeywords || [
     'security', 'audit', 'vulnerability', 'exploit', 'attack'
   ]
-  
-  const hasSecurityKeywords = securityKeywords.some(keyword => 
+
+  const hasSecurityKeywords = securityKeywords.some(keyword =>
     fullPrompt.toLowerCase().includes(keyword)
   )
-  
+
   console.log(`[DeepAgentInferencer] Auto selection analysis:`, {
     complexity,
     hasSecurityKeywords,
     promptLength: fullPrompt.length
   })
-  
+
   // Decision logic: complex tasks or security-related → Claude, simple → Mistral
   if (complexity === 'complex' || hasSecurityKeywords) {
     console.log('[DeepAgentInferencer] Selected Anthropic Claude for complex/security task')
@@ -155,14 +147,14 @@ export function selectOptimalModel(prompt: string, context?: string, autoModeCon
     } else {
       console.warn('[DeepAgentInferencer] Preferred Claude model not available, falling back to Mistral')
       return {
-        provider: 'mistralai', 
+        provider: 'mistralai',
         modelId: allowedModels.find(model => model.includes('mistral-medium')) || 'mistral-medium-latest'
       }
-    }    
+    }
   } else {
     console.log('[DeepAgentInferencer] Selected Mistral for simple task')
     return {
-      provider: 'mistralai', 
+      provider: 'mistralai',
       modelId: allowedModels.find(model => model.includes('mistral-medium')) || 'mistral-medium-latest'
     }
   }
