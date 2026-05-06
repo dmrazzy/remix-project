@@ -1005,9 +1005,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
       let enhancedSystemPrompt = REMIX_DEEPAGENT_SYSTEM_PROMPT
       if (this.toolSelector) {
-        // Save input token
-        // const toolInventoryPrompt = this.toolSelector.generateToolInventoryPrompt(selectedTools)
-        // enhancedSystemPrompt += toolInventoryPrompt
+        const toolInventoryPrompt = this.toolSelector.generateToolInventoryPrompt(selectedTools)
+        enhancedSystemPrompt += toolInventoryPrompt
       }
       agentConfig.systemPrompt = enhancedSystemPrompt
 
