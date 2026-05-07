@@ -46,6 +46,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private model: BaseChatModel | null = null
   private modelSelection: ModelSelection
   private mcpInferencer: any = null
+  private allowedModels: string[] = []
   private sessionThreadId: string = DeepAgentInferencer.generateThreadId()
   private streamEventHandler: StreamEventHandler
 
@@ -66,6 +67,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
   getSessionThreadId(): string {
     return this.sessionThreadId
+  }
+
+  setAllowedModels(models: string[]): void {
+    this.allowedModels = models
   }
 
   constructor(
@@ -143,11 +148,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         tool.name === 'get_tool_schema' || tool.name === 'call_tool'
       )
 
-      await this.createAgentWithTools(metaTools)
-      console.log('[DeepAgentInferencer] Agent created successfully')
-      console.log('[DeepAgentInferencer] DeepAgent instance created successfully', this.agent)
-
-      console.log('[DeepAgentInferencer] Initialized successfully')
+      console.log('[DeepAgentInferencer] Agent direct tools:', metaTools.map(t => t.name))
+      console.log('[DeepAgentInferencer] All available tools via call_tool:', this.tools.map(t => t.name))
+      this.createAgentWithTools(metaTools)
+      console.log('[DeepAgentInferencer] Initialized: agent tools =', metaTools.map(t => t.name), ', available via call_tool =', this.tools.map(t => t.name))
     } catch (error: any) {
       console.error('[DeepAgentInferencer] Initialization failed:', error)
       throw new DeepAgentError(
@@ -282,16 +286,17 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
     try {
       if (!this.agent) {
+        console.error('[DeepAgent] answer() FAILED: agent is null/undefined!')
         throw new DeepAgentError(
           'DeepAgent not initialized',
           DeepAgentErrorType.INITIALIZATION_FAILED
         )
       }
 
-      // Auto model selection based on prompt and context
-      const allowedModels = await this.plugin.call('remixAI', 'getAllowedModels') || []
-      const optimalModel = selectOptimalModel(prompt, context, this.config.autoMode, this.modelSelection, allowedModels)
-      await this.updateAgentModel(optimalModel)
+      if (this.config.autoMode?.enabled) {
+        const optimalModel = selectOptimalModel(prompt, context, this.config.autoMode, this.modelSelection, (this.plugin as any).getAllowedModels())
+        await this.updateAgentModel(optimalModel)
+      }
 
       const mcpContext = await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
@@ -378,6 +383,104 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
+  /**
+   * Answer with a custom system prompt - used for specialized generation like DApps.
+   * Creates a dedicated model instance with higher token limit (16384) to avoid
+   * truncation in large code generation tasks. Streams the response so the user
+   * gets real-time feedback during generation. Returns the full concatenated result
+   * for the caller to parse.
+   */
+  async answerWithCustomSystemPrompt(
+    prompt: string,
+    systemPrompt: string,
+    params: IParams,
+    imageBase64?: string
+  ): Promise<string> {
+    this.event.emit('onInference')
+    this.currentAbortController = new AbortController()
+
+    try {
+      if (!this.model) {
+        throw new DeepAgentError(
+          'DeepAgent not initialized',
+          DeepAgentErrorType.INITIALIZATION_FAILED
+        )
+      }
+
+      // Create a dedicated model with higher token limit for code generation
+      // (the default agent model uses 4096 which truncates multi-file output)
+      const DAPP_MAX_TOKENS = 16384
+      const dappModel = this.createModelInstance(DAPP_MAX_TOKENS)
+
+      // Build the full prompt with system context
+      const fullPrompt = `${systemPrompt}\n\n---\n\nUser Request:\n${prompt}`
+
+      // Convert to LangChain messages with image support
+      let langchainMessages: any[]
+
+      if (imageBase64) {
+        langchainMessages = [
+          new HumanMessage({
+            content: [
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`
+                }
+              },
+              { type: 'text', text: fullPrompt }
+            ]
+          })
+        ]
+      } else {
+        langchainMessages = [new HumanMessage(fullPrompt)]
+      }
+
+      const timeoutMs = 120_000
+      const timeoutSignal = AbortSignal.timeout(timeoutMs)
+      const combinedController = this.currentAbortController!
+      timeoutSignal.addEventListener('abort', () => combinedController.abort(), { once: true })
+
+      const stream = await dappModel.stream(langchainMessages, {
+        signal: combinedController.signal
+      })
+
+      let result = ''
+      for await (const chunk of stream) {
+        if (combinedController.signal.aborted) break
+
+        let delta = ''
+        if (typeof chunk.content === 'string') {
+          delta = chunk.content
+        } else if (Array.isArray(chunk.content)) {
+          delta = chunk.content
+            .map((c: any) => (typeof c === 'string' ? c : c.text || ''))
+            .join('')
+        }
+
+        if (delta) {
+          result += delta
+          this.event.emit('onStreamResult', delta)
+        }
+      }
+
+      this.event.emit('onInferenceDone')
+      return result
+    } catch (error: any) {
+      this.event.emit('onInferenceDone')
+      if (error?.name === 'AbortError' || this.currentAbortController?.signal.aborted) {
+        return ''
+      }
+      console.error('[DeepAgent] answerWithCustomSystemPrompt error:', error?.message || error)
+      throw error
+    } finally {
+      this.currentAbortController = null
+    }
+  }
+
+  /**
+   * Code completion method (not supported by DeepAgent, falls back)
+   */
   async code_completion(prompt: string, context: string, ctxFiles: any, fileName: string, params: IParams): Promise<any> {
     console.warn('[DeepAgentInferencer] code_completion not supported, using fallback')
     if (this.fallbackInferencer) {
@@ -435,7 +538,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
           signal: this.currentAbortController?.signal
         }
       )
-      console.log('[DeepAgentInferencer] Agent streamEvents initiated')
+
       let finalMessageFromChain = ''
       for await (const event of eventStream) {
         if (this.currentAbortController?.signal.aborted) {
