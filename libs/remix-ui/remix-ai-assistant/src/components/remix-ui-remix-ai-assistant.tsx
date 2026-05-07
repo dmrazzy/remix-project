@@ -1112,7 +1112,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                   theme={themeTracker?.name}
                   plugin={props.plugin}
                   handleGenerateWorkspace={handleGenerateWorkspace}
-                    handleLoadSkills={handleLoadSkills}
+                  handleLoadSkills={handleLoadSkills}
                   allowedMcps={modelAccess.allowedMcps}
                 />
               </section>
