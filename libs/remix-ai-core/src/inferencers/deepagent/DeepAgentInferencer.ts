@@ -148,9 +148,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         tool.name === 'get_tool_schema' || tool.name === 'call_tool'
       )
 
-      console.log('[DeepAgentInferencer] Agent direct tools:', metaTools.map(t => t.name))
-      console.log('[DeepAgentInferencer] All available tools via call_tool:', this.tools.map(t => t.name))
-      this.createAgentWithTools(metaTools)
+      await this.createAgentWithTools(metaTools)
       console.log('[DeepAgentInferencer] Initialized: agent tools =', metaTools.map(t => t.name), ', available via call_tool =', this.tools.map(t => t.name))
     } catch (error: any) {
       console.error('[DeepAgentInferencer] Initialization failed:', error)
@@ -173,6 +171,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   }
 
   private async gatherMCPResourcesContext(prompt?: string): Promise<string> {
+    return ''
     if (!this.mcpInferencer || !prompt) {
       return ''
     }
@@ -298,7 +297,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         await this.updateAgentModel(optimalModel)
       }
 
-      const mcpContext = await this.gatherMCPResourcesContext(prompt)
+      const mcpContext = undefined //await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
         ? (context ? `${mcpContext}\n\n${context}` : mcpContext)
         : context
@@ -407,15 +406,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
-      // Create a dedicated model with higher token limit for code generation
-      // (the default agent model uses 4096 which truncates multi-file output)
-      const DAPP_MAX_TOKENS = 16384
-      const dappModel = this.createModelInstance(DAPP_MAX_TOKENS)
-
-      // Build the full prompt with system context
+      const dappModel = createModelInstance(this.modelSelection)
       const fullPrompt = `${systemPrompt}\n\n---\n\nUser Request:\n${prompt}`
 
-      // Convert to LangChain messages with image support
       let langchainMessages: any[]
 
       if (imageBase64) {
@@ -698,7 +691,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
       agentConfig.systemPrompt = enhancedSystemPrompt
 
-      this.agent = createDeepAgent(agentConfig)
+      this.agent = await createDeepAgent(agentConfig)
 
       console.log(`[DeepAgentInferencer] Recreated agent with ${selectedTools.length} selected tools`)
     } catch (error) {

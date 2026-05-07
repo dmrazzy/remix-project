@@ -91,7 +91,10 @@ export class ModelManager {
     }
 
     // Reinitialize DeepAgent if enabled and model changed
+    console.log(`[ModelManager] Model set to ${modelId} (provider: ${model.provider}). Previous model was ${previousModelId}. Reinitializing DeepAgent if needed.`)
+    console.log(`[ModelManager] DeepAgent enabled: ${plugin.deepAgentEnabled}, DeepAgentInferencer exists: ${!!plugin.deepAgentInferencer}, MCP Server exists: ${!!plugin.remixMCPServer}`)
     if (plugin.deepAgentEnabled && plugin.deepAgentInferencer && plugin.remixMCPServer && previousModelId !== modelId) {
+      console.log('[ModelManager] Reinitializing DeepAgent due to model change...')
       await this.reinitializeDeepAgentForModelChange(model, modelId)
     }
 
