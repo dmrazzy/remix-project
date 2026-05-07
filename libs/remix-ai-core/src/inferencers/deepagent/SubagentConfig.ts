@@ -1,3 +1,4 @@
+import { SubAgent, CompiledSubAgent } from 'deepagents'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import {
@@ -34,14 +35,15 @@ export interface SubagentConfigItem {
   systemPrompt: string
   model: BaseChatModel
   tools: DynamicStructuredTool[]
-  backend: any
+  backend?: any
+  description?: string | undefined
 }
 
 export function buildSubagentConfigs(
   tools: DynamicStructuredTool[],
   model: BaseChatModel,
   filesystemBackend: any
-): SubagentConfigItem[] {
+): (SubAgent | CompiledSubAgent)[] {
   const etherscanTools = getEtherscanToolsForEtherscanSpecialist(tools)
   const theGraphTools = getTheGraphToolsForTheGraphSpecialist(tools)
   const alchemyTools = getAlchemyToolsForAlchemySpecialist(tools)
@@ -60,91 +62,91 @@ export function buildSubagentConfigs(
       systemPrompt: SOLIDITY_ENGINEER_SUBAGENT_PROMPT,
       model,
       tools: solidityTools,
-      backend: filesystemBackend
+      description: 'Expert in Solidity development, code generation, and smart contract architecture. Can write, explain, and optimize Solidity code.'
     },
     {
       name: 'Web Search Specialist',
       systemPrompt: WEB_SEARCH_SUBAGENT_PROMPT,
       model,
       tools: webSearchTools,
-      backend: filesystemBackend
+      description: 'Specializes in searching and retrieving information from web sources.'
     },
     {
       name: 'Security Auditor',
       systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
       model,
       tools: basicMcpTools,
-      backend: filesystemBackend
+      description: 'Specializes in auditing and reviewing code for security vulnerabilities.'
     },
     {
       name: 'Gas Optimizer',
       systemPrompt: GAS_OPTIMIZER_SUBAGENT_PROMPT,
       model,
       tools: basicFileTools,
-      backend: filesystemBackend
+      description: 'Specializes in optimizing gas usage in smart contracts.'
     },
     {
       name: 'Code Reviewer',
       systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
       model,
       tools: [],
-      backend: filesystemBackend
+      description: 'Specializes in reviewing and providing feedback on code quality and best practices.'
     },
     {
       name: 'Comprehensive Auditor',
       systemPrompt: COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
       model,
       tools: coordinationTools,
-      backend: filesystemBackend
+      description: 'Specializes in comprehensive auditing and analysis of smart contracts.'
     },
     {
       name: 'Web3 Educator',
       systemPrompt: WEB3_EDUCATOR_SUBAGENT_PROMPT,
       model,
       tools: educationTools,
-      backend: filesystemBackend
+      description: 'Specializes in teaching and explaining Web3 concepts and technologies.'
     },
     {
       name: 'Frontend Specialist',
       systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
       model,
       tools: [],
-      backend: filesystemBackend
+      description: 'Specializes in frontend development and user interface design.'
     },
     {
       name: 'Etherscan Specialist',
       systemPrompt: ETHERSCAN_SUBAGENT_PROMPT,
       model,
       tools: etherscanTools,
-      backend: filesystemBackend
+      description: 'Specializes in analyzing and retrieving data from the Etherscan blockchain explorer.'
     },
     {
       name: 'TheGraph Specialist',
       systemPrompt: THEGRAPH_SUBAGENT_PROMPT,
       model,
       tools: theGraphTools,
-      backend: filesystemBackend
+      description: 'Specializes in analyzing and retrieving data from TheGraph decentralized query protocol.'
     },
     {
       name: 'Alchemy Specialist',
       systemPrompt: ALCHEMY_SUBAGENT_PROMPT,
       model,
       tools: alchemyTools,
-      backend: filesystemBackend
+      description: 'Specializes in analyzing and retrieving data from the Alchemy blockchain infrastructure.'
     },
     {
       name: 'Debug Specialist',
       systemPrompt: DEBUG_SPECIALIST_SUBAGENT_PROMPT,
       model,
       tools: debugTools,
-      backend: filesystemBackend
+      description: 'Specializes in debugging and troubleshooting smart contract issues.'
     },
     {
       name: 'Conversion Utilities Specialist',
       systemPrompt: CONVERSION_UTILITIES_SUBAGENT_PROMPT,
       model,
       tools: conversionTools,
-      backend: filesystemBackend
+      description: 'Specializes in providing conversion utilities for various data formats.'
     }
   ]
 }

@@ -3,6 +3,7 @@
  * Integrates LangChain DeepAgent with Remix's AI system
  */
 
+import { createDeepAgent, CreateDeepAgentParams } from 'deepagents'
 import { ICompletions, IGeneration, IParams } from '../../types/types'
 import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
@@ -644,20 +645,25 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
   private async createAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
     try {
-      const { createDeepAgent } = await import('deepagents')
+      if (!this.model) {
+        throw new DeepAgentError(
+          'Model not initialized',
+          DeepAgentErrorType.INITIALIZATION_FAILED
+        )
+      }
 
       const checkpointer = new IndexedDBCheckpointSaver()
       const generalTools = filterOutFileOperationTools(filterOutSpecialistTools(this.tools)) 
 
       // Create agent configuration with selected tools
-      const agentConfig: any = {
-        backend: this.filesystemBackend,
+      const agentConfig: CreateDeepAgentParams = {
+        backend: this.filesystemBackend as any,
         tools: generalTools,
         model: this.model,
         systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
         skills: ["skills/"],
         checkpointer,
-        middlewares: [new RemixDeepAgentMiddleware()]
+        middleware: [new RemixDeepAgentMiddleware()]
       }
 
       if (this.config.enableSubagents && this.model) {
@@ -669,10 +675,10 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
 
       if (this.memoryBackend) {
-        agentConfig.store = this.memoryBackend
+        agentConfig.store = this.memoryBackend as any
       }
 
-      this.agent = await createDeepAgent(agentConfig)
+      this.agent = await createDeepAgent(agentConfig as any)
 
       console.log(`[DeepAgentInferencer] Recreated agent with ${selectedTools.length} selected tools`)
     } catch (error) {
