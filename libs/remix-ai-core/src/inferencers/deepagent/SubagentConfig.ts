@@ -9,7 +9,11 @@ import {
   ALCHEMY_SUBAGENT_PROMPT,
   GAS_OPTIMIZER_SUBAGENT_PROMPT,
   COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
-  WEB3_EDUCATOR_SUBAGENT_PROMPT
+  WEB3_EDUCATOR_SUBAGENT_PROMPT,
+  CONVERSION_UTILITIES_SUBAGENT_PROMPT,
+  DEBUG_SPECIALIST_SUBAGENT_PROMPT,
+  SOLIDITY_ENGINEER_SUBAGENT_PROMPT,
+  WEB_SEARCH_SUBAGENT_PROMPT
 } from './prompts/system/lightPrompts'
 import {
   getBasicMcpToolsForSecurityAuditor,
@@ -24,7 +28,6 @@ import {
   getAlchemyToolsForAlchemySpecialist,
   getTheGraphToolsForTheGraphSpecialist
 } from './helpers/subagentToolFilters'
-import { CONVERSION_UTILITIES_SUBAGENT_PROMPT, DEBUG_SPECIALIST_SUBAGENT_PROMPT, SOLIDITY_ENGINEER_SUBAGENT_PROMPT, WEB_SEARCH_SUBAGENT_PROMPT } from './prompts/system/lightPrompts'
 
 export interface SubagentConfigItem {
   name: string
