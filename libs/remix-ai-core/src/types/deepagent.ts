@@ -1,10 +1,17 @@
+export type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
+
+export interface ModelSelection {
+  provider: ModelProvider
+  modelId: string
+}
+
 /**
  * Auto model selection configuration
  */
 export interface IAutoModelConfig {
   enabled: boolean
   fallbackModel?: {
-    provider: 'anthropic' | 'mistralai' | 'openai' | 'ollama'
+    provider: ModelProvider
     modelId: string
   }
   securityKeywords?: string[]

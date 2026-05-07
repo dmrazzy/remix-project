@@ -369,8 +369,6 @@ export class ToolSelector {
     prompt += "Examples:\n"
     prompt += "- To understand a tool: get_tool_schema({\"toolName\": \"tool_name_here\"})\n"
     prompt += "- To call a tool directly: call_tool({\"toolName\": \"tool_name_here\", \"arguments\": {\"param1\": \"value1\"}})\n"
-
-    console.log(prompt)
     return prompt
   }
 
