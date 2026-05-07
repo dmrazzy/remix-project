@@ -18,10 +18,6 @@ export class MCPServerManager {
     this.plugin = plugin
   }
 
-  /**
-   * Set additional dependencies after initial construction.
-   * This is needed to break circular dependency during plugin initialization.
-   */
   setDeps(deps: MCPServerManagerDeps): void {
     this.deps = deps
   }
@@ -210,10 +206,6 @@ export class MCPServerManager {
     this.plugin.mcpServers = [...mcpDefaultServersConfig.defaultServers]
   }
 
-  /**
-   * Refresh MCP servers when auth state changes.
-   * Updates servers based on user permissions and reinitializes DeepAgent if needed.
-   */
   async refreshOnAuthChange(authState: any): Promise<void> {
     if (!this.deps) {
       console.warn('[MCPServerManager] deps not set, skipping auth refresh')
@@ -234,21 +226,17 @@ export class MCPServerManager {
 
       const { hasBasicMcp, isBetaUser } = await this.deps.permissionChecker.checkMCPAccess()
 
-      // Switch to claude-sonnet-4-6 for beta users
-      if (isBetaUser) {
-        console.log('[RemixAI Plugin] Beta user logged in, switching to claude-sonnet-4-6')
-        await this.deps.setModel('claude-sonnet-4-6')
-      } else {
-        const defaultModel = getDefaultModel()
-        console.log(`[RemixAI Plugin] Non-beta user logged in, using default model: ${defaultModel.id}`)
-        await this.deps.setModel(defaultModel.id)
-      }
+      // Determine the expected model based on user type
 
+      // Calculate server list change
       const newServerList = this.getDefaultServers(hasBasicMcp)
       const currentServerNames = this.plugin.mcpServers.map(s => s.name).sort().join(',')
       const newServerNames = newServerList.map(s => s.name).sort().join(',')
+      const serversChanged = currentServerNames !== newServerNames
 
-      if (currentServerNames !== newServerNames) {
+      // Update servers if needed
+      if (serversChanged) {
+        console.log('[RemixAI Plugin] Updating MCP servers')
         this.plugin.mcpServers = newServerList
         await this.recreateInferencerAndConnect()
       }
@@ -269,20 +257,14 @@ export class MCPServerManager {
     }
   }
 
-  /**
-   * Recreate MCP inferencer with current servers and reconnect.
-   * Also reinitializes DeepAgent if enabled.
-   */
   private async recreateInferencerAndConnect(): Promise<void> {
     if (!this.plugin.remixMCPServer) return
 
-    // Clean up existing servers from inferencer
     if (this.plugin.mcpInferencer) {
       for (const server of this.plugin.mcpServers) {
         try {
           await this.plugin.mcpInferencer.removeMCPServer(server.name)
         } catch (err) {
-          // Ignore errors during cleanup
         }
       }
     }
@@ -313,7 +295,6 @@ export class MCPServerManager {
       console.log('[RemixAI Plugin] MCP servers refreshed and connected')
     }
 
-    // Reinitialize DeepAgent if needed
     if (this.deps) {
       await this.deps.reinitializeDeepAgent()
     }

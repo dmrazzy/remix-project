@@ -6,7 +6,7 @@ import { CodeCompletionAgent, ContractAgent, workspaceAgent, IContextType, mcpDe
 import { MCPInferencer, DeepAgentInferencer } from '@remix/remix-ai-core';
 import { IMCPServer, IMCPConnectionStatus } from '@remix/remix-ai-core';
 import { RemixMCPServer, createRemixMCPServer } from '@remix/remix-ai-core';
-import { AIModel, getDefaultModel } from '@remix/remix-ai-core';
+import { AIModel, getDefaultModel, getModelById } from '@remix/remix-ai-core';
 import axios from 'axios';
 import { endpointUrls } from "@remix-endpoints-helper"
 import { DeepAgentEventBridge, MCPServerManager, PermissionChecker, ModelManager, DeepAgentManager, DAppGenerationManager, ChatRequestBuffer } from './remixAI'
@@ -134,11 +134,22 @@ export class RemixAIPlugin extends Plugin {
   }
 
   async onActivation(): Promise<void> {
-    // check access
     const { hasBasicMcp, isBetaUser } = await this.checkMCPAccess()
 
-    // IMPORTANT: Must await initialize() before loading MCP servers
-    // to ensure remixMCPServer is created first (race condition fix)
+    if (isBetaUser) {
+      console.log('[RemixAI Plugin] Beta user detected at startup, using claude-sonnet-4-6')
+      const betaModel = getModelById('claude-sonnet-4-6')
+      if (betaModel) {
+        this.selectedModelId = 'claude-sonnet-4-6'
+        this.selectedModel = betaModel
+      }
+    } else {
+      console.log('[RemixAI Plugin] Non-beta user at startup, using default model')
+      const defaultModel = getDefaultModel()
+      this.selectedModelId = defaultModel.id
+      this.selectedModel = defaultModel
+    }
+
     await this.initialize()
     this.completionAgent = new CodeCompletionAgent(this)
     this.securityAgent = new SecurityAgent(this)
@@ -146,13 +157,6 @@ export class RemixAIPlugin extends Plugin {
     this.contractor = ContractAgent.getInstance(this)
     this.workspaceAgent = workspaceAgent.getInstance(this)
 
-    // Switch to claude-sonnet-4-6 for beta users
-    if (isBetaUser) {
-      console.log('[RemixAI Plugin] Beta user detected, switching to claude-sonnet-4-6')
-      await this.setModel('claude-sonnet-4-6')
-    }
-
-    // Initialize MCP servers with defaults (after initialize() completes)
     this.mcpServers = [...mcpDefaultServersConfig.defaultServers, ...(hasBasicMcp ? mcpBasicServersConfig.defaultServers : [])]
 
     // Initialize MCP inferencer if we have servers and remixMCPServer exists
@@ -234,7 +238,6 @@ export class RemixAIPlugin extends Plugin {
       this.isInferencing = false
     })
 
-    // Always initialize with default model on page reload
     await this.setModel(this.selectedModelId)
 
     this.aiIsActivated = true
@@ -642,12 +645,6 @@ export class RemixAIPlugin extends Plugin {
     }
   }
 
-  /**
-   * Generate DApp frontend content using DeepAgent.
-   * Called by DAppGeneratorHandler (MCP) for DApp generation workflow.
-   * Accepts messages and systemPrompt directly.
-   * Returns the raw content string.
-   */
   async generateDAppContent(params: {
     messages: any[];
     systemPrompt: string;
@@ -658,10 +655,6 @@ export class RemixAIPlugin extends Plugin {
     return this.dappManager.generateDAppContent(params)
   }
 
-  /**
-   * Fetch and process a Figma design file for DApp generation.
-   * Returns data in a flat structure for use by DApp generation handlers.
-   */
   async fetchFigmaDesign(params: {
     figmaUrl: string;
     figmaToken: string;
@@ -669,12 +662,6 @@ export class RemixAIPlugin extends Plugin {
     return this.dappManager.fetchFigmaDesign(params)
   }
 
-  /**
-   * Generate a DApp directly from a Figma design.
-   * Combines Figma fetching with DApp generation.
-   * This is a convenience method - callers can also invoke
-   * fetchFigmaDesign and generateDAppContent separately.
-   */
   async generateDAppFromFigma(params: {
     figmaUrl: string;
     figmaToken: string;
