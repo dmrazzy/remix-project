@@ -25,6 +25,7 @@ import { selectOptimalModel } from './helpers/modelSelection'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import { filterOutSpecialistTools, filterOutFileOperationTools } from './helpers/subagentToolFilters'
 import type { DeepAgent } from 'deepagents'
+import { RemixDeepAgentMiddleware } from './deepAgentMiddleWare'
 
 import './AsyncLocalStorageInit'
 import { createModelInstance } from './ModelFactory'
@@ -655,7 +656,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         model: this.model,
         systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
         skills: ["skills/"],
-        checkpointer
+        checkpointer,
+        middlewares: [new RemixDeepAgentMiddleware()]
       }
 
       if (this.config.enableSubagents && this.model) {
