@@ -1,4 +1,4 @@
-import { AgentMiddleware, BaseMessage, ModelRequest, WrapModelCallHandler, trimMessages } from 'langchain'
+import { AIMessage, AgentMiddleware, BaseMessage, ModelRequest, WrapModelCallHandler, trimMessages } from 'langchain'
 
 /**
  * Custom middleware for DeepAgent with beforeModel hook functionality
@@ -88,16 +88,85 @@ function dummyTokenCounter(messages: BaseMessage[]): number {
 }
 
 const summarizeOldMessages = async (request: ModelRequest) => {
-  if (request.messages && request.messages.length > 6) {
-    request.messages = await trimMessages(request.messages, {
-      maxTokens: 40,
-      tokenCounter: dummyTokenCounter,
-      strategy: "first",
-      includeSystem: true,
-      allowPartial: true,
-      startOn: "human",
-    });
+  if (!request.messages || request.messages.length <= 3) {
+    return;
   }
+
+  const messages = request.messages;
+  const keptMessages: BaseMessage[] = [];
+  
+  // Always keep last 3 messages
+  const lastThreeMessages = messages.slice(-3);
+  const messagesToProcess = messages.slice(0, -3);
+  
+  let summaryContent = '';
+  let i = 0;
+  
+  // Loop through messages except the last 3
+  while (i < messagesToProcess.length) {
+    const message = messagesToProcess[i];
+    if (message.type === 'ai') {
+      const aiMessage = message as AIMessage
+
+      // check if this message contain a tool call block.
+      const block = aiMessage.contentBlocks.find(block => {
+        if (block.toolCallId) {
+          return true;
+        }
+        return false;
+      })
+      if (!block) {
+        aiMessage.contentBlocks.forEach(block => {
+          if (typeof block.content === 'string') {
+            summaryContent += `Assistant: ${block.content}\n`
+          } else {
+            summaryContent += `Assistant: [${block.type} content]\n`
+          }
+        })
+      } else {
+        // If we find a tool call block, we shouldn't summarize that message.
+        // so we add any accumulated summary content as a human message before it, then add the original message with tool call as-is
+        keptMessages.push({
+          type: 'human',
+          content: `Previous conversation summary: ${summaryContent.trim()}`
+        } as BaseMessage)
+        keptMessages.push(message)
+        summaryContent = ''
+      }      
+    } else if (message.type === 'human') {
+      if (typeof message.content === 'string') {
+        summaryContent += `Human: ${message.content}\n`
+      } else {
+        summaryContent += `Human: [${JSON.stringify(message.content)}]\n`
+      }
+    } else if (message.type === 'tool') {
+      // If we encounter a tool message, we want to keep it and all subsequent messages until the last 3, without summarizing
+      if (summaryContent.trim()) {
+        keptMessages.push({
+          type: 'human',
+          content: `Previous conversation summary: ${summaryContent.trim()}`
+        } as BaseMessage)
+      }
+      keptMessages.push(message)
+      summaryContent = ''
+    } else if (message.type === 'system') {
+      // For any other message types, we can also choose to ignore or handle them as needed. Here we choose to ignore them.
+    } else {
+      // For any other message types, we can also choose to ignore or handle them as needed. Here we choose to ignore them.
+    }
+    i++;
+  }  
+  // If we reached the end and have summary content, add it
+  if (summaryContent.trim()) {
+    keptMessages.push({
+      type: 'human',
+      content: `Previous conversation summary: ${summaryContent.trim()}`
+    } as BaseMessage);
+  }  
+  // Always add the last 3 messages
+  keptMessages.push(...lastThreeMessages);
+  
+  request.messages = keptMessages;
 }
 
 const shortWriteTodosDescription = 'Create and manage a structured task list for the current work session to track progress on complex, multi-step work. Use when: a task has 3+ distinct steps, requires planning across multiple operations, the user provides multiple tasks, or the user explicitly requests a todo list. Skip for trivial, single-step, or purely conversational requests where tracking adds no value. Mark tasks as in_progress before starting and completed immediately after finishing — never mark complete if blocked, partial, or errored. Always keep at least one task in_progress until all are done, and update the list in real time as scope changes.'
