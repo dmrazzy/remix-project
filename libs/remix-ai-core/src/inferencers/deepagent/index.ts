@@ -12,3 +12,20 @@ export {
   SECURITY_ANALYSIS_PROMPT,
   CODE_EXPLANATION_PROMPT
 } from './DeepAgentLightPrompts'
+
+// DApp Generator exports
+export {
+  DAPP_GENERATOR_SUBAGENT_PROMPT,
+  buildDAppSystemPrompt,
+  buildDAppUserMessage,
+  parsePages,
+  findMissingImports,
+  isLocalVMChainId,
+  REQUIRED_DAPP_FILES,
+  cleanFileContent,
+  ensureCompleteHtml,
+  type DAppPromptContext,
+  type DAppContractInfo,
+  type DAppUserMessageOptions
+} from './DAppGeneratorPrompts'
+

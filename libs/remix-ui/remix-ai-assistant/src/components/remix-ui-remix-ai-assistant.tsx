@@ -207,6 +207,41 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   }, [props.initialMessages])
 
+  // When switching conversations, clean up any in-flight streaming / pending approvals.
+  const prevConversationIdRef = useRef(props.currentConversationId)
+  useEffect(() => {
+    if (prevConversationIdRef.current === props.currentConversationId) return
+    prevConversationIdRef.current = props.currentConversationId
+
+    // 1. Reject all pending approvals so DeepAgent's approvalGate unblocks
+    setPendingApprovals(prev => {
+      for (const approval of prev) {
+        props.plugin.call('remixAI', 'respondToToolApproval', {
+          requestId: approval.requestId,
+          approved: false
+        }).catch(() => { /* best-effort */ })
+      }
+      return []
+    })
+    setReviewingApprovals(new Set())
+
+    // 2. Cancel the backend request and abort the frontend stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    props.plugin.call('remixAI', 'cancelRequest').catch(() => { /* best-effort */ })
+
+    // 3. Stop the spinner so the new conversation starts clean
+    setIsStreaming(false)
+    streamingAssistantIdRef.current = null
+    if (clearToolTimeoutRef.current) {
+      clearTimeout(clearToolTimeoutRef.current)
+      clearToolTimeoutRef.current = null
+    }
+    uiToolCallbackRef.current = null
+  }, [props.currentConversationId, props.plugin])
+
   const handleOllamaModelSelection = useCallback(async (modelName: string) => {
     const previousModel = selectedOllamaModel
     setSelectedOllamaModel(modelName)
@@ -565,10 +600,35 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
 
     // Human-in-the-loop: listen for tool approval requests (batch processing)
     const handleToolApproval = (request: ToolApprovalRequest) => {
-      // Add the new approval to pending approvals to show all at once
       setPendingApprovals(prev => [...prev, request])
     }
     props.plugin.on('remixAI', 'onToolApprovalRequired', handleToolApproval)
+
+    // DApp update review: listen for post-update file changes
+    const handleDappUpdateCompleted = (data: { slug: string; files: Record<string, string>; backups: Record<string, string> }) => {
+      console.log('[DAppReview] Update completed for:', data.slug, '- files:', Object.keys(data.files).length)
+      // Find the latest assistant message (may or may not be streaming) and attach review data
+      setMessages(prev => {
+        // Find the last assistant message to attach the review to
+        const lastAssistantIdx = [...prev].reverse().findIndex(m => m.role === 'assistant')
+        if (lastAssistantIdx === -1) return prev
+        const targetIdx = prev.length - 1 - lastAssistantIdx
+        return prev.map((m, idx) =>
+          idx === targetIdx
+            ? {
+              ...m,
+              dappUpdateReview: {
+                workspaceName: data.slug,
+                files: data.files,
+                backups: data.backups,
+                status: 'pending' as const
+              }
+            }
+            : m
+        )
+      })
+    }
+    props.plugin.on('remixAI', 'onDappUpdateCompleted', handleDappUpdateCompleted)
 
     return () => {
       props.plugin.off('remixAI', 'onStreamResult')
@@ -583,6 +643,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
       props.plugin.off('remixAI', 'onAgentError')
       props.plugin.off('remixAI', 'onApiError')
       props.plugin.off('remixAI', 'onToolApprovalRequired')
+      props.plugin.off('remixAI', 'onDappUpdateCompleted')
     }
   }, [props.plugin])
 
@@ -815,7 +876,6 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         approved: true
       })
     }
-    // Clear all approvals
     setPendingApprovals([])
     setReviewingApprovals(new Set())
   }, [pendingApprovals, props.plugin, reviewingApprovals])
@@ -841,10 +901,112 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
         approved: false
       })
     }
-    // Clear all approvals
     setPendingApprovals([])
     setReviewingApprovals(new Set())
   }, [pendingApprovals, props.plugin, reviewingApprovals])
+
+  // ── DApp Update Review Handlers ──
+
+  /** Close any open diff editor sessions */
+  const closeDiffSessions = useCallback(async () => {
+    try {
+      const sessions = await props.plugin.call('editor', 'getDiffSessions')
+      for (const session of sessions) {
+        await props.plugin.call('editor', 'closeDiffSession', session.id)
+      }
+    } catch (err) {
+      console.warn('[DAppReview] Failed to close diff sessions:', err)
+    }
+  }, [props.plugin])
+
+  const handleDappReviewAcceptAll = useCallback(async (msgId: string) => {
+    console.log('[DAppReview] Accept all for message:', msgId)
+    await closeDiffSessions()
+    // Remove review data entirely so the card disappears
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === msgId && m.dappUpdateReview
+          ? { ...m, dappUpdateReview: { ...m.dappUpdateReview, status: 'accepted' as const } }
+          : m
+      )
+    )
+  }, [closeDiffSessions])
+
+  const handleDappReviewRevertAll = useCallback(async (msgId: string) => {
+    const msg = messages.find(m => m.id === msgId)
+    if (!msg?.dappUpdateReview) return
+    const { backups, workspaceName } = msg.dappUpdateReview
+
+    console.log('[DAppReview] Reverting', Object.keys(backups).length, 'files in', workspaceName)
+
+    // Close diff editors first
+    await closeDiffSessions()
+
+    try {
+      // Ensure we're on the right workspace
+      const currentWs = await props.plugin.call('filePanel', 'getCurrentWorkspace')
+      if (currentWs?.name !== workspaceName) {
+        await props.plugin.call('filePanel' as any, 'switchToWorkspace', {
+          name: workspaceName,
+          isLocalhost: false,
+        })
+        await new Promise(r => setTimeout(r, 300))
+      }
+
+      // Restore each backup file
+      for (const [filePath, originalContent] of Object.entries(backups)) {
+        const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`
+        try {
+          if (originalContent === '') {
+            try {
+              await props.plugin.call('fileManager', 'remove', normalizedPath)
+              console.log('[DAppReview] Deleted new file:', normalizedPath)
+            } catch (e) {
+              console.warn('[DAppReview] Could not delete:', normalizedPath)
+            }
+          } else {
+            await props.plugin.call('fileManager', 'writeFile', normalizedPath, originalContent)
+            console.log('[DAppReview] Reverted:', normalizedPath)
+          }
+        } catch (e: any) {
+          console.error('[DAppReview] Failed to revert file:', normalizedPath, e?.message)
+        }
+      }
+
+      // Mark as reverted (card will hide via return null)
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === msgId && m.dappUpdateReview
+            ? { ...m, dappUpdateReview: { ...m.dappUpdateReview, status: 'reverted' as const } }
+            : m
+        )
+      )
+      console.log('[DAppReview] All files reverted in', workspaceName)
+    } catch (e: any) {
+      console.error('[DAppReview] Revert failed:', e?.message)
+    }
+  }, [messages, props.plugin, closeDiffSessions])
+
+  const handleDappReviewViewDiff = useCallback(async (filePath: string, newContent: string, oldContent: string) => {
+    try {
+      const normalizedPath = filePath.replace(/^\/+/, '')
+      console.log('[DAppReview] Opening diff for:', normalizedPath)
+
+      // showCustomDiff compares current file content against proposed content.
+      // Since the new content is already on disk, temporarily write old content
+      // so the diff correctly shows before → after.
+      const currentContent = await props.plugin.call('fileManager', 'readFile', normalizedPath).catch(() => '')
+
+      if (currentContent === newContent && oldContent) {
+        await props.plugin.call('fileManager', 'writeFile', normalizedPath, oldContent)
+      }
+
+      await props.plugin.call('fileManager', 'open', normalizedPath)
+      await props.plugin.call('editor', 'showCustomDiff', normalizedPath, newContent)
+    } catch (err) {
+      console.error('[DAppReview] Failed to show diff:', err)
+    }
+  }, [props.plugin])
 
   // Push a queued message (if any) into history once props update
   useEffect(() => {
@@ -904,6 +1066,10 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
 
       // Cancel the backend fetch so the server stops generating
       props.plugin.call('remixAI', 'cancelRequest').catch(() => { /* best-effort */ })
+
+      // Clear all pending HITL approval modals from the aborted request
+      setPendingApprovals([])
+      setReviewingApprovals(new Set())
 
       trackMatomoEvent({ category: 'ai', action: 'remixAI', name: 'StopRequest', isClick: true })
     }
@@ -1655,6 +1821,9 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                   plugin={props.plugin}
                   handleGenerateWorkspace={handleGenerateWorkspace}
                   allowedMcps={modelAccess.allowedMcps}
+                  onDappReviewAcceptAll={handleDappReviewAcceptAll}
+                  onDappReviewRevertAll={handleDappReviewRevertAll}
+                  onDappReviewViewDiff={handleDappReviewViewDiff}
                 />
                 {pendingApprovals.length > 1 && (
                   <div style={{ padding: '12px', borderBottom: '1px solid #ccc', marginBottom: '8px' }}>
@@ -1769,6 +1938,9 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                     plugin={props.plugin}
                     handleGenerateWorkspace={handleGenerateWorkspace}
                     allowedMcps={modelAccess.allowedMcps}
+                    onDappReviewAcceptAll={handleDappReviewAcceptAll}
+                    onDappReviewRevertAll={handleDappReviewRevertAll}
+                    onDappReviewViewDiff={handleDappReviewViewDiff}
                   />
                   {pendingApprovals.length > 1 && (
                     <div style={{ padding: '12px', borderBottom: '1px solid #ccc', marginBottom: '8px' }}>
