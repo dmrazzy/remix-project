@@ -11,13 +11,13 @@ import {
   GAS_OPTIMIZER_SUBAGENT_PROMPT,
   COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
   WEB3_EDUCATOR_SUBAGENT_PROMPT
-} from './DeepAgentPrompts'
+} from './prompts'
 import {
   getBasicMcpToolsForSecurityAuditor,
   getBasicFileToolsForGasOptimizer,
   getCoordinationToolsForComprehensiveAuditor,
   getEducationToolsForWeb3Educator
-} from './helpers'
+} from './helpers/subagentToolFilters'
 
 export interface SubagentConfigItem {
   name: string

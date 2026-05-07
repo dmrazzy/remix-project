@@ -1,7 +1,7 @@
 import EventEmitter from 'events'
 import { InactivityTimeoutManager } from './InactivityTimeoutManager'
 import { INACTIVITY_TIMEOUT_MS } from './constants'
-import { resolveToolUIString } from './ToolUIStrings'
+import { resolveToolUIString } from './tools/toolUIStrings'
 
 interface SubagentInfo {
   name: string

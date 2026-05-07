@@ -7,14 +7,14 @@ import { ICompletions, IGeneration, IParams } from '../../types/types'
 import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
 import { RemixFilesystemBackend } from './RemixFilesystemBackend'
-import { createRemixTools, ToolApprovalGate } from './RemixToolAdapter'
+import { createRemixTools, ToolApprovalGate } from './tools'
 import { ToolSelector } from './ToolSelector'
 import {
   REMIX_DEEPAGENT_SYSTEM_PROMPT,
   SOLIDITY_CODE_GENERATION_PROMPT,
   SECURITY_ANALYSIS_PROMPT,
   CODE_EXPLANATION_PROMPT
-} from './DeepAgentPrompts'
+} from './prompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType, ModelSelection } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
@@ -22,7 +22,7 @@ import { classifyApiError, getErrorMessage } from './ApiErrorHandler'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
-import { selectOptimalModel } from './helpers'
+import { selectOptimalModel } from './helpers/modelSelection'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
 import type { DeepAgent } from 'deepagents'
 
