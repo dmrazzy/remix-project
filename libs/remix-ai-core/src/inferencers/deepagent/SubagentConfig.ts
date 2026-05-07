@@ -1,6 +1,5 @@
 import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
-import { ToolSelector } from './ToolSelector'
 import {
   SECURITY_AUDITOR_SUBAGENT_PROMPT,
   CODE_REVIEWER_SUBAGENT_PROMPT,
@@ -11,13 +10,21 @@ import {
   GAS_OPTIMIZER_SUBAGENT_PROMPT,
   COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT,
   WEB3_EDUCATOR_SUBAGENT_PROMPT
-} from './prompts'
+} from './prompts/system/lightPrompts'
 import {
   getBasicMcpToolsForSecurityAuditor,
   getBasicFileToolsForGasOptimizer,
   getCoordinationToolsForComprehensiveAuditor,
-  getEducationToolsForWeb3Educator
+  getEducationToolsForWeb3Educator,
+  getDebugToolsForDebugSpecialist,
+  getSolidityToolsForSolidityEngineer,
+  getWebSearchToolsForWebSearchSpecialist,
+  getConversionToolsForConversionSpecialist,
+  getEtherscanToolsForEtherscanSpecialist,
+  getAlchemyToolsForAlchemySpecialist,
+  getTheGraphToolsForTheGraphSpecialist
 } from './helpers/subagentToolFilters'
+import { CONVERSION_UTILITIES_SUBAGENT_PROMPT, DEBUG_SPECIALIST_SUBAGENT_PROMPT, SOLIDITY_ENGINEER_SUBAGENT_PROMPT, WEB_SEARCH_SUBAGENT_PROMPT } from './prompts/system/lightPrompts'
 
 export interface SubagentConfigItem {
   name: string
@@ -29,24 +36,36 @@ export interface SubagentConfigItem {
 
 export function buildSubagentConfigs(
   tools: DynamicStructuredTool[],
-  toolSelector: ToolSelector | null,
   model: BaseChatModel,
   filesystemBackend: any
 ): SubagentConfigItem[] {
-  const etherscanTools = toolSelector?.getEtherscanTools() ?? []
-  const theGraphTools = toolSelector?.getTheGraphTools() ?? []
-  const alchemyTools = toolSelector?.getAlchemyTools() ?? []
-
+  const etherscanTools = getEtherscanToolsForEtherscanSpecialist(tools)
+  const theGraphTools = getTheGraphToolsForTheGraphSpecialist(tools)
+  const alchemyTools = getAlchemyToolsForAlchemySpecialist(tools)
   const basicMcpTools = getBasicMcpToolsForSecurityAuditor(tools)
   const basicFileTools = getBasicFileToolsForGasOptimizer(tools)
   const coordinationTools = getCoordinationToolsForComprehensiveAuditor(tools)
   const educationTools = getEducationToolsForWeb3Educator(tools)
-
-  const generalTools = toolSelector
-    ? toolSelector.filterOutSpecialistTools(tools)
-    : tools
+  const debugTools = getDebugToolsForDebugSpecialist(tools)
+  const solidityTools = getSolidityToolsForSolidityEngineer(tools)
+  const webSearchTools = getWebSearchToolsForWebSearchSpecialist(tools)
+  const conversionTools = getConversionToolsForConversionSpecialist(tools)
 
   return [
+    {
+      name: 'Solidity Engineer',
+      systemPrompt: SOLIDITY_ENGINEER_SUBAGENT_PROMPT,
+      model,
+      tools: solidityTools,
+      backend: filesystemBackend
+    },
+    {
+      name: 'Web Search Specialist',
+      systemPrompt: WEB_SEARCH_SUBAGENT_PROMPT,
+      model,
+      tools: webSearchTools,
+      backend: filesystemBackend
+    },
     {
       name: 'Security Auditor',
       systemPrompt: SECURITY_AUDITOR_SUBAGENT_PROMPT,
@@ -65,7 +84,7 @@ export function buildSubagentConfigs(
       name: 'Code Reviewer',
       systemPrompt: CODE_REVIEWER_SUBAGENT_PROMPT,
       model,
-      tools: generalTools,
+      tools: [],
       backend: filesystemBackend
     },
     {
@@ -86,7 +105,7 @@ export function buildSubagentConfigs(
       name: 'Frontend Specialist',
       systemPrompt: FRONTEND_SPECIALIST_SUBAGENT_PROMPT,
       model,
-      tools: generalTools,
+      tools: [],
       backend: filesystemBackend
     },
     {
@@ -108,6 +127,20 @@ export function buildSubagentConfigs(
       systemPrompt: ALCHEMY_SUBAGENT_PROMPT,
       model,
       tools: alchemyTools,
+      backend: filesystemBackend
+    },
+    {
+      name: 'Debug Specialist',
+      systemPrompt: DEBUG_SPECIALIST_SUBAGENT_PROMPT,
+      model,
+      tools: debugTools,
+      backend: filesystemBackend
+    },
+    {
+      name: 'Conversion Utilities Specialist',
+      systemPrompt: CONVERSION_UTILITIES_SUBAGENT_PROMPT,
+      model,
+      tools: conversionTools,
       backend: filesystemBackend
     }
   ]
