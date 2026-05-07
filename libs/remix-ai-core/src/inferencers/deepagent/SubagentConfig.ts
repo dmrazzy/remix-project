@@ -14,7 +14,8 @@ import {
   CONVERSION_UTILITIES_SUBAGENT_PROMPT,
   DEBUG_SPECIALIST_SUBAGENT_PROMPT,
   SOLIDITY_ENGINEER_SUBAGENT_PROMPT,
-  WEB_SEARCH_SUBAGENT_PROMPT
+  WEB_SEARCH_SUBAGENT_PROMPT,
+  CIRCLE_SUBAGENT_PROMPT
 } from './prompts/system/lightPrompts'
 import {
   getBasicMcpToolsForSecurityAuditor,
@@ -27,7 +28,8 @@ import {
   getConversionToolsForConversionSpecialist,
   getEtherscanToolsForEtherscanSpecialist,
   getAlchemyToolsForAlchemySpecialist,
-  getTheGraphToolsForTheGraphSpecialist
+  getTheGraphToolsForTheGraphSpecialist,
+  getCircleToolsForCircleSpecialist
 } from './helpers/subagentToolFilters'
 
 export interface SubagentConfigItem {
@@ -47,6 +49,7 @@ export function buildSubagentConfigs(
   const etherscanTools = getEtherscanToolsForEtherscanSpecialist(tools)
   const theGraphTools = getTheGraphToolsForTheGraphSpecialist(tools)
   const alchemyTools = getAlchemyToolsForAlchemySpecialist(tools)
+  const circleTools = getCircleToolsForCircleSpecialist(tools)
   const basicMcpTools = getBasicMcpToolsForSecurityAuditor(tools)
   const basicFileTools = getBasicFileToolsForGasOptimizer(tools)
   const coordinationTools = getCoordinationToolsForComprehensiveAuditor(tools)
@@ -147,6 +150,13 @@ export function buildSubagentConfigs(
       model,
       tools: conversionTools,
       description: 'Specializes in providing conversion utilities for various data formats.'
+    },
+    {
+      name: 'Circle Specialist',
+      systemPrompt: CIRCLE_SUBAGENT_PROMPT,
+      model,
+      tools: circleTools,
+      description: 'Specializes in Circle product documentation, APIs, and development resources.'
     }
   ]
 }

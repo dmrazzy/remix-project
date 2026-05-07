@@ -161,10 +161,26 @@ export function getAlchemyToolsForAlchemySpecialist(tools: DynamicStructuredTool
   return alchemyTools
 }
 
+export function getCircleToolsForCircleSpecialist(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
+  const circleToolNames = [
+    'search_circle_documentation',
+    'get_circle_product_summary',
+    'list_available_coding_resources',
+    'get_coding_resource_details'
+  ]
+
+  const circleTools = tools.filter(tool =>
+    circleToolNames.includes(tool.name)
+  )
+
+  return circleTools
+}
+
 export function filterOutSpecialistTools(tools: DynamicStructuredTool[]): DynamicStructuredTool[] {
   const etherscanToolNames = new Set(getEtherscanToolsForEtherscanSpecialist(tools).map(t => t.name))
   const theGraphToolNames = new Set(getTheGraphToolsForTheGraphSpecialist(tools).map(t => t.name))
   const alchemyToolNames = new Set(getAlchemyToolsForAlchemySpecialist(tools).map(t => t.name))
+  const circleToolNames = new Set(getCircleToolsForCircleSpecialist(tools).map(t => t.name))
   const educationToolNames = new Set(getEducationToolsForWeb3Educator(tools).map(t => t.name))
   const securityToolNames = new Set(getSecurityToolsForSecurityAuditor(tools).map(t => t.name))
   const debugToolNames = new Set(getDebugToolsForDebugSpecialist(tools).map(t => t.name))
@@ -176,6 +192,7 @@ export function filterOutSpecialistTools(tools: DynamicStructuredTool[]): Dynami
     !etherscanToolNames.has(tool.name) &&
     !theGraphToolNames.has(tool.name) &&
     !alchemyToolNames.has(tool.name) &&
+    !circleToolNames.has(tool.name) &&
     !educationToolNames.has(tool.name) &&
     !securityToolNames.has(tool.name) &&
     !debugToolNames.has(tool.name) &&

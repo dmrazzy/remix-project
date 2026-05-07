@@ -53,3 +53,6 @@ Performs comprehensive web searches, summarizes results, and retrieves detailed 
 
 export const CONVERSION_UTILITIES_SUBAGENT_PROMPT = `Conversion Utilities Specialist: Expert in Ethereum unit conversions and data transformations.
 Handles wei/ether conversions, hex/decimal transformations, and timestamp formatting using conversion tools.`
+
+export const CIRCLE_SUBAGENT_PROMPT = `Circle Specialist: Expert in Circle product documentation, APIs, and development resources.
+Searches Circle docs, retrieves product summaries, lists coding resources, and provides detailed resource information.`
