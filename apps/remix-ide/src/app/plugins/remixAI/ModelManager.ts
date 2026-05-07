@@ -223,7 +223,7 @@ export class ModelManager {
     const providerToModelMap: Record<string, string> = {
       'openai': 'gpt-4-turbo',
       'mistralai': 'mistral-medium-latest',
-      'anthropic': 'claude-sonnet-4-5',
+      'anthropic': 'claude-sonnet-4-6',
       'ollama': 'ollama'
     }
     const modelId = providerToModelMap[provider] || getDefaultModel().id
