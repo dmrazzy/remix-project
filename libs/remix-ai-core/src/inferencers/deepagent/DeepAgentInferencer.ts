@@ -14,7 +14,7 @@ import {
   SOLIDITY_CODE_GENERATION_PROMPT,
   SECURITY_ANALYSIS_PROMPT,
   CODE_EXPLANATION_PROMPT
-} from './prompts'
+} from '../deepagent/prompts/system/lightPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType, ModelSelection } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
