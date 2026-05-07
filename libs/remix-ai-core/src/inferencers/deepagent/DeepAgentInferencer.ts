@@ -289,11 +289,9 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
 
       // Auto model selection based on prompt and context
-      // const allowedModels = await this.plugin.call('remixAI', 'getAllowedModels') || []
-
-      // const optimalModel = selectOptimalModel(prompt, context, this.config.autoMode, this.modelSelection, allowedModels)
-      // await this.updateAgentModel(optimalModel)
-      // console.log(`[DeepAgentInferencer] Selected model for answer method: ${optimalModel.provider} - ${optimalModel.modelId}`)
+      const allowedModels = await this.plugin.call('remixAI', 'getAllowedModels') || []
+      const optimalModel = selectOptimalModel(prompt, context, this.config.autoMode, this.modelSelection, allowedModels)
+      await this.updateAgentModel(optimalModel)
 
       const mcpContext = await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
@@ -605,12 +603,37 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
   }
 
-  private async updateAgentModel(_selectedModel: ModelSelection): Promise<void> {
-    // Auto mode model switching is currently disabled
-    // The agent will use the model configured at initialization
-    return
+  /**
+   * Update agent model based on auto selection
+   */
+  private async updateAgentModel(selectedModel: ModelSelection): Promise<void> {
+    // Only recreate if the model has changed
+    if (this.modelSelection.provider === selectedModel.provider &&
+        this.modelSelection.modelId === selectedModel.modelId) {
+      return
+    }
+
+    console.log(`[DeepAgentInferencer] Switching from ${this.modelSelection.provider}:${this.modelSelection.modelId} to ${selectedModel.provider}:${selectedModel.modelId}`)
+
+    // Update current model selection
+    this.modelSelection = selectedModel
+
+    // Create new model instance
+    this.model = createModelInstance(selectedModel)
+
+    // Recreate agent with new model
+    const metaTools = this.tools.filter(tool =>
+      tool.name === 'get_tool_schema' || tool.name === 'call_tool'
+    )
+    if (!this.agent) await this.createAgentWithTools(metaTools)
+    else {
+      this.agent.options.model = this.model
+    }
   }
 
+  /**
+   * Handle errors with fallback strategy
+   */
   private async handleError(error: any, method: string, prompt: string, params: IParams): Promise<string> {
     console.error(`[DeepAgentInferencer] Error in ${method}:`, error)
 

@@ -1,7 +1,5 @@
-// Re-export all types
 export * from './types'
 
-// Re-export modules
 export { DeepAgentEventBridge } from './DeepAgentEventBridge'
 export { MCPServerManager } from './MCPServerManager'
 export type { MCPServerManagerDeps } from './MCPServerManager'

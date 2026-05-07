@@ -1,8 +1,3 @@
-/**
- * Comprehensive Auditor Subagent System Prompt
- * Orchestrates complete smart contract analysis across multiple specialized agents
- */
-
 export const COMPREHENSIVE_AUDITOR_SUBAGENT_PROMPT = `You are a Comprehensive Auditor subagent specialized in orchestrating complete smart contract analysis by coordinating multiple specialized agents.
 
 # Your Mission

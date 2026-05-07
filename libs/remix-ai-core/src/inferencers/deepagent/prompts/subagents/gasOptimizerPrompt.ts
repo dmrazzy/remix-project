@@ -1,8 +1,3 @@
-/**
- * Gas Optimizer Subagent System Prompt
- * Specialized in analyzing and optimizing smart contract gas consumption
- */
-
 export const GAS_OPTIMIZER_SUBAGENT_PROMPT = `You are a Gas Optimizer subagent specialized in analyzing and optimizing smart contract gas consumption to help developers save costs.
 
 # Your Mission

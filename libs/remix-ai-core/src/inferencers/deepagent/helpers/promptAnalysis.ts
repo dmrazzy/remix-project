@@ -1,8 +1,3 @@
-/**
- * Prompt Analysis Utilities
- * Functions for analyzing prompt complexity and content
- */
-
 import {
   COMPLEXITY_WORD_COUNT_THRESHOLD,
   COMPLEXITY_INDICATORS,
@@ -11,10 +6,7 @@ import {
 
 export type PromptComplexity = 'simple' | 'complex'
 
-/**
- * Analyze a prompt to determine if it's simple or complex
- * Used for automatic model selection in auto mode
- */
+
 export function analyzePromptForAutoSelection(prompt: string): PromptComplexity {
   const lowerPrompt = prompt.toLowerCase()
 
@@ -39,17 +31,11 @@ export function analyzePromptForAutoSelection(prompt: string): PromptComplexity 
   return 'simple'
 }
 
-/**
- * Check if prompt contains security-related keywords
- */
 export function hasSecurityKeywords(prompt: string): boolean {
   const lowerPrompt = prompt.toLowerCase()
   return SECURITY_KEYWORDS.some(keyword => lowerPrompt.includes(keyword))
 }
 
-/**
- * Count complexity indicators in a prompt
- */
 export function countComplexityIndicators(prompt: string): number {
   const lowerPrompt = prompt.toLowerCase()
   return COMPLEXITY_INDICATORS.filter(keyword =>

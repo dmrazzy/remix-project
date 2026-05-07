@@ -1,7 +1,3 @@
-/**
- * Utility Tool UI Strings
- * UI strings for miscellaneous utility tools
- */
 
 import { ToolUIStringRegistry } from './types'
 

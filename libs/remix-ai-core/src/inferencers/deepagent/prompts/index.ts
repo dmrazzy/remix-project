@@ -1,9 +1,3 @@
-/**
- * DeepAgent Prompts - Main Entry Point
- * Re-exports all system and subagent prompts for backward compatibility
- */
-
-// System prompts
 export {
   REMIX_DEEPAGENT_SYSTEM_PROMPT,
   SOLIDITY_CODE_GENERATION_PROMPT,
@@ -11,7 +5,6 @@ export {
   CODE_EXPLANATION_PROMPT
 } from './system'
 
-// Subagent prompts
 export {
   SECURITY_AUDITOR_SUBAGENT_PROMPT,
   CODE_REVIEWER_SUBAGENT_PROMPT,

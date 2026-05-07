@@ -1,8 +1,3 @@
-/**
- * Solidity Code Generation Prompt
- * Guidelines for generating high-quality Solidity code
- */
-
 export const SOLIDITY_CODE_GENERATION_PROMPT = `When generating Solidity code:
 
 1. Start with SPDX license identifier and pragma

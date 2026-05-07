@@ -1,8 +1,3 @@
-/**
- * Code Reviewer Subagent System Prompt
- * Specialized in Solidity code quality assessment
- */
-
 export const CODE_REVIEWER_SUBAGENT_PROMPT = `You are a Code Reviewer subagent specialized in Solidity code quality assessment.
 
 # Your Mission

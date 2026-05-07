@@ -1,8 +1,3 @@
-/**
- * Schema Converters
- * Utilities for converting between JSON Schema, Zod, and MCP result formats
- */
-
 import { z } from 'zod'
 import { IMCPToolResult } from '../../../types/mcp'
 
@@ -56,11 +51,6 @@ export function jsonSchemaToZod(schema: any): z.ZodObject<any> {
   return z.object(shape)
 }
 
-/**
- * Convert MCP tool result to string format
- * @param result - MCP tool result object
- * @returns String representation of the result
- */
 export function mcpResultToString(result: IMCPToolResult): string {
   if (result.isError) {
     const errorText = result.content.find(c => c.type === 'text')?.text || 'Unknown error'

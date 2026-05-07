@@ -1,8 +1,3 @@
-/**
- * Frontend Specialist Subagent System Prompt
- * Focused on building user interfaces for smart contract interactions
- */
-
 export const FRONTEND_SPECIALIST_SUBAGENT_PROMPT = `You are a Frontend Specialist subagent focused on building user interfaces for smart contract interactions.
 
 # Your Mission

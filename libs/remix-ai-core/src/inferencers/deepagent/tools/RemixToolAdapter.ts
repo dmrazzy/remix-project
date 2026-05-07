@@ -1,8 +1,3 @@
-/**
- * Remix Tool Adapter
- * Converts Remix MCP tools to LangChain format
- */
-
 import { Plugin } from '@remixproject/engine'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
@@ -11,9 +6,6 @@ import { RemixToolDefinition, ToolRegistry } from '../../../remix-mcp-server/typ
 import { ToolApprovalGate } from './ToolApprovalGate'
 import { jsonSchemaToZod, mcpResultToString } from './schemaConverters'
 
-/**
- * RemixToolAdapter converts Remix MCP tools to LangChain format
- */
 export class RemixToolAdapter {
   private plugin: Plugin
   private toolRegistry: ToolRegistry
@@ -25,9 +17,6 @@ export class RemixToolAdapter {
     this.approvalGate = approvalGate
   }
 
-  /**
-   * Get all Remix tools as LangChain tools
-   */
   getAllTools(): DynamicStructuredTool[] {
     const tools: DynamicStructuredTool[] = []
     const allToolDefs = this.toolRegistry.list()
@@ -39,9 +28,6 @@ export class RemixToolAdapter {
     return tools
   }
 
-  /**
-   * Get specific tools by name
-   */
   getTools(toolNames: string[]): DynamicStructuredTool[] {
     return toolNames
       .map(name => {
@@ -51,9 +37,6 @@ export class RemixToolAdapter {
       .filter((tool): tool is DynamicStructuredTool => tool !== null)
   }
 
-  /**
-   * Get Solidity-specific tools
-   */
   getSolidityTools(): DynamicStructuredTool[] {
     const solidityToolNames = [
       'solidity_compile',
@@ -67,9 +50,6 @@ export class RemixToolAdapter {
     return this.getTools(solidityToolNames)
   }
 
-  /**
-   * Convert external MCP tools to LangChain format
-   */
   convertExternalMCPTools(
     mcpTools: Array<IMCPTool & { _mcpServer?: string; _mcpCategory?: string }>,
     mcpInferencer: any
@@ -119,9 +99,6 @@ export class RemixToolAdapter {
     return tools
   }
 
-  /**
-   * Convert a Remix MCP tool definition to LangChain tool
-   */
   private convertToLangChainTool(toolDef: RemixToolDefinition): DynamicStructuredTool {
     const zodSchema = jsonSchemaToZod(toolDef.inputSchema)
 
@@ -146,9 +123,6 @@ export class RemixToolAdapter {
     })
   }
 
-  /**
-   * Create helper tools for Solidity development
-   */
   static createSolidityHelperTools(plugin: Plugin): DynamicStructuredTool[] {
     return [
       // Get current file
@@ -230,9 +204,6 @@ export class RemixToolAdapter {
   }
 }
 
-/**
- * Create Remix tools for use with DeepAgent
- */
 export async function createRemixTools(
   plugin: Plugin,
   toolRegistry: ToolRegistry,

@@ -1,8 +1,3 @@
-/**
- * Compilation Tool UI Strings
- * UI strings for Solidity compilation and analysis tools
- */
-
 import { ToolUIStringRegistry, getFileName, truncateAddress } from './types'
 
 export const compilationToolStrings: ToolUIStringRegistry = {

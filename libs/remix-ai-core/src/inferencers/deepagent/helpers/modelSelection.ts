@@ -1,8 +1,3 @@
-/**
- * Model Selection Utilities
- * Functions for selecting optimal AI models based on context
- */
-
 import { IAutoModelConfig, ModelSelection } from '../../../types/deepagent'
 import { analyzePromptForAutoSelection } from './promptAnalysis'
 import { DEFAULT_MODEL_PROVIDER, DEFAULT_MODEL_ID } from '../constants'
@@ -66,9 +61,6 @@ export function selectOptimalModel(
   }
 }
 
-/**
- * Get default model selection
- */
 export function getDefaultModelSelection(): ModelSelection {
   return {
     provider: DEFAULT_MODEL_PROVIDER,

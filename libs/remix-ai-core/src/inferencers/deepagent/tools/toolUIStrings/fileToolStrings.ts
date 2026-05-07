@@ -1,8 +1,3 @@
-/**
- * File Operation Tool UI Strings
- * UI strings for file-related tools
- */
-
 import { ToolUIStringRegistry, getFileName } from './types'
 
 export const fileToolStrings: ToolUIStringRegistry = {

@@ -1,11 +1,5 @@
-/**
- * Model provider type
- */
 export type ModelProvider = 'anthropic' | 'mistralai' | 'openai' | 'ollama'
 
-/**
- * Model selection interface
- */
 export interface ModelSelection {
   provider: ModelProvider
   modelId: string

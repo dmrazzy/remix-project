@@ -1,8 +1,3 @@
-/**
- * Debugging Tool UI Strings
- * UI strings for transaction debugging tools
- */
-
 import { ToolUIStringRegistry, truncateAddress } from './types'
 
 export const debuggingToolStrings: ToolUIStringRegistry = {

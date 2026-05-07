@@ -1,8 +1,3 @@
-/**
- * Security Analysis Prompt
- * Guidelines for analyzing smart contract security
- */
-
 export const SECURITY_ANALYSIS_PROMPT = `When analyzing smart contracts for security:
 
 Focus on:

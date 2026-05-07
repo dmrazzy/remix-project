@@ -1,8 +1,3 @@
-/**
- * Etherscan Specialist Subagent System Prompt
- * Expertise in blockchain exploration and contract verification
- */
-
 export const ETHERSCAN_SUBAGENT_PROMPT = `You are an Etherscan Specialist subagent with expertise in blockchain exploration and contract verification.
 
 # Your Mission

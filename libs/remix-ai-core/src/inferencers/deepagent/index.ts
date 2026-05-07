@@ -1,26 +1,6 @@
-/**
- * DeepAgent Module
- * Main entry point for the DeepAgent inferencer system
- *
- * This module provides:
- * - DeepAgentInferencer: Main agent for AI-powered Solidity development
- * - RemixFilesystemBackend: Filesystem abstraction for Remix IDE
- * - Tool adapters: Convert Remix MCP tools to LangChain format
- * - Prompts: System and subagent prompts
- * - Helpers: Utility functions for analysis and selection
- * - Constants: Configuration values
- */
-
-// ============================================================================
-// Core Classes
-// ============================================================================
 
 export { DeepAgentInferencer } from './DeepAgentInferencer'
 export { RemixFilesystemBackend } from './RemixFilesystemBackend'
-
-// ============================================================================
-// Tool Adapters (from ./tools)
-// ============================================================================
 
 export {
   RemixToolAdapter,
@@ -30,10 +10,6 @@ export {
   mcpResultToString,
   resolveToolUIString
 } from './tools'
-
-// ============================================================================
-// Prompts (from ./prompts)
-// ============================================================================
 
 // System prompts
 export {
@@ -55,10 +31,6 @@ export {
   ALCHEMY_SUBAGENT_PROMPT,
   WEB3_EDUCATOR_SUBAGENT_PROMPT
 } from './prompts'
-
-// ============================================================================
-// Constants (from ./constants)
-// ============================================================================
 
 export {
   // Token and timeout configuration
@@ -104,11 +76,6 @@ export {
   type MemoryBackendType
 } from './constants'
 
-// ============================================================================
-// Helpers (from ./helpers)
-// ============================================================================
-
-// Subagent tool filters
 export {
   getBasicMcpToolsForSecurityAuditor,
   getBasicFileToolsForGasOptimizer,
@@ -116,7 +83,6 @@ export {
   getEducationToolsForWeb3Educator
 } from './helpers/subagentToolFilters'
 
-// Prompt analysis
 export {
   analyzePromptForAutoSelection,
   hasSecurityKeywords,
@@ -130,26 +96,10 @@ export {
   getDefaultModelSelection
 } from './helpers/modelSelection'
 
-// ============================================================================
-// Model Factory
-// ============================================================================
-
 export { createModelInstance } from './ModelFactory'
-
-// ============================================================================
-// Subagent Configuration
-// ============================================================================
 
 export { buildSubagentConfigs, type SubagentConfigItem } from './SubagentConfig'
 
-// ============================================================================
-// Stream Event Handler
-// ============================================================================
-
 export { StreamEventHandler, type TokenUsageState, type StreamProcessingResult } from './StreamEventHandler'
-
-// ============================================================================
-// Inactivity Timeout Manager
-// ============================================================================
 
 export { InactivityTimeoutManager } from './InactivityTimeoutManager'

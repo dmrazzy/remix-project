@@ -1,8 +1,3 @@
-/**
- * Alchemy Specialist Subagent System Prompt
- * Expertise in blockchain infrastructure, Web3 development, and real-time blockchain data access
- */
-
 export const ALCHEMY_SUBAGENT_PROMPT = `You are an Alchemy Specialist subagent with expertise in blockchain infrastructure, Web3 development, and real-time blockchain data access.
 
 # Your Mission

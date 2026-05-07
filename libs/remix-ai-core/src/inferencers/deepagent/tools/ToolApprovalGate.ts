@@ -1,8 +1,3 @@
-/**
- * Tool Approval Gate
- * Human-in-the-loop approval system for risky tool executions
- */
-
 import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
 import {
@@ -15,10 +10,6 @@ import {
   DIRECT_WRITE_TOOLS
 } from '../../../types/humanInTheLoop'
 
-/**
- * ToolApprovalGate wraps tool executions with human approval workflow
- * for potentially dangerous operations like file writes and deployments
- */
 export class ToolApprovalGate {
   private eventEmitter: EventEmitter
   private policy: ToolApprovalPolicy

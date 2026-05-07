@@ -1,8 +1,3 @@
-/**
- * Code Explanation Prompt
- * Guidelines for explaining Solidity code
- */
-
 export const CODE_EXPLANATION_PROMPT = `When explaining Solidity code:
 
 1. Start with high-level purpose

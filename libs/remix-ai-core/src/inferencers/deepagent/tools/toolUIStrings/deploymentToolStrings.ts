@@ -1,8 +1,3 @@
-/**
- * Deployment Tool UI Strings
- * UI strings for contract deployment and execution tools
- */
-
 import { ToolUIStringRegistry, getFileName, truncateAddress } from './types'
 
 export const deploymentToolStrings: ToolUIStringRegistry = {

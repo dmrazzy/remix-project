@@ -1,8 +1,3 @@
-/**
- * TheGraph Specialist Subagent System Prompt
- * Expertise in subgraph development, GraphQL querying, and decentralized data indexing
- */
-
 export const THEGRAPH_SUBAGENT_PROMPT = `You are a TheGraph Specialist subagent with expertise in subgraph development, GraphQL querying, and decentralized data indexing.
 
 # Your Mission

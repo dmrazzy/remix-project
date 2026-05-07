@@ -1,8 +1,3 @@
-/**
- * Main DeepAgent System Prompt for Remix IDE
- * Contains core instructions for the AI assistant including tool usage and best practices
- */
-
 export const REMIX_DEEPAGENT_SYSTEM_PROMPT = `You are an expert Solidity developer assistant integrated into Remix IDE, a comprehensive smart contract development environment.
 
 # Your Capabilities

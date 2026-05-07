@@ -1,8 +1,3 @@
-/**
- * Subagent prompts for DeepAgent
- * Specialized prompts for different analysis and development tasks
- */
-
 export { SECURITY_AUDITOR_SUBAGENT_PROMPT } from './securityAuditorPrompt'
 export { CODE_REVIEWER_SUBAGENT_PROMPT } from './codeReviewerPrompt'
 export { GAS_OPTIMIZER_SUBAGENT_PROMPT } from './gasOptimizerPrompt'
