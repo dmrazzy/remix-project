@@ -44,6 +44,7 @@ export interface RemixUiRemixAiAssistantProps {
   onDeleteAllConversations?: () => void
   onToggleHistorySidebar?: () => void
   onSearch?: (query: string) => Promise<ConversationMetadata[]>
+  onOpenSkillsModal?: () => void
 }
 export interface RemixUiRemixAiAssistantHandle {
   /** Programmatically send a prompt to the chat (returns after processing starts) */
@@ -1635,6 +1636,12 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
     }
   }, [toggleRecording, isRecording])
 
+  const handleLoadSkills = useCallback(() => {
+    if (props.onOpenSkillsModal) {
+      props.onOpenSkillsModal()
+    }
+  }, [props.onOpenSkillsModal])
+
   const handleGenerateWorkspace = useCallback(async () => {
     dispatchActivity('button', 'generateWorkspace')
     try {
@@ -1820,6 +1827,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                   theme={themeTracker?.name}
                   plugin={props.plugin}
                   handleGenerateWorkspace={handleGenerateWorkspace}
+                  handleLoadSkills={handleLoadSkills}
                   allowedMcps={modelAccess.allowedMcps}
                   onDappReviewAcceptAll={handleDappReviewAcceptAll}
                   onDappReviewRevertAll={handleDappReviewRevertAll}
@@ -1937,6 +1945,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
                     theme={themeTracker?.name}
                     plugin={props.plugin}
                     handleGenerateWorkspace={handleGenerateWorkspace}
+                    handleLoadSkills={handleLoadSkills}
                     allowedMcps={modelAccess.allowedMcps}
                     onDappReviewAcceptAll={handleDappReviewAcceptAll}
                     onDappReviewRevertAll={handleDappReviewRevertAll}
@@ -2027,6 +2036,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               selectedOllamaModel={selectedOllamaModel}
               ollamaModels={ollamaModels}
               messages={messages}
+              handleLoadSkills={handleLoadSkills}
             />
           ) : (
             <AiChatPromptArea
@@ -2071,6 +2081,7 @@ export const RemixUiRemixAiAssistant = React.forwardRef<
               selectedOllamaModel={selectedOllamaModel}
               ollamaModels={ollamaModels}
               messages={messages}
+              handleLoadSkills={handleLoadSkills}
             />
           )
         }

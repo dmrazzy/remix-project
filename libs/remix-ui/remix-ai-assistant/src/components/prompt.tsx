@@ -38,6 +38,7 @@ export interface PromptAreaProps {
   themeTracker: any
   stopRequest: () => void
   autoModeEnabled?: boolean
+  handleLoadSkills?: () => void
 }
 
 export const PromptArea: React.FC<PromptAreaProps> = ({
@@ -61,6 +62,7 @@ export const PromptArea: React.FC<PromptAreaProps> = ({
   selectedOllamaModel,
   modelSelectorBtnRef,
   autoModeEnabled
+  handleLoadSkills
 }) => {
   const { trackMatomoEvent: baseTrackEvent } = useContext(TrackingContext)
 

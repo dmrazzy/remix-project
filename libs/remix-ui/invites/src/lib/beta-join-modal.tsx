@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { InviteValidateResponse, InviteRedeemResponse } from '@remix-api'
-import { LoginModal } from '@remix-ui/login'
+import { LoginModal, startSignInFlow } from '@remix-ui/login'
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -535,7 +535,7 @@ const BetaJoinModal: React.FC<BetaJoinModalProps> = ({
             ) : (
               <div>
                 <button
-                  onClick={() => setShowLogin(true)}
+                  onClick={() => startSignInFlow(plugin, () => setShowLogin(true), 'Invite Sign In')}
                   style={{
                     width: "100%", padding: 14, borderRadius: 12,
                     background: c.cy, border: "none",
