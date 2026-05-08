@@ -285,7 +285,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         await this.updateAgentModel(optimalModel)
       }
 
-      const mcpContext = undefined //await this.gatherMCPResourcesContext(prompt)
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
         ? (context ? `${mcpContext}\n\n${context}` : mcpContext)
         : context

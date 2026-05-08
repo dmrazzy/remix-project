@@ -34,11 +34,13 @@ export class RemixDeepAgentMiddleware implements AgentMiddleware {
 }
 
 const removePeviousContextFromMessages = (request: ModelRequest) => {
+  console.log('[RemixDeepAgentMiddleware] Removing previous context from messages if present', request)
   // Optimize message history by removing context from all human messages except the last one
   if (request.messages && request.messages.length > 1) {
     for (let i = 0; i < request.messages.length - 1; i++) {
       const message = request.messages[i]
       if (typeof message.content === 'string') {
+        console.log(`[RemixDeepAgentMiddleware] Processing string content for message ${i}`)
         const content = message.content
         if (content.startsWith('Context:')) {
           const questionIndex = content.indexOf('Question:')
@@ -47,6 +49,26 @@ const removePeviousContextFromMessages = (request: ModelRequest) => {
             const newContent = content.substring(questionIndex + 'Question:'.length).trim()
             ;(message as any).content = newContent
             console.log(`[RemixDeepAgentMiddleware] Stripped context from message ${i}`)
+          }
+        }
+      }
+      // Handle array content (complex message types for Mistral, OpenAI, etc.)
+      else if (Array.isArray(message.content)) {
+        console.log(`[RemixDeepAgentMiddleware] Processing array content for message ${i}`)
+        for (let j = 0; j < message.content.length; j++) {
+          const contentPart = message.content[j]
+          // Only process text type content
+          if (contentPart.type === 'text' && typeof contentPart.text === 'string') {
+            const text = contentPart.text
+            if (text.startsWith('Context:')) {
+              const questionIndex = text.indexOf('Question:')
+              if (questionIndex !== -1) {
+                // Strip out everything between "Context:" and "Question:", including "Question:"
+                const newText = text.substring(questionIndex + 'Question:'.length).trim()
+                contentPart.text = newText
+                console.log(`[RemixDeepAgentMiddleware] Stripped context from message ${i}, part ${j}`)
+              }
+            }
           }
         }
       }
