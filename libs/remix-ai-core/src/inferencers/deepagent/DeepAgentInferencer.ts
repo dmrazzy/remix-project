@@ -3,18 +3,18 @@
  * Integrates LangChain DeepAgent with Remix's AI system
  */
 
+import { createDeepAgent, CreateDeepAgentParams } from 'deepagents'
 import { ICompletions, IGeneration, IParams } from '../../types/types'
 import { Plugin } from '@remixproject/engine'
 import EventEmitter from 'events'
 import { RemixFilesystemBackend } from './RemixFilesystemBackend'
 import { createRemixTools, ToolApprovalGate } from './tools'
-import { ToolSelector } from './ToolSelector'
 import {
   REMIX_DEEPAGENT_SYSTEM_PROMPT,
   SOLIDITY_CODE_GENERATION_PROMPT,
   SECURITY_ANALYSIS_PROMPT,
   CODE_EXPLANATION_PROMPT
-} from './prompts'
+} from '../deepagent/prompts/system/lightPrompts'
 import { DeepAgentMemoryBackend } from '../../storage/deepAgentMemoryBackend'
 import { IDeepAgentConfig, DeepAgentError, DeepAgentErrorType, ModelSelection } from '../../types/deepagent'
 import { ToolRegistry } from '../../remix-mcp-server/types/mcpTools'
@@ -24,7 +24,9 @@ import type { DynamicStructuredTool } from '@langchain/core/tools'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { selectOptimalModel } from './helpers/modelSelection'
 import { IndexedDBCheckpointSaver } from '../../storage/IndexedDBCheckpointSaver'
+import { filterOutSpecialistTools, filterOutFileOperationTools } from './helpers/subagentToolFilters'
 import type { DeepAgent } from 'deepagents'
+import { RemixDeepAgentMiddleware } from './deepAgentMiddleWare'
 
 import './AsyncLocalStorageInit'
 import { createModelInstance } from './ModelFactory'
@@ -40,7 +42,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private memoryBackend: DeepAgentMemoryBackend | null = null
   private tools: DynamicStructuredTool[] = []
   private approvalGate: ToolApprovalGate | undefined
-  private toolSelector: ToolSelector | null = null
   private currentAbortController: AbortController | null = null
   private fallbackInferencer: any = null
   private model: BaseChatModel | null = null
@@ -119,8 +120,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     // Initialize tools with approval gate
     this.approvalGate = new ToolApprovalGate(plugin, this.event, 'ask_risky')
     this.initializeTools(toolRegistry, mcpInferencer)
-
-    this.toolSelector = new ToolSelector()
   }
 
   async initialize(): Promise<void> {
@@ -138,18 +137,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         await this.memoryBackend.init()
       }
 
-      this.tools.push(...this.toolSelector?.getEssentialTools() || [])
-
-      if (this.toolSelector && this.tools.length > 0) {
-        await this.toolSelector.buildToolIndex(this.tools)
-      }
-
-      const metaTools = this.tools.filter(tool =>
-        tool.name === 'get_tool_schema' || tool.name === 'call_tool'
-      )
-
-      await this.createAgentWithTools(metaTools)
-      console.log('[DeepAgentInferencer] Initialized: agent tools =', metaTools.map(t => t.name), ', available via call_tool =', this.tools.map(t => t.name))
+      await this.createAgentWithTools(this.tools)
     } catch (error: any) {
       console.error('[DeepAgentInferencer] Initialization failed:', error)
       throw new DeepAgentError(
@@ -297,7 +285,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         await this.updateAgentModel(optimalModel)
       }
 
-      const mcpContext = undefined //await this.gatherMCPResourcesContext(prompt)
+      const mcpContext = await this.gatherMCPResourcesContext(prompt)
       const enrichedContext = mcpContext
         ? (context ? `${mcpContext}\n\n${context}` : mcpContext)
         : context
@@ -657,41 +645,40 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
 
   private async createAgentWithTools(selectedTools: DynamicStructuredTool[]): Promise<void> {
     try {
-      const { createDeepAgent } = await import('deepagents')
+      if (!this.model) {
+        throw new DeepAgentError(
+          'Model not initialized',
+          DeepAgentErrorType.INITIALIZATION_FAILED
+        )
+      }
 
       const checkpointer = new IndexedDBCheckpointSaver()
+      const generalTools = filterOutFileOperationTools(filterOutSpecialistTools(this.tools)) 
 
       // Create agent configuration with selected tools
-      const agentConfig: any = {
-        backend: this.filesystemBackend,
-        tools: selectedTools,
+      const agentConfig: CreateDeepAgentParams = {
+        backend: this.filesystemBackend as any,
+        tools: generalTools,
         model: this.model,
         systemPrompt: REMIX_DEEPAGENT_SYSTEM_PROMPT,
         skills: ["skills/"],
-        checkpointer
+        checkpointer,
+        middleware: [new RemixDeepAgentMiddleware()]
       }
 
       if (this.config.enableSubagents && this.model) {
         agentConfig.subagents = buildSubagentConfigs(
           this.tools,
-          this.toolSelector,
           this.model,
           this.filesystemBackend
         )
       }
 
       if (this.memoryBackend) {
-        agentConfig.store = this.memoryBackend
+        agentConfig.store = this.memoryBackend as any
       }
 
-      let enhancedSystemPrompt = REMIX_DEEPAGENT_SYSTEM_PROMPT
-      if (this.toolSelector) {
-        const toolInventoryPrompt = this.toolSelector.generateToolInventoryPrompt(selectedTools)
-        enhancedSystemPrompt += toolInventoryPrompt
-      }
-      agentConfig.systemPrompt = enhancedSystemPrompt
-
-      this.agent = await createDeepAgent(agentConfig)
+      this.agent = await createDeepAgent(agentConfig as any)
 
       console.log(`[DeepAgentInferencer] Recreated agent with ${selectedTools.length} selected tools`)
     } catch (error) {
@@ -717,11 +704,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     // Create new model instance
     this.model = createModelInstance(selectedModel)
 
-    // Recreate agent with new model
-    const metaTools = this.tools.filter(tool =>
-      tool.name === 'get_tool_schema' || tool.name === 'call_tool'
-    )
-    if (!this.agent) await this.createAgentWithTools(metaTools)
+    if (!this.agent) await this.createAgentWithTools(this.tools)
     else {
       this.agent.options.model = this.model
     }
@@ -801,7 +784,6 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
     }
     this.agent = null
     this.model = null
-    this.toolSelector = null
   }
 
   getEventEmitter(): EventEmitter {
