@@ -32,6 +32,8 @@ import './AsyncLocalStorageInit'
 import { createModelInstance } from './ModelFactory'
 import { buildSubagentConfigs } from './SubagentConfig'
 import { StreamEventHandler } from './StreamEventHandler'
+import { langSmithTracing } from './LangSmithTracing'
+import { CONVERSATION_THREAD_PREFIX } from '@remix/remix-ai-core'
 
 export class DeepAgentInferencer implements ICompletions, IGeneration {
   private plugin: Plugin
@@ -52,7 +54,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
   private streamEventHandler: StreamEventHandler
 
   private static generateThreadId(): string {
-    return `remix-session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    return CONVERSATION_THREAD_PREFIX + `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   }
 
   private resetSessionThread(): void {
@@ -138,6 +140,7 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
       }
 
       await this.createAgentWithTools(this.tools)
+      await langSmithTracing.initialize('Remix-IDE')
     } catch (error: any) {
       console.error('[DeepAgentInferencer] Initialization failed:', error)
       throw new DeepAgentError(
@@ -506,6 +509,12 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
         )
       }
 
+      // Get LangSmith tracing callbacks if enabled
+      const tracingCallbacks = langSmithTracing.getCallbacks()
+      if (tracingCallbacks.length > 0) {
+        console.log('[DeepAgent] LangSmith tracing enabled, adding callbacks')
+      }
+
       const eventStream = this.agent.streamEvents(
         {
           messages: langchainMessages
@@ -516,7 +525,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
             thread_id: this.sessionThreadId
           },
           subgraphs: true,
-          signal: this.currentAbortController?.signal
+          signal: this.currentAbortController?.signal,
+          callbacks: tracingCallbacks
         }
       )
 
@@ -582,7 +592,8 @@ export class DeepAgentInferencer implements ICompletions, IGeneration {
               version: 'v2',
               configurable: { thread_id: this.sessionThreadId },
               subgraphs: true,
-              signal: this.currentAbortController?.signal
+              signal: this.currentAbortController?.signal,
+              callbacks: langSmithTracing.getCallbacks()
             }
           )
           for await (const event of retryStream) {
