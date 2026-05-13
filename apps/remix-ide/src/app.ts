@@ -385,7 +385,6 @@ class AppComponent {
     //---- matomo
     const matomo = new Matomo()
 
-
     //---------------- Solidity UML Generator -------------------------
     const solidityumlgen = new SolidityUmlGen(appManager)
 
